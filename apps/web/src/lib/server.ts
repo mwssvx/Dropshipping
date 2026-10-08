@@ -8,15 +8,18 @@ import {
   getSessionUser,
   listShopsForUser,
   mailerFromEnv,
+  modelFromEnv,
   paymentProviderFromEnv,
   primaryDomain,
   requireMember,
   suppliersFromEnv,
   taxCalculatorFromEnv,
+  type AgentContext,
   type DomainContext,
   type DomainHost,
   type FulfillmentContext,
   type Mailer,
+  type ModelClient,
   type PaymentProvider,
   type RefundContext,
   type Suppliers,
@@ -31,6 +34,7 @@ const g = globalThis as unknown as {
   __sfMailer?: Mailer;
   __sfDomainHost?: DomainHost;
   __sfTax?: TaxCalculator;
+  __sfModel?: ModelClient;
 };
 
 export function db(): Promise<Db> {
@@ -135,4 +139,14 @@ export async function requireStaff() {
   const staff = (process.env.STAFF_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
   if (!staff.includes(user.email.toLowerCase())) notFound();
   return { user, db: await db() };
+}
+
+/** Claude when ANTHROPIC_API_KEY is set, otherwise the built-in demo brain. */
+export function aiModel(): ModelClient {
+  g.__sfModel ??= modelFromEnv(process.env);
+  return g.__sfModel;
+}
+
+export async function agents(): Promise<AgentContext> {
+  return { ...(await refunds()), model: aiModel() };
 }

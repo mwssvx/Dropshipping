@@ -36,6 +36,13 @@
       "when": 1791482635394,
       "tag": "0004_m4_tax_trust",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791484069103,
+      "tag": "0005_m5_agents",
+      "breakpoints": true
     }
   ]
 }

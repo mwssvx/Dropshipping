@@ -1,8 +1,10 @@
 "use server";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getOrder, startCheckout, FakePaymentProvider, UserError } from "@sf/core";
+import { after } from "next/server";
+import { getOrder, handleBuyerMessage, startCheckout, FakePaymentProvider, UserError } from "@sf/core";
 import { readCart, writeCart } from "@/lib/cart";
-import { db, payments, tax } from "@/lib/server";
+import { agents, db, payments, tax } from "@/lib/server";
 import { processPaymentWebhook } from "@/lib/webhooks";
 import { loadShop, storeBase } from "./data";
 
@@ -68,4 +70,28 @@ export async function fakePayAction(handle: string, orderId: string) {
   await processPaymentWebhook(body, signature);
   await writeCart(shop.id, []);
   redirect(`${await storeBase(handle)}/orders/${order.paymentIntentId}`);
+}
+
+export type QuestionState = { error?: string; sent?: boolean };
+
+/** A buyer asks about their order from its status page. Buyer support answers after the response. */
+export async function askAboutOrderAction(handle: string, ref: string, _: QuestionState, form: FormData): Promise<QuestionState> {
+  const shop = await loadShop(handle);
+  const ctx = await agents();
+  let run: () => Promise<unknown>;
+  try {
+    ({ run } = await handleBuyerMessage(ctx, { shopId: shop.id, paymentIntentId: ref, body: String(form.get("message") ?? "") }));
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  after(async () => {
+    try {
+      await run();
+    } catch (e) {
+      console.error("buyer support run failed", e);
+    }
+  });
+  revalidatePath(`/s/${shop.handle}/orders/${ref}`);
+  return { sent: true };
 }

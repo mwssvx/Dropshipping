@@ -2,7 +2,7 @@
 import { useActionState } from "react";
 import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
-import { decideAppealAction, sendNoticeAction } from "./actions";
+import { decideAppealAction, sendNoticeAction, staffReplyAction } from "./actions";
 
 export function DecideAppealForm({ appealId }: { appealId: string }) {
   const [state, action] = useActionState(decideAppealAction.bind(null, appealId), {});
@@ -58,6 +58,22 @@ export function SendNoticeForm({ shopId, reasons }: { shopId: string; reasons: {
         <span className="hint">Defaults to 7 days.</span>
       </div>
       <div><SubmitButton pendingText="Sending…">Send notice</SubmitButton></div>
+    </form>
+  );
+}
+
+export function StaffReplyForm({ conversationId, toMerchant }: { conversationId: string; toMerchant: boolean }) {
+  const [state, action] = useActionState(staffReplyAction.bind(null, conversationId), {});
+  if (state.saved) return <p className="banner banner-info" role="status">Sent.</p>;
+  return (
+    <form action={action} className="flex flex-col gap-3">
+      <FormError message={state.error} />
+      <div className="field">
+        <label className="label" htmlFor={`staff-${conversationId}`}>{toMerchant ? "Reply to the merchant (shows in their assistant chat)" : "Note for the record"}</label>
+        <textarea className="input" id={`staff-${conversationId}`} name="message" rows={3} required minLength={5} />
+      </div>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="close" defaultChecked className="size-4" /> Close it</label>
+      <div><SubmitButton pendingText="Sending…">Send</SubmitButton></div>
     </form>
   );
 }

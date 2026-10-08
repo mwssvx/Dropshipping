@@ -5,6 +5,7 @@ import { requireShop, suppliers } from "@/lib/server";
 import { updateProductAction } from "../../../actions";
 import { PageHeader } from "../../PageHeader";
 import { ProductForm } from "../ProductForm";
+import { WriteListingButton } from "./WriteListingButton";
 
 const toPrice = (m: number | null | undefined) => (m == null ? "" : (m / 100).toFixed(2));
 
@@ -32,7 +33,8 @@ export default async function EditProductPage({ params, searchParams }: { params
               : "Imported as a draft. Check the description and prices, then set it to Active."}
           </p>
         )}
-        <ProductForm action={updateProductAction.bind(null, product.id)} currency={shop.currency} submitLabel="Save changes"
+        <WriteListingButton productId={product.id} live={product.status === "active"} />
+        <ProductForm key={product.updatedAt.getTime()} action={updateProductAction.bind(null, product.id)} currency={shop.currency} submitLabel="Save changes"
           initial={{
             title: product.title,
             description: product.descriptionHtml,

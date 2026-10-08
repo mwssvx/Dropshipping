@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { listRequirements, openNotices } from "@sf/core";
+import { countNeedsYou, listPendingActions, listRequirements, openNotices } from "@sf/core";
 import { requireShop, storeAddress } from "@/lib/server";
 import { BRAND } from "@/lib/brand";
 import { switchShopAction } from "../actions";
@@ -7,7 +7,14 @@ import { NavLink } from "./NavLink";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, shop, shops, db } = await requireShop();
-  const [address, requirements, notices] = await Promise.all([storeAddress(shop), listRequirements(db, shop.id), openNotices(db, shop.id)]);
+  const [address, requirements, notices, pending, inbox] = await Promise.all([
+    storeAddress(shop),
+    listRequirements(db, shop.id),
+    openNotices(db, shop.id),
+    listPendingActions(db, shop.id),
+    countNeedsYou(db, shop.id),
+  ]);
+  const approvals = pending.filter((p) => !("message_id" in p.input)).length;
   const pause = notices.find((n) => n.kind === "paused");
   const warning = notices.find((n) => n.kind === "warning");
   const holds = requirements.filter((r) => r.holdsPayouts).length;
@@ -33,7 +40,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         )}
         <nav className="flex lg:flex-col gap-1 px-2 pb-3 overflow-x-auto" aria-label="Admin">
           <NavLink href="/admin" exact>Home</NavLink>
+          <NavLink href="/admin/assistant">Assistant{approvals ? <span className="ml-2 pill pill-warning">{approvals}</span> : null}</NavLink>
           <NavLink href="/admin/orders">Orders</NavLink>
+          <NavLink href="/admin/inbox">Inbox{inbox ? <span className="ml-2 pill pill-warning">{inbox}</span> : null}</NavLink>
           <NavLink href="/admin/money">Money{holds ? <span className="ml-2 pill pill-critical">{holds}</span> : null}</NavLink>
           <NavLink href="/admin/products">Products</NavLink>
           <NavLink href="/admin/collections">Collections</NavLink>
@@ -45,6 +54,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <span className="hidden lg:block px-3 pt-4 pb-1 text-xs font-semibold text-muted uppercase tracking-wide">Settings</span>
           <NavLink href="/admin/trust">Trust{notices.length ? <span className="ml-2 pill pill-warning">{notices.length}</span> : null}</NavLink>
           <NavLink href="/admin/plan">Plan</NavLink>
+          <NavLink href="/admin/ai">AI settings</NavLink>
           <NavLink href="/admin/taxes">Taxes</NavLink>
         </nav>
         <div className="mt-auto hidden lg:flex flex-col gap-2 px-4 py-4 border-t border-border">

@@ -7,9 +7,12 @@
   "types": "./src/index.ts",
   "scripts": {
     "test": "vitest run",
+    "evals": "vitest run test/evals.test.ts",
+    "evals:live": "EVAL_LIVE=1 vitest run test/evals.test.ts",
     "typecheck": "tsc -p ."
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.132.1",
     "@sf/db": "workspace:*",
     "drizzle-orm": "^0.44.0",
     "stripe": "^18.0.0",
