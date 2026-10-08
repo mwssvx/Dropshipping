@@ -19,7 +19,11 @@ import { ROOT_DOMAIN, STORE_SUBDOMAINS } from "./brand";
 const g = globalThis as unknown as { __sfDb?: Promise<Db>; __sfPayments?: PaymentProvider; __sfSuppliers?: Suppliers; __sfMailer?: Mailer };
 
 export function db(): Promise<Db> {
-  g.__sfDb ??= openDb({ url: process.env.DATABASE_URL || undefined, dataDir: process.env.DATA_DIR || undefined });
+  // A failed connection isn't cached, so the next request tries again.
+  g.__sfDb ??= openDb({ url: process.env.DATABASE_URL || undefined, dataDir: process.env.DATA_DIR || undefined }).catch((e) => {
+    g.__sfDb = undefined;
+    throw e;
+  });
   return g.__sfDb;
 }
 
