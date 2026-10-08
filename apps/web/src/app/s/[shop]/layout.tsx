@@ -1,4 +1,5 @@
 import { readCart } from "@/lib/cart";
+import { Track } from "@/components/Track";
 import { StoreShell } from "@/theme/StoreShell";
 import { loadShop, loadTheme, storeBase } from "./data";
 
@@ -19,6 +20,7 @@ export default async function StoreLayout({ children, params }: { children: Reac
   const count = (await readCart(shop.id)).reduce((s, l) => s + l.quantity, 0);
   return (
     <StoreShell doc={theme} shopName={shop.name} currency={shop.currency} base={base} cartCount={count} closed={shop.status !== "active"} verified={!!shop.verifiedAt && shop.status === "active"}>
+      <Track shopId={shop.id} kind="page_view" />
       {children}
     </StoreShell>
   );

@@ -41,6 +41,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         )}
         <nav className="flex lg:flex-col gap-1 px-2 pb-3 overflow-x-auto" aria-label="Admin">
           <NavLink href="/admin" exact>Home</NavLink>
+          <NavLink href="/admin/analytics">Analytics</NavLink>
           <NavLink href="/admin/assistant">Assistant{approvals ? <span className="ml-2 pill pill-warning">{approvals}</span> : null}</NavLink>
           <NavLink href="/admin/orders">Orders</NavLink>
           <NavLink href="/admin/inbox">Inbox{inbox ? <span className="ml-2 pill pill-warning">{inbox}</span> : null}</NavLink>
@@ -59,6 +60,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <NavLink href="/admin/plan">Plan</NavLink>
           <NavLink href="/admin/ai">AI settings</NavLink>
           <NavLink href="/admin/taxes">Taxes</NavLink>
+          <NavLink href="/admin/developers">Developers</NavLink>
+          <NavLink href="/admin/export">Export and import</NavLink>
         </nav>
         <div className="mt-auto hidden lg:flex flex-col gap-2 px-4 py-4 border-t border-border">
           <span className="hint truncate">{user.email}</span>

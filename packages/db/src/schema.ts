@@ -704,3 +704,84 @@ export const reviews = pgTable(
     check("reviews_rating_range", sql`${t.rating} between 1 and 5`),
   ],
 );
+
+// What buyers do on the store, for the funnel. No personal data: a random session id from a cookie.
+export const STOREFRONT_EVENTS = ["page_view", "product_view", "add_to_cart", "checkout_start"] as const;
+export type StorefrontEventKind = (typeof STOREFRONT_EVENTS)[number];
+
+export const storefrontEvents = pgTable(
+  "storefront_events",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    sessionId: text("session_id").notNull(),
+    kind: text("kind", { enum: STOREFRONT_EVENTS }).notNull(),
+    productId: uuid("product_id").references(() => products.id, { onDelete: "set null" }),
+    // Where the visitor came from: the referring site's host, or null when direct.
+    source: text("source"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("storefront_events_shop_idx").on(t.shopId, t.createdAt), index("storefront_events_product_idx").on(t.productId)],
+);
+
+// Keys for the public REST API. Only a hash is stored; the key is shown once when created.
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    // The first characters, to tell keys apart in the list.
+    prefix: text("prefix").notNull(),
+    hash: text("hash").notNull().unique(),
+    access: text("access", { enum: ["read", "write"] }).notNull(),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("api_keys_shop_idx").on(t.shopId)],
+);
+
+export const WEBHOOK_EVENTS = ["order.paid", "order.shipped", "order.delivered", "order.refunded", "product.updated"] as const;
+export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
+
+// Addresses a store wants told about events, signed with a secret only they and we know.
+export const webhookEndpoints = pgTable(
+  "webhook_endpoints",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    secret: text("secret").notNull(),
+    events: jsonb("events").$type<WebhookEvent[]>().notNull(),
+    active: boolean("active").notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [index("webhook_endpoints_shop_idx").on(t.shopId)],
+);
+
+// One row per endpoint per event, retried with growing gaps until it's delivered or we give up.
+export const webhookDeliveries = pgTable(
+  "webhook_deliveries",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    endpointId: uuid("endpoint_id").notNull().references(() => webhookEndpoints.id, { onDelete: "cascade" }),
+    event: text("event", { enum: WEBHOOK_EVENTS }).notNull(),
+    ref: text("ref").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    status: text("status", { enum: ["pending", "delivered", "failed"] }).notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+    lastStatusCode: integer("last_status_code"),
+    lastError: text("last_error"),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("webhook_deliveries_once_uq").on(t.endpointId, t.event, t.ref),
+    index("webhook_deliveries_due_idx").on(t.status, t.nextAttemptAt),
+    index("webhook_deliveries_shop_idx").on(t.shopId, t.createdAt),
+  ],
+);

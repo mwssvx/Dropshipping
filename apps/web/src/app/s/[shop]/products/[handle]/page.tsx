@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { Track } from "@/components/Track";
 import { getActiveProductByHandle, NotFoundError, productReviews, upsellsFor } from "@sf/core";
 import { db } from "@/lib/server";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -64,6 +65,7 @@ export default async function ProductPage({ params }: { params: Promise<{ shop: 
         {product.imageUrl && <img src={product.imageUrl} alt={product.title} width={800} height={800} fetchPriority="high" className="size-full object-cover" />}
       </div>
       <div className="flex flex-col gap-5">
+        <Track shopId={shop.id} kind="product_view" productId={product.id} />
         <h1 className="text-3xl font-bold tracking-tight">{product.title}</h1>
         {reviews.count > 0 && (
           <a href="#reviews" className="text-sm flex items-center gap-2">

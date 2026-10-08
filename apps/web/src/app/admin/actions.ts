@@ -15,7 +15,7 @@ import {
   UserError,
   type ProductInput,
 } from "@sf/core";
-import { db, fulfillment, requireShop, requireUser, SHOP_COOKIE, suppliers } from "@/lib/server";
+import { db, fulfillment, notifyLater, requireShop, requireUser, SHOP_COOKIE, suppliers } from "@/lib/server";
 
 export type FormState = { error?: string; saved?: boolean };
 
@@ -139,6 +139,8 @@ async function orderAction(orderId: string, run: (shopId: string) => Promise<unk
     if (e instanceof UserError) return { error: e.message };
     throw e;
   }
+  // Shipping and fixes are events for phones and webhooks.
+  notifyLater(shop.id);
   revalidatePath(`/admin/orders/${orderId}`);
   revalidatePath("/admin/orders");
   return { saved: true };

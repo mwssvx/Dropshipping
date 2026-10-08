@@ -13,6 +13,7 @@ import {
   paymentProviderFromEnv,
   pushSenderFromEnv,
   sendShopNotifications,
+  sendShopWebhooks,
   primaryDomain,
   requireMember,
   suppliersFromEnv,
@@ -28,6 +29,7 @@ import {
   type RefundContext,
   type Suppliers,
   type TaxCalculator,
+  type WebhookContext,
 } from "@sf/core";
 import { ROOT_DOMAIN, STORE_SUBDOMAINS } from "./brand";
 
@@ -165,13 +167,26 @@ export function pushSender(): PushSender {
   return local.push;
 }
 
-/** Sends any new push notifications for a store after the response is out. Safe to call often. */
+/** Webhooks may only reach public https addresses, except in development and tests. */
+export async function webhooks(): Promise<WebhookContext> {
+  return { db: await db(), allowPrivate: process.env.WEBHOOKS_ALLOW_PRIVATE === "on" };
+}
+
+/**
+ * Sends any new push notifications and webhooks for a store after the response is out. Safe to
+ * call often: each event goes out once, and the scheduled job retries what fails.
+ */
 export function notifyLater(shopId: string) {
   after(async () => {
     try {
       await sendShopNotifications({ db: await db(), push: pushSender() }, shopId);
     } catch (e) {
       console.error(`Push notifications for store ${shopId} failed; the scheduled job will retry.`, e);
+    }
+    try {
+      await sendShopWebhooks(await webhooks(), shopId);
+    } catch (e) {
+      console.error(`Webhooks for store ${shopId} failed; the scheduled job will retry.`, e);
     }
   });
 }

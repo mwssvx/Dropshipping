@@ -16,7 +16,7 @@ import {
   UserError,
   type RequirementKind,
 } from "@sf/core";
-import { adminUrl, payments, refunds, requireShop, tax, testPayments } from "@/lib/server";
+import { adminUrl, notifyLater, payments, refunds, requireShop, tax, testPayments } from "@/lib/server";
 import type { FormState } from "./actions";
 
 export type RefundState = FormState & { message?: string; warning?: string };
@@ -103,6 +103,7 @@ export async function refundAction(orderId: string, _: RefundState, form: FormDa
       }
     }
     const result = await refundOrder(await refunds(), shop.id, orderId, { amountMinor, reason: String(form.get("reason") ?? "") });
+    notifyLater(shop.id);
     revalidatePath(`/admin/orders/${orderId}`);
     revalidatePath("/admin/orders");
     const warning = result.notCancelled.length
