@@ -25,7 +25,7 @@ export function AuthForm({
         <label className="label" htmlFor="password">Password</label>
         <input className="input" id="password" name="password" type="password" minLength={8} required
           autoComplete={signup ? "new-password" : "current-password"} />
-        {signup && <span className="hint">At least 8 characters.</span>}
+        {signup ? <span className="hint">At least 8 characters.</span> : <Link className="hint hover:text-ink self-end" href="/forgot">Forgot your password?</Link>}
       </div>
       <SubmitButton className="btn btn-primary btn-lg" pendingText={signup ? "Creating account…" : "Signing in…"}>
         {signup ? "Create account" : "Sign in"}

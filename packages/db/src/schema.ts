@@ -1,4 +1,4 @@
-// Milestone 1 to 7 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 8 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -784,4 +784,29 @@ export const webhookDeliveries = pgTable(
     index("webhook_deliveries_due_idx").on(t.status, t.nextAttemptAt),
     index("webhook_deliveries_shop_idx").on(t.shopId, t.createdAt),
   ],
+);
+
+// Sign-in attempts, to slow down password guessing. Kept for a day.
+export const authAttempts = pgTable(
+  "auth_attempts",
+  {
+    id: id(),
+    email: text("email").notNull(),
+    ok: boolean("ok").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("auth_attempts_email_idx").on(t.email, t.createdAt)],
+);
+
+// One-time links to set a new password. Only a hash of the token is kept.
+export const passwordResets = pgTable(
+  "password_resets",
+  {
+    tokenHash: text("token_hash").primaryKey(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("password_resets_user_idx").on(t.userId)],
 );

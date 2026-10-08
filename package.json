@@ -8,7 +8,8 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "e2e": "pnpm --filter @sf/web e2e",
-    "db:generate": "pnpm --filter @sf/db generate"
+    "db:generate": "pnpm --filter @sf/db generate",
+    "preflight": "pnpm --filter @sf/core preflight"
   },
   "devDependencies": {
     "turbo": "^2.5.0",

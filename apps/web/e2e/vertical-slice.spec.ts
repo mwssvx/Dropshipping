@@ -8,7 +8,8 @@ test("merchant opens a store, a buyer pays, the order shows up as paid", async (
 
   // Merchant signs up and creates a store.
   await page.goto("/");
-  await page.getByRole("link", { name: "Start free" }).click();
+  await page.getByRole("link", { name: "Start free" }).first().click();
+  await expect(page.getByRole("button", { name: "Create account" })).toBeVisible();
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill("correct horse battery");
   await page.getByRole("button", { name: "Create account" }).click();

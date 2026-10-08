@@ -9,7 +9,10 @@ export default async function StaffLayout({ children }: { children: React.ReactN
   return (
     <div className="min-h-dvh">
       <header className="bg-surface border-b border-border px-4 sm:px-8 h-14 flex items-center justify-between gap-4">
-        <Link href="/staff" className="font-bold tracking-tight">{BRAND} staff</Link>
+        <nav className="flex items-center gap-4">
+          <Link href="/staff" className="font-bold tracking-tight">{BRAND} staff</Link>
+          <Link href="/staff/launch" className="text-sm hover:text-accent">Launch checklist</Link>
+        </nav>
         <span className="hint truncate">{user.email}</span>
       </header>
       {children}
