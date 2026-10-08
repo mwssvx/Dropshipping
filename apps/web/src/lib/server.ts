@@ -16,6 +16,8 @@ import {
   sendShopWebhooks,
   primaryDomain,
   requireMember,
+  can,
+  type Area,
   suppliersFromEnv,
   taxCalculatorFromEnv,
   type AgentContext,
@@ -142,8 +144,11 @@ export async function requireUser() {
   return user;
 }
 
-/** The signed-in merchant's selected store. Sends them to create one if they have none. */
-export async function requireShop() {
+/**
+ * The signed-in merchant's selected store. Sends them to create one if they have none. With an
+ * area, people whose role can't open it go back to Home with a note instead.
+ */
+export async function requireShop(area?: Area) {
   const user = await requireUser();
   const database = await db();
   const shops = await listShopsForUser(database, user.id);
@@ -151,6 +156,7 @@ export async function requireShop() {
   const wanted = (await cookies()).get(SHOP_COOKIE)?.value;
   const pick = shops.find((s) => s.id === wanted) ?? shops[0]!;
   const { shop, role } = await requireMember(database, user.id, pick.id);
+  if (area && !can(role, area)) redirect(`/admin?denied=${area}`);
   return { user, shop, role, shops, db: database };
 }
 

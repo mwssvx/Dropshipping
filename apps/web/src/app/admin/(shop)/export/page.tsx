@@ -7,7 +7,7 @@ export const metadata = { title: "Export and import" };
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 export default async function ExportPage({ searchParams }: { searchParams: Promise<{ loaded?: string; currency?: string }> }) {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("export");
   const { loaded, currency } = await searchParams;
   const [product, collection, page] = await Promise.all([
     db.query.products.findFirst({ where: (p, { eq }) => eq(p.shopId, shop.id), columns: { id: true } }),

@@ -7,7 +7,7 @@ import { requireShop } from "@/lib/server";
 export type ImportState = { error?: string };
 
 export async function importStoreAction(_: ImportState, form: FormData): Promise<ImportState> {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("export");
   const file = form.get("file");
   if (!(file instanceof File) || !file.size) return { error: "Choose the store file you downloaded." };
   if (file.size > 10 * 1024 * 1024) return { error: "That file is over 10 MB." };

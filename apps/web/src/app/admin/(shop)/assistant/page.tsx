@@ -10,7 +10,7 @@ export const metadata = { title: "Assistant" };
 const time = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" });
 
 export default async function AssistantPage() {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("assistant");
   const [messages, pending, budget, decided] = await Promise.all([
     assistantMessages(db, shop.id, 40),
     listPendingActions(db, shop.id),

@@ -1,4 +1,4 @@
-// Milestone 1 to 8 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 9 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -809,4 +809,21 @@ export const passwordResets = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("password_resets_user_idx").on(t.userId)],
+);
+
+// Milestone 9: inviting people to help run a store. The invite link is emailed; only its hash is kept.
+export const shopInvites = pgTable(
+  "shop_invites",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    role: text("role", { enum: ["admin", "staff"] }).notNull(),
+    tokenHash: text("token_hash").notNull().unique(),
+    invitedBy: uuid("invited_by").references(() => users.id, { onDelete: "set null" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("shop_invites_shop_idx").on(t.shopId, t.email)],
 );

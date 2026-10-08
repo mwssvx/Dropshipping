@@ -23,7 +23,7 @@ const WHAT = {
 };
 
 export default async function AiSettingsPage() {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("ai");
   const [budget, activity] = await Promise.all([aiBudget(db, shop), listAgentActivity(db, shop.id, 40)]);
   const usd = (m: number) => formatMoney(m, "USD");
   const model = aiModel();

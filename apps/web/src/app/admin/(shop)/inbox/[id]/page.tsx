@@ -14,7 +14,7 @@ const WHO = { buyer: "Buyer", merchant: "You", agent: "Buyer support", staff: "O
 
 export default async function ConversationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("inbox");
   const { conversation, messages, order } = await getConversation(db, shop.id, id).catch((e) => {
     if (e instanceof NotFoundError) notFound();
     throw e;

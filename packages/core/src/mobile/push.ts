@@ -7,6 +7,7 @@ import { PUSH_KINDS, schema, type Db, type PushKind } from "@sf/db";
 import { formatMoney } from "../money";
 import { REQUIREMENT_KINDS } from "../payouts";
 import { UserError } from "../errors";
+import { can, type Area, type Role } from "../team";
 
 export type PushMessage = { to: string; title: string; body: string; url: string; sound: boolean };
 export type PushResult = { ok: true } | { ok: false; error: string; deviceGone?: boolean };
@@ -81,6 +82,16 @@ export const PUSH_LABELS: Record<PushKind, string> = {
   agent_proposal: "Changes waiting for your OK",
   escalation_reply: "Replies from our support team",
 };
+/** Who gets each kind: staff, for example, don't hear about payouts or AI proposals. */
+const PUSH_AREA: Record<PushKind, Area> = {
+  new_order: "orders",
+  problem_order: "orders",
+  payout_hold: "money",
+  margin_alert: "assistant",
+  agent_proposal: "assistant",
+  escalation_reply: "assistant",
+};
+
 /** Not a kind of its own: turning this off makes new-order notifications silent. */
 export const NEW_ORDER_SOUND = "new_order_sound";
 
@@ -200,7 +211,7 @@ export async function sendShopNotifications(ctx: PushContext, shopId: string, op
   const now = opts.now ?? new Date();
   const since = new Date(now.getTime() - (opts.windowMs ?? 48 * 3_600_000));
   const people = await ctx.db
-    .select({ user: schema.users, device: schema.pushDevices })
+    .select({ user: schema.users, device: schema.pushDevices, role: schema.shopMembers.role })
     .from(schema.shopMembers)
     .innerJoin(schema.users, eq(schema.users.id, schema.shopMembers.userId))
     .innerJoin(schema.pushDevices, eq(schema.pushDevices.userId, schema.shopMembers.userId))
@@ -209,17 +220,18 @@ export async function sendShopNotifications(ctx: PushContext, shopId: string, op
   const events = await collectPushEvents(ctx.db, shopId, since);
   if (!events.length) return { sent: 0 };
 
-  const byUser = new Map<string, { user: (typeof people)[number]["user"]; devices: (typeof people)[number]["device"][] }>();
+  const byUser = new Map<string, { user: (typeof people)[number]["user"]; role: Role; devices: (typeof people)[number]["device"][] }>();
   for (const p of people) {
-    const entry = byUser.get(p.user.id) ?? { user: p.user, devices: [] };
+    const entry = byUser.get(p.user.id) ?? { user: p.user, role: p.role, devices: [] };
     entry.devices.push(p.device);
     byUser.set(p.user.id, entry);
   }
 
   const outgoing: { rowId: string; message: PushMessage; deviceId: string }[] = [];
-  for (const { user, devices } of byUser.values()) {
+  for (const { user, role, devices } of byUser.values()) {
     const off = new Set(user.pushOff);
     for (const e of events) {
+      if (!can(role, PUSH_AREA[e.kind])) continue;
       const targets = devices.filter((d) => d.createdAt <= e.at);
       if (!targets.length) continue;
       const status = off.has(e.kind) ? "off" : "pending";

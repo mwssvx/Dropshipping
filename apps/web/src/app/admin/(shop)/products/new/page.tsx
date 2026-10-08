@@ -7,7 +7,7 @@ import { ProductForm } from "../ProductForm";
 export const metadata = { title: "Add product" };
 
 export default async function NewProductPage() {
-  const { shop } = await requireShop();
+  const { shop } = await requireShop("products");
   return (
     <main className="pb-12">
       <PageHeader title="Add product" back={<Link href="/admin/products" className="hint hover:text-ink">← Products</Link>} />

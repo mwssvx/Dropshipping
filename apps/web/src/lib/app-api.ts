@@ -40,6 +40,10 @@ import {
   unregisterDevice,
   UserError,
   writeListing,
+  can,
+  AREAS,
+  type Area,
+  type Role,
   type Shop,
 } from "@sf/core";
 import type { Db } from "@sf/db";
@@ -47,7 +51,7 @@ import { agents, db, fulfillment, notifyLater, payments, refunds, storeAddress, 
 
 type User = { id: string; email: string };
 type ShopLink = { id: string; name: string; handle: string; role: string };
-type Ctx = { req: Request; url: URL; params: Record<string, string>; db: Db; user: User; shop: Shop; shops: ShopLink[] };
+type Ctx = { req: Request; url: URL; params: Record<string, string>; db: Db; user: User; shop: Shop; shops: ShopLink[]; role: Role };
 type Handler = (c: Ctx) => Promise<unknown>;
 type PublicHandler = (c: { req: Request; db: Db }) => Promise<unknown>;
 
@@ -126,10 +130,13 @@ const routes: Record<string, Handler> = {
     return { ok: true };
   },
 
-  "GET me": async ({ db, user, shop, shops }) => ({
+  "GET me": async ({ db, user, shop, shops, role }) => ({
     user,
     shop: { ...shopView(shop), address: await storeAddress(shop) },
     shops,
+    role,
+    // What this person's role can open, so the app hides the rest.
+    can: AREAS.filter((a) => can(role, a)),
     push: await getPushSettings(db, user.id),
     testMode: testPayments(),
   }),
@@ -148,9 +155,9 @@ const routes: Record<string, Handler> = {
     return { ok: true };
   },
 
-  "GET today": async ({ db, shop }) => {
+  "GET today": async ({ db, shop, role }) => {
     notifyLater(shop.id);
-    return todaySummary(db, shop);
+    return todaySummary(db, shop, new Date(), role);
   },
 
   "GET orders": async ({ url, db, shop }) => {
@@ -284,6 +291,18 @@ const routes: Record<string, Handler> = {
   },
 };
 
+/** The part of the store each route belongs to; routes not listed are open to every member. */
+function routeArea(key: string): Area | null {
+  if (key === "POST orders/:id/refund") return "refunds";
+  const path = key.split(" ")[1]!;
+  if (path.startsWith("orders")) return "orders";
+  if (path.startsWith("products") || path.startsWith("imports")) return "products";
+  if (path.startsWith("money")) return "money";
+  if (path.startsWith("assistant") || path.startsWith("actions")) return "assistant";
+  if (path === "today") return "home";
+  return null;
+}
+
 function bearer(req: Request) {
   const h = req.headers.get("authorization") ?? "";
   return h.startsWith("Bearer ") ? h.slice(7).trim() : null;
@@ -333,8 +352,10 @@ export async function handleAppRequest(req: Request, path: string[]): Promise<Re
     if (!shops.length) throw new HttpError(409, "Create your store on the web first.");
     const wanted = req.headers.get("x-shop-id");
     const pick = (wanted && shops.find((s) => s.id === wanted)) || shops[0]!;
-    const { shop } = await requireMember(database, user.id, pick.id);
-    const result = await routes[found.key]!({ req, url: new URL(req.url), params: found.params, db: database, user, shop, shops });
+    const { shop, role } = await requireMember(database, user.id, pick.id);
+    const area = routeArea(found.key);
+    if (area && !can(role, area)) throw new HttpError(403, "Your role on this store doesn't include this. The owner can change it.");
+    const result = await routes[found.key]!({ req, url: new URL(req.url), params: found.params, db: database, user, shop, shops, role });
     return Response.json(result, { headers });
   } catch (e) {
     if (e instanceof HttpError) return Response.json({ error: e.message }, { status: e.status, headers });

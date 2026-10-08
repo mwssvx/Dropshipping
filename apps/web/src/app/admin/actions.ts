@@ -77,7 +77,7 @@ function readProduct(form: FormData): ProductInput {
 }
 
 export async function createProductAction(_: FormState, form: FormData): Promise<FormState> {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("products");
   let id: string;
   try {
     id = (await createProduct(db, shop.id, readProduct(form))).id;
@@ -90,7 +90,7 @@ export async function createProductAction(_: FormState, form: FormData): Promise
 }
 
 export async function updateProductAction(productId: string, _: FormState, form: FormData): Promise<FormState> {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("products");
   try {
     await updateProduct(db, shop.id, productId, readProduct(form));
   } catch (e) {
@@ -103,7 +103,7 @@ export async function updateProductAction(productId: string, _: FormState, form:
 }
 
 export async function importProductAction(_: FormState, form: FormData): Promise<FormState> {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("products");
   let id: string;
   try {
     const prices: Record<string, number> = {};
@@ -132,7 +132,7 @@ export async function importProductAction(_: FormState, form: FormData): Promise
 }
 
 async function orderAction(orderId: string, run: (shopId: string) => Promise<unknown>): Promise<FormState> {
-  const { shop } = await requireShop();
+  const { shop } = await requireShop("orders");
   try {
     await run(shop.id);
   } catch (e) {

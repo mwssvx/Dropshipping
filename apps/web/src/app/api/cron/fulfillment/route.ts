@@ -1,4 +1,4 @@
-import { pruneAuthRecords, pruneEvents, refreshAllVerified, runWebhooks, routeStuckOrders, runFakePayouts, runHealthChecks, runScheduledAgents, sendAbandonedCartEmails, sendAllNotifications, syncTracking } from "@sf/core";
+import { pruneAuthRecords, pruneInvites, pruneEvents, refreshAllVerified, runWebhooks, routeStuckOrders, runFakePayouts, runHealthChecks, runScheduledAgents, sendAbandonedCartEmails, sendAllNotifications, syncTracking } from "@sf/core";
 import { agents, fulfillment, pushSender, testPayments, webhooks } from "@/lib/server";
 
 /**
@@ -26,5 +26,6 @@ export async function GET(request: Request) {
   const hooks = await runWebhooks(await webhooks());
   const pruned = await pruneEvents(ctx.db);
   await pruneAuthRecords(ctx.db);
+  await pruneInvites(ctx.db);
   return Response.json({ routed, tracking, payouts, health, verified, reminders, ai, push, webhooks: hooks, pruned });
 }

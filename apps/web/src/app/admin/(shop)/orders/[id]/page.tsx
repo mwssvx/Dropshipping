@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatMoney, getOrder, listRefunds, listSupplierLinks, NotFoundError, PLANS, PROBLEM_FIXES, type ProblemCode } from "@sf/core";
+import { can, formatMoney, getOrder, listRefunds, listSupplierLinks, NotFoundError, PLANS, PROBLEM_FIXES, type ProblemCode } from "@sf/core";
 import { requireShop, suppliers } from "@/lib/server";
 import { CheckTrackingButton, ManualTrackingForm, RetryButton } from "./FulfillmentActions";
 import { RefundForm } from "./RefundForm";
@@ -12,7 +12,8 @@ const when = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: 
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { shop, db } = await requireShop();
+  const { shop, db, role } = await requireShop("orders");
+  const seesMoney = can(role, "money");
   const order = await getOrder(db, shop.id, id).catch((e) => {
     if (e instanceof NotFoundError) notFound();
     throw e;
@@ -76,14 +77,14 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <dt className="hint">{order.taxBreakdown.length ? order.taxBreakdown.map((t) => t.label).join(", ") : "Tax"}{order.taxIncluded ? " (included)" : ""}</dt><dd>{money(order.taxMinor)}</dd>
               <dt className="font-semibold">Total</dt><dd className="font-semibold">{money(order.totalMinor)}</dd>
               {order.refundedMinor > 0 && <><dt className="hint">Refunded</dt><dd>−{money(order.refundedMinor)}</dd></>}
-              {order.paidAt && (
+              {order.paidAt && seesMoney && (
                 <>
                   <dt className="hint">Our fee{!order.platformFeeMinor ? " (none on your plan)" : feeKept < order.platformFeeMinor ? " (returned with the refund)" : ""}</dt><dd>−{money(feeKept)}</dd>
                   <dt className="hint">Card processing (est.)</dt><dd>−{money(order.processingFeeMinor)}</dd>
                   <dt className="font-semibold">You receive</dt><dd className="font-semibold">{money(net)}</dd>
                 </>
               )}
-              {knownCost && order.paymentStatus !== "refunded" && <><dt className="hint" title="What you receive, minus supplier cost. The shipping charge is assumed to cover the supplier's shipping.">Profit after supplier cost</dt><dd className="text-success font-semibold">{money(net - order.shippingMinor - cost)}</dd></>}
+              {knownCost && seesMoney && order.paymentStatus !== "refunded" && <><dt className="hint" title="What you receive, minus supplier cost. The shipping charge is assumed to cover the supplier's shipping.">Profit after supplier cost</dt><dd className="text-success font-semibold">{money(net - order.shippingMinor - cost)}</dd></>}
             </dl>
           </section>
           {problems.map((f) => (
@@ -97,7 +98,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                 {f.status === "failed" && <RetryButton orderId={order.id} />}
                 <ManualTrackingForm orderId={order.id} primary={f.status !== "failed"} />
               </div>
-              {f.status === "failed" && <FixWithAiButton orderId={order.id} />}
+              {f.status === "failed" && can(role, "assistant") && <FixWithAiButton orderId={order.id} />}
             </section>
           ))}
           <section className="card p-5 flex flex-col gap-4">
@@ -159,7 +160,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             </address>
           </div>
         </div>
-        {(refundable || refunds.length > 0) && (
+        {(refundable || refunds.length > 0) && can(role, "refunds") && (
           <div className="card p-5 flex flex-col gap-3 text-sm">
             <h2 className="font-semibold">Refund</h2>
             <RefundForm orderId={order.id} leftMinor={order.totalMinor - order.refundedMinor} currency={order.currency}

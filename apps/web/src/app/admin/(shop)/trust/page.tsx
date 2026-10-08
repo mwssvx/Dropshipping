@@ -15,7 +15,7 @@ const KIND: Record<string, [string, string]> = {
 };
 
 export default async function TrustPage() {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("trust");
   const [notices, check] = await Promise.all([listNotices(db, shop.id), verifiedChecklist(db, shop)]);
   await markNoticesRead(db, shop.id);
   const open = notices.filter((n) => !n.closedAt);

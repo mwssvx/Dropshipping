@@ -9,7 +9,7 @@ const DAY = 86_400_000;
 const RANGES = [7, 30, 90] as const;
 
 export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<{ days?: string }> }) {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("analytics");
   const wanted = (await searchParams).days;
   const days = RANGES.find((d) => String(d) === wanted) ?? 30;
   const now = new Date();

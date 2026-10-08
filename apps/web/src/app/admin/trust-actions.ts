@@ -5,7 +5,7 @@ import { requireShop } from "@/lib/server";
 import type { FormState } from "./actions";
 
 export async function appealAction(noticeId: string, _: FormState, form: FormData): Promise<FormState> {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("trust");
   try {
     await submitAppeal(db, shop.id, noticeId, String(form.get("message") ?? ""));
   } catch (e) {
@@ -17,7 +17,7 @@ export async function appealAction(noticeId: string, _: FormState, form: FormDat
 }
 
 export async function checkVerifiedAction() {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("trust");
   await refreshVerified(db, shop.id);
   revalidatePath("/admin/trust");
 }

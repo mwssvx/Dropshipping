@@ -22,7 +22,7 @@ import type { FormState } from "./actions";
 export type RefundState = FormState & { message?: string; warning?: string };
 
 export async function setupPayoutsAction() {
-  const { shop, user, db } = await requireShop();
+  const { shop, user, db } = await requireShop("payouts");
   const url = await startPayoutSetup(db, payments(), shop, {
     email: user.email,
     returnUrl: await adminUrl("/admin/money/return"),
@@ -40,7 +40,7 @@ export async function setupPayoutsAction() {
 }
 
 export async function uploadDocumentAction(requirementId: string, _: FormState, form: FormData): Promise<FormState> {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("money");
   const file = form.get("file");
   try {
     if (!(file instanceof File) || !file.size) throw new UserError("Choose a file to send.");
@@ -59,21 +59,21 @@ export async function uploadDocumentAction(requirementId: string, _: FormState, 
 
 export async function simulateHoldAction(form: FormData) {
   if (!testPayments()) throw new Error("Only in test mode.");
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("money");
   await simulateHold(db, shop.id, (String(form.get("kind") || "identity_document")) as RequirementKind);
   revalidatePath("/admin", "layout");
 }
 
 export async function runPayoutsAction() {
   if (!testPayments()) throw new Error("Only in test mode.");
-  const { db } = await requireShop();
+  const { db } = await requireShop("money");
   // Pretend two days passed so today's sales have cleared.
   await runFakePayouts(db, new Date(Date.now() + 2 * 86_400_000 + 60_000));
   revalidatePath("/admin/money");
 }
 
 export async function changePlanAction(_: FormState, form: FormData): Promise<FormState> {
-  const { shop, user, db } = await requireShop();
+  const { shop, user, db } = await requireShop("plan");
   let url: string | null;
   try {
     ({ url } = await changePlan(db, payments(), shop, {
@@ -91,7 +91,7 @@ export async function changePlanAction(_: FormState, form: FormData): Promise<Fo
 }
 
 export async function refundAction(orderId: string, _: RefundState, form: FormData): Promise<RefundState> {
-  const { shop } = await requireShop();
+  const { shop } = await requireShop("refunds");
   try {
     const raw = String(form.get("amount") ?? "").trim();
     let amountMinor: number | undefined;
@@ -120,7 +120,7 @@ export async function refundAction(orderId: string, _: RefundState, form: FormDa
 }
 
 export async function addTaxRegistrationAction(_: FormState, form: FormData): Promise<FormState> {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("taxes");
   try {
     await addTaxRegistration(db, tax(), shop, {
       jurisdiction: String(form.get("jurisdiction") ?? ""),
@@ -135,13 +135,13 @@ export async function addTaxRegistrationAction(_: FormState, form: FormData): Pr
 }
 
 export async function removeTaxRegistrationAction(id: string) {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("taxes");
   await removeTaxRegistration(db, shop.id, id);
   revalidatePath("/admin/taxes");
 }
 
 export async function setPricesIncludeTaxAction(form: FormData) {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("taxes");
   await setPricesIncludeTax(db, shop.id, form.get("pricesIncludeTax") === "1");
   revalidatePath("/admin/taxes");
 }

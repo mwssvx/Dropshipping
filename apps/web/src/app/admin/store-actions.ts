@@ -38,13 +38,13 @@ async function userErrors<T>(fn: () => Promise<T>): Promise<{ error: string } | 
 // Theme ---------------------------------------------------------------------------------------
 
 export async function saveThemeAction(doc: unknown) {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("theme");
   const r = await userErrors(() => saveThemeDraft(db, shop, doc));
   return "error" in r ? r : { savedAt: r.ok.updatedAt.toISOString(), hasChanges: r.ok.hasChanges };
 }
 
 export async function publishThemeAction(doc: unknown) {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("theme");
   const r = await userErrors(async () => {
     await saveThemeDraft(db, shop, doc);
     return publishTheme(db, shop);
@@ -55,7 +55,7 @@ export async function publishThemeAction(doc: unknown) {
 }
 
 export async function discardThemeAction(): Promise<{ doc: ThemeDoc }> {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("theme");
   return { doc: await discardThemeDraft(db, shop) };
 }
 
@@ -71,7 +71,7 @@ function readCollection(form: FormData) {
 }
 
 export async function createCollectionAction(_: FormState, form: FormData): Promise<FormState> {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("collections");
   const r = await userErrors(() => createCollection(db, shop.id, readCollection(form)));
   if ("error" in r) return r;
   refreshStore(shop.handle);
@@ -79,7 +79,7 @@ export async function createCollectionAction(_: FormState, form: FormData): Prom
 }
 
 export async function updateCollectionAction(id: string, _: FormState, form: FormData): Promise<FormState> {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("collections");
   const r = await userErrors(() => updateCollection(db, shop.id, id, readCollection(form)));
   if ("error" in r) return r;
   refreshStore(shop.handle);
@@ -88,7 +88,7 @@ export async function updateCollectionAction(id: string, _: FormState, form: For
 }
 
 export async function deleteCollectionAction(id: string) {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("collections");
   await deleteCollection(db, shop.id, id);
   refreshStore(shop.handle);
   redirect("/admin/collections");
@@ -107,7 +107,7 @@ function readPage(form: FormData) {
 }
 
 export async function createPageAction(_: FormState, form: FormData): Promise<FormState> {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("pages");
   const r = await userErrors(() => createPage(db, shop.id, readPage(form)));
   if ("error" in r) return r;
   refreshStore(shop.handle);
@@ -115,7 +115,7 @@ export async function createPageAction(_: FormState, form: FormData): Promise<Fo
 }
 
 export async function updatePageAction(id: string, _: FormState, form: FormData): Promise<FormState> {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("pages");
   const r = await userErrors(() => updatePage(db, shop.id, id, readPage(form)));
   if ("error" in r) return r;
   refreshStore(shop.handle);
@@ -124,7 +124,7 @@ export async function updatePageAction(id: string, _: FormState, form: FormData)
 }
 
 export async function deletePageAction(id: string) {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("pages");
   await deletePage(db, shop.id, id);
   refreshStore(shop.handle);
   redirect("/admin/pages");
@@ -133,7 +133,7 @@ export async function deletePageAction(id: string) {
 // Domains -------------------------------------------------------------------------------------
 
 export async function addDomainAction(_: FormState, form: FormData): Promise<FormState> {
-  const { shop } = await requireShop();
+  const { shop } = await requireShop("domains");
   const ctx = await domains();
   const r = await userErrors(async () => {
     const d = await addDomain(ctx, shop.id, String(form.get("hostname") ?? ""));
@@ -146,7 +146,7 @@ export async function addDomainAction(_: FormState, form: FormData): Promise<For
 }
 
 export async function checkDomainAction(id: string, _: FormState, _form: FormData): Promise<FormState> {
-  const { shop } = await requireShop();
+  const { shop } = await requireShop("domains");
   const r = await userErrors(async () => checkDomain(await domains(), shop.id, id));
   if ("error" in r) return r;
   revalidatePath("/admin/domains");
@@ -154,13 +154,13 @@ export async function checkDomainAction(id: string, _: FormState, _form: FormDat
 }
 
 export async function makePrimaryDomainAction(id: string) {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("domains");
   await setPrimaryDomain(db, shop.id, id);
   revalidatePath("/admin/domains");
 }
 
 export async function removeDomainAction(id: string) {
-  const { shop } = await requireShop();
+  const { shop } = await requireShop("domains");
   await removeDomain(await domains(), shop.id, id);
   revalidatePath("/admin/domains");
 }

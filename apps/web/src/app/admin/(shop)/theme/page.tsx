@@ -5,7 +5,7 @@ import { ThemeEditor } from "./ThemeEditor";
 export const metadata = { title: "Theme" };
 
 export default async function ThemePage() {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("theme");
   const [theme, collections, pages, products, storeLink] = await Promise.all([
     getTheme(db, shop),
     listCollections(db, shop.id),

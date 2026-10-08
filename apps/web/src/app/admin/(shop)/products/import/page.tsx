@@ -8,7 +8,7 @@ export const metadata = { title: "Import from supplier" };
 
 export default async function ImportPage({ searchParams }: { searchParams: Promise<{ url?: string }> }) {
   const { url } = await searchParams;
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("products");
   const available = suppliers().available;
   let preview: ImportPreview | null = null;
   let error: string | null = null;

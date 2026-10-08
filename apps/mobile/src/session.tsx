@@ -10,6 +10,9 @@ export type Me = {
   shops: ShopLink[];
   push: PushSettings;
   testMode: boolean;
+  role: "owner" | "admin" | "staff";
+  /** The parts of the store this person's role can open (Today, orders, money, and so on). */
+  can: string[];
 };
 
 type SessionValue = {
@@ -80,4 +83,10 @@ export function useSession() {
   const v = useContext(Ctx);
   if (!v) throw new Error("useSession outside SessionProvider");
   return v;
+}
+
+/** Whether the signed-in person's role includes an area, such as "money" or "refunds". */
+export function useCan() {
+  const { me } = useSession();
+  return (area: string) => !me?.can || me.can.includes(area);
 }

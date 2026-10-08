@@ -10,7 +10,7 @@ export const metadata = { title: "Developers" };
 const when = (d: Date | null) => (d ? d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "never");
 
 export default async function DevelopersPage() {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("developers");
   const [keys, endpoints, base] = await Promise.all([listApiKeys(db, shop.id), listWebhookEndpoints(db, shop.id), adminUrl("/api/v1")]);
   const live = keys.filter((k) => !k.revokedAt);
 

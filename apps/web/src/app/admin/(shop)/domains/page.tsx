@@ -7,7 +7,7 @@ import { AddDomainForm, CheckDomainButton } from "./DomainActions";
 export const metadata = { title: "Domains" };
 
 export default async function DomainsPage() {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("domains");
   const [list, ctx] = await Promise.all([listDomains(db, shop.id), domainContext()]);
   const platform = storeUrl(shop.handle).replace(/^https?:\/\//, "");
   return (

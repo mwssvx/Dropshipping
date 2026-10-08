@@ -5,6 +5,7 @@ import { api, useApi } from "../../src/api";
 import { FULFILMENT, money, PAYMENT, parseMoney, when } from "../../src/format";
 import { BackLink, Banner, Body, Button, Card, Field, Heading, List, LoadError, Loading, Pill, Row, Screen, Section } from "../../src/ui";
 import { space } from "../../src/theme";
+import { useCan } from "../../src/session";
 
 type Detail = {
   id: string;
@@ -31,6 +32,7 @@ type Detail = {
 export default function OrderScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const order = useApi<Detail>(`orders/${id}`);
+  const can = useCan();
   const [panel, setPanel] = useState<null | "refund" | "tracking">(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{ tone: "success" | "critical"; text: string } | null>(null);
@@ -130,7 +132,7 @@ export default function OrderScreen() {
         </Section>
       ) : null}
 
-      <Section title="Refunds">
+      {can("refunds") && <Section title="Refunds">
         {o.refunds.map((r, i) => (
           <Body key={i} muted>
             Refunded {money(r.amountMinor, o.currency)} on {when(r.createdAt)}
@@ -164,7 +166,7 @@ export default function OrderScreen() {
         ) : o.refunds.length === 0 ? (
           <Body muted>Nothing to refund on this order.</Body>
         ) : null}
-      </Section>
+      </Section>}
     </Screen>
   );
 }

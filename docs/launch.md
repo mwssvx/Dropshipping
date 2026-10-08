@@ -33,7 +33,7 @@ Run `pnpm preflight` with the production settings (for example `node --env-file=
 
 ## Product promises to check before launch
 
-- The plan blurbs in `packages/core/src/plans.ts` mention "priority support" (Growth) and "staff accounts and advanced analytics" (Scale). Staff accounts are on the after-launch list. Build them, or reword the blurbs, before taking money for Scale.
+- The plan blurbs in `packages/core/src/plans.ts` mention "priority support" (Growth) and "advanced analytics" (Scale). Staff accounts (Scale, up to 15) are built. Decide what priority support means in practice, and what "advanced" analytics adds over the Analytics page every plan has, or reword the blurbs before taking money.
 - The landing page says stores can be based in the US, UK, EU and Canada. Keep it in line with the Stripe countries you turn on.
 
 ## Already in place for launch

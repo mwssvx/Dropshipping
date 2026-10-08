@@ -7,7 +7,7 @@ import { PageForm } from "../PageForm";
 export const metadata = { title: "Add page" };
 
 export default async function NewPagePage({ searchParams }: { searchParams: Promise<{ title?: string }> }) {
-  await requireShop();
+  await requireShop("pages");
   const title = ((await searchParams).title ?? "").slice(0, 120);
   return (
     <main className="pb-12">
