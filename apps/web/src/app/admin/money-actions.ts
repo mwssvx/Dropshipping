@@ -5,6 +5,7 @@ import {
   addTaxRegistration,
   changePlan,
   parseMoney,
+  refreshPayoutAccount,
   refundOrder,
   removeTaxRegistration,
   runFakePayouts,
@@ -27,6 +28,14 @@ export async function setupPayoutsAction() {
     returnUrl: await adminUrl("/admin/money/return"),
     refreshUrl: await adminUrl("/admin/money/setup"),
   });
+  // Test mode connects at once and hands back our own return address. Going there from a server
+  // action would leave the browser on the return route, where the page's forms can't post, so
+  // finish here instead.
+  if (url === (await adminUrl("/admin/money/return"))) {
+    const fresh = await db.query.shops.findFirst({ where: (t, { eq }) => eq(t.id, shop.id) });
+    await refreshPayoutAccount(db, payments(), fresh!);
+    redirect("/admin/money?setup=done");
+  }
   redirect(url);
 }
 

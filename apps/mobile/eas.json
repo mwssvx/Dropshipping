@@ -1,0 +1,14 @@
+{
+  "cli": { "version": ">= 16.0.0", "appVersionSource": "remote" },
+  "build": {
+    "development": { "developmentClient": true, "distribution": "internal", "env": { "EXPO_PUBLIC_API_URL": "http://localhost:3000" } },
+    "preview": { "distribution": "internal", "channel": "preview", "env": { "EXPO_PUBLIC_API_URL": "https://storefront-test-muaz9.vercel.app" } },
+    "production": { "autoIncrement": true, "channel": "production", "env": { "EXPO_PUBLIC_API_URL": "https://REPLACE-WITH-PLATFORM-DOMAIN" } }
+  },
+  "submit": {
+    "production": {
+      "ios": { "ascAppId": "REPLACE-AFTER-CREATING-THE-APP-IN-APP-STORE-CONNECT" },
+      "android": { "track": "internal", "serviceAccountKeyPath": "./google-play-service-account.json" }
+    }
+  }
+}

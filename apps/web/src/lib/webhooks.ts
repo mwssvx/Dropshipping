@@ -1,7 +1,7 @@
 import "server-only";
 import { after } from "next/server";
-import { handlePaymentEvent, onOrderPaid } from "@sf/core";
-import { db, fulfillment, payments, tax } from "./server";
+import { handlePaymentEvent, onOrderPaid, sendShopNotifications } from "@sf/core";
+import { db, fulfillment, payments, pushSender, tax } from "./server";
 
 /**
  * Verify, then apply, a payment webhook. Used by the webhook route and the test-mode pay button.
@@ -26,6 +26,12 @@ export async function processPaymentWebhook(rawBody: string, signature: string |
         if (order?.taxCalculationId) await tax().record(order.taxCalculationId, order.id);
       } catch (e) {
         console.error(`Recording tax for order ${orderId} failed.`, e);
+      }
+      try {
+        const order = await (await db()).query.orders.findFirst({ where: (o, { eq }) => eq(o.id, orderId) });
+        if (order) await sendShopNotifications({ db: await db(), push: pushSender() }, order.shopId);
+      } catch (e) {
+        console.error(`Push notifications for order ${orderId} failed; the scheduled job will retry.`, e);
       }
     });
   }

@@ -1,0 +1,16 @@
+# The M6 acceptance flow: import from a link, let AI write the listing, put it on sale, in under 60 seconds.
+appId: com.placeholder.storefront
+---
+- runFlow: sign-in.yaml
+- tapOn: "Products"
+- tapOn: "Import from a supplier link"
+- tapOn: "Supplier link"
+- inputText: ${PRODUCT_URL || "https://demo-supplier.test/p/sunset-projection-lamp"}
+- tapOn: "Look it up"
+- assertVisible: "Your price"
+- tapOn: "Import as draft"
+- assertVisible: "Imported as a draft.*"
+- tapOn: "Write with AI"
+- assertVisible: "Written with AI"
+- tapOn: "Put on sale"
+- assertVisible: "It's on sale now."
