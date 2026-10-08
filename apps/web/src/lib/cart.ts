@@ -24,3 +24,17 @@ export async function writeCart(shopId: string, lines: CartLine[]) {
   if (!clean.length) jar.delete(name(shopId));
   else jar.set(name(shopId), JSON.stringify(clean), { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 14 });
 }
+
+const codeName = (shopId: string) => `sf_code_${shopId}`;
+
+/** The discount code the buyer applied in the cart. Checked again at checkout. */
+export async function readDiscountCode(shopId: string): Promise<string | null> {
+  const raw = (await cookies()).get(codeName(shopId))?.value;
+  return raw && /^[A-Z0-9_-]{1,30}$/.test(raw) ? raw : null;
+}
+
+export async function writeDiscountCode(shopId: string, code: string | null) {
+  const jar = await cookies();
+  if (!code) jar.delete(codeName(shopId));
+  else jar.set(codeName(shopId), code, { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 14 });
+}

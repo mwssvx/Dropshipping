@@ -2,8 +2,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { getOrder, handleBuyerMessage, startCheckout, FakePaymentProvider, UserError } from "@sf/core";
-import { readCart, writeCart } from "@/lib/cart";
+import { findUsableDiscount, getOrder, handleBuyerMessage, quoteCart, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
+import { readCart, readDiscountCode, writeCart, writeDiscountCode } from "@/lib/cart";
 import { agents, db, payments, tax } from "@/lib/server";
 import { processPaymentWebhook } from "@/lib/webhooks";
 import { loadShop, storeBase } from "./data";
@@ -29,6 +29,31 @@ export async function updateCartAction(handle: string, form: FormData) {
   redirect(`${await storeBase(handle)}/cart`);
 }
 
+export type CodeState = { error?: string };
+
+/** Apply a discount code in the cart. It's checked against the cart now and again at checkout. */
+export async function applyCodeAction(handle: string, _: CodeState, form: FormData): Promise<CodeState> {
+  const shop = await loadShop(handle);
+  const code = String(form.get("code") ?? "").trim().toUpperCase();
+  if (!code) return { error: "Enter a code." };
+  try {
+    const cart = await quoteCart(await db(), shop, await readCart(shop.id));
+    await findUsableDiscount(await db(), shop, code, { subtotalMinor: cart.subtotalMinor });
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  await writeDiscountCode(shop.id, code);
+  revalidatePath(`/s/${shop.handle}/cart`);
+  return {};
+}
+
+export async function removeCodeAction(handle: string) {
+  const shop = await loadShop(handle);
+  await writeDiscountCode(shop.id, null);
+  redirect(`${await storeBase(handle)}/cart`);
+}
+
 export type CheckoutState = { error?: string; values?: Record<string, string> };
 
 export async function checkoutAction(handle: string, _: CheckoutState, form: FormData): Promise<CheckoutState> {
@@ -48,6 +73,7 @@ export async function checkoutAction(handle: string, _: CheckoutState, form: For
         country: values.country ?? "",
       },
       lines: await readCart(shop.id),
+      discountCode: await readDiscountCode(shop.id),
     }, tax());
     orderId = order.id;
   } catch (e) {
@@ -69,6 +95,7 @@ export async function fakePayAction(handle: string, orderId: string) {
   const { body, signature } = provider.succeededEvent(order.paymentIntentId!, order.totalMinor);
   await processPaymentWebhook(body, signature);
   await writeCart(shop.id, []);
+  await writeDiscountCode(shop.id, null);
   redirect(`${await storeBase(handle)}/orders/${order.paymentIntentId}`);
 }
 
@@ -92,6 +119,26 @@ export async function askAboutOrderAction(handle: string, ref: string, _: Questi
       console.error("buyer support run failed", e);
     }
   });
+  revalidatePath(`/s/${shop.handle}/orders/${ref}`);
+  return { sent: true };
+}
+
+export type ReviewState = { error?: string; sent?: boolean };
+
+/** A buyer reviews a product from their order status page (the link is their proof of purchase). */
+export async function reviewAction(handle: string, ref: string, productId: string, _: ReviewState, form: FormData): Promise<ReviewState> {
+  const shop = await loadShop(handle);
+  try {
+    await submitReview(await db(), shop, ref, {
+      productId,
+      rating: Number(form.get("rating") ?? 0),
+      name: String(form.get("name") ?? ""),
+      body: String(form.get("body") ?? ""),
+    });
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
   revalidatePath(`/s/${shop.handle}/orders/${ref}`);
   return { sent: true };
 }

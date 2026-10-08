@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
-import { buyerThread, formatMoney, getOrderByPaymentIntent, NotFoundError } from "@sf/core";
+import { buyerThread, formatMoney, getOrderByPaymentIntent, NotFoundError, reviewableItems } from "@sf/core";
+import Link from "next/link";
 import { db } from "@/lib/server";
-import { loadShop } from "../../data";
+import { loadShop, storeBase } from "../../data";
+import { ReviewForm } from "./ReviewForm";
 import { QuestionForm } from "./QuestionForm";
 
 const time = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -17,6 +19,8 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
   });
   const paid = ["paid", "partially_refunded", "refunded"].includes(order.paymentStatus);
   const thread = paid ? await buyerThread(await db(), shop.id, ref) : [];
+  const reviewable = paid ? await reviewableItems(await db(), shop.id, ref) : [];
+  const base = await storeBase(handle);
   const shipped = order.fulfillments.filter((f) => f.trackingNumber);
   const steps = [
     { label: "Order confirmed", done: paid },
@@ -30,6 +34,9 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
         <p className="hint num">Order #{order.number}</p>
         <h1 className="text-3xl font-bold tracking-tight">{paid ? `Thank you, ${order.shippingAddress.name.split(" ")[0]}!` : "We're waiting for your payment"}</h1>
         <p className="text-muted">{paid ? `We've emailed a receipt to ${order.email}. This page updates as your order moves.` : "If you've paid, this page updates in a moment."}</p>
+        {order.paymentStatus === "pending" && (
+          <Link href={`${base}/pay/${order.id}`} className="btn btn-primary self-start">Finish paying</Link>
+        )}
       </div>
       {order.refundedMinor > 0 && (
         <p className="banner banner-info">
@@ -65,11 +72,30 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
         {order.lines.map((l) => (
           <div key={l.id} className="flex justify-between gap-3"><span>{l.title} × {l.quantity}</span><span className="num">{formatMoney(l.unitPriceMinor * l.quantity, order.currency)}</span></div>
         ))}
+        {order.discountMinor > 0 && (
+          <div className="flex justify-between gap-3 hint"><span>Discount ({order.discountCode})</span><span className="num">−{formatMoney(order.discountMinor, order.currency)}</span></div>
+        )}
+        <div className="flex justify-between gap-3 hint"><span>Shipping</span><span className="num">{order.shippingMinor ? formatMoney(order.shippingMinor, order.currency) : "Free"}</span></div>
         {order.taxMinor > 0 && (
           <div className="flex justify-between gap-3 hint"><span>{order.taxBreakdown.map((t) => t.label).join(", ") || "Tax"}{order.taxIncluded ? " (included)" : ""}</span><span className="num">{formatMoney(order.taxMinor, order.currency)}</span></div>
         )}
         <div className="flex justify-between gap-3 border-t border-border pt-3 font-semibold"><span>Total</span><span className="num">{formatMoney(order.totalMinor, order.currency)}</span></div>
       </section>
+      {reviewable.length > 0 && (
+        <section id="review" className="card p-5 flex flex-col gap-4" aria-labelledby="review-heading">
+          <h2 id="review-heading" className="font-semibold">How was it?</h2>
+          {reviewable.map((item) =>
+            item.review ? (
+              <p key={item.productId} className="text-sm">
+                <span className="font-medium">{item.title}:</span> you gave it {item.review.rating} of 5 stars.{" "}
+                {item.review.status === "pending" ? "It shows on the store once the shop has had a look." : "Thank you!"}
+              </p>
+            ) : (
+              <ReviewForm key={item.productId} handle={handle} orderRef={ref} productId={item.productId} title={item.title} name={order.shippingAddress.name.split(" ")[0] ?? ""} />
+            ),
+          )}
+        </section>
+      )}
       {paid && (
         <section className="card p-5 flex flex-col gap-4" aria-labelledby="questions">
           <h2 id="questions" className="font-semibold">Questions</h2>

@@ -72,7 +72,7 @@ test("a buyer's question gets a drafted reply the merchant checks, then automati
 
   await buyer.goto(statusUrl);
   await buyer.getByLabel("Ask a question about this order").fill("Hi, where is my order?");
-  await buyer.getByRole("button", { name: "Send" }).click();
+  await buyer.getByRole("button", { name: "Send", exact: true }).click();
   await expect(buyer.getByText("Thanks, we got your message.")).toBeVisible();
   await shot(buyer, "45-buyer-question");
 
@@ -102,7 +102,7 @@ test("a buyer's question gets a drafted reply the merchant checks, then automati
   await shot(page, "49-ai-settings");
 
   await buyer.getByLabel("Ask a question about this order").fill("Can you send me the tracking link again?");
-  await buyer.getByRole("button", { name: "Send" }).click();
+  await buyer.getByRole("button", { name: "Send", exact: true }).click();
   await reloadUntil(buyer, () => expect(buyer.getByText(/you can follow it here/).nth(1)).toBeVisible({ timeout: 1000 }));
 });
 
@@ -185,7 +185,7 @@ test("a ticket from the assistant reaches staff, and the answer comes back in th
   await expect(ticket.getByText("Merchant ticket")).toBeVisible();
   await shot(staff, "54-staff-escalations");
   await ticket.getByLabel(/Reply to the merchant/).fill("We released the hold. It pays out tomorrow.");
-  await ticket.getByRole("button", { name: "Send" }).click();
+  await ticket.getByRole("button", { name: "Send", exact: true }).click();
   // "Close it" is ticked by default, so the ticket leaves the list.
   await expect(ticket).toHaveCount(0);
 

@@ -15,6 +15,8 @@ type Detail = {
   totalMinor: number;
   subtotalMinor: number;
   shippingMinor: number;
+  discountMinor: number;
+  discountCode: string | null;
   taxMinor: number;
   paymentStatus: string;
   fulfillmentStatus: string;
@@ -94,7 +96,8 @@ export default function OrderScreen() {
           {o.lines.map((l, i) => (
             <Row key={i} title={l.title} subtitle={`${l.quantity} × ${money(l.unitPriceMinor, o.currency)}`} />
           ))}
-          <Row title="Shipping" right={<Body>{money(o.shippingMinor, o.currency)}</Body>} />
+          {o.discountMinor ? <Row title={`Discount (${o.discountCode})`} right={<Body>−{money(o.discountMinor, o.currency)}</Body>} /> : null}
+          <Row title="Shipping" right={<Body>{o.shippingMinor ? money(o.shippingMinor, o.currency) : "Free"}</Body>} />
           {o.taxMinor ? <Row title="Tax" right={<Body>{money(o.taxMinor, o.currency)}</Body>} /> : null}
           <Row title="Total" right={<Heading>{money(o.totalMinor, o.currency)}</Heading>} />
         </List>

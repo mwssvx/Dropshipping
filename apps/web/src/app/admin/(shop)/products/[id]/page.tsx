@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getProduct, getSupplierLink, NotFoundError } from "@sf/core";
+import { getProduct, getSupplierLink, listProducts, NotFoundError } from "@sf/core";
 import { requireShop, suppliers } from "@/lib/server";
 import { updateProductAction } from "../../../actions";
+import { setUpsellAction } from "../../../growth-actions";
 import { PageHeader } from "../../PageHeader";
 import { ProductForm } from "../ProductForm";
 import { WriteListingButton } from "./WriteListingButton";
@@ -20,6 +21,7 @@ export default async function EditProductPage({ params, searchParams }: { params
   const provider = found.supplierId ? (await getSupplierLink(db, shop.id, found.supplierId))?.provider : undefined;
   const label = provider ? (suppliers().available.find((s) => s.name === provider)?.label ?? provider.toUpperCase()) : undefined;
   const product = { ...found, supplier: label ? { label } : null };
+  const others = (await listProducts(db, shop.id)).filter((p) => p.id !== product.id && p.status !== "archived");
   return (
     <main className="pb-12">
       <PageHeader title={product.title} back={<Link href="/admin/products" className="hint hover:text-ink">← Products</Link>}
@@ -49,6 +51,22 @@ export default async function EditProductPage({ params, searchParams }: { params
             })),
             supplier: product.supplier ? { label: product.supplier.label, sourceUrl: product.sourceUrl } : undefined,
           }} />
+        <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="upsell-heading">
+          <div>
+            <h2 id="upsell-heading" className="font-semibold">Goes well with</h2>
+            <p className="hint">Suggested on this product's page and in the cart. Only shown while it's active and in stock.</p>
+          </div>
+          <form action={setUpsellAction.bind(null, product.id)} className="flex flex-wrap gap-2 items-end">
+            <div className="field flex-1 min-w-56">
+              <label className="label" htmlFor="upsellProductId">Suggest</label>
+              <select className="input" id="upsellProductId" name="upsellProductId" defaultValue={product.upsellProductId ?? ""} key={product.upsellProductId ?? "none"}>
+                <option value="">Nothing</option>
+                {others.map((p) => <option key={p.id} value={p.id}>{p.title}{p.status === "draft" ? " (draft)" : ""}</option>)}
+              </select>
+            </div>
+            <button className="btn btn-secondary">Save suggestion</button>
+          </form>
+        </section>
       </div>
     </main>
   );
