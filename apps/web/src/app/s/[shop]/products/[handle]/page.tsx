@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
-import { getActiveProductByHandle, NotFoundError } from "@sf/core";
+import Link from "next/link";
+import { getActiveProductByHandle, NotFoundError, productReviews, upsellsFor } from "@sf/core";
 import { db } from "@/lib/server";
 import { SubmitButton } from "@/components/SubmitButton";
 import { addToCartAction } from "../../actions";
-import { loadShop } from "../../data";
+import { loadShop, storeBase } from "../../data";
 import { Price } from "@/components/Price";
 
 async function load(shopHandle: string, handle: string) {
@@ -30,7 +31,7 @@ function summary(text: string) {
 }
 
 /** Product data for search engines (schema.org), so results can show price and stock. */
-function productJsonLd(product: Awaited<ReturnType<typeof load>>["product"], currency: string) {
+function productJsonLd(product: Awaited<ReturnType<typeof load>>["product"], currency: string, rating: { count: number; average: number | null }) {
   return {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -44,6 +45,7 @@ function productJsonLd(product: Awaited<ReturnType<typeof load>>["product"], cur
       priceCurrency: currency,
       availability: `https://schema.org/${x.stock === null || x.stock > 0 ? "InStock" : "OutOfStock"}`,
     })),
+    ...(rating.count && rating.average !== null ? { aggregateRating: { "@type": "AggregateRating", ratingValue: rating.average, reviewCount: rating.count } } : {}),
   };
 }
 
@@ -53,7 +55,8 @@ export default async function ProductPage({ params }: { params: Promise<{ shop: 
   const buyable = product.variants.filter((x) => x.stock === null || x.stock > 0);
   const v = buyable[0] ?? product.variants[0];
   const many = product.variants.length > 1;
-  const jsonLd = JSON.stringify(productJsonLd(product, shop.currency)).replace(/</g, "\\u003c");
+  const [reviews, upsells, base] = await Promise.all([productReviews(await db(), product.id), upsellsFor(await db(), shop.id, [product.id]), storeBase(shopHandle)]);
+  const jsonLd = JSON.stringify(productJsonLd(product, shop.currency, reviews)).replace(/</g, "\\u003c");
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-10 md:grid-cols-2">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
@@ -62,6 +65,12 @@ export default async function ProductPage({ params }: { params: Promise<{ shop: 
       </div>
       <div className="flex flex-col gap-5">
         <h1 className="text-3xl font-bold tracking-tight">{product.title}</h1>
+        {reviews.count > 0 && (
+          <a href="#reviews" className="text-sm flex items-center gap-2">
+            <Stars value={reviews.average ?? 0} />
+            <span className="hint">{reviews.average} · {reviews.count} {reviews.count === 1 ? "review" : "reviews"}</span>
+          </a>
+        )}
         {v && <div className="text-xl"><Price minor={v.priceMinor} compareAt={v.compareAtMinor} currency={shop.currency} /></div>}
         {v && buyable.length > 0 && (
           <form action={addToCartAction.bind(null, shopHandle)} className="flex flex-col gap-4">
@@ -97,7 +106,45 @@ export default async function ProductPage({ params }: { params: Promise<{ shop: 
           <li>Secure checkout. Card details never touch this store.</li>
           <li>Questions about your order? Reply to your confirmation email.</li>
         </ul>
+        {upsells.length > 0 && (
+          <section className="flex flex-col gap-3 border-t border-border pt-4" aria-labelledby="goes-well">
+            <h2 id="goes-well" className="font-semibold">Goes well with</h2>
+            {upsells.map((u) => (
+              <Link key={u.id} href={`${base}/products/${u.handle}`} className="flex items-center gap-3 hover:underline">
+                <span className="size-12 rounded-md bg-sunken overflow-hidden shrink-0">{u.imageUrl && <img src={u.imageUrl} alt="" className="size-full object-cover" />}</span>
+                <span className="flex-1">{u.title}</span>
+                <span className="num"><Price minor={u.priceMinor} currency={shop.currency} /></span>
+              </Link>
+            ))}
+          </section>
+        )}
       </div>
+      <section id="reviews" className="md:col-span-2 flex flex-col gap-4 border-t border-border pt-8" aria-labelledby="reviews-heading">
+        <h2 id="reviews-heading" className="text-xl font-semibold">Reviews</h2>
+        {reviews.count === 0 ? (
+          <p className="hint">No reviews yet. Buyers can leave one from their order page once it has shipped.</p>
+        ) : (
+          <ul className="grid gap-4 sm:grid-cols-2">
+            {reviews.reviews.map((r) => (
+              <li key={r.id} className="card p-4 flex flex-col gap-2">
+                <div className="flex items-center gap-2"><Stars value={r.rating} /><span className="font-medium text-sm">{r.name}</span></div>
+                <p className="text-sm whitespace-pre-line">{r.body}</p>
+                {r.reply && <p className="text-sm hint border-l-2 border-border pl-3"><span className="font-medium">{shop.name}: </span>{r.reply}</p>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </main>
+  );
+}
+
+function Stars({ value }: { value: number }) {
+  const full = Math.round(value);
+  return (
+    <span className="text-warning tracking-tight" role="img" aria-label={`${value} out of 5 stars`}>
+      {"★".repeat(full)}
+      <span className="text-border">{"★".repeat(5 - full)}</span>
+    </span>
   );
 }

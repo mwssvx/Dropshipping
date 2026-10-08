@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { formatMoney, quoteCart, UserError } from "@sf/core";
-import { readCart } from "@/lib/cart";
+import { formatMoney, quoteCart, upsellsFor, UserError } from "@sf/core";
+import { readCart, readDiscountCode } from "@/lib/cart";
 import { db } from "@/lib/server";
-import { updateCartAction } from "../actions";
+import { addToCartAction, removeCodeAction, updateCartAction } from "../actions";
+import { CodeForm } from "./CodeForm";
 import { loadShop, storeBase } from "../data";
 
 export const metadata = { title: "Cart" };
@@ -12,16 +13,24 @@ export default async function CartPage({ params }: { params: Promise<{ shop: str
   const shop = await loadShop(handle);
   const base = await storeBase(handle);
   const lines = await readCart(shop.id);
+  const code = await readDiscountCode(shop.id);
   let quote: Awaited<ReturnType<typeof quoteCart>> | null = null;
   let problem: string | null = null;
+  let codeProblem: string | null = null;
   if (lines.length) {
     try {
-      quote = await quoteCart(await db(), shop, lines);
+      quote = await quoteCart(await db(), shop, lines, { discountCode: code });
     } catch (e) {
       if (!(e instanceof UserError)) throw e;
-      problem = e.message;
+      // A code that stopped working (cart below its minimum, expired) shouldn't hide the cart.
+      if (e.code === "discount_invalid") {
+        codeProblem = e.message;
+        quote = await quoteCart(await db(), shop, lines).catch(() => null);
+      } else problem = e.message;
     }
   }
+  const variants = quote ? await (await db()).query.variants.findMany({ where: (v, { inArray }) => inArray(v.id, quote!.items.map((i) => i.variantId)) }) : [];
+  const upsells = quote ? await upsellsFor(await db(), shop.id, [...new Set(variants.map((v) => v.productId))]) : [];
   const money = (m: number) => formatMoney(m, shop.currency);
   return (
     <main className="max-w-3xl mx-auto px-4 sm:px-6 py-10 flex flex-col gap-6">
@@ -56,11 +65,43 @@ export default async function CartPage({ params }: { params: Promise<{ shop: str
           </ul>
           <dl className="grid grid-cols-[1fr_auto] gap-y-1 num text-sm self-end w-full max-w-xs">
             <dt className="hint">Subtotal</dt><dd className="text-right">{money(quote.subtotalMinor)}</dd>
+            {quote.discount && (
+              <>
+                <dt className="hint">Discount ({quote.discount.code})</dt>
+                <dd className="text-right">{quote.discountMinor ? `−${money(quote.discountMinor)}` : quote.discount.label}</dd>
+              </>
+            )}
             <dt className="hint">Shipping</dt><dd className="text-right">{quote.shippingMinor ? money(quote.shippingMinor) : "Free"}</dd>
             <dt className="font-semibold text-base">Total</dt><dd className="font-semibold text-base text-right">{money(quote.totalMinor)}</dd>
             <dd className="col-span-2 hint text-right font-sans">{quote.pricesIncludeTax ? "Tax included where it applies." : "Tax, if any, is added at checkout."}</dd>
           </dl>
+          {quote.discount ? (
+            <form action={removeCodeAction.bind(null, handle)} className="self-end flex items-center gap-2 text-sm">
+              <span className="pill pill-success">{quote.discount.code}: {quote.discount.label}</span>
+              <button className="underline">Remove</button>
+            </form>
+          ) : (
+            <>
+              {codeProblem && <p className="banner banner-warning self-end" role="alert">{codeProblem}</p>}
+              <CodeForm handle={handle} />
+            </>
+          )}
           <Link href={`${base}/checkout`} className="btn btn-primary btn-lg self-end">Check out</Link>
+          {upsells.length > 0 && (
+            <section className="flex flex-col gap-3 border-t border-border pt-6" aria-labelledby="goes-well">
+              <h2 id="goes-well" className="font-semibold">Goes well with</h2>
+              {upsells.map((u) => (
+                <form key={u.id} action={addToCartAction.bind(null, handle)} className="flex items-center gap-4">
+                  <div className="size-14 rounded-md bg-sunken overflow-hidden shrink-0">{u.imageUrl && <img src={u.imageUrl} alt="" className="size-full object-cover" />}</div>
+                  <Link href={`${base}/products/${u.handle}`} className="flex-1 font-medium hover:underline">{u.title}</Link>
+                  <span className="num">{money(u.priceMinor)}</span>
+                  <input type="hidden" name="variantId" value={u.variantId} />
+                  <input type="hidden" name="quantity" value="1" />
+                  <button className="btn btn-secondary" aria-label={`Add ${u.title} to cart`}>Add</button>
+                </form>
+              ))}
+            </section>
+          )}
         </>
       )}
     </main>

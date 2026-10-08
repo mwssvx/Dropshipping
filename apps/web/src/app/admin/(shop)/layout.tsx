@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { countNeedsYou, listPendingActions, listRequirements, openNotices } from "@sf/core";
+import { countNeedsYou, countPendingReviews, listPendingActions, listRequirements, openNotices } from "@sf/core";
 import { requireShop, storeAddress } from "@/lib/server";
 import { BRAND } from "@/lib/brand";
 import { switchShopAction } from "../actions";
@@ -7,12 +7,13 @@ import { NavLink } from "./NavLink";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, shop, shops, db } = await requireShop();
-  const [address, requirements, notices, pending, inbox] = await Promise.all([
+  const [address, requirements, notices, pending, inbox, reviews] = await Promise.all([
     storeAddress(shop),
     listRequirements(db, shop.id),
     openNotices(db, shop.id),
     listPendingActions(db, shop.id),
     countNeedsYou(db, shop.id),
+    countPendingReviews(db, shop.id),
   ]);
   const approvals = pending.filter((p) => !("message_id" in p.input)).length;
   const pause = notices.find((n) => n.kind === "paused");
@@ -47,6 +48,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <NavLink href="/admin/products">Products</NavLink>
           <NavLink href="/admin/collections">Collections</NavLink>
           <NavLink href="/admin/suppliers">Suppliers</NavLink>
+          <NavLink href="/admin/marketing">Marketing</NavLink>
+          <NavLink href="/admin/reviews">Reviews{reviews ? <span className="ml-2 pill pill-info">{reviews}</span> : null}</NavLink>
           <span className="hidden lg:block px-3 pt-4 pb-1 text-xs font-semibold text-muted uppercase tracking-wide">Online store</span>
           <NavLink href="/admin/theme">Theme</NavLink>
           <NavLink href="/admin/pages">Pages</NavLink>

@@ -19,5 +19,8 @@ export * from "./payouts";
 export * from "./refunds";
 export * from "./tax";
 export * from "./trust";
+export * from "./discounts";
+export * from "./reviews";
+export * from "./growth";
 export * from "./ai";
 export * from "./mobile";

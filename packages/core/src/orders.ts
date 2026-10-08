@@ -3,6 +3,7 @@ import { schema, type Address, type Db } from "@sf/db";
 import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
 import type { PaymentEvent, PaymentProvider } from "./payments";
+import { applyDiscount, describeDiscount, findUsableDiscount, spreadDiscount } from "./discounts";
 import { applyMoneyEvent } from "./payouts";
 import { estimateProcessingFee, platformFeeFor } from "./plans";
 import { BuiltInTaxCalculator, listTaxRegistrations, type TaxCalculator } from "./tax";
@@ -15,8 +16,11 @@ export type CartLine = { variantId: string; quantity: number };
 export const FREE_SHIPPING_OVER_MINOR = 5000;
 export const FLAT_SHIPPING_MINOR = 499;
 
-/** Price a cart from the database. Never trusts prices sent by the browser. */
-export async function quoteCart(db: Db, shop: Shop, lines: CartLine[]) {
+/**
+ * Price a cart from the database. Never trusts prices sent by the browser. A discount code that
+ * can't be used throws a message for the buyer.
+ */
+export async function quoteCart(db: Db, shop: Shop, lines: CartLine[], opts: { discountCode?: string | null; email?: string } = {}) {
   const wanted = lines.filter((l) => l.quantity > 0);
   if (!wanted.length) throw new UserError("Your cart is empty.");
   const rows = await db
@@ -50,9 +54,26 @@ export async function quoteCart(db: Db, shop: Shop, lines: CartLine[]) {
     };
   });
   const subtotalMinor = items.reduce((s, i) => s + i.lineMinor, 0);
-  const shippingMinor = subtotalMinor >= FREE_SHIPPING_OVER_MINOR ? 0 : FLAT_SHIPPING_MINOR;
+  let shippingMinor = subtotalMinor >= FREE_SHIPPING_OVER_MINOR ? 0 : FLAT_SHIPPING_MINOR;
+  let discount: { id: string; code: string; label: string; discountMinor: number } | null = null;
+  if (opts.discountCode?.trim()) {
+    const d = await findUsableDiscount(db, shop, opts.discountCode, { subtotalMinor, email: opts.email });
+    const applied = applyDiscount(d, subtotalMinor, shippingMinor);
+    shippingMinor = applied.shippingMinor;
+    discount = { id: d.id, code: d.code, label: describeDiscount(d, shop.currency), discountMinor: applied.discountMinor };
+  }
+  const discountMinor = discount?.discountMinor ?? 0;
   // Tax depends on where it ships, so it's added at checkout once the address is known.
-  return { items, currency: shop.currency, subtotalMinor, shippingMinor, totalMinor: subtotalMinor + shippingMinor, pricesIncludeTax: shop.pricesIncludeTax };
+  return {
+    items,
+    currency: shop.currency,
+    subtotalMinor,
+    discount,
+    discountMinor,
+    shippingMinor,
+    totalMinor: subtotalMinor - discountMinor + shippingMinor,
+    pricesIncludeTax: shop.pricesIncludeTax,
+  };
 }
 
 const addressSchema = z.object({
@@ -74,17 +95,19 @@ export async function startCheckout(
   db: Db,
   payments: PaymentProvider,
   shop: Shop,
-  input: { email: string; address: Address; lines: CartLine[] },
+  input: { email: string; address: Address; lines: CartLine[]; discountCode?: string | null },
   taxCalculator: TaxCalculator = new BuiltInTaxCalculator(),
 ) {
   if (shop.status !== "active") throw new UserError("This store isn't taking orders right now.", "shop_inactive");
   const parsed = checkoutSchema.safeParse(input);
   if (!parsed.success) throw new UserError(parsed.error.issues[0]!.message);
   const { email, address } = parsed.data;
-  const cart = await quoteCart(db, shop, input.lines);
+  const cart = await quoteCart(db, shop, input.lines, { discountCode: input.discountCode, email });
+  // Tax is on what the buyer actually pays for each line, after the discount.
+  const taxed = spreadDiscount(cart.items.map((i) => i.lineMinor), cart.discountMinor);
   const tax = await taxCalculator.calculate({
     currency: cart.currency,
-    lines: cart.items.map((i) => ({ reference: i.variantId, amountMinor: i.lineMinor })),
+    lines: cart.items.map((i, n) => ({ reference: i.variantId, amountMinor: taxed[n]! })),
     shippingMinor: cart.shippingMinor,
     address,
     pricesIncludeTax: shop.pricesIncludeTax,
@@ -96,7 +119,7 @@ export async function startCheckout(
     taxMinor: tax.taxMinor,
     taxIncluded: tax.included,
     taxBreakdown: tax.breakdown,
-    totalMinor: cart.subtotalMinor + cart.shippingMinor + (tax.included ? 0 : tax.taxMinor),
+    totalMinor: cart.subtotalMinor - cart.discountMinor + cart.shippingMinor + (tax.included ? 0 : tax.taxMinor),
   };
   // Our fee is on the sale, not on tax the merchant passes on to the government.
   const platformFeeMinor = platformFeeFor(shop.plan, quote.totalMinor - quote.taxMinor);
@@ -131,6 +154,9 @@ export async function startCheckout(
         shippingAddress: address,
         currency: quote.currency,
         subtotalMinor: quote.subtotalMinor,
+        discountMinor: quote.discountMinor,
+        discountId: quote.discount?.id ?? null,
+        discountCode: quote.discount?.code ?? null,
         shippingMinor: quote.shippingMinor,
         taxMinor: quote.taxMinor,
         taxIncluded: quote.taxIncluded,

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { formatMoney, quoteCart, UserError } from "@sf/core";
-import { readCart } from "@/lib/cart";
+import { readCart, readDiscountCode } from "@/lib/cart";
 import { db } from "@/lib/server";
 import { loadShop, storeBase } from "../data";
 import { CheckoutForm } from "./CheckoutForm";
@@ -15,7 +15,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
   if (!lines.length) redirect(`${base}/cart`);
   let quote;
   try {
-    quote = await quoteCart(await db(), shop, lines);
+    quote = await quoteCart(await db(), shop, lines, { discountCode: await readDiscountCode(shop.id) });
   } catch (e) {
     if (e instanceof UserError) redirect(`${base}/cart`);
     throw e;
@@ -39,6 +39,11 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
         </ul>
         <dl className="grid grid-cols-[1fr_auto] gap-y-1 num text-sm border-t border-border pt-3">
           <dt className="hint">Subtotal</dt><dd className="text-right">{money(quote.subtotalMinor)}</dd>
+          {quote.discount && quote.discountMinor > 0 && (
+            <>
+              <dt className="hint">Discount ({quote.discount.code})</dt><dd className="text-right">−{money(quote.discountMinor)}</dd>
+            </>
+          )}
           <dt className="hint">Shipping</dt><dd className="text-right">{quote.shippingMinor ? money(quote.shippingMinor) : "Free"}</dd>
           <dt className="hint">Tax</dt><dd className="text-right hint">{quote.pricesIncludeTax ? "Included" : "Next step"}</dd>
           <dt className="font-semibold text-base">{quote.pricesIncludeTax ? "Total" : "Total before tax"}</dt><dd className="font-semibold text-base text-right">{money(quote.totalMinor)}</dd>

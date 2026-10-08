@@ -17,6 +17,8 @@ export type FulfillmentContext = {
   mailer: Mailer;
   /** Public link to the buyer's order status page. */
   orderStatusUrl: (shop: Shop, order: Order) => string | Promise<string>;
+  /** Link back to an unpaid order's payment page, for checkout reminders. Defaults to the status page. */
+  payUrl?: (shop: Shop, order: Order) => string | Promise<string>;
   now?: () => Date;
 };
 
@@ -293,6 +295,26 @@ type EmailKind = (typeof schema.emails.$inferSelect)["kind"];
 async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kind: EmailKind, ref: string) {
   const link = await ctx.orderStatusUrl(shop, order);
   const first = order.shippingAddress.name.split(" ")[0];
+  if (kind === "abandoned_cart") {
+    const lines = await ctx.db.query.orderLines.findMany({ where: eq(schema.orderLines.orderId, order.id) });
+    const pay = ctx.payUrl ? await ctx.payUrl(shop, order) : link;
+    return {
+      subject: `You left something at ${shop.name}`,
+      text: [
+        `Hi ${first},`,
+        ``,
+        `You started checking out at ${shop.name} but didn't finish. Your cart is saved:`,
+        ``,
+        ...lines.map((l) => `  ${l.title} × ${l.quantity}  ${formatMoney(l.unitPriceMinor * l.quantity, order.currency)}`),
+        ``,
+        `Total: ${formatMoney(order.totalMinor, order.currency)}`,
+        ``,
+        `Finish your order: ${pay}`,
+        ``,
+        `If you changed your mind, there's nothing to do. We won't email you about it again.`,
+      ].join("\n"),
+    };
+  }
   if (kind === "refund") {
     const refund = await ctx.db.query.refunds.findFirst({ where: eq(schema.refunds.id, ref) });
     if (!refund) throw new NotFoundError("Refund");
@@ -340,7 +362,15 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
   }
   return {
     subject: `Order #${order.number} was delivered`,
-    text: [`Hi ${first},`, ``, `Your order from ${shop.name} was delivered. We hope you love it.`, ``, `If anything's wrong, reply to this email.`, ``, `Order status: ${link}`].join("\n"),
+    text: [
+      `Hi ${first},`,
+      ``,
+      `Your order from ${shop.name} was delivered. We hope you love it.`,
+      ``,
+      `If anything's wrong, reply to this email. If you like it, a short review helps other buyers: ${link}#review`,
+      ``,
+      `Order status: ${link}`,
+    ].join("\n"),
   };
 }
 

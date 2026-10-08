@@ -50,6 +50,13 @@
       "when": 1791486352725,
       "tag": "0006_m6_mobile",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791488380419,
+      "tag": "0007_m7_growth",
+      "breakpoints": true
     }
   ]
 }

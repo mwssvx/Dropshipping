@@ -27,7 +27,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     const provider = links.find((l) => l.id === supplierId)?.provider;
     return suppliers().available.find((s) => s.name === provider)?.label ?? provider ?? "Supplier";
   };
-  const EMAIL_LABEL = { order_confirmation: "Order confirmation", shipping_update: "Shipping update", delivered: "Delivery confirmation", refund: "Refund", support_reply: "Reply to a question" };
+  const EMAIL_LABEL = { order_confirmation: "Order confirmation", shipping_update: "Shipping update", delivered: "Delivery confirmation", refund: "Refund", support_reply: "Reply to a question", abandoned_cart: "Checkout reminder" };
   const timeline = [
     { at: order.createdAt, text: "Order placed" },
     ...(order.paidAt ? [{ at: order.paidAt, text: `Payment of ${money(order.totalMinor)} received` }] : []),
@@ -70,6 +70,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             </ul>
             <dl className="border-t border-border px-5 py-4 text-sm grid grid-cols-[1fr_auto] gap-y-1 num">
               <dt className="hint">Subtotal</dt><dd>{money(order.subtotalMinor)}</dd>
+              {order.discountMinor > 0 && <><dt className="hint">Discount ({order.discountCode})</dt><dd>−{money(order.discountMinor)}</dd></>}
+              {!order.discountMinor && order.discountCode && <><dt className="hint">Code</dt><dd>{order.discountCode} (free shipping)</dd></>}
               <dt className="hint">Shipping</dt><dd>{order.shippingMinor ? money(order.shippingMinor) : "Free"}</dd>
               <dt className="hint">{order.taxBreakdown.length ? order.taxBreakdown.map((t) => t.label).join(", ") : "Tax"}{order.taxIncluded ? " (included)" : ""}</dt><dd>{money(order.taxMinor)}</dd>
               <dt className="font-semibold">Total</dt><dd className="font-semibold">{money(order.totalMinor)}</dd>

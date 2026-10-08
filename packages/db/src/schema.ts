@@ -1,7 +1,8 @@
-// Milestone 1 to 6 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 7 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   bigint,
   customType,
   date,
@@ -75,6 +76,10 @@ export const shops = pgTable(
     aiAutoReplyTopics: jsonb("ai_auto_reply_topics").$type<string[]>().notNull().default([]),
     // Let the margin agent pause a product that loses money without asking first.
     aiAutoPause: boolean("ai_auto_pause").notNull().default(false),
+    // Remind buyers who started checkout but didn't pay (one email, an hour later).
+    abandonedCartEmails: boolean("abandoned_cart_emails").notNull().default(true),
+    // Show new reviews straight away instead of waiting for the merchant.
+    reviewsAutoPublish: boolean("reviews_auto_publish").notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -123,6 +128,8 @@ export const products = pgTable(
     supplierProductRef: text("supplier_product_ref"),
     sourceUrl: text("source_url"),
     aiGenerated: boolean("ai_generated").notNull().default(false),
+    // Suggested next to this product and in the cart ("Goes well with").
+    upsellProductId: uuid("upsell_product_id").references((): AnyPgColumn => products.id, { onDelete: "set null" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -188,6 +195,10 @@ export const orders = pgTable(
     currency: char("currency", { length: 3 }).notNull(),
     subtotalMinor: money("subtotal_minor").notNull(),
     shippingMinor: money("shipping_minor").notNull(),
+    // Taken off the subtotal by a discount code. A free-shipping code sets shipping to 0 instead.
+    discountMinor: money("discount_minor").notNull().default(0),
+    discountId: uuid("discount_id"),
+    discountCode: text("discount_code"),
     taxMinor: money("tax_minor").notNull(),
     totalMinor: money("total_minor").notNull(),
     paymentStatus: text("payment_status", {
@@ -218,8 +229,10 @@ export const orders = pgTable(
     index("orders_shop_created_idx").on(t.shopId, t.createdAt),
     check(
       "orders_total_matches",
-      sql`${t.totalMinor} = ${t.subtotalMinor} + ${t.shippingMinor} + case when ${t.taxIncluded} then 0 else ${t.taxMinor} end`,
+      sql`${t.totalMinor} = ${t.subtotalMinor} - ${t.discountMinor} + ${t.shippingMinor} + case when ${t.taxIncluded} then 0 else ${t.taxMinor} end`,
     ),
+    check("orders_discount_within_subtotal", sql`${t.discountMinor} >= 0 and ${t.discountMinor} <= ${t.subtotalMinor}`),
+    index("orders_discount_idx").on(t.discountId),
     check("orders_refund_within_total", sql`${t.refundedMinor} >= 0 and ${t.refundedMinor} <= ${t.totalMinor}`),
   ],
 );
@@ -287,7 +300,7 @@ export const emails = pgTable(
     id: id(),
     shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
     orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
-    kind: text("kind", { enum: ["order_confirmation", "shipping_update", "delivered", "refund", "support_reply"] }).notNull(),
+    kind: text("kind", { enum: ["order_confirmation", "shipping_update", "delivered", "refund", "support_reply", "abandoned_cart"] }).notNull(),
     // Tells apart emails of a kind that can repeat (one per refund). Empty for once-only kinds.
     ref: text("ref").notNull().default(""),
     to: text("to").notNull(),
@@ -646,4 +659,48 @@ export const media = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("media_shop_idx").on(t.shopId)],
+);
+
+// Discount codes buyers type at checkout.
+export const discounts = pgTable(
+  "discounts",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    code: text("code").notNull(),
+    kind: text("kind", { enum: ["percent", "amount", "free_shipping"] }).notNull(),
+    // Percent (1 to 100) or an amount in minor units. Unused for free shipping.
+    value: integer("value").notNull().default(0),
+    minSubtotalMinor: money("min_subtotal_minor").notNull().default(0),
+    // How many paid orders may use it in total; null means no limit.
+    usageLimit: integer("usage_limit"),
+    oncePerCustomer: boolean("once_per_customer").notNull().default(false),
+    startsAt: timestamp("starts_at", { withTimezone: true }),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    active: boolean("active").notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("discounts_shop_code_uq").on(t.shopId, t.code), check("discounts_value_ok", sql`${t.value} >= 0`)],
+);
+
+// Product reviews from buyers who received their order. One per order and product.
+export const reviews = pgTable(
+  "reviews",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+    orderId: uuid("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    rating: integer("rating").notNull(),
+    body: text("body").notNull(),
+    status: text("status", { enum: ["pending", "published", "hidden"] }).notNull().default("pending"),
+    reply: text("reply"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("reviews_order_product_uq").on(t.orderId, t.productId),
+    index("reviews_product_idx").on(t.productId, t.status),
+    check("reviews_rating_range", sql`${t.rating} between 1 and 5`),
+  ],
 );
