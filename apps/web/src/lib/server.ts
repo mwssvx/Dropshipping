@@ -14,7 +14,7 @@ import {
   type PaymentProvider,
   type Suppliers,
 } from "@sf/core";
-import { ROOT_DOMAIN } from "./brand";
+import { ROOT_DOMAIN, STORE_SUBDOMAINS } from "./brand";
 
 const g = globalThis as unknown as { __sfDb?: Promise<Db>; __sfPayments?: PaymentProvider; __sfSuppliers?: Suppliers; __sfMailer?: Mailer };
 
@@ -40,8 +40,8 @@ export function mailer(): Mailer {
 
 /** Public address of a store, e.g. https://glow.example.com */
 export function storeUrl(handle: string) {
-  const local = ROOT_DOMAIN.startsWith("localhost");
-  return `${local ? "http" : "https"}://${handle}.${ROOT_DOMAIN}`;
+  const scheme = ROOT_DOMAIN.startsWith("localhost") ? "http" : "https";
+  return STORE_SUBDOMAINS ? `${scheme}://${handle}.${ROOT_DOMAIN}` : `${scheme}://${ROOT_DOMAIN}/s/${handle}`;
 }
 
 export async function fulfillment(): Promise<FulfillmentContext> {

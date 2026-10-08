@@ -7,6 +7,7 @@ const ROOT = (process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "localhost:3000").toLowerCa
  * /s/<handle>/..., which is also reachable directly in development. Custom domains come in M3.
  */
 export function proxy(request: NextRequest) {
+  if (process.env.NEXT_PUBLIC_STORE_SUBDOMAINS === "off") return NextResponse.next();
   const host = (request.headers.get("host") ?? "").toLowerCase();
   if (host === ROOT || !host.endsWith(`.${ROOT}`)) return NextResponse.next();
   const handle = host.slice(0, -(ROOT.length + 1));

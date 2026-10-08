@@ -40,7 +40,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. Payment webhook marks the order paid. Right after the response, the buyer gets a confirmation email and each supplier's items are placed with that supplier (`routeOrder`). One fulfilment row per supplier, claimed before the call, so retries never double-order.
 2. A refusal (out of stock, address, wallet balance) becomes a **problem order** with a plain-language fix: try again, or ship it yourself and add tracking.
-3. Every 30 minutes `/api/cron/fulfillment` places any paid order that was missed and pulls tracking. The first tracking number emails the buyer; delivery emails again. No tracking 7 days after placing flags the order as late.
+3. On a schedule (every 30 minutes on a paid Vercel plan, daily on the free one) `/api/cron/fulfillment` places any paid order that was missed and pulls tracking. The first tracking number emails the buyer; delivery emails again. No tracking 7 days after placing flags the order as late.
 - [ ] M3 Storefront themes and visual editor, custom domains
 - [ ] M4 Money and trust: Stripe Connect, Money page, Stripe Tax, refunds, verified badge
 - [ ] M5 AI agents
