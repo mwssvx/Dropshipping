@@ -7,6 +7,8 @@ import { applyDiscount, describeDiscount, findUsableDiscount, spreadDiscount } f
 import { applyMoneyEvent } from "./payouts";
 import { estimateProcessingFee, platformFeeFor } from "./plans";
 import { BuiltInTaxCalculator, listTaxRegistrations, type TaxCalculator } from "./tax";
+import { presentQuote } from "./currency";
+import { convertAmount, type DisplayFx } from "./money";
 
 type Shop = typeof schema.shops.$inferSelect;
 type Order = typeof schema.orders.$inferSelect;
@@ -95,7 +97,7 @@ export async function startCheckout(
   db: Db,
   payments: PaymentProvider,
   shop: Shop,
-  input: { email: string; address: Address; lines: CartLine[]; discountCode?: string | null },
+  input: { email: string; address: Address; lines: CartLine[]; discountCode?: string | null; fx?: DisplayFx | null },
   taxCalculator: TaxCalculator = new BuiltInTaxCalculator(),
 ) {
   if (shop.status !== "active") throw new UserError("This store isn't taking orders right now.", "shop_inactive");
@@ -123,12 +125,15 @@ export async function startCheckout(
   };
   // Our fee is on the sale, not on tax the merchant passes on to the government.
   const platformFeeMinor = platformFeeFor(shop.plan, quote.totalMinor - quote.taxMinor);
+  // A buyer shopping in another currency is charged exactly what they saw, in that currency.
+  const fx = input.fx && input.fx.currency !== shop.currency && input.fx.rate > 0 ? input.fx : null;
+  const presentment = fx ? presentQuote({ ...quote, pricesIncludeTax: tax.included }, fx) : null;
 
   const intent = await payments.createPaymentIntent({
-    amountMinor: quote.totalMinor,
-    currency: quote.currency,
+    amountMinor: presentment?.totalMinor ?? quote.totalMinor,
+    currency: presentment?.currency ?? quote.currency,
     shopAccountId: shop.paymentsAccountId,
-    applicationFeeMinor: platformFeeMinor,
+    applicationFeeMinor: fx ? convertAmount(platformFeeMinor, fx) : platformFeeMinor,
     metadata: { shopId: shop.id },
   });
 
@@ -165,6 +170,7 @@ export async function startCheckout(
         totalMinor: quote.totalMinor,
         platformFeeMinor,
         processingFeeMinor: estimateProcessingFee(quote.totalMinor),
+        presentment,
         paymentIntentId: intent.id,
       })
       .returning();
@@ -208,7 +214,8 @@ export async function handlePaymentEvent(db: Db, provider: string, event: Paymen
 
     let becamePaid = false;
     if (event.type === "payment.succeeded") {
-      if (event.amountMinor !== order.totalMinor) throw new Error(`Amount mismatch on order ${order.id}`);
+      const charged = order.presentment?.totalMinor ?? order.totalMinor;
+      if (event.amountMinor !== charged) throw new Error(`Amount mismatch on order ${order.id}`);
       if (order.paymentStatus === "pending" || order.paymentStatus === "failed") {
         becamePaid = true;
         await tx

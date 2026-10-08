@@ -6,6 +6,8 @@ import { openDb, type Db } from "@sf/db";
 import {
   dnsTargetsFromEnv,
   domainHostFromEnv,
+  fxFromEnv,
+  type FxProvider,
   getSessionUser,
   listShopsForUser,
   mailerFromEnv,
@@ -47,7 +49,14 @@ const local: {
   tax?: TaxCalculator;
   model?: ModelClient;
   push?: PushSender;
+  fx?: FxProvider;
 } = {};
+
+/** Exchange rates for stores that sell in more than one currency. */
+export function fxRates(): FxProvider {
+  local.fx ??= fxFromEnv(process.env);
+  return local.fx;
+}
 
 export function db(): Promise<Db> {
   // A failed connection isn't cached, so the next request tries again.

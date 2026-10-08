@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { formatMoney, quoteCart, upsellsFor, UserError } from "@sf/core";
+import { convertPrice, formatMoney, presentQuote, quoteCart, upsellsFor, UserError } from "@sf/core";
+import { buyerFx } from "@/lib/currency";
 import { readCart, readDiscountCode } from "@/lib/cart";
 import { db } from "@/lib/server";
 import { addToCartAction, removeCodeAction, updateCartAction } from "../actions";
@@ -32,7 +33,10 @@ export default async function CartPage({ params, searchParams }: { params: Promi
   }
   const variants = quote ? await (await db()).query.variants.findMany({ where: (v, { inArray }) => inArray(v.id, quote!.items.map((i) => i.variantId)) }) : [];
   const upsells = quote ? await upsellsFor(await db(), shop.id, [...new Set(variants.map((v) => v.productId))]) : [];
-  const money = (m: number) => formatMoney(m, shop.currency);
+  // Shown in the buyer's currency when they picked one; the total is exactly what they'll pay.
+  const fx = await buyerFx(shop);
+  const shown = quote ? presentQuote({ ...quote, taxMinor: 0 }, fx) : null;
+  const money = (m: number) => formatMoney(m, fx.currency);
   return (
     <main className="max-w-3xl mx-auto px-4 sm:px-6 py-10 flex flex-col gap-6">
       <h1 className="text-3xl font-bold tracking-tight">Your cart</h1>
@@ -57,7 +61,7 @@ export default async function CartPage({ params, searchParams }: { params: Promi
                 </div>
                 <div className="flex-1 min-w-0">
                   <Link href={`${base}/products/${i.productHandle}`} className="font-medium hover:underline">{i.title}</Link>
-                  <p className="hint num">{money(i.unitPriceMinor)} each</p>
+                  <p className="hint num">{money(shown!.units[i.variantId]!)} each</p>
                 </div>
                 <form action={updateCartAction.bind(null, handle)} className="flex items-center gap-2">
                   <input type="hidden" name="variantId" value={i.variantId} />
@@ -65,20 +69,20 @@ export default async function CartPage({ params, searchParams }: { params: Promi
                   <input id={`q-${i.variantId}`} name="quantity" type="number" min={0} max={99} defaultValue={i.quantity} className="input w-16 num" />
                   <button className="btn btn-secondary">Update</button>
                 </form>
-                <span className="num font-semibold w-20 text-right">{money(i.lineMinor)}</span>
+                <span className="num font-semibold w-20 text-right">{money(shown!.units[i.variantId]! * i.quantity)}</span>
               </li>
             ))}
           </ul>
           <dl className="grid grid-cols-[1fr_auto] gap-y-1 num text-sm self-end w-full max-w-xs">
-            <dt className="hint">Subtotal</dt><dd className="text-right">{money(quote.subtotalMinor)}</dd>
+            <dt className="hint">Subtotal</dt><dd className="text-right">{money(shown!.subtotalMinor)}</dd>
             {quote.discount && (
               <>
                 <dt className="hint">Discount ({quote.discount.code})</dt>
-                <dd className="text-right">{quote.discountMinor ? `−${money(quote.discountMinor)}` : quote.discount.label}</dd>
+                <dd className="text-right">{shown!.discountMinor ? `−${money(shown!.discountMinor)}` : quote.discount.label}</dd>
               </>
             )}
-            <dt className="hint">Shipping</dt><dd className="text-right">{quote.shippingMinor ? money(quote.shippingMinor) : "Free"}</dd>
-            <dt className="font-semibold text-base">Total</dt><dd className="font-semibold text-base text-right">{money(quote.totalMinor)}</dd>
+            <dt className="hint">Shipping</dt><dd className="text-right">{shown!.shippingMinor ? money(shown!.shippingMinor) : "Free"}</dd>
+            <dt className="font-semibold text-base">Total</dt><dd className="font-semibold text-base text-right">{money(shown!.totalMinor)}</dd>
             <dd className="col-span-2 hint text-right font-sans">{quote.pricesIncludeTax ? "Tax included where it applies." : "Tax, if any, is added at checkout."}</dd>
           </dl>
           {quote.discount ? (
@@ -100,7 +104,7 @@ export default async function CartPage({ params, searchParams }: { params: Promi
                 <form key={u.id} action={addToCartAction.bind(null, handle)} className="flex items-center gap-4">
                   <div className="size-14 rounded-md bg-sunken overflow-hidden shrink-0">{u.imageUrl && <img src={u.imageUrl} alt="" className="size-full object-cover" />}</div>
                   <Link href={`${base}/products/${u.handle}`} className="flex-1 font-medium hover:underline">{u.title}</Link>
-                  <span className="num">{money(u.priceMinor)}</span>
+                  <span className="num">{money(convertPrice(u.priceMinor, fx))}</span>
                   <input type="hidden" name="variantId" value={u.variantId} />
                   <input type="hidden" name="quantity" value="1" />
                   <button className="btn btn-secondary" aria-label={`Add ${u.title} to cart`}>Add</button>

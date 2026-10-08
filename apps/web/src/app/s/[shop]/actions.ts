@@ -3,11 +3,12 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { findUsableDiscount, getOrder, recordEvent, handleBuyerMessage, quoteCart, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
+import { findUsableDiscount, getOrder, recordEvent, handleBuyerMessage, quoteCart, shopCurrencies, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
 import { readCart, readDiscountCode, writeCart, writeDiscountCode } from "@/lib/cart";
 import { agents, db, payments, tax } from "@/lib/server";
 import { processPaymentWebhook } from "@/lib/webhooks";
 import { loadShop, storeBase } from "./data";
+import { buyerFx, currencyCookie } from "@/lib/currency";
 
 /** The visit id the store's tracker set, for the funnel. */
 async function track(shopId: string, kind: "add_to_cart" | "checkout_start", productId?: string | null) {
@@ -86,6 +87,7 @@ export async function checkoutAction(handle: string, _: CheckoutState, form: For
       },
       lines: await readCart(shop.id),
       discountCode: await readDiscountCode(shop.id),
+      fx: await buyerFx(shop),
     }, tax());
     orderId = order.id;
     await track(shop.id, "checkout_start");
@@ -105,7 +107,7 @@ export async function fakePayAction(handle: string, orderId: string) {
   if (!(provider instanceof FakePaymentProvider)) throw new Error("Test payments are off.");
   const shop = await loadShop(handle);
   const order = await getOrder(await db(), shop.id, orderId);
-  const { body, signature } = provider.succeededEvent(order.paymentIntentId!, order.totalMinor);
+  const { body, signature } = provider.succeededEvent(order.paymentIntentId!, order.presentment?.totalMinor ?? order.totalMinor);
   await processPaymentWebhook(body, signature);
   await writeCart(shop.id, []);
   await writeDiscountCode(shop.id, null);
@@ -154,4 +156,16 @@ export async function reviewAction(handle: string, ref: string, productId: strin
   }
   revalidatePath(`/s/${shop.handle}/orders/${ref}`);
   return { sent: true };
+}
+
+/** The buyer picks the currency to shop in. Stays for a year on this store. */
+export async function setCurrencyAction(handle: string, form: FormData) {
+  const shop = await loadShop(handle);
+  const currency = String(form.get("currency") ?? "");
+  const back = String(form.get("back") ?? "");
+  if (shopCurrencies(shop).includes(currency)) {
+    (await cookies()).set(currencyCookie(shop.id), currency, { httpOnly: true, sameSite: "lax", path: "/", maxAge: 365 * 86_400 });
+  }
+  const base = await storeBase(handle);
+  redirect(back.startsWith("/") && !back.startsWith("//") ? back : base || "/");
 }

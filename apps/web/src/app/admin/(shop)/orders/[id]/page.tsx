@@ -76,6 +76,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <dt className="hint">Shipping</dt><dd>{order.shippingMinor ? money(order.shippingMinor) : "Free"}</dd>
               <dt className="hint">{order.taxBreakdown.length ? order.taxBreakdown.map((t) => t.label).join(", ") : "Tax"}{order.taxIncluded ? " (included)" : ""}</dt><dd>{money(order.taxMinor)}</dd>
               <dt className="font-semibold">Total</dt><dd className="font-semibold">{money(order.totalMinor)}</dd>
+              {order.presentment && (
+                <><dt className="hint">Buyer paid in {order.presentment.currency}</dt><dd>{formatMoney(order.presentment.totalMinor, order.presentment.currency)}</dd></>
+              )}
               {order.refundedMinor > 0 && <><dt className="hint">Refunded</dt><dd>−{money(order.refundedMinor)}</dd></>}
               {order.paidAt && seesMoney && (
                 <>
@@ -163,6 +166,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         {(refundable || refunds.length > 0) && can(role, "refunds") && (
           <div className="card p-5 flex flex-col gap-3 text-sm">
             <h2 className="font-semibold">Refund</h2>
+            {order.presentment && <p className="hint">The buyer paid in {order.presentment.currency}, so refunds go back in {order.presentment.currency} at the rate they paid (1 {order.currency} = {order.presentment.rate.toFixed(4)} {order.presentment.currency}). Enter the amount in {order.currency}.</p>}
             <RefundForm orderId={order.id} leftMinor={order.totalMinor - order.refundedMinor} currency={order.currency}
               feeNote={feeBack ? `Our ${PLANS.free.feeBps / 100}% fee comes back to you in proportion. The card processing fee isn't returned by the card network.` : null} />
           </div>

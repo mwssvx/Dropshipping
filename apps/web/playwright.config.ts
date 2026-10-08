@@ -28,7 +28,7 @@ export default defineConfig({
     command: `next start -p ${PORT}`,
     url: `http://localhost:${PORT}`,
     reuseExistingServer: false,
-    env: { DATA_DIR, STAFF_EMAILS: "staff-desktop@example.com,staff-phone@example.com,staff-m5-desktop@example.com,staff-m5-phone@example.com,staff-m8-desktop@example.com,staff-m8-phone@example.com", ANTHROPIC_API_KEY: "", PUSH_PROVIDER: "log", WEBHOOKS_ALLOW_PRIVATE: "on", EMAIL_PREVIEW: "on", APP_WEB_ORIGINS: `http://localhost:${APP_PORT}`, PAYMENTS_PROVIDER: "fake", DEMO_SUPPLIER: "on", DOMAIN_CHECKS: "off", NEXT_PUBLIC_ROOT_DOMAIN: `localhost:${PORT}` },
+    env: { DATA_DIR, STAFF_EMAILS: "staff-desktop@example.com,staff-phone@example.com,staff-m5-desktop@example.com,staff-m5-phone@example.com,staff-m8-desktop@example.com,staff-m8-phone@example.com", ANTHROPIC_API_KEY: "", PUSH_PROVIDER: "log", WEBHOOKS_ALLOW_PRIVATE: "on", EMAIL_PREVIEW: "on", FX_PROVIDER: "static", APP_WEB_ORIGINS: `http://localhost:${APP_PORT}`, PAYMENTS_PROVIDER: "fake", DEMO_SUPPLIER: "on", DOMAIN_CHECKS: "off", NEXT_PUBLIC_ROOT_DOMAIN: `localhost:${PORT}` },
     timeout: 60_000,
   }, {
     command: `node e2e/serve-app.mjs ${APP_PORT}`,
