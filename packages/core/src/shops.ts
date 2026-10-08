@@ -38,7 +38,7 @@ export async function createShop(db: Db, userId: string, input: { name: string; 
   return db.transaction(async (tx) => {
     const [shop] = await tx
       .insert(schema.shops)
-      .values({ name, handle, country, currency: defaultCurrency(country) })
+      .values({ name, handle, country, currency: defaultCurrency(country), pricesIncludeTax: country !== "US" && country !== "CA" })
       .returning();
     await tx.insert(schema.shopMembers).values({ shopId: shop!.id, userId, role: "owner" });
     return shop!;

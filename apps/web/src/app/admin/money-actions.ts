@@ -2,17 +2,20 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
+  addTaxRegistration,
   changePlan,
   parseMoney,
   refundOrder,
+  removeTaxRegistration,
   runFakePayouts,
+  setPricesIncludeTax,
   simulateHold,
   startPayoutSetup,
   submitRequirementDocument,
   UserError,
   type RequirementKind,
 } from "@sf/core";
-import { adminUrl, payments, refunds, requireShop, testPayments } from "@/lib/server";
+import { adminUrl, payments, refunds, requireShop, tax, testPayments } from "@/lib/server";
 import type { FormState } from "./actions";
 
 export type RefundState = FormState & { message?: string; warning?: string };
@@ -104,4 +107,31 @@ export async function refundAction(orderId: string, _: RefundState, form: FormDa
     if (e instanceof UserError) return { error: e.message };
     throw e;
   }
+}
+
+export async function addTaxRegistrationAction(_: FormState, form: FormData): Promise<FormState> {
+  const { shop, db } = await requireShop();
+  try {
+    await addTaxRegistration(db, tax(), shop, {
+      jurisdiction: String(form.get("jurisdiction") ?? ""),
+      registrationNumber: String(form.get("registrationNumber") ?? ""),
+    });
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath("/admin/taxes");
+  return { saved: true };
+}
+
+export async function removeTaxRegistrationAction(id: string) {
+  const { shop, db } = await requireShop();
+  await removeTaxRegistration(db, shop.id, id);
+  revalidatePath("/admin/taxes");
+}
+
+export async function setPricesIncludeTaxAction(form: FormData) {
+  const { shop, db } = await requireShop();
+  await setPricesIncludeTax(db, shop.id, form.get("pricesIncludeTax") === "1");
+  revalidatePath("/admin/taxes");
 }

@@ -40,6 +40,11 @@ export class StripePaymentProvider implements PaymentProvider {
     return { id: pi.id, clientSecret: pi.client_secret! };
   }
 
+  async clientSecret(paymentIntentId: string) {
+    const pi = await this.stripe.paymentIntents.retrieve(paymentIntentId);
+    return pi.client_secret!;
+  }
+
   async refund(input: { paymentIntentId: string; amountMinor: number; reason: string | null }) {
     const r = await this.stripe.refunds.create({
       payment_intent: input.paymentIntentId,

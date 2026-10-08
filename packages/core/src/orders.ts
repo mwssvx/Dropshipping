@@ -5,6 +5,7 @@ import { NotFoundError, UserError } from "./errors";
 import type { PaymentEvent, PaymentProvider } from "./payments";
 import { applyMoneyEvent } from "./payouts";
 import { estimateProcessingFee, platformFeeFor } from "./plans";
+import { BuiltInTaxCalculator, listTaxRegistrations, type TaxCalculator } from "./tax";
 
 type Shop = typeof schema.shops.$inferSelect;
 type Order = typeof schema.orders.$inferSelect;
@@ -50,8 +51,8 @@ export async function quoteCart(db: Db, shop: Shop, lines: CartLine[]) {
   });
   const subtotalMinor = items.reduce((s, i) => s + i.lineMinor, 0);
   const shippingMinor = subtotalMinor >= FREE_SHIPPING_OVER_MINOR ? 0 : FLAT_SHIPPING_MINOR;
-  const taxMinor = 0; // Stripe Tax replaces this in milestone 4.
-  return { items, currency: shop.currency, subtotalMinor, shippingMinor, taxMinor, totalMinor: subtotalMinor + shippingMinor + taxMinor };
+  // Tax depends on where it ships, so it's added at checkout once the address is known.
+  return { items, currency: shop.currency, subtotalMinor, shippingMinor, totalMinor: subtotalMinor + shippingMinor, pricesIncludeTax: shop.pricesIncludeTax };
 }
 
 const addressSchema = z.object({
@@ -74,13 +75,31 @@ export async function startCheckout(
   payments: PaymentProvider,
   shop: Shop,
   input: { email: string; address: Address; lines: CartLine[] },
+  taxCalculator: TaxCalculator = new BuiltInTaxCalculator(),
 ) {
   if (shop.status !== "active") throw new UserError("This store isn't taking orders right now.", "shop_inactive");
   const parsed = checkoutSchema.safeParse(input);
   if (!parsed.success) throw new UserError(parsed.error.issues[0]!.message);
   const { email, address } = parsed.data;
-  const quote = await quoteCart(db, shop, input.lines);
-  const platformFeeMinor = platformFeeFor(shop.plan, quote.totalMinor);
+  const cart = await quoteCart(db, shop, input.lines);
+  const tax = await taxCalculator.calculate({
+    currency: cart.currency,
+    lines: cart.items.map((i) => ({ reference: i.variantId, amountMinor: i.lineMinor })),
+    shippingMinor: cart.shippingMinor,
+    address,
+    pricesIncludeTax: shop.pricesIncludeTax,
+    accountId: shop.paymentsAccountId,
+    registrations: (await listTaxRegistrations(db, shop.id)).map((r) => r.jurisdiction),
+  });
+  const quote = {
+    ...cart,
+    taxMinor: tax.taxMinor,
+    taxIncluded: tax.included,
+    taxBreakdown: tax.breakdown,
+    totalMinor: cart.subtotalMinor + cart.shippingMinor + (tax.included ? 0 : tax.taxMinor),
+  };
+  // Our fee is on the sale, not on tax the merchant passes on to the government.
+  const platformFeeMinor = platformFeeFor(shop.plan, quote.totalMinor - quote.taxMinor);
 
   const intent = await payments.createPaymentIntent({
     amountMinor: quote.totalMinor,
@@ -114,6 +133,9 @@ export async function startCheckout(
         subtotalMinor: quote.subtotalMinor,
         shippingMinor: quote.shippingMinor,
         taxMinor: quote.taxMinor,
+        taxIncluded: quote.taxIncluded,
+        taxBreakdown: quote.taxBreakdown,
+        taxCalculationId: tax.calculationId,
         totalMinor: quote.totalMinor,
         platformFeeMinor,
         processingFeeMinor: estimateProcessingFee(quote.totalMinor),

@@ -1,4 +1,5 @@
-import { listRequirements } from "@sf/core";
+import Link from "next/link";
+import { listRequirements, openNotices } from "@sf/core";
 import { requireShop, storeAddress } from "@/lib/server";
 import { BRAND } from "@/lib/brand";
 import { switchShopAction } from "../actions";
@@ -6,7 +7,9 @@ import { NavLink } from "./NavLink";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, shop, shops, db } = await requireShop();
-  const [address, requirements] = await Promise.all([storeAddress(shop), listRequirements(db, shop.id)]);
+  const [address, requirements, notices] = await Promise.all([storeAddress(shop), listRequirements(db, shop.id), openNotices(db, shop.id)]);
+  const pause = notices.find((n) => n.kind === "paused");
+  const warning = notices.find((n) => n.kind === "warning");
   const holds = requirements.filter((r) => r.holdsPayouts).length;
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[232px_1fr]">
@@ -40,14 +43,27 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <NavLink href="/admin/pages">Pages</NavLink>
           <NavLink href="/admin/domains">Domains</NavLink>
           <span className="hidden lg:block px-3 pt-4 pb-1 text-xs font-semibold text-muted uppercase tracking-wide">Settings</span>
+          <NavLink href="/admin/trust">Trust{notices.length ? <span className="ml-2 pill pill-warning">{notices.length}</span> : null}</NavLink>
           <NavLink href="/admin/plan">Plan</NavLink>
+          <NavLink href="/admin/taxes">Taxes</NavLink>
         </nav>
         <div className="mt-auto hidden lg:flex flex-col gap-2 px-4 py-4 border-t border-border">
           <span className="hint truncate">{user.email}</span>
           <form action="/logout" method="post"><button className="hint hover:text-ink">Sign out</button></form>
         </div>
       </aside>
-      <div className="min-w-0">{children}</div>
+      <div className="min-w-0">
+        {pause ? (
+          <Link href="/admin/trust" className="block banner banner-critical rounded-none px-4 sm:px-8">
+            <span className="font-semibold">Your store is paused: {pause.title.toLowerCase()}.</span> See why and how to reopen it →
+          </Link>
+        ) : warning ? (
+          <Link href="/admin/trust" className="block banner banner-warning rounded-none px-4 sm:px-8">
+            <span className="font-semibold">{warning.title}.</span> Fix it{warning.dueBy ? ` by ${warning.dueBy.toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""} to keep selling as normal →
+          </Link>
+        ) : null}
+        {children}
+      </div>
     </div>
   );
 }

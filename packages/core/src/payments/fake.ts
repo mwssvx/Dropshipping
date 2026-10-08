@@ -15,6 +15,10 @@ export class FakePaymentProvider implements PaymentProvider {
     return { id, clientSecret: `${id}_secret` };
   }
 
+  async clientSecret(paymentIntentId: string) {
+    return `${paymentIntentId}_secret`;
+  }
+
   sign(rawBody: string) {
     return createHmac("sha256", this.secret).update(rawBody).digest("hex");
   }

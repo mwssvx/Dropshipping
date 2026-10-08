@@ -73,6 +73,7 @@
   .banner { border-radius: var(--radius-md); padding: .75rem 1rem; font-size: .875rem; }
   .banner-critical { background: var(--color-critical-soft); color: var(--color-critical); }
   .banner-info { background: var(--color-info-soft); color: var(--color-info); }
+  .banner-warning { background: var(--color-warning-soft); color: var(--color-warning); }
 }
 
 /* Storefront theming. The theme sets the --store-* values (src/theme/style.ts); the shared

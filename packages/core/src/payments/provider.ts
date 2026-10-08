@@ -41,6 +41,8 @@ export interface PaymentProvider {
     applicationFeeMinor: number;
     metadata: Record<string, string>;
   }): Promise<PaymentIntent>;
+  /** The secret the browser's card form needs to finish paying for an order. */
+  clientSecret(paymentIntentId: string): Promise<string>;
   /** Verify and normalise a webhook. Throws if the signature is wrong. Returns null for events we ignore. */
   parseWebhook(rawBody: string, signature: string | null): Promise<PaymentEvent | null>;
 

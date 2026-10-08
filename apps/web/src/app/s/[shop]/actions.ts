@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import { getOrder, startCheckout, FakePaymentProvider, UserError } from "@sf/core";
 import { readCart, writeCart } from "@/lib/cart";
-import { db, payments } from "@/lib/server";
+import { db, payments, tax } from "@/lib/server";
 import { processPaymentWebhook } from "@/lib/webhooks";
 import { loadShop, storeBase } from "./data";
 
@@ -46,7 +46,7 @@ export async function checkoutAction(handle: string, _: CheckoutState, form: For
         country: values.country ?? "",
       },
       lines: await readCart(shop.id),
-    });
+    }, tax());
     orderId = order.id;
   } catch (e) {
     if (e instanceof UserError) return { error: e.message, values };

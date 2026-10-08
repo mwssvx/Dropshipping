@@ -99,6 +99,7 @@ export default async function MoneyPage({ searchParams }: { searchParams: Promis
             <dt className="hint">Refunded</dt><dd className="hint">{money(summary.last30.refundsMinor)}</dd>
             <dt>Our fee ({plan.feeBps ? `${plan.feeBps / 100}% on the ${plan.name} plan` : `0% on the ${plan.name} plan`})</dt><dd>−{money(summary.last30.platformFeesMinor)}</dd>
             <dt>Card processing (estimated)</dt><dd>−{money(summary.last30.processingFeesMinor)}</dd>
+            <dt>Tax collected <Link className="hint underline" href="/admin/taxes">(you pay this to the tax office)</Link></dt><dd>−{money(summary.last30.taxMinor)}</dd>
             <dt>Shipping charged to buyers</dt><dd>−{money(summary.last30.shippingMinor)}</dd>
             <dt>Supplier costs</dt><dd>−{money(summary.last30.supplierCostsMinor)}</dd>
             <dt className="font-semibold border-t border-border pt-2">Profit</dt>

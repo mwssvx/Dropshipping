@@ -12,6 +12,7 @@ export function StoreShell({
   base,
   cartCount,
   closed,
+  verified,
   children,
 }: {
   doc: ThemeDoc;
@@ -20,6 +21,8 @@ export function StoreShell({
   base: string;
   cartCount: number;
   closed?: boolean;
+  /** Shown as a badge in the footer, linking to what it means. */
+  verified?: boolean;
   children: React.ReactNode;
 }) {
   const { settings, menus } = doc;
@@ -73,7 +76,15 @@ export function StoreShell({
             </nav>
           )}
           <div className="flex flex-wrap justify-between gap-4 hint">
-            <span>© {new Date().getFullYear()} {shopName}</span>
+            <span className="flex items-center gap-3 flex-wrap">
+              © {new Date().getFullYear()} {shopName}
+              {verified && (
+                <Link href={`${base}/verified`} className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-ink font-medium hover:border-accent">
+                  <svg viewBox="0 0 16 16" className="size-3.5 text-accent" fill="currentColor" aria-hidden><path d="M8 0l2 2.2 2.9-.4.5 2.9L16 6.3 14.6 9l.6 2.9-2.9.7L11 15.2 8 14l-3 1.2-1.3-2.6-2.9-.7L1.4 9 0 6.3l2.6-1.6.5-2.9 2.9.4z" /><path d="M5 8.2l2 2 4-4.2" stroke="#fff" strokeWidth="1.6" fill="none" /></svg>
+                  Verified store
+                </Link>
+              )}
+            </span>
             <span>Powered by {BRAND}</span>
           </div>
         </div>

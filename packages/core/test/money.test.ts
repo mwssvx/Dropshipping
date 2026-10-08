@@ -270,7 +270,7 @@ describe("payouts", () => {
     await refundOrder(ctx, s.id, order.id, { amountMinor: 1000, reason: 'Said "broken", =SUM(A1)' });
     const csv = await statementCsv(db, await freshShop(s.id), { from: new Date(now.getTime() - DAY), to: new Date(later.getTime() + 10 * DAY) });
     const lines = csv.trim().split("\n");
-    expect(lines[0]).toBe("date,type,reference,amount (USD),our fee,card fee (est.),net,note");
+    expect(lines[0]).toBe("date,type,reference,amount (USD),of which tax,our fee,card fee (est.),net,note");
     expect(lines.slice(1).map((l) => l.split(",")[1])).toEqual(["sale", "refund", "payout (paid)"]);
     expect(csv).toContain(`#${order.number}`);
     expect(csv).toContain('"Said ""broken"", =SUM(A1)"');

@@ -1,9 +1,11 @@
+import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { formatMoney, getOrder, NotFoundError } from "@sf/core";
 import { db, payments } from "@/lib/server";
 import { SubmitButton } from "@/components/SubmitButton";
 import { fakePayAction } from "../../actions";
 import { loadShop, storeBase } from "../../data";
+import { CardForm } from "./CardForm";
 
 export const metadata = { title: "Payment" };
 
@@ -15,20 +17,46 @@ export default async function PayPage({ params }: { params: Promise<{ shop: stri
     if (e instanceof NotFoundError) notFound();
     throw e;
   });
-  if (order.paymentStatus === "paid") redirect(`${base}/orders/${order.paymentIntentId}`);
-  const testMode = payments().name === "fake";
+  if (order.paymentStatus !== "pending" && order.paymentStatus !== "failed") redirect(`${base}/orders/${order.paymentIntentId}`);
+  const provider = payments();
+  const money = (m: number) => formatMoney(m, order.currency);
+  const payLabel = `Pay ${money(order.totalMinor)}`;
+  const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+  let card: React.ReactNode = null;
+  if (provider.name === "stripe" && publishableKey) {
+    const h = await headers();
+    const host = h.get("x-forwarded-host") ?? h.get("host");
+    const proto = h.get("x-forwarded-proto") ?? "https";
+    const returnUrl = `${proto}://${host}${base}/orders/${order.paymentIntentId}`;
+    card = <CardForm publishableKey={publishableKey} clientSecret={await provider.clientSecret(order.paymentIntentId!)} returnUrl={returnUrl} payLabel={payLabel} />;
+  }
+
   return (
     <main className="max-w-md mx-auto px-4 sm:px-6 py-12 flex flex-col gap-6">
       <h1 className="text-3xl font-bold tracking-tight">Payment</h1>
-      <p className="text-lg num">Total due <strong>{formatMoney(order.totalMinor, order.currency)}</strong></p>
-      {testMode ? (
+      <dl className="card p-5 grid grid-cols-[1fr_auto] gap-y-1 num text-sm">
+        {order.lines.map((l) => (
+          <div key={l.id} className="contents">
+            <dt>{l.title} <span className="hint">× {l.quantity}</span></dt><dd className="text-right">{money(l.unitPriceMinor * l.quantity)}</dd>
+          </div>
+        ))}
+        <dt className="hint border-t border-border pt-2 mt-1">Shipping</dt>
+        <dd className="text-right border-t border-border pt-2 mt-1">{order.shippingMinor ? money(order.shippingMinor) : "Free"}</dd>
+        {order.taxMinor > 0 && (
+          <>
+            <dt className="hint">{order.taxBreakdown.map((t) => t.label).join(", ") || "Tax"}{order.taxIncluded ? " (included)" : ""}</dt>
+            <dd className="text-right">{money(order.taxMinor)}</dd>
+          </>
+        )}
+        <dt className="font-semibold text-base">Total due</dt><dd className="font-semibold text-base text-right">{money(order.totalMinor)}</dd>
+      </dl>
+      {order.paymentStatus === "failed" && <p className="banner banner-critical">The last attempt didn't go through. You can try again.</p>}
+      {provider.name === "fake" ? (
         <form action={fakePayAction.bind(null, handle, order.id)} className="card p-5 flex flex-col gap-4">
-          <p className="banner banner-info">Test mode: no real card is charged. Card payments with Apple Pay and Google Pay switch on when the store connects payouts.</p>
-          <SubmitButton className="btn btn-primary btn-lg" pendingText="Paying…">Pay {formatMoney(order.totalMinor, order.currency)}</SubmitButton>
+          <p className="banner banner-info">Test mode: no real card is charged.</p>
+          <SubmitButton className="btn btn-primary btn-lg" pendingText="Paying…">{payLabel}</SubmitButton>
         </form>
-      ) : (
-        <p className="banner banner-info">Card payment form loads here (Stripe Payment Element, milestone 4).</p>
-      )}
+      ) : card ?? <p className="banner banner-critical">Card payments aren't switched on for this store yet.</p>}
     </main>
   );
 }

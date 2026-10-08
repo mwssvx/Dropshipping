@@ -50,17 +50,32 @@ export async function refundOrder(
 
   const full = reserved.refundedMinor >= reserved.totalMinor;
   const refund = await db.transaction(async (tx) => {
-    const [{ already }] = (await tx
-      .select({ already: sql<number>`coalesce(sum(${schema.refunds.platformFeeRefundedMinor}), 0)::int` })
+    const [{ already, taxAlready }] = (await tx
+      .select({
+        already: sql<number>`coalesce(sum(${schema.refunds.platformFeeRefundedMinor}), 0)::int`,
+        taxAlready: sql<number>`coalesce(sum(${schema.refunds.taxRefundedMinor}), 0)::int`,
+      })
       .from(schema.refunds)
-      .where(eq(schema.refunds.orderId, order.id))) as [{ already: number }];
+      .where(eq(schema.refunds.orderId, order.id))) as [{ already: number; taxAlready: number }];
     // The last refund returns whatever fee is left, so rounding never keeps a cent.
     const feeBack = full
       ? order.platformFeeMinor - Number(already)
       : Math.min(Math.round((order.platformFeeMinor * amount) / order.totalMinor), order.platformFeeMinor - Number(already));
+    // The tax in the refunded amount goes back to the buyer too, and comes off what the merchant owes.
+    const taxBack = full
+      ? order.taxMinor - Number(taxAlready)
+      : Math.min(Math.round((order.taxMinor * amount) / order.totalMinor), order.taxMinor - Number(taxAlready));
     const [row] = await tx
       .insert(schema.refunds)
-      .values({ shopId, orderId: order.id, amountMinor: amount, platformFeeRefundedMinor: Math.max(feeBack, 0), reason, providerRefundId })
+      .values({
+        shopId,
+        orderId: order.id,
+        amountMinor: amount,
+        platformFeeRefundedMinor: Math.max(feeBack, 0),
+        taxRefundedMinor: Math.max(taxBack, 0),
+        reason,
+        providerRefundId,
+      })
       .returning();
     await tx
       .update(schema.orders)
