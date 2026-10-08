@@ -1,6 +1,6 @@
 "use server";
 import { redirect } from "next/navigation";
-import { reorderLines, requestBuyerCode, signOutBuyer, subscribeBuyer, unsubscribeBuyer, UserError, verifyBuyerCode } from "@sf/core";
+import { applyForWholesale, reorderLines, requestBuyerCode, signOutBuyer, subscribeBuyer, unsubscribeBuyer, UserError, verifyBuyerCode } from "@sf/core";
 import { readCart, writeCart } from "@/lib/cart";
 import { buyerToken, clearBuyerCookie, currentBuyer, setBuyerCookie } from "@/lib/buyer";
 import { db, mailer } from "@/lib/server";
@@ -59,5 +59,23 @@ export async function setBuyerMarketingAction(handle: string, subscribe: boolean
   if (!buyer) redirect(`${await storeBase(handle)}/account`);
   if (subscribe) await subscribeBuyer(await db(), shop.id, buyer.email);
   else await unsubscribeBuyer(await db(), shop.id, buyer.email);
+  redirect(`${await storeBase(handle)}/account`);
+}
+
+/** A signed-in buyer asks the store for wholesale prices. */
+export async function applyWholesaleAction(handle: string, _: { error?: string }, form: FormData): Promise<{ error?: string }> {
+  const shop = await loadShop(handle);
+  const buyer = await currentBuyer(shop.id);
+  if (!buyer) redirect(`${await storeBase(handle)}/account`);
+  try {
+    await applyForWholesale(await db(), shop, buyer.email, {
+      company: String(form.get("company") ?? ""),
+      taxId: String(form.get("taxId") ?? ""),
+      message: String(form.get("message") ?? ""),
+    });
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
   redirect(`${await storeBase(handle)}/account`);
 }

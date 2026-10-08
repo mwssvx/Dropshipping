@@ -15,18 +15,19 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
   const base = await storeBase(handle);
   const lines = await readCart(shop.id);
   if (!lines.length) redirect(`${base}/cart`);
+  const buyer = await currentBuyer(shop.id);
   let quote;
   try {
-    quote = await quoteCart(await db(), shop, lines, { discountCode: await readDiscountCode(shop.id) });
+    quote = await quoteCart(await db(), shop, lines, { discountCode: await readDiscountCode(shop.id), buyerEmail: buyer?.email });
   } catch (e) {
     if (e instanceof UserError) redirect(`${base}/cart`);
     throw e;
   }
+  if (quote.wholesale && quote.wholesale.shortByMinor > 0) redirect(`${base}/cart`);
   const fx = await buyerFx(shop);
   const shown = presentQuote({ ...quote, taxMinor: 0 }, fx);
   const money = (m: number) => formatMoney(m, fx.currency);
   // Signed-in buyers start with the details from their last order.
-  const buyer = await currentBuyer(shop.id);
   const saved = buyer ? await lastCheckoutDetails(await db(), shop.id, buyer.email) : null;
   const initial = saved ? { email: saved.email, ...(saved.address ? Object.fromEntries(Object.entries(saved.address).map(([k, v]) => [k, String(v ?? "")])) : {}) } : undefined;
   return (
@@ -40,7 +41,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
         <ul className="flex flex-col gap-2 text-sm">
           {quote.items.map((i) => (
             <li key={i.variantId} className="flex justify-between gap-3">
-              <span>{i.title} <span className="hint">× {i.quantity}</span></span>
+              <span>{i.title} <span className="hint">× {i.quantity}</span>{i.priceNote && <span className="block hint">{i.priceNote}</span>}</span>
               <span className="num">{money(shown.units[i.variantId]! * i.quantity)}</span>
             </li>
           ))}

@@ -69,7 +69,7 @@ export async function verifyBuyerCode(db: Db, shopId: string, emailInput: string
 export async function getBuyer(db: Db, shopId: string, token: string | undefined, now = new Date()) {
   if (!token) return null;
   const [row] = await db
-    .select({ id: schema.customers.id, email: schema.customers.email, name: schema.customers.name, acceptsMarketing: schema.customers.acceptsMarketing })
+    .select({ id: schema.customers.id, email: schema.customers.email, name: schema.customers.name, acceptsMarketing: schema.customers.acceptsMarketing, wholesaleStatus: schema.customers.wholesaleStatus, wholesaleCompany: schema.customers.wholesaleCompany })
     .from(schema.buyerSessions)
     .innerJoin(schema.customers, eq(schema.customers.id, schema.buyerSessions.customerId))
     .where(and(eq(schema.buyerSessions.tokenHash, sha(token)), eq(schema.buyerSessions.shopId, shopId), gt(schema.buyerSessions.expiresAt, now)))
@@ -168,7 +168,7 @@ export async function listCustomers(db: Db, shopId: string, opts: { query?: stri
     .where(and(eq(schema.customers.shopId, shopId), q ? sql`(lower(${schema.customers.email}) like ${`%${q}%`} or lower(coalesce(${schema.customers.name}, '')) like ${`%${q}%`})` : undefined))
     .groupBy(schema.customers.id)
     // Leaves out addresses that only asked for the newsletter and never confirmed or bought.
-    .having(sql`count(${schema.orders.id}) > 0 or bool_or(${schema.customers.acceptsMarketing}) or max(${schema.customers.lastSignInAt}) is not null or max(${schema.customers.name}) is not null`)
+    .having(sql`count(${schema.orders.id}) > 0 or bool_or(${schema.customers.acceptsMarketing}) or max(${schema.customers.lastSignInAt}) is not null or max(${schema.customers.name}) is not null or bool_or(${schema.customers.wholesaleStatus} = 'approved')`)
     .orderBy(sql`max(${schema.orders.paidAt}) desc nulls last`, desc(schema.customers.createdAt))
     .limit(500);
   return rows;

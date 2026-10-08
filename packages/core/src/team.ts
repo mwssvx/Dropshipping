@@ -13,7 +13,7 @@ export type Role = (typeof schema.shopMembers.$inferSelect)["role"];
 export const AREAS = [
   "home", "analytics", "assistant", "orders", "refunds", "customers", "inbox", "money", "payouts", "products", "collections",
   "suppliers", "marketing", "reviews", "theme", "pages", "domains", "trust", "plan", "ai", "taxes", "currencies", "developers",
-  "export", "team",
+  "export", "team", "wholesale",
 ] as const;
 export type Area = (typeof AREAS)[number];
 

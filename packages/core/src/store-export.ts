@@ -53,6 +53,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       reviews_auto_publish: shop.reviewsAutoPublish,
       presentment_currencies: shop.presentmentCurrencies,
       round_converted_prices: shop.roundConvertedPrices,
+      wholesale: { enabled: shop.wholesaleEnabled, percent_off: shop.wholesalePercentOff, min_order_minor: shop.wholesaleMinOrderMinor },
     },
     theme: theme ? { template: theme.template, draft: theme.draft, published: theme.published } : null,
     products: products.map((p) => ({
@@ -64,6 +65,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       source_url: p.sourceUrl,
       supplier: p.supplierId ? supplierOf(supplierRows.find((s) => s.id === p.supplierId), p.supplierProductRef) : null,
       goes_well_with: p.upsellProductId ? (handleOf.get(p.upsellProductId) ?? null) : null,
+      quantity_breaks: p.quantityBreaks.map((t) => ({ min_qty: t.minQty, percent_off: t.percentOff })),
       variants: variants
         .filter((v) => v.productId === p.id)
         .map((v) => ({
@@ -120,6 +122,9 @@ const importSchema = z.object({
       reviews_auto_publish: z.boolean().optional(),
       presentment_currencies: z.array(z.enum(CURRENCIES)).max(CURRENCIES.length).optional(),
       round_converted_prices: z.boolean().optional(),
+      wholesale: z
+        .object({ enabled: z.boolean(), percent_off: z.number().int().min(1).max(80), min_order_minor: z.number().int().min(0).max(100_000_000) })
+        .optional(),
     })
     .passthrough(),
   theme: z.object({ template: str(40), draft: z.unknown(), published: z.unknown() }).nullable().optional(),
@@ -143,6 +148,10 @@ const importSchema = z.object({
           .nullable()
           .optional(),
         goes_well_with: handle.nullable().optional(),
+        quantity_breaks: z
+          .array(z.object({ min_qty: z.number().int().min(2).max(99), percent_off: z.number().int().min(1).max(80) }))
+          .max(3)
+          .optional(),
         variants: z
           .array(
             z.object({
@@ -251,6 +260,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
           sourceUrl: x.source_url ?? null,
           supplierId: key ? supplierIds.get(key)! : null,
           supplierProductRef: provider ? (x.supplier?.product_ref ?? null) : null,
+          quantityBreaks: (x.quantity_breaks ?? []).map((t) => ({ minQty: t.min_qty, percentOff: t.percent_off })).sort((a, b) => a.minQty - b.minQty),
         })
         .returning({ id: schema.products.id });
       productIds.set(x.handle, row!.id);
@@ -322,6 +332,13 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
     if (data.store.reviews_auto_publish !== undefined) settings.reviewsAutoPublish = data.store.reviews_auto_publish;
     if (data.store.presentment_currencies !== undefined) settings.presentmentCurrencies = [...new Set(data.store.presentment_currencies)];
     if (data.store.round_converted_prices !== undefined) settings.roundConvertedPrices = data.store.round_converted_prices;
+    if (data.store.wholesale) {
+      Object.assign(settings, {
+        wholesaleEnabled: data.store.wholesale.enabled,
+        wholesalePercentOff: data.store.wholesale.percent_off,
+        wholesaleMinOrderMinor: data.store.wholesale.min_order_minor,
+      });
+    }
     if (Object.keys(settings).length) await tx.update(schema.shops).set(settings).where(eq(schema.shops.id, shopId));
     return {
       products: data.products.length,

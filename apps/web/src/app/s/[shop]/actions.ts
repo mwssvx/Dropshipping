@@ -10,6 +10,7 @@ import { processPaymentWebhook } from "@/lib/webhooks";
 import { loadShop, storeBase } from "./data";
 import { buyerFx, currencyCookie } from "@/lib/currency";
 import { campaignCookie } from "@/lib/campaigns";
+import { currentBuyer } from "@/lib/buyer";
 
 /** The visit id the store's tracker set, for the funnel. */
 async function track(shopId: string, kind: "add_to_cart" | "checkout_start", productId?: string | null) {
@@ -51,7 +52,8 @@ export async function applyCodeAction(handle: string, _: CodeState, form: FormDa
   const code = String(form.get("code") ?? "").trim().toUpperCase();
   if (!code) return { error: "Enter a code." };
   try {
-    const cart = await quoteCart(await db(), shop, await readCart(shop.id));
+    const cart = await quoteCart(await db(), shop, await readCart(shop.id), { buyerEmail: (await currentBuyer(shop.id))?.email ?? null });
+    if (cart.wholesale) return { error: "Discount codes don't apply to wholesale prices." };
     await findUsableDiscount(await db(), shop, code, { subtotalMinor: cart.subtotalMinor });
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
@@ -91,6 +93,7 @@ export async function checkoutAction(handle: string, _: CheckoutState, form: For
       fx: await buyerFx(shop),
       acceptsMarketing: values.acceptsMarketing === "on",
       campaignId: (await cookies()).get(campaignCookie(shop.id))?.value ?? null,
+      buyerEmail: (await currentBuyer(shop.id))?.email ?? null,
     }, tax());
     orderId = order.id;
     await track(shop.id, "checkout_start");

@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Track } from "@/components/Track";
-import { getActiveProductByHandle, NotFoundError, productReviews, upsellsFor } from "@sf/core";
+import { describeBreak, getActiveProductByHandle, NotFoundError, percentOff, productReviews, upsellsFor, wholesaleTermsFor } from "@sf/core";
+import { currentBuyer } from "@/lib/buyer";
 import { db } from "@/lib/server";
 import { buyerFx } from "@/lib/currency";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -58,6 +59,8 @@ export default async function ProductPage({ params }: { params: Promise<{ shop: 
   const v = buyable[0] ?? product.variants[0];
   const many = product.variants.length > 1;
   const [reviews, upsells, base, fx] = await Promise.all([productReviews(await db(), product.id), upsellsFor(await db(), shop.id, [product.id]), storeBase(shopHandle), buyerFx(shop)]);
+  const wholesale = await wholesaleTermsFor(await db(), shop, (await currentBuyer(shop.id))?.email);
+  const tiers = wholesale ? [] : product.quantityBreaks;
   const jsonLd = JSON.stringify(productJsonLd(product, shop.currency, reviews)).replace(/</g, "\\u003c");
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-10 md:grid-cols-2">
@@ -75,6 +78,24 @@ export default async function ProductPage({ params }: { params: Promise<{ shop: 
           </a>
         )}
         {v && <div className="text-xl"><Price minor={v.priceMinor} compareAt={v.compareAtMinor} currency={shop.currency} fx={fx} /></div>}
+        {v && wholesale && (
+          <p className="banner banner-info" role="status">
+            Your wholesale price: <strong className="num"><Price minor={percentOff(v.priceMinor, wholesale.percentOff)} currency={shop.currency} fx={fx} /></strong> ({wholesale.percentOff}% off)
+          </p>
+        )}
+        {v && tiers.length > 0 && (
+          <section aria-labelledby="bulk" className="card p-4 flex flex-col gap-2">
+            <h2 id="bulk" className="font-semibold">Buy more, save more</h2>
+            <ul className="text-sm flex flex-col gap-1">
+              {tiers.map((t) => (
+                <li key={t.minQty} className="flex justify-between gap-3">
+                  <span>{describeBreak(t)}</span>
+                  <span className="num"><Price minor={percentOff(v.priceMinor, t.percentOff)} currency={shop.currency} fx={fx} /> each</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         {v && buyable.length > 0 && (
           <form action={addToCartAction.bind(null, shopHandle)} className="flex flex-col gap-4">
             {many ? (
@@ -96,7 +117,14 @@ export default async function ProductPage({ params }: { params: Promise<{ shop: 
             ) : (
               <input type="hidden" name="variantId" value={v.id} />
             )}
-            <input type="hidden" name="quantity" value="1" />
+            {tiers.length > 0 || wholesale ? (
+              <div className="field w-28">
+                <label className="label" htmlFor="quantity">Quantity</label>
+                <input className="input num" id="quantity" name="quantity" type="number" min={1} max={99} defaultValue={1} />
+              </div>
+            ) : (
+              <input type="hidden" name="quantity" value="1" />
+            )}
             <SubmitButton className="btn btn-primary btn-lg" pendingText="Adding…">Add to cart</SubmitButton>
           </form>
         )}
