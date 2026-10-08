@@ -1,4 +1,4 @@
-// Milestone 1 to 10 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 11 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -80,6 +80,10 @@ export const shops = pgTable(
     abandonedCartEmails: boolean("abandoned_cart_emails").notNull().default(true),
     // Show new reviews straight away instead of waiting for the merchant.
     reviewsAutoPublish: boolean("reviews_auto_publish").notNull().default(false),
+    // Extra currencies buyers can shop in, converted from the store's own currency at today's rate.
+    presentmentCurrencies: jsonb("presentment_currencies").$type<string[]>().notNull().default([]),
+    // Round converted prices up to end in .99 (shipping and tax are never rounded).
+    roundConvertedPrices: boolean("round_converted_prices").notNull().default(true),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -173,6 +177,23 @@ export const customers = pgTable(
   (t) => [uniqueIndex("customers_shop_email_uq").on(t.shopId, t.email)],
 );
 
+/**
+ * What the buyer saw and paid when they shopped in another currency. The order's own amounts stay
+ * in the store's currency; these are for the buyer and the card charge.
+ */
+export type Presentment = {
+  currency: string;
+  /** Buyer currency units per store currency unit, fixed at checkout. */
+  rate: number;
+  /** Each item's unit price as shown to the buyer, by variant id. */
+  units: Record<string, number>;
+  subtotalMinor: number;
+  discountMinor: number;
+  shippingMinor: number;
+  taxMinor: number;
+  totalMinor: number;
+};
+
 export type TaxBreakdownLine = { jurisdiction: string; label: string; rateBps: number; amountMinor: number };
 
 export type Address = {
@@ -222,6 +243,7 @@ export const orders = pgTable(
     taxIncluded: boolean("tax_included").notNull().default(false),
     taxBreakdown: jsonb("tax_breakdown").$type<TaxBreakdownLine[]>().notNull().default([]),
     taxCalculationId: text("tax_calculation_id"),
+    presentment: jsonb("presentment").$type<Presentment>(),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -401,6 +423,8 @@ export const refunds = pgTable(
     amountMinor: money("amount_minor").notNull(),
     platformFeeRefundedMinor: money("platform_fee_refunded_minor").notNull().default(0),
     taxRefundedMinor: money("tax_refunded_minor").notNull().default(0),
+    // In the buyer's currency, when they paid in another one.
+    presentmentAmountMinor: money("presentment_amount_minor"),
     reason: text("reason"),
     providerRefundId: text("provider_refund_id").unique(),
     createdAt: createdAt(),

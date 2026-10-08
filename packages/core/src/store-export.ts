@@ -5,6 +5,7 @@ import { asc, eq, inArray } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
+import { CURRENCIES } from "./currency";
 import { csvCell } from "./payouts";
 import { parseTheme } from "./theme-doc";
 
@@ -43,6 +44,8 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       prices_include_tax: shop.pricesIncludeTax,
       abandoned_cart_emails: shop.abandonedCartEmails,
       reviews_auto_publish: shop.reviewsAutoPublish,
+      presentment_currencies: shop.presentmentCurrencies,
+      round_converted_prices: shop.roundConvertedPrices,
     },
     theme: theme ? { template: theme.template, draft: theme.draft, published: theme.published } : null,
     products: products.map((p) => ({
@@ -104,7 +107,13 @@ const importSchema = z.object({
   format: z.literal(EXPORT_FORMAT, { errorMap: () => ({ message: "This isn't a store file from us." }) }),
   version: z.literal(1, { errorMap: () => ({ message: "This store file is from a newer version. Update and try again." }) }),
   store: z
-    .object({ prices_include_tax: z.boolean().optional(), abandoned_cart_emails: z.boolean().optional(), reviews_auto_publish: z.boolean().optional() })
+    .object({
+      prices_include_tax: z.boolean().optional(),
+      abandoned_cart_emails: z.boolean().optional(),
+      reviews_auto_publish: z.boolean().optional(),
+      presentment_currencies: z.array(z.enum(CURRENCIES)).max(CURRENCIES.length).optional(),
+      round_converted_prices: z.boolean().optional(),
+    })
     .passthrough(),
   theme: z.object({ template: str(40), draft: z.unknown(), published: z.unknown() }).nullable().optional(),
   products: z
@@ -288,6 +297,8 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
     if (data.store.prices_include_tax !== undefined) settings.pricesIncludeTax = data.store.prices_include_tax;
     if (data.store.abandoned_cart_emails !== undefined) settings.abandonedCartEmails = data.store.abandoned_cart_emails;
     if (data.store.reviews_auto_publish !== undefined) settings.reviewsAutoPublish = data.store.reviews_auto_publish;
+    if (data.store.presentment_currencies !== undefined) settings.presentmentCurrencies = [...new Set(data.store.presentment_currencies)];
+    if (data.store.round_converted_prices !== undefined) settings.roundConvertedPrices = data.store.round_converted_prices;
     if (Object.keys(settings).length) await tx.update(schema.shops).set(settings).where(eq(schema.shops.id, shopId));
     return {
       products: data.products.length,

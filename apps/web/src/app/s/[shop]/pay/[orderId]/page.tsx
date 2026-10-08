@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { formatMoney, getOrder, NotFoundError } from "@sf/core";
+import { buyerAmounts, formatMoney, getOrder, NotFoundError } from "@sf/core";
 import { db, payments } from "@/lib/server";
 import { SubmitButton } from "@/components/SubmitButton";
 import { fakePayAction } from "../../actions";
@@ -19,8 +19,10 @@ export default async function PayPage({ params }: { params: Promise<{ shop: stri
   });
   if (order.paymentStatus !== "pending" && order.paymentStatus !== "failed") redirect(`${base}/orders/${order.paymentIntentId}`);
   const provider = payments();
-  const money = (m: number) => formatMoney(m, order.currency);
-  const payLabel = `Pay ${money(order.totalMinor)}`;
+  // What the buyer pays, in their own currency when they shopped in one.
+  const due = buyerAmounts(order, order.lines);
+  const money = (m: number) => formatMoney(m, due.currency);
+  const payLabel = `Pay ${money(due.totalMinor)}`;
   const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
   let card: React.ReactNode = null;
   if (provider.name === "stripe" && publishableKey) {
@@ -35,26 +37,26 @@ export default async function PayPage({ params }: { params: Promise<{ shop: stri
     <main className="max-w-md mx-auto px-4 sm:px-6 py-12 flex flex-col gap-6">
       <h1 className="text-3xl font-bold tracking-tight">Payment</h1>
       <dl className="card p-5 grid grid-cols-[1fr_auto] gap-y-1 num text-sm">
-        {order.lines.map((l) => (
+        {order.lines.map((l, n) => (
           <div key={l.id} className="contents">
-            <dt>{l.title} <span className="hint">× {l.quantity}</span></dt><dd className="text-right">{money(l.unitPriceMinor * l.quantity)}</dd>
+            <dt>{l.title} <span className="hint">× {l.quantity}</span></dt><dd className="text-right">{money(due.lines[n]!)}</dd>
           </div>
         ))}
         {order.discountMinor > 0 && (
           <>
             <dt className="hint border-t border-border pt-2 mt-1">Discount ({order.discountCode})</dt>
-            <dd className="text-right border-t border-border pt-2 mt-1">−{money(order.discountMinor)}</dd>
+            <dd className="text-right border-t border-border pt-2 mt-1">−{money(due.discountMinor)}</dd>
           </>
         )}
         <dt className={`hint ${order.discountMinor ? "" : "border-t border-border pt-2 mt-1"}`}>Shipping{order.discountCode && !order.shippingMinor && !order.discountMinor ? ` (${order.discountCode})` : ""}</dt>
-        <dd className={`text-right ${order.discountMinor ? "" : "border-t border-border pt-2 mt-1"}`}>{order.shippingMinor ? money(order.shippingMinor) : "Free"}</dd>
+        <dd className={`text-right ${order.discountMinor ? "" : "border-t border-border pt-2 mt-1"}`}>{due.shippingMinor ? money(due.shippingMinor) : "Free"}</dd>
         {order.taxMinor > 0 && (
           <>
             <dt className="hint">{order.taxBreakdown.map((t) => t.label).join(", ") || "Tax"}{order.taxIncluded ? " (included)" : ""}</dt>
-            <dd className="text-right">{money(order.taxMinor)}</dd>
+            <dd className="text-right">{money(due.taxMinor)}</dd>
           </>
         )}
-        <dt className="font-semibold text-base">Total due</dt><dd className="font-semibold text-base text-right">{money(order.totalMinor)}</dd>
+        <dt className="font-semibold text-base">Total due</dt><dd className="font-semibold text-base text-right">{money(due.totalMinor)}</dd>
       </dl>
       {order.paymentStatus === "failed" && <p className="banner banner-critical">The last attempt didn't go through. You can try again.</p>}
       {provider.name === "fake" ? (

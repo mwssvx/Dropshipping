@@ -37,9 +37,21 @@ export async function refundOrder(
     .returning();
   if (!reserved) throw new UserError("Someone else just refunded this order. Reload to see what's left.");
 
+  // A buyer who paid in another currency is refunded in it, at the rate they paid; refunding
+  // everything left returns exactly what's left of their charge.
+  let presentmentAmount: number | null = null;
+  if (order.presentment) {
+    const [{ done }] = (await db
+      .select({ done: sql<number>`coalesce(sum(${schema.refunds.presentmentAmountMinor}), 0)::int` })
+      .from(schema.refunds)
+      .where(eq(schema.refunds.orderId, order.id))) as [{ done: number }];
+    const presentLeft = order.presentment.totalMinor - Number(done);
+    presentmentAmount = amount === left ? presentLeft : Math.min(presentLeft, Math.round(amount * order.presentment.rate));
+  }
+
   let providerRefundId: string;
   try {
-    ({ id: providerRefundId } = await ctx.payments.refund({ paymentIntentId: order.paymentIntentId, amountMinor: amount, reason }));
+    ({ id: providerRefundId } = await ctx.payments.refund({ paymentIntentId: order.paymentIntentId, amountMinor: presentmentAmount ?? amount, reason }));
   } catch (e) {
     await db
       .update(schema.orders)
@@ -73,6 +85,7 @@ export async function refundOrder(
         amountMinor: amount,
         platformFeeRefundedMinor: Math.max(feeBack, 0),
         taxRefundedMinor: Math.max(taxBack, 0),
+        presentmentAmountMinor: presentmentAmount,
         reason,
         providerRefundId,
       })

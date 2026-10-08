@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Track } from "@/components/Track";
 import { getActiveProductByHandle, NotFoundError, productReviews, upsellsFor } from "@sf/core";
 import { db } from "@/lib/server";
+import { buyerFx } from "@/lib/currency";
 import { SubmitButton } from "@/components/SubmitButton";
 import { addToCartAction } from "../../actions";
 import { loadShop, storeBase } from "../../data";
@@ -56,7 +57,7 @@ export default async function ProductPage({ params }: { params: Promise<{ shop: 
   const buyable = product.variants.filter((x) => x.stock === null || x.stock > 0);
   const v = buyable[0] ?? product.variants[0];
   const many = product.variants.length > 1;
-  const [reviews, upsells, base] = await Promise.all([productReviews(await db(), product.id), upsellsFor(await db(), shop.id, [product.id]), storeBase(shopHandle)]);
+  const [reviews, upsells, base, fx] = await Promise.all([productReviews(await db(), product.id), upsellsFor(await db(), shop.id, [product.id]), storeBase(shopHandle), buyerFx(shop)]);
   const jsonLd = JSON.stringify(productJsonLd(product, shop.currency, reviews)).replace(/</g, "\\u003c");
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-10 md:grid-cols-2">
@@ -73,7 +74,7 @@ export default async function ProductPage({ params }: { params: Promise<{ shop: 
             <span className="hint">{reviews.average} · {reviews.count} {reviews.count === 1 ? "review" : "reviews"}</span>
           </a>
         )}
-        {v && <div className="text-xl"><Price minor={v.priceMinor} compareAt={v.compareAtMinor} currency={shop.currency} /></div>}
+        {v && <div className="text-xl"><Price minor={v.priceMinor} compareAt={v.compareAtMinor} currency={shop.currency} fx={fx} /></div>}
         {v && buyable.length > 0 && (
           <form action={addToCartAction.bind(null, shopHandle)} className="flex flex-col gap-4">
             {many ? (
@@ -86,7 +87,7 @@ export default async function ProductPage({ params }: { params: Promise<{ shop: 
                       <label key={x.id} className={`chip ${out ? "opacity-50 line-through" : ""}`}>
                         <input type="radio" name="variantId" value={x.id} defaultChecked={x.id === v.id} disabled={out} className="sr-only peer" />
                         <span>{x.title}</span>
-                        <span className="hint num"><Price minor={x.priceMinor} currency={shop.currency} /></span>
+                        <span className="hint num"><Price minor={x.priceMinor} currency={shop.currency} fx={fx} /></span>
                       </label>
                     );
                   })}
@@ -115,7 +116,7 @@ export default async function ProductPage({ params }: { params: Promise<{ shop: 
               <Link key={u.id} href={`${base}/products/${u.handle}`} className="flex items-center gap-3 hover:underline">
                 <span className="size-12 rounded-md bg-sunken overflow-hidden shrink-0">{u.imageUrl && <img src={u.imageUrl} alt="" className="size-full object-cover" />}</span>
                 <span className="flex-1">{u.title}</span>
-                <span className="num"><Price minor={u.priceMinor} currency={shop.currency} /></span>
+                <span className="num"><Price minor={u.priceMinor} currency={shop.currency} fx={fx} /></span>
               </Link>
             ))}
           </section>

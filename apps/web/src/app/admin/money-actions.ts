@@ -10,6 +10,7 @@ import {
   removeTaxRegistration,
   runFakePayouts,
   setPricesIncludeTax,
+  setShopCurrencies,
   simulateHold,
   startPayoutSetup,
   submitRequirementDocument,
@@ -144,4 +145,16 @@ export async function setPricesIncludeTaxAction(form: FormData) {
   const { shop, db } = await requireShop("taxes");
   await setPricesIncludeTax(db, shop.id, form.get("pricesIncludeTax") === "1");
   revalidatePath("/admin/taxes");
+}
+
+export async function saveCurrenciesAction(_: FormState, form: FormData): Promise<FormState> {
+  const { shop, db } = await requireShop("currencies");
+  try {
+    await setShopCurrencies(db, shop, { currencies: form.getAll("currencies").map(String), round: form.get("round") === "on" });
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath("/admin/currencies");
+  return { saved: true };
 }

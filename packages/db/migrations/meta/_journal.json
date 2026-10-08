@@ -85,6 +85,13 @@
       "when": 1791494237020,
       "tag": "0011_buyer_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791495017018,
+      "tag": "0012_currencies",
+      "breakpoints": true
     }
   ]
 }

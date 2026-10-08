@@ -4,6 +4,7 @@ import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
 import type { Mailer } from "./email";
 import { formatMoney } from "./money";
+import { buyerAmounts } from "./currency";
 import { SupplierError, type ProblemCode, type Suppliers } from "./suppliers";
 
 type Order = typeof schema.orders.$inferSelect;
@@ -297,6 +298,7 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
   const first = order.shippingAddress.name.split(" ")[0];
   if (kind === "abandoned_cart") {
     const lines = await ctx.db.query.orderLines.findMany({ where: eq(schema.orderLines.orderId, order.id) });
+    const paid = buyerAmounts(order, lines);
     const pay = ctx.payUrl ? await ctx.payUrl(shop, order) : link;
     return {
       subject: `You left something at ${shop.name}`,
@@ -305,9 +307,9 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
         ``,
         `You started checking out at ${shop.name} but didn't finish. Your cart is saved:`,
         ``,
-        ...lines.map((l) => `  ${l.title} × ${l.quantity}  ${formatMoney(l.unitPriceMinor * l.quantity, order.currency)}`),
+        ...lines.map((l, n) => `  ${l.title} × ${l.quantity}  ${formatMoney(paid.lines[n]!, paid.currency)}`),
         ``,
-        `Total: ${formatMoney(order.totalMinor, order.currency)}`,
+        `Total: ${formatMoney(paid.totalMinor, paid.currency)}`,
         ``,
         `Finish your order: ${pay}`,
         ``,
@@ -324,7 +326,7 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
       text: [
         `Hi ${first},`,
         ``,
-        `${shop.name} refunded ${formatMoney(refund.amountMinor, order.currency)} to the card you paid with${full ? " (the whole order)" : ""}.`,
+        `${shop.name} refunded ${refund.presentmentAmountMinor != null && order.presentment ? formatMoney(refund.presentmentAmountMinor, order.presentment.currency) : formatMoney(refund.amountMinor, order.currency)} to the card you paid with${full ? " (the whole order)" : ""}.`,
         ...(refund.reason ? [``, `Reason: ${refund.reason}`] : []),
         ``,
         `Banks usually show it within 5 to 10 business days.`,
@@ -335,6 +337,7 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
   }
   if (kind === "order_confirmation") {
     const lines = await ctx.db.query.orderLines.findMany({ where: eq(schema.orderLines.orderId, order.id) });
+    const paid = buyerAmounts(order, lines);
     return {
       subject: `Order #${order.number} confirmed`,
       text: [
@@ -342,9 +345,9 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
         ``,
         `Thanks for your order from ${shop.name}. Here's what you bought:`,
         ``,
-        ...lines.map((l) => `  ${l.title} × ${l.quantity}  ${formatMoney(l.unitPriceMinor * l.quantity, order.currency)}`),
+        ...lines.map((l, n) => `  ${l.title} × ${l.quantity}  ${formatMoney(paid.lines[n]!, paid.currency)}`),
         ``,
-        `Total paid: ${formatMoney(order.totalMinor, order.currency)}`,
+        `Total paid: ${formatMoney(paid.totalMinor, paid.currency)}`,
         ``,
         `We'll email you again when it ships. Track your order any time: ${link}`,
       ].join("\n"),

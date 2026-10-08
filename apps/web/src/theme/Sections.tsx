@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Section, SectionSettings } from "@sf/core/theme";
 import type { StorefrontCatalog } from "@sf/core";
+import type { DisplayFx } from "@sf/core/money";
 import { Price } from "@/components/Price";
 import { storeHref } from "./style";
 
@@ -9,7 +10,8 @@ import { storeHref } from "./style";
  * them on the server and the editor preview renders the same ones in the browser.
  */
 
-export type SectionData = { base: string; currency: string; catalog: StorefrontCatalog };
+/** fx: the buyer's currency when they picked another one. */
+export type SectionData = { base: string; currency: string; fx?: DisplayFx; catalog: StorefrontCatalog };
 
 type Props<T extends keyof SectionSettings> = { s: SectionSettings[T]; data: SectionData; first: boolean };
 
@@ -68,7 +70,7 @@ export function ProductGrid({ products, data }: { products: StorefrontCatalog["p
               )}
             </div>
             <span className="font-medium group-hover:underline">{p.title}</span>
-            <Price minor={p.priceMinor} compareAt={p.compareAtMinor} currency={data.currency} />
+            <Price minor={p.priceMinor} compareAt={p.compareAtMinor} currency={data.currency} fx={data.fx} />
           </Link>
         </li>
       ))}

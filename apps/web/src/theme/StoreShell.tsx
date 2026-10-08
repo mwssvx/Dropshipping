@@ -2,6 +2,7 @@ import Link from "next/link";
 import { themeFontsHref, type ThemeDoc } from "@sf/core/theme";
 import { BRAND } from "@/lib/brand";
 import { SectionView } from "./Sections";
+import { CurrencyPicker } from "./CurrencyPicker";
 import { storeHref, themeStyle } from "./style";
 
 /** Header, announcement bar and footer around every storefront page, styled by the theme. */
@@ -13,6 +14,7 @@ export function StoreShell({
   cartCount,
   closed,
   verified,
+  picker,
   children,
 }: {
   doc: ThemeDoc;
@@ -23,6 +25,8 @@ export function StoreShell({
   closed?: boolean;
   /** Shown as a badge in the footer, linking to what it means. */
   verified?: boolean;
+  /** When the store sells in more than one currency: the choices, the buyer's, and how to switch. */
+  picker?: { currencies: string[]; current: string; action: (form: FormData) => Promise<void> };
   children: React.ReactNode;
 }) {
   const { settings, menus } = doc;
@@ -60,6 +64,7 @@ export function StoreShell({
                 </nav>
               </details>
             )}
+            {picker && picker.currencies.length > 1 && <CurrencyPicker {...picker} />}
             <Link href={`${base}/account`} className="text-sm font-medium hover:text-accent px-2">Account</Link>
             <Link href={`${base}/cart`} className="btn btn-secondary" aria-label={`Cart, ${cartCount} items`}>
               Cart{cartCount > 0 && <span className="num rounded-full bg-ink text-surface text-xs px-1.5 py-0.5">{cartCount}</span>}

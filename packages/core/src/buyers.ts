@@ -7,6 +7,7 @@ import { z } from "zod";
 import type { Mailer } from "./email";
 import { UserError } from "./errors";
 import type { CartLine } from "./orders";
+import { buyerAmounts } from "./currency";
 
 const MINUTE = 60_000;
 const CODE_MINUTES = 10;
@@ -91,18 +92,22 @@ export async function buyerOrders(db: Db, shopId: string, buyerEmail: string) {
   });
   if (!orders.length) return [];
   const lines = await db.query.orderLines.findMany({ where: inArray(schema.orderLines.orderId, orders.map((o) => o.id)) });
-  return orders.map((o) => ({
-    id: o.id,
-    number: o.number,
-    ref: o.paymentIntentId!,
-    paidAt: o.paidAt!,
-    currency: o.currency,
-    totalMinor: o.totalMinor,
-    refundedMinor: o.refundedMinor,
-    paymentStatus: o.paymentStatus,
-    fulfillmentStatus: o.fulfillmentStatus,
-    items: lines.filter((l) => l.orderId === o.id).map((l) => ({ title: l.title, quantity: l.quantity, variantId: l.variantId })),
-  }));
+  return orders.map((o) => {
+    // In the buyer's own currency when they shopped in one.
+    const paid = buyerAmounts(o);
+    return {
+      id: o.id,
+      number: o.number,
+      ref: o.paymentIntentId!,
+      paidAt: o.paidAt!,
+      currency: paid.currency,
+      totalMinor: paid.totalMinor,
+      refundedMinor: paid.refundedMinor,
+      paymentStatus: o.paymentStatus,
+      fulfillmentStatus: o.fulfillmentStatus,
+      items: lines.filter((l) => l.orderId === o.id).map((l) => ({ title: l.title, quantity: l.quantity, variantId: l.variantId })),
+    };
+  });
 }
 
 /** Details for checkout from the buyer's last order: their email, name and shipping address. */

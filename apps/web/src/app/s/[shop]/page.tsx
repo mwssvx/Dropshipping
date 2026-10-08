@@ -1,5 +1,6 @@
 import { storefrontCatalog } from "@sf/core";
 import { db } from "@/lib/server";
+import { buyerFx } from "@/lib/currency";
 import { HomeSections } from "@/theme/Sections";
 import { loadShop, loadTheme, storeBase } from "./data";
 
@@ -10,7 +11,7 @@ export default async function StoreHome({ params }: { params: Promise<{ shop: st
   return (
     <main>
       <h1 className="sr-only">{theme.settings.seo.title || shop.name}</h1>
-      <HomeSections sections={theme.home} data={{ base, currency: shop.currency, catalog }} />
+      <HomeSections sections={theme.home} data={{ base, currency: shop.currency, fx: await buyerFx(shop), catalog }} />
     </main>
   );
 }

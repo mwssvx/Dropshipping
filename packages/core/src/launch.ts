@@ -80,9 +80,9 @@ export function launchChecks(env: Env): LaunchCheck[] {
     id: "push", area: "App", label: "Push notifications are sent", severity: "warning",
     fix: "Leave PUSH_PROVIDER empty in production so notifications go through Expo.",
   });
-  add(!on("DOMAIN_CHECKS", "off") && !on("WEBHOOKS_ALLOW_PRIVATE", "on") && !on("EMAIL_PREVIEW", "on"), {
+  add(!on("DOMAIN_CHECKS", "off") && !on("WEBHOOKS_ALLOW_PRIVATE", "on") && !on("EMAIL_PREVIEW", "on") && !on("FX_PROVIDER", "static"), {
     id: "test-switches", area: "Security", label: "Test-only switches are off", severity: "blocker",
-    fix: "Remove DOMAIN_CHECKS=off, WEBHOOKS_ALLOW_PRIVATE=on and EMAIL_PREVIEW=on. They skip checks that protect stores.",
+    fix: "Remove DOMAIN_CHECKS=off, WEBHOOKS_ALLOW_PRIVATE=on, EMAIL_PREVIEW=on and FX_PROVIDER=static. They skip checks that protect stores or use made-up exchange rates.",
   });
   add(!(env.APP_WEB_ORIGINS ?? "").includes("localhost"), {
     id: "app-origins", area: "Security", label: "No local addresses can call the app API", severity: "warning",

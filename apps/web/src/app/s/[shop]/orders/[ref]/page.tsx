@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { buyerThread, formatMoney, getOrderByPaymentIntent, NotFoundError, reviewableItems } from "@sf/core";
+import { buyerAmounts, buyerThread, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, reviewableItems } from "@sf/core";
 import Link from "next/link";
 import { db } from "@/lib/server";
 import { loadShop, storeBase } from "../../data";
@@ -21,6 +21,10 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
   const thread = paid ? await buyerThread(await db(), shop.id, ref) : [];
   const reviewable = paid ? await reviewableItems(await db(), shop.id, ref) : [];
   const base = await storeBase(handle);
+  // Amounts as the buyer paid them, in their own currency when they shopped in one.
+  const refunds = order.presentment && order.refundedMinor ? await listRefunds(await db(), order.id) : [];
+  const due = buyerAmounts(order, order.lines, order.presentment ? refunds.reduce((s, r) => s + (r.presentmentAmountMinor ?? 0), 0) : undefined);
+  const money = (m: number) => formatMoney(m, due.currency);
   const shipped = order.fulfillments.filter((f) => f.trackingNumber);
   const steps = [
     { label: "Order confirmed", done: paid },
@@ -41,7 +45,7 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
       </div>
       {order.refundedMinor > 0 && (
         <p className="banner banner-info">
-          {order.paymentStatus === "refunded" ? "This order was refunded" : `${formatMoney(order.refundedMinor, order.currency)} was refunded`} to the card you paid with. Banks usually show it within 5 to 10 business days.
+          {order.paymentStatus === "refunded" ? "This order was refunded" : `${money(due.refundedMinor)} was refunded`} to the card you paid with. Banks usually show it within 5 to 10 business days.
         </p>
       )}
       <ol className="grid grid-cols-4 gap-2" aria-label="Order progress">
@@ -70,17 +74,17 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
         </p>
       )}
       <section className="card p-5 flex flex-col gap-3 text-sm">
-        {order.lines.map((l) => (
-          <div key={l.id} className="flex justify-between gap-3"><span>{l.title} × {l.quantity}</span><span className="num">{formatMoney(l.unitPriceMinor * l.quantity, order.currency)}</span></div>
+        {order.lines.map((l, n) => (
+          <div key={l.id} className="flex justify-between gap-3"><span>{l.title} × {l.quantity}</span><span className="num">{money(due.lines[n]!)}</span></div>
         ))}
         {order.discountMinor > 0 && (
-          <div className="flex justify-between gap-3 hint"><span>Discount ({order.discountCode})</span><span className="num">−{formatMoney(order.discountMinor, order.currency)}</span></div>
+          <div className="flex justify-between gap-3 hint"><span>Discount ({order.discountCode})</span><span className="num">−{money(due.discountMinor)}</span></div>
         )}
-        <div className="flex justify-between gap-3 hint"><span>Shipping</span><span className="num">{order.shippingMinor ? formatMoney(order.shippingMinor, order.currency) : "Free"}</span></div>
+        <div className="flex justify-between gap-3 hint"><span>Shipping</span><span className="num">{due.shippingMinor ? money(due.shippingMinor) : "Free"}</span></div>
         {order.taxMinor > 0 && (
-          <div className="flex justify-between gap-3 hint"><span>{order.taxBreakdown.map((t) => t.label).join(", ") || "Tax"}{order.taxIncluded ? " (included)" : ""}</span><span className="num">{formatMoney(order.taxMinor, order.currency)}</span></div>
+          <div className="flex justify-between gap-3 hint"><span>{order.taxBreakdown.map((t) => t.label).join(", ") || "Tax"}{order.taxIncluded ? " (included)" : ""}</span><span className="num">{money(due.taxMinor)}</span></div>
         )}
-        <div className="flex justify-between gap-3 border-t border-border pt-3 font-semibold"><span>Total</span><span className="num">{formatMoney(order.totalMinor, order.currency)}</span></div>
+        <div className="flex justify-between gap-3 border-t border-border pt-3 font-semibold"><span>Total</span><span className="num">{money(due.totalMinor)}</span></div>
       </section>
       {reviewable.length > 0 && (
         <section id="review" className="card p-5 flex flex-col gap-4" aria-labelledby="review-heading">

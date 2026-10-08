@@ -63,6 +63,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           {show("plan") && <NavLink href="/admin/plan">Plan</NavLink>}
           {show("ai") && <NavLink href="/admin/ai">AI settings</NavLink>}
           {show("taxes") && <NavLink href="/admin/taxes">Taxes</NavLink>}
+          {show("currencies") && <NavLink href="/admin/currencies">Currencies</NavLink>}
           {show("developers") && <NavLink href="/admin/developers">Developers</NavLink>}
           {show("export") && <NavLink href="/admin/export">Export and import</NavLink>}
         </nav>
