@@ -1,4 +1,4 @@
-// Milestone 1 to 4 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 5 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -67,6 +67,12 @@ export const shops = pgTable(
     pricesIncludeTax: boolean("prices_include_tax").notNull().default(false),
     // Set while the store meets the verified-store checklist; shown as a badge on the storefront.
     verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    // AI settings. Budget in minor units of USD per calendar month; null means the plan's default.
+    aiBudgetMinor: integer("ai_budget_minor"),
+    // Kinds of buyer question the support agent may answer without the merchant checking first.
+    aiAutoReplyTopics: jsonb("ai_auto_reply_topics").$type<string[]>().notNull().default([]),
+    // Let the margin agent pause a product that loses money without asking first.
+    aiAutoPause: boolean("ai_auto_pause").notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -279,7 +285,7 @@ export const emails = pgTable(
     id: id(),
     shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
     orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
-    kind: text("kind", { enum: ["order_confirmation", "shipping_update", "delivered", "refund"] }).notNull(),
+    kind: text("kind", { enum: ["order_confirmation", "shipping_update", "delivered", "refund", "support_reply"] }).notNull(),
     // Tells apart emails of a kind that can repeat (one per refund). Empty for once-only kinds.
     ref: text("ref").notNull().default(""),
     to: text("to").notNull(),
@@ -495,4 +501,96 @@ export const appeals = pgTable(
     // One open appeal per notice at a time.
     uniqueIndex("appeals_open_uq").on(t.noticeId).where(sql`${t.status} = 'open'`),
   ],
+);
+
+// AI agents. Every run is recorded with its token use and cost, and every tool call it makes is an
+// agent action: reads run straight away, changes may wait for the merchant's approval.
+export const AGENTS = ["listing", "assistant", "buyer_support", "fulfilment", "margin"] as const;
+export type AgentName = (typeof AGENTS)[number];
+
+export const agentRuns = pgTable(
+  "agent_runs",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    agent: text("agent", { enum: AGENTS }).notNull(),
+    trigger: text("trigger", { enum: ["merchant", "buyer", "schedule", "event"] }).notNull(),
+    status: text("status", { enum: ["running", "done", "failed", "over_budget"] }).notNull().default("running"),
+    model: text("model").notNull(),
+    conversationId: uuid("conversation_id"),
+    orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
+    productId: uuid("product_id").references(() => products.id, { onDelete: "set null" }),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    cacheReadTokens: integer("cache_read_tokens").notNull().default(0),
+    cacheWriteTokens: integer("cache_write_tokens").notNull().default(0),
+    // Millionths of a US dollar, so small runs don't round to zero.
+    costMicros: bigint("cost_micros", { mode: "number" }).notNull().default(0),
+    error: text("error"),
+    createdAt: createdAt(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => [index("agent_runs_shop_created_idx").on(t.shopId, t.createdAt), index("agent_runs_order_idx").on(t.orderId)],
+);
+
+export const agentActions = pgTable(
+  "agent_actions",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    runId: uuid("run_id").notNull().references(() => agentRuns.id, { onDelete: "cascade" }),
+    agent: text("agent", { enum: AGENTS }).notNull(),
+    tool: text("tool").notNull(),
+    input: jsonb("input").$type<Record<string, unknown>>().notNull(),
+    // What the merchant sees in the approvals list and the activity log.
+    summary: text("summary").notNull(),
+    status: text("status", { enum: ["done", "pending", "approved", "rejected", "failed", "blocked"] }).notNull(),
+    // Why it needs the merchant's OK (pending), or why it was refused (blocked).
+    reason: text("reason"),
+    result: jsonb("result").$type<unknown>(),
+    error: text("error"),
+    decidedBy: text("decided_by"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("agent_actions_shop_status_idx").on(t.shopId, t.status, t.createdAt)],
+);
+
+// A conversation: a buyer asking about an order, the merchant talking to their assistant, or a
+// ticket for platform staff.
+export const conversations = pgTable(
+  "conversations",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["buyer", "assistant", "ticket"] }).notNull(),
+    orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
+    email: text("email"),
+    subject: text("subject").notNull(),
+    // needs_merchant: the agent handed it over. escalated: waiting on platform staff.
+    status: text("status", { enum: ["open", "needs_merchant", "escalated", "resolved"] }).notNull().default("open"),
+    statusReason: text("status_reason"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("conversations_shop_idx").on(t.shopId, t.kind, t.updatedAt),
+    index("conversations_status_idx").on(t.status, t.updatedAt),
+    uniqueIndex("conversations_buyer_order_uq").on(t.orderId).where(sql`${t.kind} = 'buyer'`),
+  ],
+);
+
+export const messages = pgTable(
+  "messages",
+  {
+    id: id(),
+    conversationId: uuid("conversation_id").notNull().references(() => conversations.id, { onDelete: "cascade" }),
+    author: text("author", { enum: ["merchant", "buyer", "agent", "staff"] }).notNull(),
+    body: text("body").notNull(),
+    // Agent replies to buyers start as drafts unless the merchant allowed that kind of answer.
+    status: text("status", { enum: ["sent", "draft", "discarded"] }).notNull().default("sent"),
+    topic: text("topic"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("messages_conversation_idx").on(t.conversationId, t.createdAt)],
 );

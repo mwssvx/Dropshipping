@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { decideAppeal, sendNotice, UserError, type NoticeReason } from "@sf/core";
+import { decideAppeal, sendNotice, staffReply, UserError, type NoticeReason } from "@sf/core";
 import { requireStaff } from "@/lib/server";
 import type { FormState } from "../admin/actions";
 
@@ -29,6 +29,18 @@ export async function decideAppealAction(appealId: string, _: FormState, form: F
   const { user, db } = await requireStaff();
   try {
     await decideAppeal(db, appealId, { accept: form.get("decision") === "accept", response: String(form.get("response") ?? ""), by: user.email });
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath("/staff", "layout");
+  return { saved: true };
+}
+
+export async function staffReplyAction(conversationId: string, _: FormState, form: FormData): Promise<FormState> {
+  const { user, db } = await requireStaff();
+  try {
+    await staffReply(db, conversationId, { body: String(form.get("message") ?? ""), close: form.get("close") === "on", by: user.email });
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
     throw e;

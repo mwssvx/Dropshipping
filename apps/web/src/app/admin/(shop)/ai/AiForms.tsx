@@ -1,0 +1,50 @@
+"use client";
+import { useActionState } from "react";
+import { FormError } from "@/components/FormError";
+import { SubmitButton } from "@/components/SubmitButton";
+import { marginCheckAction, saveAiSettingsAction } from "../../ai-actions";
+
+export function AiSettingsForm(props: { budget: string; planMax: string; topics: { key: string; label: string; on: boolean }[]; autoPause: boolean }) {
+  const [state, action] = useActionState(saveAiSettingsAction, {});
+  return (
+    <form action={action} className="flex flex-col gap-5">
+      <FormError message={state.error} />
+      {state.saved && <p className="banner banner-info" role="status">Saved.</p>}
+      <div className="field max-w-xs">
+        <label className="label" htmlFor="budget">Monthly AI budget (US$)</label>
+        <input className="input num" id="budget" name="budget" inputMode="decimal" defaultValue={props.budget} placeholder={props.planMax} />
+        <span className="hint">Up to ${props.planMax} is included in your plan. The assistants stop for the month when it&apos;s used.</span>
+      </div>
+      <fieldset className="flex flex-col gap-2">
+        <legend className="label mb-1">Buyer questions the assistant may answer without you checking first</legend>
+        <div className="flex flex-wrap gap-2">
+          {props.topics.map((t) => (
+            <label key={t.key} className="chip">
+              <input type="checkbox" name="topics" value={t.key} defaultChecked={t.on} /> {t.label}
+            </label>
+          ))}
+        </div>
+        <span className="hint">Replies that mention refunds, discounts or anything free always wait for you, and so do refunds, cancellations and complaints.</span>
+      </fieldset>
+      <label className="flex items-start gap-3 text-sm">
+        <input type="checkbox" name="autoPause" defaultChecked={props.autoPause} className="mt-1 size-4" />
+        <span>
+          <span className="font-medium">Let margin watch take money-losing products off sale on its own</span>
+          <span className="hint block">Price changes over 10% always wait for you.</span>
+        </span>
+      </label>
+      <div><SubmitButton>Save</SubmitButton></div>
+    </form>
+  );
+}
+
+export function MarginCheckButton() {
+  const [state, action] = useActionState(marginCheckAction, {});
+  return (
+    <form action={action} className="flex flex-col gap-2">
+      <FormError message={state.error} />
+      {state.message && <p className="banner banner-info whitespace-pre-line" role="status">{state.message}</p>}
+      <div><SubmitButton className="btn btn-secondary" pendingText="Checking…">Check margins now</SubmitButton></div>
+    </form>
+  );
+}

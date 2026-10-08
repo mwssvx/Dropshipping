@@ -4,6 +4,7 @@ import { formatMoney, getOrder, listRefunds, listSupplierLinks, NotFoundError, P
 import { requireShop, suppliers } from "@/lib/server";
 import { CheckTrackingButton, ManualTrackingForm, RetryButton } from "./FulfillmentActions";
 import { RefundForm } from "./RefundForm";
+import { FixWithAiButton } from "./FixWithAiButton";
 import { FulfilmentStatus, PaymentStatus } from "@/components/Status";
 import { PageHeader } from "../../PageHeader";
 
@@ -26,7 +27,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     const provider = links.find((l) => l.id === supplierId)?.provider;
     return suppliers().available.find((s) => s.name === provider)?.label ?? provider ?? "Supplier";
   };
-  const EMAIL_LABEL = { order_confirmation: "Order confirmation", shipping_update: "Shipping update", delivered: "Delivery confirmation", refund: "Refund" };
+  const EMAIL_LABEL = { order_confirmation: "Order confirmation", shipping_update: "Shipping update", delivered: "Delivery confirmation", refund: "Refund", support_reply: "Reply to a question" };
   const timeline = [
     { at: order.createdAt, text: "Order placed" },
     ...(order.paidAt ? [{ at: order.paidAt, text: `Payment of ${money(order.totalMinor)} received` }] : []),
@@ -94,6 +95,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                 {f.status === "failed" && <RetryButton orderId={order.id} />}
                 <ManualTrackingForm orderId={order.id} primary={f.status !== "failed"} />
               </div>
+              {f.status === "failed" && <FixWithAiButton orderId={order.id} />}
             </section>
           ))}
           <section className="card p-5 flex flex-col gap-4">

@@ -1,7 +1,10 @@
 import { notFound } from "next/navigation";
-import { formatMoney, getOrderByPaymentIntent, NotFoundError } from "@sf/core";
+import { buyerThread, formatMoney, getOrderByPaymentIntent, NotFoundError } from "@sf/core";
 import { db } from "@/lib/server";
 import { loadShop } from "../../data";
+import { QuestionForm } from "./QuestionForm";
+
+const time = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 export const metadata = { title: "Order status", robots: { index: false } };
 
@@ -13,6 +16,7 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
     throw e;
   });
   const paid = ["paid", "partially_refunded", "refunded"].includes(order.paymentStatus);
+  const thread = paid ? await buyerThread(await db(), shop.id, ref) : [];
   const shipped = order.fulfillments.filter((f) => f.trackingNumber);
   const steps = [
     { label: "Order confirmed", done: paid },
@@ -66,6 +70,22 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
         )}
         <div className="flex justify-between gap-3 border-t border-border pt-3 font-semibold"><span>Total</span><span className="num">{formatMoney(order.totalMinor, order.currency)}</span></div>
       </section>
+      {paid && (
+        <section className="card p-5 flex flex-col gap-4" aria-labelledby="questions">
+          <h2 id="questions" className="font-semibold">Questions</h2>
+          {thread.length > 0 && (
+            <ol className="flex flex-col gap-3">
+              {thread.map((m) => (
+                <li key={m.id} className={`flex flex-col gap-1 max-w-[85%] ${m.author === "buyer" ? "self-end items-end" : "self-start"}`}>
+                  <span className="hint">{m.author === "buyer" ? "You" : shop.name} · {time.format(m.createdAt)}</span>
+                  <div className={`rounded-2xl px-4 py-2.5 text-sm whitespace-pre-line ${m.author === "buyer" ? "bg-accent text-accent-ink" : "bg-sunken"}`}>{m.body}</div>
+                </li>
+              ))}
+            </ol>
+          )}
+          <QuestionForm handle={handle} orderRef={ref} email={order.email} />
+        </section>
+      )}
     </main>
   );
 }

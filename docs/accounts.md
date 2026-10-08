@@ -11,7 +11,7 @@ Nothing here was signed up for on your behalf. Until these exist, the app runs o
 | Expo (EAS) | building the iOS and Android app | Expo Go | `eas init` |
 | Apple Developer ($99/yr), Google Play ($25 once) | publishing the app | none | needed before M6 store submission |
 | Resend | order emails (confirmation, shipped, delivered) | logged to the console and the `emails` table | `RESEND_API_KEY`, `EMAIL_FROM` on a verified domain |
-| Anthropic API | AI agents (M5) | none | `ANTHROPIC_API_KEY` |
+| Anthropic API | AI agents (M5) | rule-based demo brain with the same tools and approval rules | `ANTHROPIC_API_KEY` (console.anthropic.com > API keys). Set a monthly spend limit there too; each store also has its own AI budget in the app |
 | A domain | the platform's address; stores get `<handle>.<domain>` | `localhost` | set `NEXT_PUBLIC_ROOT_DOMAIN`, and add the domain plus a wildcard `*.<domain>` to the Vercel project |
 
 Also set `STAFF_EMAILS` to the email addresses (comma-separated) of the people who may open `/staff` to warn or pause stores and answer appeals.
