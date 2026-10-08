@@ -1,4 +1,4 @@
 export * from "./client";
 export * as schema from "./schema";
-export type { Address, TaxBreakdownLine, AgentName, PushKind } from "./schema";
-export { AGENTS, PUSH_KINDS } from "./schema";
+export type { Address, TaxBreakdownLine, AgentName, PushKind, StorefrontEventKind, WebhookEvent } from "./schema";
+export { AGENTS, PUSH_KINDS, STOREFRONT_EVENTS, WEBHOOK_EVENTS } from "./schema";

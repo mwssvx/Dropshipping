@@ -1,12 +1,22 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { findUsableDiscount, getOrder, handleBuyerMessage, quoteCart, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
+import { findUsableDiscount, getOrder, recordEvent, handleBuyerMessage, quoteCart, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
 import { readCart, readDiscountCode, writeCart, writeDiscountCode } from "@/lib/cart";
 import { agents, db, payments, tax } from "@/lib/server";
 import { processPaymentWebhook } from "@/lib/webhooks";
 import { loadShop, storeBase } from "./data";
+
+/** The visit id the store's tracker set, for the funnel. */
+async function track(shopId: string, kind: "add_to_cart" | "checkout_start", productId?: string | null) {
+  const sessionId = (await cookies()).get("sf_vid")?.value;
+  if (!sessionId) return;
+  after(async () => {
+    await recordEvent(await db(), shopId, { sessionId, kind, productId }).catch(() => {});
+  });
+}
 
 export async function addToCartAction(handle: string, form: FormData) {
   const shop = await loadShop(handle);
@@ -17,6 +27,8 @@ export async function addToCartAction(handle: string, form: FormData) {
   if (line) line.quantity = Math.min(99, line.quantity + quantity);
   else cart.push({ variantId, quantity });
   await writeCart(shop.id, cart);
+  const variant = await (await db()).query.variants.findFirst({ where: (v, { eq }) => eq(v.id, variantId), columns: { productId: true } }).catch(() => undefined);
+  await track(shop.id, "add_to_cart", variant?.productId);
   redirect(`${await storeBase(handle)}/cart`);
 }
 
@@ -76,6 +88,7 @@ export async function checkoutAction(handle: string, _: CheckoutState, form: For
       discountCode: await readDiscountCode(shop.id),
     }, tax());
     orderId = order.id;
+    await track(shop.id, "checkout_start");
   } catch (e) {
     if (e instanceof UserError) return { error: e.message, values };
     throw e;

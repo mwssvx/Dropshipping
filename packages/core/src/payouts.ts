@@ -372,7 +372,7 @@ export async function runFakePayouts(db: Db, now = new Date()) {
 
 // Statement -----------------------------------------------------------------------------------
 
-const csvCell = (v: string | number | null) => {
+export const csvCell = (v: string | number | null) => {
   const s = v === null ? "" : String(v);
   // Quote anything with separators, and defuse cells a spreadsheet would run as a formula.
   const safe = /^[=+\-@\t\r]/.test(s) && typeof v === "string" ? `'${s}` : s;
