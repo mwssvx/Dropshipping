@@ -1,27 +1,49 @@
-// Supplier adapters (milestone 2). The interface is fixed now so the order flow can depend on it.
-export type SupplierProduct = {
-  ref: string;
-  title: string;
-  descriptionHtml: string;
-  images: string[];
-  variants: { ref: string; title: string; costMinor: number; stock: number | null; shipDaysMin: number; shipDaysMax: number }[];
+import { CjSupplier } from "./cj";
+import { FakeSupplier } from "./fake";
+import { SupplierError, type SupplierAdapter, type SupplierName } from "./types";
+
+export * from "./types";
+export { FakeSupplier, DEMO_SUPPLIER_HOST, DEMO_SUPPLIER_LINKS } from "./fake";
+export { CjSupplier } from "./cj";
+
+export type Suppliers = {
+  get(name: SupplierName): SupplierAdapter;
+  /** The supplier a product link belongs to, or a SupplierError explaining what's supported. */
+  forUrl(url: string): SupplierAdapter;
+  available: SupplierAdapter[];
 };
 
-export interface SupplierAdapter {
-  readonly name: "fake" | "cj";
-  getProductFromUrl(url: string): Promise<SupplierProduct>;
-  placeOrder(input: { lines: { variantRef: string; quantity: number }[]; address: unknown; reference: string }): Promise<{ supplierOrderRef: string }>;
-  getTracking(supplierOrderRef: string): Promise<{ carrier: string; trackingNumber: string; url: string } | null>;
+export function suppliersFrom(list: SupplierAdapter[]): Suppliers {
+  return {
+    available: list,
+    get(name) {
+      const s = list.find((x) => x.name === name);
+      if (!s) throw new SupplierError("not_connected", `The ${name === "cj" ? "CJ Dropshipping" : name} connection isn't set up.`);
+      return s;
+    },
+    forUrl(raw) {
+      let url: URL;
+      try {
+        url = new URL(raw.trim());
+      } catch {
+        throw new SupplierError("product_unavailable", "Paste the full product link, starting with https://");
+      }
+      const s = list.find((x) => x.matchesUrl(url));
+      if (s) return s;
+      if (/(^|\.)cjdropshipping\.com$/.test(url.hostname)) {
+        throw new SupplierError("not_connected", "CJ Dropshipping isn't connected yet. Add your CJ API key to import from CJ.");
+      }
+      throw new SupplierError("product_unavailable", "That link isn't from a supported supplier. CJ Dropshipping links work once CJ is connected.");
+    },
+  };
 }
 
-/** CJ Dropshipping (official API). Wired up in milestone 2 once a CJ API key exists. */
-export class CjSupplier implements SupplierAdapter {
-  readonly name = "cj" as const;
-  constructor(private readonly apiKey: string | undefined) {}
-  private notReady(): never {
-    throw new Error(this.apiKey ? "CJ adapter arrives in milestone 2." : "CJ_API_KEY is not set.");
+/** The demo supplier is on unless DEMO_SUPPLIER=off. CJ is on when CJ_API_KEY is set. */
+export function suppliersFromEnv(env: Record<string, string | undefined>): Suppliers {
+  const list: SupplierAdapter[] = [];
+  if (env.CJ_API_KEY) list.push(new CjSupplier({ apiKey: env.CJ_API_KEY }));
+  if (env.DEMO_SUPPLIER !== "off") {
+    list.push(new FakeSupplier({ shipAfterMs: Number(env.DEMO_SUPPLIER_SHIP_AFTER_SECONDS ?? 0) * 1000 }));
   }
-  getProductFromUrl(): Promise<SupplierProduct> { return this.notReady(); }
-  placeOrder(): Promise<{ supplierOrderRef: string }> { return this.notReady(); }
-  getTracking(): Promise<null> { return this.notReady(); }
+  return suppliersFrom(list);
 }

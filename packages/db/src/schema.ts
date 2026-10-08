@@ -1,4 +1,4 @@
-// Milestone 1 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 and 2 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -76,6 +76,20 @@ export const shopMembers = pgTable(
   (t) => [primaryKey({ columns: [t.shopId, t.userId] }), index("shop_members_user_idx").on(t.userId)],
 );
 
+// A supplier connection for one store. Credentials live in a secret store; only a pointer is kept here.
+export const suppliers = pgTable(
+  "suppliers",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    provider: text("provider", { enum: ["fake", "cj"] }).notNull(),
+    credentialsRef: text("credentials_ref"),
+    status: text("status", { enum: ["connected", "error", "disconnected"] }).notNull().default("connected"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("suppliers_shop_provider_uq").on(t.shopId, t.provider)],
+);
+
 export const products = pgTable(
   "products",
   {
@@ -86,7 +100,9 @@ export const products = pgTable(
     descriptionHtml: text("description_html").notNull().default(""),
     imageUrl: text("image_url"),
     status: text("status", { enum: ["draft", "active", "archived"] }).notNull().default("draft"),
+    supplierId: uuid("supplier_id").references(() => suppliers.id, { onDelete: "set null" }),
     supplierProductRef: text("supplier_product_ref"),
+    sourceUrl: text("source_url"),
     aiGenerated: boolean("ai_generated").notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -105,6 +121,7 @@ export const variants = pgTable(
     title: text("title").notNull().default("Default"),
     options: jsonb("options").$type<Record<string, string>>().notNull().default({}),
     sku: text("sku"),
+    supplierVariantRef: text("supplier_variant_ref"),
     priceMinor: money("price_minor").notNull(),
     compareAtMinor: money("compare_at_minor"),
     costMinor: money("cost_minor"),
@@ -195,3 +212,57 @@ export const webhookEvents = pgTable("webhook_events", {
   receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
   processedAt: timestamp("processed_at", { withTimezone: true }),
 });
+
+// One supplier order per supplier per customer order. The row id is sent to the supplier as the
+// order reference, so a retry after a timeout can't create a second supplier order.
+export const fulfillments = pgTable(
+  "fulfillments",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    orderId: uuid("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+    // Null for a parcel the merchant sent themselves.
+    supplierId: uuid("supplier_id").references(() => suppliers.id, { onDelete: "restrict" }),
+    status: text("status", { enum: ["pending", "placing", "placed", "shipped", "delivered", "failed", "cancelled"] })
+      .notNull()
+      .default("pending"),
+    supplierOrderRef: text("supplier_order_ref"),
+    problemCode: text("problem_code"),
+    problemMessage: text("problem_message"),
+    attempts: integer("attempts").notNull().default(0),
+    carrier: text("carrier"),
+    trackingNumber: text("tracking_number"),
+    trackingUrl: text("tracking_url"),
+    placedAt: timestamp("placed_at", { withTimezone: true }),
+    shippedAt: timestamp("shipped_at", { withTimezone: true }),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex("fulfillments_order_supplier_uq").on(t.orderId, t.supplierId),
+    index("fulfillments_open_idx").on(t.status).where(sql`${t.status} in ('placed', 'shipped')`),
+    check("fulfillments_problem_when_failed", sql`${t.status} <> 'failed' or ${t.problemMessage} is not null`),
+  ],
+);
+
+// Outgoing email log. Each (order, kind) is sent at most once.
+export const emails = pgTable(
+  "emails",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
+    kind: text("kind", { enum: ["order_confirmation", "shipping_update", "delivered"] }).notNull(),
+    to: text("to").notNull(),
+    subject: text("subject").notNull(),
+    bodyText: text("body_text").notNull(),
+    status: text("status", { enum: ["queued", "sent", "failed"] }).notNull().default("queued"),
+    providerMessageId: text("provider_message_id"),
+    error: text("error"),
+    createdAt: createdAt(),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("emails_order_kind_uq").on(t.orderId, t.kind), index("emails_shop_created_idx").on(t.shopId, t.createdAt)],
+);

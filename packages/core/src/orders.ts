@@ -5,6 +5,7 @@ import { NotFoundError, UserError } from "./errors";
 import type { PaymentEvent, PaymentProvider } from "./payments";
 
 type Shop = typeof schema.shops.$inferSelect;
+type Order = typeof schema.orders.$inferSelect;
 export type CartLine = { variantId: string; quantity: number };
 
 // Milestone 1 shipping rule until shipping zones arrive (M3): free over 50.00, else 4.99.
@@ -142,9 +143,11 @@ export async function handlePaymentEvent(db: Db, provider: string, event: Paymen
     const order = await tx.query.orders.findFirst({ where: eq(schema.orders.paymentIntentId, event.paymentIntentId) });
     if (!order) return { status: "unknown_order" as const };
 
+    let becamePaid = false;
     if (event.type === "payment.succeeded") {
       if (event.amountMinor !== order.totalMinor) throw new Error(`Amount mismatch on order ${order.id}`);
       if (order.paymentStatus === "pending" || order.paymentStatus === "failed") {
+        becamePaid = true;
         await tx
           .update(schema.orders)
           .set({ paymentStatus: "paid", paidAt: new Date(), updatedAt: new Date() })
@@ -154,12 +157,18 @@ export async function handlePaymentEvent(db: Db, provider: string, event: Paymen
       await tx.update(schema.orders).set({ paymentStatus: "failed", updatedAt: new Date() }).where(eq(schema.orders.id, order.id));
     }
     await tx.update(schema.webhookEvents).set({ processedAt: new Date() }).where(eq(schema.webhookEvents.id, event.id));
-    return { status: "processed" as const, orderId: order.id };
+    return { status: "processed" as const, orderId: order.id, becamePaid };
   });
 }
 
-export async function listOrders(db: Db, shopId: string) {
-  return db.query.orders.findMany({ where: eq(schema.orders.shopId, shopId), orderBy: desc(schema.orders.number) });
+export async function listOrders(db: Db, shopId: string, filter: { fulfillmentStatus?: Order["fulfillmentStatus"] } = {}) {
+  return db.query.orders.findMany({
+    where: and(
+      eq(schema.orders.shopId, shopId),
+      filter.fulfillmentStatus ? eq(schema.orders.fulfillmentStatus, filter.fulfillmentStatus) : undefined,
+    ),
+    orderBy: desc(schema.orders.number),
+  });
 }
 
 export async function getOrder(db: Db, shopId: string, orderId: string) {
@@ -167,11 +176,12 @@ export async function getOrder(db: Db, shopId: string, orderId: string) {
     where: and(eq(schema.orders.id, orderId), eq(schema.orders.shopId, shopId)),
   });
   if (!order) throw new NotFoundError("Order");
-  const lines = await db.query.orderLines.findMany({
-    where: eq(schema.orderLines.orderId, order.id),
-    orderBy: asc(schema.orderLines.title),
-  });
-  return { ...order, lines };
+  const [lines, fulfillments, emails] = await Promise.all([
+    db.query.orderLines.findMany({ where: eq(schema.orderLines.orderId, order.id), orderBy: asc(schema.orderLines.title) }),
+    db.query.fulfillments.findMany({ where: eq(schema.fulfillments.orderId, order.id), orderBy: asc(schema.fulfillments.createdAt) }),
+    db.query.emails.findMany({ where: eq(schema.emails.orderId, order.id), orderBy: asc(schema.emails.createdAt) }),
+  ]);
+  return { ...order, lines, fulfillments, emails };
 }
 
 /** For the buyer's order status page. */

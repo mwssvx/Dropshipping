@@ -8,6 +8,13 @@
       "when": 1791469896034,
       "tag": "0000_medical_gravity",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791474360148,
+      "tag": "0001_m2_dropshipping",
+      "breakpoints": true
     }
   ]
 }
