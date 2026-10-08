@@ -1,4 +1,4 @@
-// Milestone 1 to 12 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 13 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -15,6 +15,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
   char,
@@ -107,17 +108,29 @@ export const shopMembers = pgTable(
 );
 
 // A supplier connection for one store. Credentials live in a secret store; only a pointer is kept here.
+// "email" is one of the merchant's own suppliers: orders reach it by email and it adds tracking
+// through a private link (portal_token), so any supplier works without an API.
 export const suppliers = pgTable(
   "suppliers",
   {
     id: id(),
     shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
-    provider: text("provider", { enum: ["fake", "cj"] }).notNull(),
+    provider: text("provider", { enum: ["fake", "cj", "email"] }).notNull(),
     credentialsRef: text("credentials_ref"),
     status: text("status", { enum: ["connected", "error", "disconnected"] }).notNull().default("connected"),
+    name: text("name"),
+    contactEmail: text("contact_email"),
+    portalToken: text("portal_token")
+      .notNull()
+      .unique()
+      .default(sql`replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '')`),
     createdAt: createdAt(),
   },
-  (t) => [uniqueIndex("suppliers_shop_provider_uq").on(t.shopId, t.provider)],
+  (t) => [
+    // One link per API supplier; own suppliers are told apart by their email.
+    unique("suppliers_shop_provider_contact_uq").on(t.shopId, t.provider, t.contactEmail).nullsNotDistinct(),
+    check("suppliers_email_has_contact", sql`${t.provider} <> 'email' or (${t.contactEmail} is not null and ${t.name} is not null)`),
+  ],
 );
 
 export const products = pgTable(

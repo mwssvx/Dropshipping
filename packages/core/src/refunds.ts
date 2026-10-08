@@ -2,6 +2,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { schema } from "@sf/db";
 import { NotFoundError, UserError } from "./errors";
 import { refreshOrderFulfillment, sendOrderEmail, type FulfillmentContext } from "./fulfillment";
+import { cancelPurchaseOrder, supplierLabel } from "./own-suppliers";
 import type { PaymentProvider } from "./payments";
 
 export type RefundContext = FulfillmentContext & { payments: PaymentProvider };
@@ -122,10 +123,13 @@ async function cancelUnshipped(ctx: RefundContext, orderId: string) {
       continue;
     }
     const link = f.supplierId ? await db.query.suppliers.findFirst({ where: eq(schema.suppliers.id, f.supplierId) }) : undefined;
-    const label = link ? ctx.suppliers.get(link.provider).label : "The supplier";
+    const label = link ? supplierLabel(ctx.suppliers, link) : "The supplier";
     try {
       if (!link) throw new Error("This supplier is no longer connected.");
-      const result = await ctx.suppliers.get(link.provider).cancelOrder(f.supplierOrderRef);
+      const result =
+        link.provider === "email"
+          ? (await cancelPurchaseOrder(ctx, link, f), { cancelled: true, message: null })
+          : await ctx.suppliers.get(link.provider).cancelOrder(f.supplierOrderRef);
       if (result.cancelled) {
         await db.update(schema.fulfillments).set({ status: "cancelled", updatedAt: new Date() }).where(eq(schema.fulfillments.id, f.id));
         cancelled++;

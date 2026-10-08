@@ -1,13 +1,14 @@
 import Link from "next/link";
-import { listSupplierLinks } from "@sf/core";
-import { requireShop, suppliers } from "@/lib/server";
+import { listOwnSuppliers, listSupplierLinks } from "@sf/core";
+import { requireShop, supplierPortalUrl, suppliers } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
+import { AddSupplierForm, OwnSupplierCard } from "./SupplierForms";
 
 export const metadata = { title: "Suppliers" };
 
 export default async function SuppliersPage() {
   const { shop, db } = await requireShop("suppliers");
-  const links = await listSupplierLinks(db, shop.id);
+  const [links, own] = await Promise.all([listSupplierLinks(db, shop.id), listOwnSuppliers(db, shop.id)]);
   const available = suppliers().available;
   const cj = available.find((s) => s.name === "cj");
   const demo = available.find((s) => s.name === "fake");
@@ -28,6 +29,26 @@ export default async function SuppliersPage() {
               ? "Import products from CJ links. Orders are placed with the cheapest shipping option and paid from your CJ wallet."
               : "Connecting needs a CJ Dropshipping account and its API key. Self-serve connect arrives with accounts; for now the key is set on the server (CJ_API_KEY)."}
           </p>
+        </section>
+        <section className="flex flex-col gap-3" aria-labelledby="own-heading">
+          <div className="card p-5 flex flex-col gap-3">
+            <div>
+              <h2 id="own-heading" className="font-semibold">Your own suppliers</h2>
+              <p className="text-sm hint">
+                Any wholesaler, warehouse or maker you already work with. Paid orders for their products are emailed to them with the shipping address
+                (never the buyer's email), and a private link where they add tracking or tell you they can't send it. They don't need an account.
+              </p>
+            </div>
+            <AddSupplierForm />
+          </div>
+          {own.length > 0 && (
+            <ul className="flex flex-col gap-3">
+              {own.map((s) => (
+                <OwnSupplierCard key={`${s.id}-${s.name}-${s.contactEmail}`}
+                  supplier={{ id: s.id, name: s.name!, email: s.contactEmail!, link: supplierPortalUrl(s.portalToken), products: s.products, openOrders: s.openOrders }} />
+              ))}
+            </ul>
+          )}
         </section>
         {demo && (
           <section className="card p-5 flex flex-col gap-2">

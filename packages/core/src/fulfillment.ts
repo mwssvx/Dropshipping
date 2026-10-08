@@ -6,6 +6,7 @@ import type { Mailer } from "./email";
 import { formatMoney } from "./money";
 import { buyerAmounts } from "./currency";
 import { SupplierError, type ProblemCode, type Suppliers } from "./suppliers";
+import { sendPurchaseOrder } from "./own-suppliers";
 
 type Order = typeof schema.orders.$inferSelect;
 type Fulfillment = typeof schema.fulfillments.$inferSelect;
@@ -20,6 +21,8 @@ export type FulfillmentContext = {
   orderStatusUrl: (shop: Shop, order: Order) => string | Promise<string>;
   /** Link back to an unpaid order's payment page, for checkout reminders. Defaults to the status page. */
   payUrl?: (shop: Shop, order: Order) => string | Promise<string>;
+  /** The private page where one of the merchant's own suppliers adds tracking. */
+  supplierPortalUrl?: (token: string) => string;
   now?: () => Date;
 };
 
@@ -58,11 +61,15 @@ export async function routeOrder(ctx: FulfillmentContext, orderId: string) {
     .innerJoin(schema.variants, eq(schema.variants.id, schema.orderLines.variantId))
     .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
     .where(eq(schema.orderLines.orderId, order.id));
+  const links = await db.query.suppliers.findMany({ where: eq(schema.suppliers.shopId, order.shopId) });
+  const own = new Set(links.filter((l) => l.provider === "email").map((l) => l.id));
   const bySupplier = new Map<string, { variantRef: string; quantity: number }[]>();
   for (const { line, variant, product } of lines) {
-    if (!product.supplierId || !variant.supplierVariantRef) continue; // merchant ships these themselves
+    // Own suppliers are sent item names, so every variant goes to them; API suppliers need their own ids.
+    const ref = product.supplierId && own.has(product.supplierId) ? variant.id : variant.supplierVariantRef;
+    if (!product.supplierId || !ref) continue; // merchant ships these themselves
     const list = bySupplier.get(product.supplierId) ?? [];
-    list.push({ variantRef: variant.supplierVariantRef, quantity: line.quantity });
+    list.push({ variantRef: ref, quantity: line.quantity });
     bySupplier.set(product.supplierId, list);
   }
 
@@ -90,16 +97,18 @@ export async function routeOrder(ctx: FulfillmentContext, orderId: string) {
       .returning();
     if (!claimed) continue;
 
-    const link = await db.query.suppliers.findFirst({ where: eq(schema.suppliers.id, supplierId) });
+    const link = links.find((l) => l.id === supplierId);
     try {
       if (!link || link.status === "disconnected") throw new SupplierError("not_connected", "This supplier is disconnected.");
-      const adapter = ctx.suppliers.get(link.provider);
-      const { supplierOrderRef } = await adapter.placeOrder({
-        reference: claimed.id,
-        email: order.email,
-        address: order.shippingAddress,
-        lines: supplierLines,
-      });
+      const { supplierOrderRef } =
+        link.provider === "email"
+          ? await sendPurchaseOrder(ctx, link, order)
+          : await ctx.suppliers.get(link.provider).placeOrder({
+              reference: claimed.id,
+              email: order.email,
+              address: order.shippingAddress,
+              lines: supplierLines,
+            });
       await db
         .update(schema.fulfillments)
         .set({ status: "placed", supplierOrderRef, placedAt: now(ctx), problemCode: null, problemMessage: null, updatedAt: now(ctx) })
@@ -155,7 +164,7 @@ export async function retryOrder(ctx: FulfillmentContext, shopId: string, orderI
   return result;
 }
 
-const manualTracking = z.object({
+export const trackingInput = z.object({
   carrier: z.string().trim().min(1, "Enter the carrier, for example USPS or Royal Mail."),
   trackingNumber: z.string().trim().min(4, "Enter the tracking number."),
   url: z
@@ -169,8 +178,8 @@ const manualTracking = z.object({
  * The merchant shipped it another way. Replaces a failed supplier fulfilment if there is one,
  * otherwise records a new one, then emails the buyer.
  */
-export async function addManualTracking(ctx: FulfillmentContext, shopId: string, orderId: string, input: z.input<typeof manualTracking>) {
-  const parsed = manualTracking.safeParse(input);
+export async function addManualTracking(ctx: FulfillmentContext, shopId: string, orderId: string, input: z.input<typeof trackingInput>) {
+  const parsed = trackingInput.safeParse(input);
   if (!parsed.success) throw new UserError(parsed.error.issues[0]!.message);
   const { carrier, trackingNumber, url } = parsed.data;
   const { db } = ctx;
@@ -212,6 +221,8 @@ export async function syncTracking(ctx: FulfillmentContext, scope: { orderId?: s
       inArray(schema.fulfillments.status, ["placed", "shipped"]),
       isNotNull(schema.fulfillments.supplierOrderRef),
       isNotNull(schema.fulfillments.supplierId),
+      // Own suppliers report shipping themselves; only their unshipped orders are watched for lateness.
+      sql`not (${schema.fulfillments.status} = 'shipped' and ${schema.fulfillments.supplierId} in (select id from ${schema.suppliers} where provider = 'email'))`,
       scope.orderId ? eq(schema.fulfillments.orderId, scope.orderId) : undefined,
     ),
     orderBy: [sql`${schema.fulfillments.lastCheckedAt} asc nulls first`, asc(schema.fulfillments.createdAt)],
@@ -225,7 +236,7 @@ export async function syncTracking(ctx: FulfillmentContext, scope: { orderId?: s
     let tracking: Awaited<ReturnType<ReturnType<Suppliers["get"]>["getTracking"]>> = null;
     try {
       if (!link) throw new SupplierError("not_connected", "Supplier connection was removed.");
-      tracking = await ctx.suppliers.get(link.provider).getTracking(f.supplierOrderRef!);
+      if (link.provider !== "email") tracking = await ctx.suppliers.get(link.provider).getTracking(f.supplierOrderRef!);
     } catch {
       result.errors++;
       await db.update(schema.fulfillments).set({ lastCheckedAt: t }).where(eq(schema.fulfillments.id, f.id));

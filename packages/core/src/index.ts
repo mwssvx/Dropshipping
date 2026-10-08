@@ -33,3 +33,4 @@ export * from "./team";
 export * from "./buyers";
 export * from "./currency";
 export * from "./campaigns";
+export * from "./own-suppliers";

@@ -39,6 +39,7 @@ export async function makeFixture(model: ModelClient, opts: { country?: string }
     mailer,
     suppliers: suppliersFrom([new FakeSupplier({ shipAfterMs: DAY, deliverAfterMs: 6 * DAY, now: () => clock })]),
     orderStatusUrl: (shop, order) => `https://${shop.handle}.example/orders/${order.paymentIntentId}`,
+    supplierPortalUrl: (token) => `https://app.example/supplier/${token}`,
     now: () => new Date(clock),
   };
   const user = await signUp(db, { email: "owner@example.com", password: "correct horse" });

@@ -99,6 +99,13 @@
       "when": 1791496224625,
       "tag": "0013_m12_campaigns",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791498167634,
+      "tag": "0014_m13_own_suppliers",
+      "breakpoints": true
     }
   ]
 }

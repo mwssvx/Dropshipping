@@ -11,6 +11,13 @@ import { parseTheme } from "./theme-doc";
 
 export const EXPORT_FORMAT = "storefront-store";
 
+function supplierOf(link: typeof schema.suppliers.$inferSelect | undefined, productRef: string | null) {
+  if (!link) return null;
+  return link.provider === "email"
+    ? { provider: link.provider, product_ref: null, name: link.name, email: link.contactEmail }
+    : { provider: link.provider, product_ref: productRef };
+}
+
 export async function exportStore(db: Db, shopId: string, now = new Date()) {
   const shop = await db.query.shops.findFirst({ where: eq(schema.shops.id, shopId) });
   if (!shop) throw new NotFoundError("Store");
@@ -55,7 +62,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       image_url: p.imageUrl,
       status: p.status,
       source_url: p.sourceUrl,
-      supplier: p.supplierId ? { provider: supplierRows.find((s) => s.id === p.supplierId)?.provider ?? null, product_ref: p.supplierProductRef } : null,
+      supplier: p.supplierId ? supplierOf(supplierRows.find((s) => s.id === p.supplierId), p.supplierProductRef) : null,
       goes_well_with: p.upsellProductId ? (handleOf.get(p.upsellProductId) ?? null) : null,
       variants: variants
         .filter((v) => v.productId === p.id)
@@ -125,7 +132,16 @@ const importSchema = z.object({
         image_url: str(2000).nullable().optional(),
         status: z.enum(["draft", "active", "archived"]),
         source_url: str(2000).nullable().optional(),
-        supplier: z.object({ provider: z.enum(["fake", "cj"]).nullable(), product_ref: str(200).nullable() }).nullable().optional(),
+        supplier: z
+          .object({
+            provider: z.enum(["fake", "cj", "email"]).nullable(),
+            product_ref: str(200).nullable(),
+            // Own suppliers only.
+            name: str(100).nullable().optional(),
+            email: z.string().email().max(320).nullable().optional(),
+          })
+          .nullable()
+          .optional(),
         goes_well_with: handle.nullable().optional(),
         variants: z
           .array(
@@ -204,18 +220,25 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
   if (p || c || pg) throw new UserError("Load a store file into a new, empty store. This one already has products, collections or pages.");
 
   return db.transaction(async (tx) => {
+    // Keyed by provider, or "email:<address>" for an own supplier.
     const supplierIds = new Map<string, string>();
-    for (const provider of new Set(data.products.map((x) => x.supplier?.provider).filter((x): x is "fake" | "cj" => !!x))) {
+    const keyOf = (sup: (typeof data.products)[number]["supplier"]) =>
+      !sup?.provider ? null : sup.provider === "email" ? (sup.email && sup.name ? `email:${sup.email.toLowerCase()}` : null) : sup.provider;
+    for (const x of data.products) {
+      const key = keyOf(x.supplier);
+      if (!key || supplierIds.has(key)) continue;
+      const own = x.supplier!.provider === "email";
       const [link] = await tx
         .insert(schema.suppliers)
-        .values({ shopId, provider })
-        .onConflictDoUpdate({ target: [schema.suppliers.shopId, schema.suppliers.provider], set: { status: "connected" } })
+        .values({ shopId, provider: x.supplier!.provider!, ...(own ? { name: x.supplier!.name!, contactEmail: x.supplier!.email!.toLowerCase() } : {}) })
+        .onConflictDoUpdate({ target: [schema.suppliers.shopId, schema.suppliers.provider, schema.suppliers.contactEmail], set: { status: "connected" } })
         .returning({ id: schema.suppliers.id });
-      supplierIds.set(provider, link!.id);
+      supplierIds.set(key, link!.id);
     }
     const productIds = new Map<string, string>();
     for (const x of data.products) {
-      const provider = x.supplier?.provider;
+      const key = keyOf(x.supplier);
+      const provider = key && x.supplier?.provider !== "email" ? key : null;
       const [row] = await tx
         .insert(schema.products)
         .values({
@@ -226,7 +249,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
           imageUrl: x.image_url ?? null,
           status: x.status,
           sourceUrl: x.source_url ?? null,
-          supplierId: provider ? supplierIds.get(provider)! : null,
+          supplierId: key ? supplierIds.get(key)! : null,
           supplierProductRef: provider ? (x.supplier?.product_ref ?? null) : null,
         })
         .returning({ id: schema.products.id });

@@ -108,6 +108,11 @@ export function storeUrl(handle: string) {
   return STORE_SUBDOMAINS ? `${scheme}://${handle}.${ROOT_DOMAIN}` : `${scheme}://${ROOT_DOMAIN}/s/${handle}`;
 }
 
+/** The private page where one of a merchant's own suppliers adds tracking. On the platform's address, not a store's. */
+export function supplierPortalUrl(token: string) {
+  return `${ROOT_DOMAIN.startsWith("localhost") ? "http" : "https"}://${ROOT_DOMAIN}/supplier/${token}`;
+}
+
 /** The address buyers should see: the store's main custom domain once one is connected. */
 export async function storeAddress(shop: { id: string; handle: string }) {
   const domain = await primaryDomain(await db(), shop.id);
@@ -137,6 +142,7 @@ export async function fulfillment(): Promise<FulfillmentContext> {
     mailer: mailer(),
     orderStatusUrl: async (shop, order) => `${await storeAddress(shop)}/orders/${order.paymentIntentId}`,
     payUrl: async (shop, order) => `${await storeAddress(shop)}/pay/${order.id}`,
+    supplierPortalUrl,
   };
 }
 
