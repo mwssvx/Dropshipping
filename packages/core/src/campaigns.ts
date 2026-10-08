@@ -87,6 +87,53 @@ export async function unsubscribeByToken(db: Db, shopId: string, token: string, 
   return row ?? null;
 }
 
+/** A confirm link goes out at most once an hour per address, so the form can't flood an inbox. */
+const OPT_IN_RESEND_MS = 3_600_000;
+
+/**
+ * The email signup on the store's home page. Nobody is added until they click the link we email
+ * them (double opt-in), so a typo or someone else's address never ends up on the list.
+ */
+export async function requestNewsletterSignup(ctx: CampaignContext, shop: Shop, rawEmail: string) {
+  const email = z.string().trim().toLowerCase().email().max(320).safeParse(rawEmail);
+  if (!email.success) throw new UserError("Enter your email address.");
+  const now = ctx.now?.() ?? new Date();
+  const [row] = await ctx.db
+    .insert(schema.customers)
+    .values({ shopId: shop.id, email: email.data })
+    .onConflictDoUpdate({ target: [schema.customers.shopId, schema.customers.email], set: { email: email.data } })
+    .returning();
+  if (row!.acceptsMarketing) return { status: "already_subscribed" as const };
+  if (row!.optInSentAt && now.getTime() - row!.optInSentAt.getTime() < OPT_IN_RESEND_MS) return { status: "sent" as const };
+  await ctx.db.update(schema.customers).set({ optInSentAt: now }).where(eq(schema.customers.id, row!.id));
+  const link = `${await ctx.storeAddress(shop)}/subscribe/${row!.emailToken}`;
+  await ctx.mailer.send({
+    to: email.data,
+    subject: `Confirm your signup to ${shop.name}`,
+    text: [
+      `Hi,`,
+      ``,
+      `Someone (hopefully you) asked to get news and offers from ${shop.name} at this address.`,
+      ``,
+      `Confirm here: ${link}`,
+      ``,
+      `If it wasn't you, ignore this email and you won't hear from us.`,
+    ].join("\n"),
+  });
+  return { status: "sent" as const };
+}
+
+/** The link in the confirm email. Returns the address, or null for a link that doesn't work. */
+export async function confirmNewsletterSignup(db: Db, shopId: string, token: string, now = new Date()) {
+  if (!/^[0-9a-f]{64}$/.test(token)) return null;
+  const [row] = await db
+    .update(schema.customers)
+    .set({ acceptsMarketing: true, marketingConsentAt: now, unsubscribedAt: null })
+    .where(and(eq(schema.customers.shopId, shopId), eq(schema.customers.emailToken, token)))
+    .returning({ email: schema.customers.email });
+  return row ?? null;
+}
+
 export async function customerByToken(db: Db, shopId: string, token: string) {
   return (
     (await db.query.customers.findFirst({

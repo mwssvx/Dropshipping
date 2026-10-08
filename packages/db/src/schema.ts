@@ -1,4 +1,4 @@
-// Milestone 1 to 13 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 14 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -191,6 +191,8 @@ export const customers = pgTable(
     acceptsMarketing: boolean("accepts_marketing").notNull().default(false),
     marketingConsentAt: timestamp("marketing_consent_at", { withTimezone: true }),
     unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
+    // When we last emailed a "confirm your signup" link, so a signup form can't be used to flood an inbox.
+    optInSentAt: timestamp("opt_in_sent_at", { withTimezone: true }),
     // Secret in each marketing email's unsubscribe link.
     emailToken: text("email_token").notNull().unique().default(sql`replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '')`),
     createdAt: createdAt(),

@@ -29,6 +29,7 @@ export default async function ThemePage() {
       links={links}
       collections={collections.map((c) => ({ id: c.id, title: c.title }))}
       storeLink={storeLink}
+      shopName={shop.name}
     />
   );
 }

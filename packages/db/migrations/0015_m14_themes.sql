@@ -1,0 +1,1 @@
+ALTER TABLE "customers" ADD COLUMN "opt_in_sent_at" timestamp with time zone;

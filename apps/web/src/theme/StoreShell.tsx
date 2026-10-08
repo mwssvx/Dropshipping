@@ -3,7 +3,7 @@ import { themeFontsHref, type ThemeDoc } from "@sf/core/theme";
 import { BRAND } from "@/lib/brand";
 import { SectionView } from "./Sections";
 import { CurrencyPicker } from "./CurrencyPicker";
-import { storeHref, themeStyle } from "./style";
+import { storeHref, themeLayoutAttrs, themeStyle } from "./style";
 
 /** Header, announcement bar and footer around every storefront page, styled by the theme. */
 export function StoreShell({
@@ -34,8 +34,11 @@ export function StoreShell({
   const announcement = doc.home.find((s) => s.type === "announcement" && !s.hidden);
   const logo = settings.logoText || shopName;
   const data = { base, currency, catalog: { products: [], collections: [] } };
+  // classic: menu beside the logo; centered: logo in the middle with the menu below; minimal: menu behind a button.
+  const header = settings.layout.header;
+  const links = menus.header.map((m, i) => <Link key={i} href={storeHref(base, m.href)} className="hover:text-accent">{m.label}</Link>);
   return (
-    <div className="store min-h-dvh flex flex-col" style={themeStyle(settings)}>
+    <div className="store min-h-dvh flex flex-col" style={themeStyle(settings)} {...themeLayoutAttrs(settings)}>
       {fonts && (
         <>
           <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
@@ -44,18 +47,17 @@ export function StoreShell({
       )}
       {announcement && <SectionView section={announcement} data={data} first={false} />}
       <header className="border-b border-border">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-          <Link href={base || "/"} className="text-xl font-bold tracking-tight truncate flex items-center gap-2">
+        <div className={`max-w-6xl mx-auto px-4 sm:px-6 flex items-center gap-4 ${header === "centered" ? "h-20 md:grid md:grid-cols-[1fr_auto_1fr]" : "h-16 justify-between"}`}>
+          {header === "centered" && <div className="hidden md:block" aria-hidden />}
+          <Link href={base || "/"} className={`text-xl font-bold tracking-tight truncate flex items-center gap-2 ${header === "centered" ? "md:text-2xl md:justify-center mr-auto md:mr-0" : ""}`}>
             {settings.logoUrl ? <img src={settings.logoUrl} alt={logo} className="h-9 w-auto" /> : logo}
           </Link>
-          {menus.header.length > 0 && (
-            <nav aria-label="Main" className="hidden md:flex items-center gap-6 text-sm font-medium">
-              {menus.header.map((m, i) => <Link key={i} href={storeHref(base, m.href)} className="hover:text-accent">{m.label}</Link>)}
-            </nav>
+          {header === "classic" && links.length > 0 && (
+            <nav aria-label="Main" className="hidden md:flex items-center gap-6 text-sm font-medium">{links}</nav>
           )}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 justify-end">
             {menus.header.length > 0 && (
-              <details className="md:hidden relative">
+              <details className={`relative ${header === "minimal" ? "" : "md:hidden"}`}>
                 <summary className="btn btn-secondary list-none" aria-label="Menu">Menu</summary>
                 <nav aria-label="Main" className="absolute right-0 mt-2 w-56 card p-2 flex flex-col z-20 shadow-lg">
                   {menus.header.map((m, i) => (
@@ -71,6 +73,9 @@ export function StoreShell({
             </Link>
           </div>
         </div>
+        {header === "centered" && links.length > 0 && (
+          <nav aria-label="Main" className="hidden md:flex justify-center items-center gap-8 text-sm font-medium pb-4">{links}</nav>
+        )}
       </header>
       {closed && <p className="banner banner-critical rounded-none text-center">This store isn't taking orders right now.</p>}
       <div className="flex-1">{children}</div>
