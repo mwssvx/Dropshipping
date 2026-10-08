@@ -71,8 +71,22 @@ export function suppliers(): Suppliers {
   return local.suppliers;
 }
 
+type OutboxItem = { to: string; subject: string; text: string; at: Date };
+const outbox = ((globalThis as { __sfOutbox?: OutboxItem[] }).__sfOutbox ??= []);
+
+/** Development and tests (EMAIL_PREVIEW=on with no real mailer): the last emails "sent", newest first. */
+export function previewOutbox() {
+  return process.env.EMAIL_PREVIEW === "on" && mailer().name === "log" ? [...outbox].reverse() : null;
+}
+
 export function mailer(): Mailer {
-  local.mailer ??= mailerFromEnv(process.env);
+  if (!local.mailer) {
+    const real = mailerFromEnv(process.env);
+    local.mailer =
+      process.env.EMAIL_PREVIEW === "on" && real.name === "log"
+        ? { name: real.name, send: async (e) => (outbox.push({ ...e, at: new Date() }), outbox.splice(0, outbox.length - 50), real.send(e)) }
+        : real;
+  }
   return local.mailer;
 }
 
