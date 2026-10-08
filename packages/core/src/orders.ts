@@ -9,7 +9,8 @@ import { estimateProcessingFee, platformFeeFor } from "./plans";
 import { BuiltInTaxCalculator, listTaxRegistrations, type TaxCalculator } from "./tax";
 import { presentQuote } from "./currency";
 import { creditableCampaign } from "./campaigns";
-import { convertAmount, type DisplayFx } from "./money";
+import { convertAmount, formatMoney, type DisplayFx } from "./money";
+import { breakFor, describeBreak, percentOff, wholesaleTermsFor } from "./wholesale";
 
 type Shop = typeof schema.shops.$inferSelect;
 type Order = typeof schema.orders.$inferSelect;
@@ -21,9 +22,11 @@ export const FLAT_SHIPPING_MINOR = 499;
 
 /**
  * Price a cart from the database. Never trusts prices sent by the browser. A discount code that
- * can't be used throws a message for the buyer.
+ * can't be used throws a message for the buyer. `buyerEmail` is the signed-in buyer (from their
+ * session, never the form): an approved wholesale buyer gets wholesale prices instead of
+ * quantity discounts, and can't add a discount code.
  */
-export async function quoteCart(db: Db, shop: Shop, lines: CartLine[], opts: { discountCode?: string | null; email?: string } = {}) {
+export async function quoteCart(db: Db, shop: Shop, lines: CartLine[], opts: { discountCode?: string | null; email?: string; buyerEmail?: string | null } = {}) {
   const wanted = lines.filter((l) => l.quantity > 0);
   if (!wanted.length) throw new UserError("Your cart is empty.");
   const rows = await db
@@ -37,6 +40,13 @@ export async function quoteCart(db: Db, shop: Shop, lines: CartLine[], opts: { d
         eq(schema.products.status, "active"),
       ),
     );
+  const wholesale = await wholesaleTermsFor(db, shop, opts.buyerEmail);
+  // Quantity discounts count every variant of a product together (2 small + 1 large = 3).
+  const perProduct = new Map<string, number>();
+  for (const l of wanted) {
+    const productId = rows.find((r) => r.variant.id === l.variantId)?.product.id;
+    if (productId) perProduct.set(productId, (perProduct.get(productId) ?? 0) + l.quantity);
+  }
   const items = wanted.map((l) => {
     const row = rows.find((r) => r.variant.id === l.variantId);
     if (!row) throw new UserError("An item in your cart is no longer available.", "unavailable");
@@ -45,20 +55,27 @@ export async function quoteCart(db: Db, shop: Shop, lines: CartLine[], opts: { d
       throw new UserError(row.variant.stock > 0 ? `Only ${row.variant.stock} of ${row.product.title} left.` : `${row.product.title} is sold out.`, "unavailable");
     }
     const title = row.variant.title === "Default" ? row.product.title : `${row.product.title} – ${row.variant.title}`;
+    const tier = wholesale ? null : breakFor(row.product.quantityBreaks, perProduct.get(row.product.id) ?? l.quantity);
+    const pct = wholesale?.percentOff ?? tier?.percentOff ?? 0;
+    const unit = pct ? percentOff(row.variant.priceMinor, pct) : row.variant.priceMinor;
     return {
       variantId: row.variant.id,
       productHandle: row.product.handle,
       title,
       imageUrl: row.product.imageUrl,
       quantity: l.quantity,
-      unitPriceMinor: row.variant.priceMinor,
+      /** The price before quantity or wholesale discounts, shown struck through when it differs. */
+      listUnitPriceMinor: row.variant.priceMinor,
+      unitPriceMinor: unit,
       unitCostMinor: row.variant.costMinor,
-      lineMinor: row.variant.priceMinor * l.quantity,
+      lineMinor: unit * l.quantity,
+      priceNote: wholesale ? `Wholesale price, ${wholesale.percentOff}% off` : tier ? describeBreak(tier) : null,
     };
   });
   const subtotalMinor = items.reduce((s, i) => s + i.lineMinor, 0);
   let shippingMinor = subtotalMinor >= FREE_SHIPPING_OVER_MINOR ? 0 : FLAT_SHIPPING_MINOR;
   let discount: { id: string; code: string; label: string; discountMinor: number } | null = null;
+  if (opts.discountCode?.trim() && wholesale) throw new UserError("Discount codes don't apply to wholesale prices.", "discount_invalid");
   if (opts.discountCode?.trim()) {
     const d = await findUsableDiscount(db, shop, opts.discountCode, { subtotalMinor, email: opts.email });
     const applied = applyDiscount(d, subtotalMinor, shippingMinor);
@@ -76,6 +93,7 @@ export async function quoteCart(db: Db, shop: Shop, lines: CartLine[], opts: { d
     shippingMinor,
     totalMinor: subtotalMinor - discountMinor + shippingMinor,
     pricesIncludeTax: shop.pricesIncludeTax,
+    wholesale: wholesale ? { ...wholesale, shortByMinor: Math.max(0, wholesale.minOrderMinor - subtotalMinor) } : null,
   };
 }
 
@@ -108,6 +126,8 @@ export async function startCheckout(
     acceptsMarketing?: boolean;
     /** From the campaign click cookie; checked to belong to this store. */
     campaignId?: string | null;
+    /** The signed-in buyer, from their session. Wholesale prices follow the account. */
+    buyerEmail?: string | null;
   },
   taxCalculator: TaxCalculator = new BuiltInTaxCalculator(),
 ) {
@@ -115,7 +135,13 @@ export async function startCheckout(
   const parsed = checkoutSchema.safeParse(input);
   if (!parsed.success) throw new UserError(parsed.error.issues[0]!.message);
   const { email, address } = parsed.data;
-  const cart = await quoteCart(db, shop, input.lines, { discountCode: input.discountCode, email });
+  const cart = await quoteCart(db, shop, input.lines, { discountCode: input.discountCode, email, buyerEmail: input.buyerEmail });
+  if (cart.wholesale && cart.wholesale.shortByMinor > 0) {
+    throw new UserError(
+      `Wholesale orders start at ${formatMoney(cart.wholesale.minOrderMinor, shop.currency)}. Add ${formatMoney(cart.wholesale.shortByMinor, shop.currency)} more to check out.`,
+      "wholesale_minimum",
+    );
+  }
   // Tax is on what the buyer actually pays for each line, after the discount.
   const taxed = spreadDiscount(cart.items.map((i) => i.lineMinor), cart.discountMinor);
   const tax = await taxCalculator.calculate({
@@ -186,6 +212,7 @@ export async function startCheckout(
         processingFeeMinor: estimateProcessingFee(quote.totalMinor),
         presentment,
         campaignId,
+        wholesale: !!cart.wholesale,
         paymentIntentId: intent.id,
       })
       .returning();

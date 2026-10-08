@@ -5,6 +5,7 @@ import { db } from "@/lib/server";
 import { loadShop, storeBase } from "../data";
 import { buyAgainAction, buyerSignOutAction, setBuyerMarketingAction } from "./actions";
 import { SignInForm } from "./SignInForm";
+import { WholesaleForm } from "./WholesaleForm";
 
 export const metadata = { title: "Your account", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -51,6 +52,28 @@ export default async function AccountPage({ params }: { params: Promise<{ shop: 
         <span>{buyer.acceptsMarketing ? `You get news and offers from ${shop.name} by email.` : `You don't get marketing emails from ${shop.name}.`}</span>
         <button className="btn btn-secondary">{buyer.acceptsMarketing ? "Stop news and offers" : "Send me news and offers"}</button>
       </form>
+      {shop.wholesaleEnabled && (
+        <section id="wholesale" aria-labelledby="wholesale-heading" className="card p-5 flex flex-col gap-3">
+          <h2 id="wholesale-heading" className="font-semibold">Buying for a business?</h2>
+          {buyer.wholesaleStatus === "approved" ? (
+            <p role="status">
+              You get wholesale prices: {shop.wholesalePercentOff}% off everything while you&apos;re signed in
+              {shop.wholesaleMinOrderMinor > 0 ? `, on orders of ${formatMoney(shop.wholesaleMinOrderMinor, shop.currency)} or more` : ""}.
+            </p>
+          ) : buyer.wholesaleStatus === "pending" ? (
+            <p role="status">Thanks, {shop.name} is looking at your application for {buyer.wholesaleCompany}. We&apos;ll email you when they decide.</p>
+          ) : (
+            <>
+              <p className="text-muted text-sm">
+                {buyer.wholesaleStatus === "declined"
+                  ? `${shop.name} couldn't offer wholesale prices last time. You can apply again.`
+                  : `${shop.name} sells wholesale to shops and businesses. Apply and they'll email you when you're approved.`}
+              </p>
+              <WholesaleForm handle={handle} company={buyer.wholesaleCompany} />
+            </>
+          )}
+        </section>
+      )}
       {orders.length === 0 ? (
         <div className="card p-6 flex flex-col gap-3 items-start">
           <p>No orders with this email yet.</p>

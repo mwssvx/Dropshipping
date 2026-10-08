@@ -3,6 +3,7 @@ import { convertPrice, formatMoney, presentQuote, quoteCart, upsellsFor, UserErr
 import { buyerFx } from "@/lib/currency";
 import { readCart, readDiscountCode } from "@/lib/cart";
 import { db } from "@/lib/server";
+import { currentBuyer } from "@/lib/buyer";
 import { addToCartAction, removeCodeAction, updateCartAction } from "../actions";
 import { CodeForm } from "./CodeForm";
 import { loadShop, storeBase } from "../data";
@@ -19,15 +20,17 @@ export default async function CartPage({ params, searchParams }: { params: Promi
   let quote: Awaited<ReturnType<typeof quoteCart>> | null = null;
   let problem: string | null = null;
   let codeProblem: string | null = null;
+  // Signed-in wholesale buyers get their prices here and at checkout.
+  const buyerEmail = (await currentBuyer(shop.id))?.email ?? null;
   if (lines.length) {
     try {
-      quote = await quoteCart(await db(), shop, lines, { discountCode: code });
+      quote = await quoteCart(await db(), shop, lines, { discountCode: code, buyerEmail });
     } catch (e) {
       if (!(e instanceof UserError)) throw e;
       // A code that stopped working (cart below its minimum, expired) shouldn't hide the cart.
       if (e.code === "discount_invalid") {
         codeProblem = e.message;
-        quote = await quoteCart(await db(), shop, lines).catch(() => null);
+        quote = await quoteCart(await db(), shop, lines, { buyerEmail }).catch(() => null);
       } else problem = e.message;
     }
   }
@@ -40,6 +43,12 @@ export default async function CartPage({ params, searchParams }: { params: Promi
   return (
     <main className="max-w-3xl mx-auto px-4 sm:px-6 py-10 flex flex-col gap-6">
       <h1 className="text-3xl font-bold tracking-tight">Your cart</h1>
+      {quote?.wholesale && (
+        <p className="banner banner-info" role="status">
+          You&apos;re getting wholesale prices ({quote.wholesale.percentOff}% off).
+          {quote.wholesale.shortByMinor > 0 && ` Wholesale orders start at ${formatMoney(quote.wholesale.minOrderMinor, shop.currency)}: add ${formatMoney(quote.wholesale.shortByMinor, shop.currency)} more to check out.`}
+        </p>
+      )}
       {problem && <p className="banner banner-critical">{problem}</p>}
       {unavailable > 0 && (
         <p className="banner banner-warning" role="status">
@@ -61,7 +70,11 @@ export default async function CartPage({ params, searchParams }: { params: Promi
                 </div>
                 <div className="flex-1 min-w-0">
                   <Link href={`${base}/products/${i.productHandle}`} className="font-medium hover:underline">{i.title}</Link>
-                  <p className="hint num">{money(shown!.units[i.variantId]!)} each</p>
+                  <p className="hint num">
+                    {i.listUnitPriceMinor !== i.unitPriceMinor && <s className="mr-1.5">{money(convertPrice(i.listUnitPriceMinor, fx))}</s>}
+                    {money(shown!.units[i.variantId]!)} each
+                  </p>
+                  {i.priceNote && <p className="text-sm text-success">{i.priceNote}</p>}
                 </div>
                 <form action={updateCartAction.bind(null, handle)} className="flex items-center gap-2">
                   <input type="hidden" name="variantId" value={i.variantId} />
@@ -90,13 +103,17 @@ export default async function CartPage({ params, searchParams }: { params: Promi
               <span className="pill pill-success">{quote.discount.code}: {quote.discount.label}</span>
               <button className="underline">Remove</button>
             </form>
-          ) : (
+          ) : quote.wholesale ? null : (
             <>
               {codeProblem && <p className="banner banner-warning self-end" role="alert">{codeProblem}</p>}
               <CodeForm handle={handle} />
             </>
           )}
-          <Link href={`${base}/checkout`} className="btn btn-primary btn-lg self-end">Check out</Link>
+          {quote.wholesale && quote.wholesale.shortByMinor > 0 ? (
+            <Link href={base || "/"} className="btn btn-secondary btn-lg self-end">Keep shopping</Link>
+          ) : (
+            <Link href={`${base}/checkout`} className="btn btn-primary btn-lg self-end">Check out</Link>
+          )}
           {upsells.length > 0 && (
             <section className="flex flex-col gap-3 border-t border-border pt-6" aria-labelledby="goes-well">
               <h2 id="goes-well" className="font-semibold">Goes well with</h2>

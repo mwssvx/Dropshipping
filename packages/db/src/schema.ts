@@ -1,4 +1,4 @@
-// Milestone 1 to 14 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 15 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -87,12 +87,17 @@ export const shops = pgTable(
     roundConvertedPrices: boolean("round_converted_prices").notNull().default(true),
     // Printed at the foot of marketing emails, as anti-spam law requires.
     mailingAddress: text("mailing_address"),
+    // Wholesale: approved business buyers pay this much less, on orders of at least the minimum.
+    wholesaleEnabled: boolean("wholesale_enabled").notNull().default(false),
+    wholesalePercentOff: integer("wholesale_percent_off").notNull().default(20),
+    wholesaleMinOrderMinor: money("wholesale_min_order_minor").notNull().default(0),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     check("shops_handle_format", sql`${t.handle} ~ '^[a-z0-9](-?[a-z0-9])*$'`),
     check("shops_reason_when_not_active", sql`${t.status} = 'active' or ${t.statusReason} is not null`),
+    check("shops_wholesale_percent", sql`${t.wholesalePercentOff} between 1 and 80`),
   ],
 );
 
@@ -149,6 +154,8 @@ export const products = pgTable(
     aiGenerated: boolean("ai_generated").notNull().default(false),
     // Suggested next to this product and in the cart ("Goes well with").
     upsellProductId: uuid("upsell_product_id").references((): AnyPgColumn => products.id, { onDelete: "set null" }),
+    // Quantity discounts, e.g. [{ minQty: 2, percentOff: 10 }, { minQty: 5, percentOff: 15 }].
+    quantityBreaks: jsonb("quantity_breaks").$type<QuantityBreak[]>().notNull().default([]),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -193,6 +200,12 @@ export const customers = pgTable(
     unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
     // When we last emailed a "confirm your signup" link, so a signup form can't be used to flood an inbox.
     optInSentAt: timestamp("opt_in_sent_at", { withTimezone: true }),
+    // Wholesale: a buyer applies from their store account and the merchant approves them.
+    wholesaleStatus: text("wholesale_status", { enum: ["none", "pending", "approved", "declined"] }).notNull().default("none"),
+    wholesaleCompany: text("wholesale_company"),
+    wholesaleTaxId: text("wholesale_tax_id"),
+    wholesaleMessage: text("wholesale_message"),
+    wholesaleRequestedAt: timestamp("wholesale_requested_at", { withTimezone: true }),
     // Secret in each marketing email's unsubscribe link.
     emailToken: text("email_token").notNull().unique().default(sql`replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '')`),
     createdAt: createdAt(),
@@ -218,6 +231,8 @@ export type Presentment = {
 };
 
 export type TaxBreakdownLine = { jurisdiction: string; label: string; rateBps: number; amountMinor: number };
+
+export type QuantityBreak = { minQty: number; percentOff: number };
 
 export type Address = {
   name: string;
@@ -269,6 +284,8 @@ export const orders = pgTable(
     presentment: jsonb("presentment").$type<Presentment>(),
     // The email campaign the buyer came from, when they clicked one in the last week.
     campaignId: uuid("campaign_id").references((): AnyPgColumn => campaigns.id, { onDelete: "set null" }),
+    // Placed by an approved wholesale buyer at wholesale prices.
+    wholesale: boolean("wholesale").notNull().default(false),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

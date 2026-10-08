@@ -7,6 +7,7 @@ import { setUpsellAction } from "../../../growth-actions";
 import { setProductSupplierAction } from "../../../supplier-actions";
 import { PageHeader } from "../../PageHeader";
 import { ProductForm } from "../ProductForm";
+import { QuantityBreaksForm } from "./QuantityBreaksForm";
 import { WriteListingButton } from "./WriteListingButton";
 
 const toPrice = (m: number | null | undefined) => (m == null ? "" : (m / 100).toFixed(2));
@@ -77,6 +78,13 @@ export default async function EditProductPage({ params, searchParams }: { params
               <button className="btn btn-secondary">Save</button>
             </form>
           )}
+        </section>
+        <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="breaks-heading">
+          <div>
+            <h2 id="breaks-heading" className="font-semibold">Quantity discounts</h2>
+            <p className="hint">Buyers who take more of this product pay less for each one. Different options count together. Wholesale buyers get your wholesale price instead.</p>
+          </div>
+          <QuantityBreaksForm productId={product.id} tiers={product.quantityBreaks} />
         </section>
         <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="upsell-heading">
           <div>

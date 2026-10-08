@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { can, countNeedsYou, countPendingReviews, listPendingActions, listRequirements, openNotices, ROLES, type Area } from "@sf/core";
+import { can, countNeedsYou, countPendingReviews, countPendingWholesale, listPendingActions, listRequirements, openNotices, ROLES, type Area } from "@sf/core";
 import { requireShop, storeAddress } from "@/lib/server";
 import { BRAND } from "@/lib/brand";
 import { switchShopAction } from "../actions";
@@ -8,13 +8,14 @@ import { NavLink } from "./NavLink";
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, shop, shops, db, role } = await requireShop();
   const show = (area: Area) => can(role, area);
-  const [address, requirements, notices, pending, inbox, reviews] = await Promise.all([
+  const [address, requirements, notices, pending, inbox, reviews, wholesale] = await Promise.all([
     storeAddress(shop),
     listRequirements(db, shop.id),
     openNotices(db, shop.id),
     listPendingActions(db, shop.id),
     countNeedsYou(db, shop.id),
     countPendingReviews(db, shop.id),
+    show("wholesale") ? countPendingWholesale(db, shop.id) : 0,
   ]);
   const approvals = pending.filter((p) => !("message_id" in p.input)).length;
   const pause = notices.find((n) => n.kind === "paused");
@@ -53,6 +54,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           {show("suppliers") && <NavLink href="/admin/suppliers">Suppliers</NavLink>}
           {show("marketing") && <NavLink href="/admin/marketing">Marketing</NavLink>}
           {show("marketing") && <NavLink href="/admin/campaigns">Email campaigns</NavLink>}
+          {show("wholesale") && <NavLink href="/admin/wholesale">Wholesale{wholesale ? <span className="ml-2 pill pill-warning">{wholesale}</span> : null}</NavLink>}
           {show("reviews") && <NavLink href="/admin/reviews">Reviews{reviews ? <span className="ml-2 pill pill-info">{reviews}</span> : null}</NavLink>}
           {show("theme") && <span className="hidden lg:block px-3 pt-4 pb-1 text-xs font-semibold text-muted uppercase tracking-wide">Online store</span>}
           {show("theme") && <NavLink href="/admin/theme">Theme</NavLink>}
