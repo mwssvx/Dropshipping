@@ -43,6 +43,8 @@ export interface SupplierAdapter {
   placeOrder(input: PlaceOrderInput): Promise<{ supplierOrderRef: string }>;
   /** null until the supplier has handed the parcel to a carrier. */
   getTracking(supplierOrderRef: string): Promise<Tracking | null>;
+  /** Cancel an order that hasn't shipped. `cancelled: false` with a reason when the supplier says no. */
+  cancelOrder(supplierOrderRef: string): Promise<{ cancelled: boolean; message: string | null }>;
 }
 
 export type ProblemCode =

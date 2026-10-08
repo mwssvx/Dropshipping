@@ -4,14 +4,18 @@ import { StripePaymentProvider } from "./stripe";
 
 export * from "./provider";
 export { FakePaymentProvider } from "./fake";
-export { StripePaymentProvider } from "./stripe";
+export { StripePaymentProvider, type StripePrices } from "./stripe";
 
 export function paymentProviderFromEnv(env: Record<string, string | undefined>): PaymentProvider {
   if (env.PAYMENTS_PROVIDER === "stripe") {
     if (!env.STRIPE_SECRET_KEY || !env.STRIPE_WEBHOOK_SECRET) {
       throw new Error("PAYMENTS_PROVIDER=stripe needs STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET");
     }
-    return new StripePaymentProvider(env.STRIPE_SECRET_KEY, env.STRIPE_WEBHOOK_SECRET);
+    return new StripePaymentProvider(env.STRIPE_SECRET_KEY, env.STRIPE_WEBHOOK_SECRET, {
+      starter: env.STRIPE_PRICE_STARTER || undefined,
+      growth: env.STRIPE_PRICE_GROWTH || undefined,
+      scale: env.STRIPE_PRICE_SCALE || undefined,
+    });
   }
   return new FakePaymentProvider(env.FAKE_WEBHOOK_SECRET);
 }

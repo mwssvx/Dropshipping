@@ -1,5 +1,5 @@
 import "server-only";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { openDb, type Db } from "@sf/db";
 import {
@@ -17,6 +17,7 @@ import {
   type FulfillmentContext,
   type Mailer,
   type PaymentProvider,
+  type RefundContext,
   type Suppliers,
 } from "@sf/core";
 import { ROOT_DOMAIN, STORE_SUBDOMAINS } from "./brand";
@@ -70,6 +71,17 @@ export async function domains(): Promise<DomainContext> {
   return { db: await db(), host: g.__sfDomainHost, platformHosts: [ROOT_DOMAIN], targets: dnsTargetsFromEnv(process.env) };
 }
 
+/** An absolute link back into the admin, for pages the payment provider sends the merchant back from. */
+export async function adminUrl(path: string) {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? ROOT_DOMAIN;
+  const proto = h.get("x-forwarded-proto") ?? (/^(localhost|127\.0\.0\.1)(:|$)/.test(host) ? "http" : "https");
+  return `${proto}://${host}${path}`;
+}
+
+/** Test mode: no real money moves, so the admin offers buttons to simulate payouts and holds. */
+export const testPayments = () => payments().name === "fake";
+
 export async function fulfillment(): Promise<FulfillmentContext> {
   return {
     db: await db(),
@@ -103,4 +115,8 @@ export async function requireShop() {
   const pick = shops.find((s) => s.id === wanted) ?? shops[0]!;
   const { shop, role } = await requireMember(database, user.id, pick.id);
   return { user, shop, role, shops, db: database };
+}
+
+export async function refunds(): Promise<RefundContext> {
+  return { ...(await fulfillment()), payments: payments() };
 }

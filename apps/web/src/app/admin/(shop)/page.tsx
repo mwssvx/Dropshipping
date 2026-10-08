@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatMoney, listOrders, listProducts } from "@sf/core";
+import { formatMoney, listOrders, listProducts, listRequirements } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "./PageHeader";
 
@@ -7,7 +7,8 @@ export const metadata = { title: "Home" };
 
 export default async function AdminHome() {
   const { shop, db } = await requireShop();
-  const [orders, products] = await Promise.all([listOrders(db, shop.id), listProducts(db, shop.id)]);
+  const [orders, products, requirements] = await Promise.all([listOrders(db, shop.id), listProducts(db, shop.id), listRequirements(db, shop.id)]);
+  const holds = requirements.filter((r) => r.holdsPayouts);
   const paid = orders.filter((o) => o.paymentStatus === "paid");
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
@@ -21,7 +22,7 @@ export default async function AdminHome() {
     { done: products.length > 0, title: "Import your first product", href: "/admin/products/import" },
     { done: hasActive, title: "Make a product active so buyers can see it", href: "/admin/products" },
     { done: paid.length > 0, title: "Place a test order on your store", href: `/s/${shop.handle}` },
-    { done: false, title: "Connect payouts so you get paid", note: "Coming soon" },
+    { done: shop.payoutsEnabled || requirements.length > 0, title: "Set up payouts so you get paid", href: "/admin/money" },
   ];
   const left = steps.filter((s) => !s.done).length;
 
@@ -44,8 +45,16 @@ export default async function AdminHome() {
           </section>
           <section className="card">
             <h2 className="font-semibold px-4 pt-4">Needs your attention</h2>
-            {toSend.length || problems.length ? (
+            {toSend.length || problems.length || holds.length ? (
               <ul className="p-2">
+                {holds.length > 0 && (
+                  <li>
+                    <Link href="/admin/money" className="flex items-center justify-between gap-3 px-2 py-3 rounded-md hover:bg-sunken">
+                      <span><span className="pill pill-critical mr-2">Payouts paused</span>The payment processor needs: {holds.map((h) => h.title.toLowerCase()).join(", ")}</span>
+                      <span className="hint">Send →</span>
+                    </Link>
+                  </li>
+                )}
                 {problems.length > 0 && (
                   <li>
                     <Link href="/admin/orders?show=problems" className="flex items-center justify-between gap-3 px-2 py-3 rounded-md hover:bg-sunken">
@@ -81,7 +90,7 @@ export default async function AdminHome() {
                 ) : (
                   <div className="flex gap-3 items-start px-2 py-2">
                     <Check done={s.done} />
-                    <span className={`text-sm ${s.done ? "text-muted line-through" : ""}`}>{s.title}{s.note && <span className="hint"> · {s.note}</span>}</span>
+                    <span className={`text-sm ${s.done ? "text-muted line-through" : ""}`}>{s.title}</span>
                   </div>
                 )}
               </li>

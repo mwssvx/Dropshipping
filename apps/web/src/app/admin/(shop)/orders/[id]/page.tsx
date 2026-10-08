@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatMoney, getOrder, listSupplierLinks, NotFoundError, PROBLEM_FIXES, type ProblemCode } from "@sf/core";
+import { formatMoney, getOrder, listRefunds, listSupplierLinks, NotFoundError, PLANS, PROBLEM_FIXES, type ProblemCode } from "@sf/core";
 import { requireShop, suppliers } from "@/lib/server";
 import { CheckTrackingButton, ManualTrackingForm, RetryButton } from "./FulfillmentActions";
+import { RefundForm } from "./RefundForm";
 import { FulfilmentStatus, PaymentStatus } from "@/components/Status";
 import { PageHeader } from "../../PageHeader";
 
@@ -19,13 +20,13 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const cost = order.lines.reduce((s, l) => s + (l.unitCostMinor ?? 0) * l.quantity, 0);
   const knownCost = order.lines.every((l) => l.unitCostMinor != null);
   const a = order.shippingAddress;
-  const links = await listSupplierLinks(db, shop.id);
+  const [links, refunds] = await Promise.all([listSupplierLinks(db, shop.id), listRefunds(db, order.id)]);
   const supplierLabel = (supplierId: string | null) => {
     if (!supplierId) return "Sent by you";
     const provider = links.find((l) => l.id === supplierId)?.provider;
     return suppliers().available.find((s) => s.name === provider)?.label ?? provider ?? "Supplier";
   };
-  const EMAIL_LABEL = { order_confirmation: "Order confirmation", shipping_update: "Shipping update", delivered: "Delivery confirmation" };
+  const EMAIL_LABEL = { order_confirmation: "Order confirmation", shipping_update: "Shipping update", delivered: "Delivery confirmation", refund: "Refund" };
   const timeline = [
     { at: order.createdAt, text: "Order placed" },
     ...(order.paidAt ? [{ at: order.paidAt, text: `Payment of ${money(order.totalMinor)} received` }] : []),
@@ -35,6 +36,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       ...(f.deliveredAt ? [{ at: f.deliveredAt, text: "Delivered" }] : []),
       ...(f.status === "failed" ? [{ at: f.updatedAt, text: `Supplier refused the order: ${f.problemMessage}` }] : []),
     ]),
+    ...refunds.map((r) => ({ at: r.createdAt, text: `Refunded ${money(r.amountMinor)}${r.reason ? `: ${r.reason}` : ""}` })),
+    ...order.fulfillments.flatMap((f) => (f.status === "cancelled" ? [{ at: f.updatedAt, text: `Supplier order cancelled (${supplierLabel(f.supplierId)})` }] : [])),
     ...order.emails.map((e) => ({
       at: e.sentAt ?? e.createdAt,
       text: `${EMAIL_LABEL[e.kind]} email ${e.status === "sent" ? "sent" : e.status === "failed" ? "failed to send" : "queued"} to ${e.to}`,
@@ -43,6 +46,10 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const problems = order.fulfillments.filter((f) => f.problemCode);
   const open = order.fulfillments.some((f) => (f.status === "placed" || f.status === "shipped") && f.supplierOrderRef);
   const paid = order.paymentStatus === "paid";
+  const refundable = paid || order.paymentStatus === "partially_refunded";
+  const feeBack = order.platformFeeMinor > 0;
+  const feeKept = order.platformFeeMinor - refunds.reduce((s, r) => s + r.platformFeeRefundedMinor, 0);
+  const net = order.totalMinor - order.refundedMinor - feeKept - order.processingFeeMinor;
 
   return (
     <main className="pb-12">
@@ -65,7 +72,15 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <dt className="hint">Shipping</dt><dd>{order.shippingMinor ? money(order.shippingMinor) : "Free"}</dd>
               <dt className="hint">Tax</dt><dd>{money(order.taxMinor)}</dd>
               <dt className="font-semibold">Total</dt><dd className="font-semibold">{money(order.totalMinor)}</dd>
-              {knownCost && <><dt className="hint">Profit after supplier cost</dt><dd className="text-success font-semibold">{money(order.subtotalMinor - cost)}</dd></>}
+              {order.refundedMinor > 0 && <><dt className="hint">Refunded</dt><dd>−{money(order.refundedMinor)}</dd></>}
+              {order.paidAt && (
+                <>
+                  <dt className="hint">Our fee{!order.platformFeeMinor ? " (none on your plan)" : feeKept < order.platformFeeMinor ? " (returned with the refund)" : ""}</dt><dd>−{money(feeKept)}</dd>
+                  <dt className="hint">Card processing (est.)</dt><dd>−{money(order.processingFeeMinor)}</dd>
+                  <dt className="font-semibold">You receive</dt><dd className="font-semibold">{money(net)}</dd>
+                </>
+              )}
+              {knownCost && order.paymentStatus !== "refunded" && <><dt className="hint" title="What you receive, minus supplier cost. The shipping charge is assumed to cover the supplier's shipping.">Profit after supplier cost</dt><dd className="text-success font-semibold">{money(net - order.shippingMinor - cost)}</dd></>}
             </dl>
           </section>
           {problems.map((f) => (
@@ -126,7 +141,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             </ol>
           </section>
         </div>
-        <aside className="card p-5 flex flex-col gap-4 text-sm">
+        <aside className="flex flex-col gap-6">
+        <div className="card p-5 flex flex-col gap-4 text-sm">
           <div>
             <h2 className="font-semibold mb-1">Customer</h2>
             <p>{a.name}</p>
@@ -138,6 +154,14 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               {a.line1}{a.line2 ? <>, {a.line2}</> : null}<br />{a.city}{a.region ? `, ${a.region}` : ""} {a.postalCode}<br />{a.country}
             </address>
           </div>
+        </div>
+        {(refundable || refunds.length > 0) && (
+          <div className="card p-5 flex flex-col gap-3 text-sm">
+            <h2 className="font-semibold">Refund</h2>
+            <RefundForm orderId={order.id} leftMinor={order.totalMinor - order.refundedMinor} currency={order.currency}
+              feeNote={feeBack ? `Our ${PLANS.free.feeBps / 100}% fee comes back to you in proportion. The card processing fee isn't returned by the card network.` : null} />
+          </div>
+        )}
         </aside>
       </div>
     </main>

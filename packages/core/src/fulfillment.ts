@@ -290,9 +290,27 @@ export async function routeStuckOrders(ctx: FulfillmentContext, olderThanMs = 2 
 
 type EmailKind = (typeof schema.emails.$inferSelect)["kind"];
 
-async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kind: EmailKind) {
+async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kind: EmailKind, ref: string) {
   const link = await ctx.orderStatusUrl(shop, order);
   const first = order.shippingAddress.name.split(" ")[0];
+  if (kind === "refund") {
+    const refund = await ctx.db.query.refunds.findFirst({ where: eq(schema.refunds.id, ref) });
+    if (!refund) throw new NotFoundError("Refund");
+    const full = order.refundedMinor >= order.totalMinor;
+    return {
+      subject: `Refund for order #${order.number}`,
+      text: [
+        `Hi ${first},`,
+        ``,
+        `${shop.name} refunded ${formatMoney(refund.amountMinor, order.currency)} to the card you paid with${full ? " (the whole order)" : ""}.`,
+        ...(refund.reason ? [``, `Reason: ${refund.reason}`] : []),
+        ``,
+        `Banks usually show it within 5 to 10 business days.`,
+        ``,
+        `Order status: ${link}`,
+      ].join("\n"),
+    };
+  }
   if (kind === "order_confirmation") {
     const lines = await ctx.db.query.orderLines.findMany({ where: eq(schema.orderLines.orderId, order.id) });
     return {
@@ -326,16 +344,19 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
   };
 }
 
-/** Send one kind of email for an order at most once. Failures are recorded, not thrown. */
-export async function sendOrderEmail(ctx: FulfillmentContext, orderId: string, kind: EmailKind) {
+/**
+ * Send one kind of email for an order at most once (per `ref`, e.g. one per refund).
+ * Failures are recorded, not thrown.
+ */
+export async function sendOrderEmail(ctx: FulfillmentContext, orderId: string, kind: EmailKind, ref = "") {
   const { db } = ctx;
   const order = await db.query.orders.findFirst({ where: eq(schema.orders.id, orderId) });
   if (!order) throw new NotFoundError("Order");
   const shop = (await db.query.shops.findFirst({ where: eq(schema.shops.id, order.shopId) }))!;
-  const { subject, text } = await buildEmail(ctx, order, shop, kind);
+  const { subject, text } = await buildEmail(ctx, order, shop, kind, ref);
   const [row] = await db
     .insert(schema.emails)
-    .values({ shopId: shop.id, orderId: order.id, kind, to: order.email, subject, bodyText: text })
+    .values({ shopId: shop.id, orderId: order.id, kind, ref, to: order.email, subject, bodyText: text })
     .onConflictDoNothing()
     .returning({ id: schema.emails.id });
   if (!row) return { status: "already_sent" as const };

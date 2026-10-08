@@ -3,6 +3,8 @@ import { schema, type Address, type Db } from "@sf/db";
 import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
 import type { PaymentEvent, PaymentProvider } from "./payments";
+import { applyMoneyEvent } from "./payouts";
+import { estimateProcessingFee, platformFeeFor } from "./plans";
 
 type Shop = typeof schema.shops.$inferSelect;
 type Order = typeof schema.orders.$inferSelect;
@@ -78,11 +80,13 @@ export async function startCheckout(
   if (!parsed.success) throw new UserError(parsed.error.issues[0]!.message);
   const { email, address } = parsed.data;
   const quote = await quoteCart(db, shop, input.lines);
+  const platformFeeMinor = platformFeeFor(shop.plan, quote.totalMinor);
 
   const intent = await payments.createPaymentIntent({
     amountMinor: quote.totalMinor,
     currency: quote.currency,
     shopAccountId: shop.paymentsAccountId,
+    applicationFeeMinor: platformFeeMinor,
     metadata: { shopId: shop.id },
   });
 
@@ -111,6 +115,8 @@ export async function startCheckout(
         shippingMinor: quote.shippingMinor,
         taxMinor: quote.taxMinor,
         totalMinor: quote.totalMinor,
+        platformFeeMinor,
+        processingFeeMinor: estimateProcessingFee(quote.totalMinor),
         paymentIntentId: intent.id,
       })
       .returning();
@@ -142,6 +148,12 @@ export async function handlePaymentEvent(db: Db, provider: string, event: Paymen
       .onConflictDoNothing()
       .returning({ id: schema.webhookEvents.id });
     if (!inserted.length) return { status: "duplicate" as const };
+
+    if (event.type !== "payment.succeeded" && event.type !== "payment.failed") {
+      const applied = await applyMoneyEvent(tx as unknown as Db, event);
+      await tx.update(schema.webhookEvents).set({ processedAt: new Date() }).where(eq(schema.webhookEvents.id, event.id));
+      return { status: applied ? ("processed" as const) : ("unknown_account" as const), becamePaid: false as const };
+    }
 
     const order = await tx.query.orders.findFirst({ where: eq(schema.orders.paymentIntentId, event.paymentIntentId) });
     if (!order) return { status: "unknown_order" as const };

@@ -46,10 +46,10 @@ export class CjSupplier implements SupplierAdapter {
     return data.accessToken;
   }
 
-  private async call<T>(method: "GET" | "POST", path: string, body?: unknown, auth = true): Promise<T> {
+  private async call<T>(method: "GET" | "POST" | "DELETE", path: string, body?: unknown, auth = true): Promise<T> {
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (auth) headers["CJ-Access-Token"] = await this.accessToken();
-    const url = method === "GET" && body ? `${BASE}${path}?${new URLSearchParams(body as Record<string, string>)}` : `${BASE}${path}`;
+    const url = method !== "POST" && body ? `${BASE}${path}?${new URLSearchParams(body as Record<string, string>)}` : `${BASE}${path}`;
     let res: Response;
     try {
       res = await this.fetch(url, { method, headers, body: method === "POST" ? JSON.stringify(body ?? {}) : undefined });
@@ -141,6 +141,19 @@ export class CjSupplier implements SupplierAdapter {
       products,
     });
     return { supplierOrderRef: order.orderId };
+  }
+
+  /** CJ only lets you delete an order before it's paid and processed; after that, ask CJ support. */
+  async cancelOrder(orderId: string) {
+    try {
+      await this.call("DELETE", "/shopping/order/deleteOrder", { orderId });
+      return { cancelled: true, message: null };
+    } catch (e) {
+      if (e instanceof SupplierError && !e.retryable) {
+        return { cancelled: false, message: `CJ wouldn't cancel it (${e.message}). Ask CJ support to cancel order ${orderId}.` };
+      }
+      throw e;
+    }
   }
 
   async getTracking(orderId: string): Promise<Tracking | null> {
