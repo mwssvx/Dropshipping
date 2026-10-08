@@ -7,7 +7,7 @@ import { PageHeader } from "../PageHeader";
 export const metadata = { title: "Products" };
 
 export default async function ProductsPage() {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("products");
   const products = await listProducts(db, shop.id);
   return (
     <main className="pb-12">

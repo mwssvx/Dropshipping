@@ -10,7 +10,7 @@ const DAY = 86_400_000;
 const date = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 
 export default async function MarketingPage() {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("marketing");
   const [discounts, stats] = await Promise.all([listDiscounts(db, shop.id), abandonedCartStats(db, shop.id, new Date(Date.now() - 30 * DAY))]);
   const money = (m: number) => formatMoney(m, shop.currency);
   const now = new Date();

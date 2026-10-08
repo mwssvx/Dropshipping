@@ -29,3 +29,4 @@ export * from "./store-export";
 export * from "./ai";
 export * from "./mobile";
 export * from "./launch";
+export * from "./team";

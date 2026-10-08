@@ -10,7 +10,7 @@ export const metadata = { title: "Collection" };
 
 export default async function CollectionPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string }> }) {
   const { id } = await params;
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("collections");
   const collection = await getCollection(db, shop.id, id).catch((e) => {
     if (e instanceof NotFoundError) notFound();
     throw e;

@@ -3,6 +3,7 @@ import { schema, type Db } from "@sf/db";
 import { NotFoundError, UserError } from "./errors";
 import type { PaymentEvent, PaymentProvider, PayoutAccountStatus, ProviderPayout, ProviderRequirement } from "./payments";
 import { PLAN_IDS, PLANS, type PlanId } from "./plans";
+import { assertSeatsFit } from "./team";
 
 type Shop = typeof schema.shops.$inferSelect;
 type Requirement = typeof schema.accountRequirements.$inferSelect;
@@ -431,6 +432,7 @@ export async function changePlan(
   if (!PLAN_IDS.includes(input.plan as PlanId)) throw new UserError("Choose a plan.");
   const plan = input.plan as PlanId;
   if (plan === shop.plan) return { url: null, plan };
+  await assertSeatsFit(db, shop.id, plan);
   const url = await payments.planCheckoutUrl({
     shopId: shop.id,
     plan,

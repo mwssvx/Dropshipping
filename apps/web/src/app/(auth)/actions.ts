@@ -1,9 +1,9 @@
 "use server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { createSession, deleteSession, requestPasswordReset, resetPassword, signIn, signUp, UserError } from "@sf/core";
+import { acceptInvite, createSession, deleteSession, requestPasswordReset, resetPassword, signIn, signUp, UserError } from "@sf/core";
 import { BRAND } from "@/lib/brand";
-import { adminUrl, db, mailer, SESSION_COOKIE } from "@/lib/server";
+import { adminUrl, db, mailer, requireUser, SESSION_COOKIE, SHOP_COOKIE } from "@/lib/server";
 
 export type AuthState = { error?: string; email?: string };
 
@@ -18,6 +18,12 @@ async function startSession(userId: string) {
   });
 }
 
+/** Only invite links are followed after signing in, so the form can't send people elsewhere. */
+function nextPath(form: FormData) {
+  const next = String(form.get("next") ?? "");
+  return /^\/invite\/[\w-]+$/.test(next) ? next : null;
+}
+
 export async function signUpAction(_: AuthState, form: FormData): Promise<AuthState> {
   const email = String(form.get("email") ?? "");
   try {
@@ -27,7 +33,7 @@ export async function signUpAction(_: AuthState, form: FormData): Promise<AuthSt
     if (e instanceof UserError) return { error: e.message, email };
     throw e;
   }
-  redirect("/admin/new-store");
+  redirect(nextPath(form) ?? "/admin/new-store");
 }
 
 export async function signInAction(_: AuthState, form: FormData): Promise<AuthState> {
@@ -39,7 +45,7 @@ export async function signInAction(_: AuthState, form: FormData): Promise<AuthSt
     if (e instanceof UserError) return { error: e.message, email };
     throw e;
   }
-  redirect("/admin");
+  redirect(nextPath(form) ?? "/admin");
 }
 
 export async function signOutAction() {
@@ -73,5 +79,20 @@ export async function resetPasswordAction(token: string, _: ResetState, form: Fo
     if (e instanceof UserError) return { error: e.message };
     throw e;
   }
+  redirect("/admin");
+}
+
+export type InviteState = { error?: string };
+
+export async function acceptInviteAction(token: string, _: InviteState, _form: FormData): Promise<InviteState> {
+  const user = await requireUser();
+  let shopId: string;
+  try {
+    ({ shopId } = await acceptInvite(await db(), token, user));
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  (await cookies()).set(SHOP_COOKIE, shopId, { httpOnly: true, sameSite: "lax", path: "/" });
   redirect("/admin");
 }

@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { countNeedsYou, countPendingReviews, listPendingActions, listRequirements, openNotices } from "@sf/core";
+import { can, countNeedsYou, countPendingReviews, listPendingActions, listRequirements, openNotices, ROLES, type Area } from "@sf/core";
 import { requireShop, storeAddress } from "@/lib/server";
 import { BRAND } from "@/lib/brand";
 import { switchShopAction } from "../actions";
 import { NavLink } from "./NavLink";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { user, shop, shops, db } = await requireShop();
+  const { user, shop, shops, db, role } = await requireShop();
+  const show = (area: Area) => can(role, area);
   const [address, requirements, notices, pending, inbox, reviews] = await Promise.all([
     storeAddress(shop),
     listRequirements(db, shop.id),
@@ -18,7 +19,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const approvals = pending.filter((p) => !("message_id" in p.input)).length;
   const pause = notices.find((n) => n.kind === "paused");
   const warning = notices.find((n) => n.kind === "warning");
-  const holds = requirements.filter((r) => r.holdsPayouts).length;
+  const holds = show("money") ? requirements.filter((r) => r.holdsPayouts).length : 0;
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[232px_1fr]">
       <aside className="bg-surface border-b lg:border-b-0 lg:border-r border-border lg:min-h-dvh flex flex-col">
@@ -41,30 +42,32 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         )}
         <nav className="flex lg:flex-col gap-1 px-2 pb-3 overflow-x-auto" aria-label="Admin">
           <NavLink href="/admin" exact>Home</NavLink>
-          <NavLink href="/admin/analytics">Analytics</NavLink>
-          <NavLink href="/admin/assistant">Assistant{approvals ? <span className="ml-2 pill pill-warning">{approvals}</span> : null}</NavLink>
-          <NavLink href="/admin/orders">Orders</NavLink>
-          <NavLink href="/admin/inbox">Inbox{inbox ? <span className="ml-2 pill pill-warning">{inbox}</span> : null}</NavLink>
-          <NavLink href="/admin/money">Money{holds ? <span className="ml-2 pill pill-critical">{holds}</span> : null}</NavLink>
-          <NavLink href="/admin/products">Products</NavLink>
-          <NavLink href="/admin/collections">Collections</NavLink>
-          <NavLink href="/admin/suppliers">Suppliers</NavLink>
-          <NavLink href="/admin/marketing">Marketing</NavLink>
-          <NavLink href="/admin/reviews">Reviews{reviews ? <span className="ml-2 pill pill-info">{reviews}</span> : null}</NavLink>
-          <span className="hidden lg:block px-3 pt-4 pb-1 text-xs font-semibold text-muted uppercase tracking-wide">Online store</span>
-          <NavLink href="/admin/theme">Theme</NavLink>
-          <NavLink href="/admin/pages">Pages</NavLink>
-          <NavLink href="/admin/domains">Domains</NavLink>
+          {show("analytics") && <NavLink href="/admin/analytics">Analytics</NavLink>}
+          {show("assistant") && <NavLink href="/admin/assistant">Assistant{approvals ? <span className="ml-2 pill pill-warning">{approvals}</span> : null}</NavLink>}
+          {show("orders") && <NavLink href="/admin/orders">Orders</NavLink>}
+          {show("inbox") && <NavLink href="/admin/inbox">Inbox{inbox ? <span className="ml-2 pill pill-warning">{inbox}</span> : null}</NavLink>}
+          {show("money") && <NavLink href="/admin/money">Money{holds ? <span className="ml-2 pill pill-critical">{holds}</span> : null}</NavLink>}
+          {show("products") && <NavLink href="/admin/products">Products</NavLink>}
+          {show("collections") && <NavLink href="/admin/collections">Collections</NavLink>}
+          {show("suppliers") && <NavLink href="/admin/suppliers">Suppliers</NavLink>}
+          {show("marketing") && <NavLink href="/admin/marketing">Marketing</NavLink>}
+          {show("reviews") && <NavLink href="/admin/reviews">Reviews{reviews ? <span className="ml-2 pill pill-info">{reviews}</span> : null}</NavLink>}
+          {show("theme") && <span className="hidden lg:block px-3 pt-4 pb-1 text-xs font-semibold text-muted uppercase tracking-wide">Online store</span>}
+          {show("theme") && <NavLink href="/admin/theme">Theme</NavLink>}
+          {show("pages") && <NavLink href="/admin/pages">Pages</NavLink>}
+          {show("domains") && <NavLink href="/admin/domains">Domains</NavLink>}
           <span className="hidden lg:block px-3 pt-4 pb-1 text-xs font-semibold text-muted uppercase tracking-wide">Settings</span>
-          <NavLink href="/admin/trust">Trust{notices.length ? <span className="ml-2 pill pill-warning">{notices.length}</span> : null}</NavLink>
-          <NavLink href="/admin/plan">Plan</NavLink>
-          <NavLink href="/admin/ai">AI settings</NavLink>
-          <NavLink href="/admin/taxes">Taxes</NavLink>
-          <NavLink href="/admin/developers">Developers</NavLink>
-          <NavLink href="/admin/export">Export and import</NavLink>
+          <NavLink href="/admin/team">Team</NavLink>
+          {show("trust") && <NavLink href="/admin/trust">Trust{notices.length ? <span className="ml-2 pill pill-warning">{notices.length}</span> : null}</NavLink>}
+          {show("plan") && <NavLink href="/admin/plan">Plan</NavLink>}
+          {show("ai") && <NavLink href="/admin/ai">AI settings</NavLink>}
+          {show("taxes") && <NavLink href="/admin/taxes">Taxes</NavLink>}
+          {show("developers") && <NavLink href="/admin/developers">Developers</NavLink>}
+          {show("export") && <NavLink href="/admin/export">Export and import</NavLink>}
         </nav>
         <div className="mt-auto hidden lg:flex flex-col gap-2 px-4 py-4 border-t border-border">
           <span className="hint truncate">{user.email}</span>
+          {role !== "owner" && <span className="hint">{ROLES[role].name} on this store</span>}
           <form action="/logout" method="post"><button className="hint hover:text-ink">Sign out</button></form>
         </div>
       </aside>

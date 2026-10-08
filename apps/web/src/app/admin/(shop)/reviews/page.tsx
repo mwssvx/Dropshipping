@@ -14,7 +14,7 @@ const TABS = [
 ] as const;
 
 export default async function ReviewsPage({ searchParams }: { searchParams: Promise<{ show?: string }> }) {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("reviews");
   const { show } = await searchParams;
   const status = TABS.find((t) => t.key === show)?.key ?? "pending";
   const rows = await listReviews(db, shop.id, { status });

@@ -8,7 +8,7 @@ export const metadata = { title: "Pages" };
 const STARTERS = ["About us", "Shipping and returns", "Contact"];
 
 export default async function PagesPage() {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("pages");
   const pages = await listPages(db, shop.id);
   return (
     <main className="pb-12">

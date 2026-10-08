@@ -13,7 +13,7 @@ const toPrice = (m: number | null | undefined) => (m == null ? "" : (m / 100).to
 export default async function EditProductPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string; imported?: string }> }) {
   const { id } = await params;
   const { created, imported } = await searchParams;
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("products");
   const found = await getProduct(db, shop.id, id).catch((e) => {
     if (e instanceof NotFoundError) notFound();
     throw e;

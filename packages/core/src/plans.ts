@@ -8,11 +8,12 @@ import { schema, type Db } from "@sf/db";
 
 export type PlanId = (typeof schema.shops.$inferSelect)["plan"];
 
-export const PLANS: Record<PlanId, { name: string; monthlyMinor: number; feeBps: number; ordersPerMonth: number | null; blurb: string }> = {
-  free: { name: "Free", monthlyMinor: 0, feeBps: 200, ordersPerMonth: 50, blurb: "Everything built in. We take 2% of each sale." },
-  starter: { name: "Starter", monthlyMinor: 1900, feeBps: 0, ordersPerMonth: 100, blurb: "No cut of your sales. Up to 100 orders a month." },
-  growth: { name: "Growth", monthlyMinor: 4900, feeBps: 0, ordersPerMonth: null, blurb: "No cut of your sales. Unlimited orders and priority support." },
-  scale: { name: "Scale", monthlyMinor: 14900, feeBps: 0, ordersPerMonth: null, blurb: "For teams: staff accounts and advanced analytics." },
+/** teamSeats: people besides the owner who can help run the store. */
+export const PLANS: Record<PlanId, { name: string; monthlyMinor: number; feeBps: number; ordersPerMonth: number | null; teamSeats: number; blurb: string }> = {
+  free: { name: "Free", monthlyMinor: 0, feeBps: 200, ordersPerMonth: 50, teamSeats: 0, blurb: "Everything built in. We take 2% of each sale." },
+  starter: { name: "Starter", monthlyMinor: 1900, feeBps: 0, ordersPerMonth: 100, teamSeats: 0, blurb: "No cut of your sales. Up to 100 orders a month." },
+  growth: { name: "Growth", monthlyMinor: 4900, feeBps: 0, ordersPerMonth: null, teamSeats: 0, blurb: "No cut of your sales. Unlimited orders and priority support." },
+  scale: { name: "Scale", monthlyMinor: 14900, feeBps: 0, ordersPerMonth: null, teamSeats: 15, blurb: "For teams: up to 15 staff accounts with roles, and advanced analytics." },
 };
 export const PLAN_IDS = Object.keys(PLANS) as PlanId[];
 

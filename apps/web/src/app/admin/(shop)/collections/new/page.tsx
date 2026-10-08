@@ -8,7 +8,7 @@ import { CollectionForm } from "../CollectionForm";
 export const metadata = { title: "Create collection" };
 
 export default async function NewCollectionPage() {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("collections");
   const products = await listProducts(db, shop.id);
   return (
     <main className="pb-12">

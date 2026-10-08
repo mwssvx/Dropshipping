@@ -15,7 +15,7 @@ function quarter(offset: number) {
 }
 
 export default async function TaxesPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("taxes");
   const { period } = await searchParams;
   const range = quarter(period === "last" ? -1 : 0);
   const [registrations, report] = await Promise.all([listTaxRegistrations(db, shop.id), taxReport(db, shop.id, range)]);

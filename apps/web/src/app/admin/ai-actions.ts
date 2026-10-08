@@ -21,7 +21,7 @@ const fail = (e: unknown): AgentState => {
 };
 
 export async function askAssistantAction(_: AgentState, form: FormData): Promise<AgentState> {
-  const { shop } = await requireShop();
+  const { shop } = await requireShop("assistant");
   try {
     await askAssistant(await agents(), shop, String(form.get("message") ?? ""));
   } catch (e) {
@@ -33,7 +33,7 @@ export async function askAssistantAction(_: AgentState, form: FormData): Promise
 
 /** Approve or turn down something an agent proposed. A message edit applies to drafted replies. */
 export async function decideAgentAction(actionId: string, approve: boolean, _: AgentState, form: FormData): Promise<AgentState> {
-  const { shop, user } = await requireShop();
+  const { shop, user } = await requireShop("assistant");
   const edited = form.get("message");
   try {
     await decideAction(await agents(), shop.id, actionId, { approve, by: user.email, message: typeof edited === "string" ? edited : undefined });
@@ -45,7 +45,7 @@ export async function decideAgentAction(actionId: string, approve: boolean, _: A
 }
 
 export async function writeListingAction(productId: string, _: AgentState): Promise<AgentState> {
-  const { shop } = await requireShop();
+  const { shop } = await requireShop("products");
   try {
     const run = await writeListing(await agents(), shop, productId);
     revalidatePath(`/admin/products/${productId}`);
@@ -59,7 +59,7 @@ export async function writeListingAction(productId: string, _: AgentState): Prom
 }
 
 export async function fixOrderAction(orderId: string, _: AgentState): Promise<AgentState> {
-  const { shop } = await requireShop();
+  const { shop } = await requireShop("orders");
   try {
     const run = await fixProblemOrder(await agents(), shop, orderId);
     revalidatePath(`/admin/orders/${orderId}`);
@@ -72,7 +72,7 @@ export async function fixOrderAction(orderId: string, _: AgentState): Promise<Ag
 }
 
 export async function marginCheckAction(_: AgentState): Promise<AgentState> {
-  const { shop } = await requireShop();
+  const { shop } = await requireShop("assistant");
   try {
     const run = await runMarginWatch(await agents(), shop, "merchant");
     revalidatePath("/admin", "layout");
@@ -85,7 +85,7 @@ export async function marginCheckAction(_: AgentState): Promise<AgentState> {
 }
 
 export async function saveAiSettingsAction(_: AgentState, form: FormData): Promise<AgentState> {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("ai");
   const budget = String(form.get("budget") ?? "").trim();
   try {
     await setAiSettings(db, shop, {
@@ -101,7 +101,7 @@ export async function saveAiSettingsAction(_: AgentState, form: FormData): Promi
 }
 
 export async function inboxReplyAction(conversationId: string, _: AgentState, form: FormData): Promise<AgentState> {
-  const { shop } = await requireShop();
+  const { shop } = await requireShop("inbox");
   try {
     await merchantReply(await fulfillment(), shop.id, conversationId, String(form.get("message") ?? ""));
   } catch (e) {

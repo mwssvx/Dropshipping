@@ -17,7 +17,7 @@ const PAYOUT_STATUS: Record<string, [string, string]> = {
 };
 
 export default async function MoneyPage({ searchParams }: { searchParams: Promise<{ setup?: string }> }) {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("money");
   const [{ setup }, summary, requirements, payouts, advice] = await Promise.all([
     searchParams,
     moneySummary(db, shop),

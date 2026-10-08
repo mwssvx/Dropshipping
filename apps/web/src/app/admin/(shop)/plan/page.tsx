@@ -6,7 +6,7 @@ import { PlanButton } from "./PlanButton";
 export const metadata = { title: "Plan" };
 
 export default async function PlanPage({ searchParams }: { searchParams: Promise<{ plan?: string }> }) {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("plan");
   const [{ plan: returned }, advice] = await Promise.all([searchParams, planAdvice(db, shop)]);
   const usd = (m: number) => formatMoney(m, "USD");
   const money = (m: number) => formatMoney(m, shop.currency);

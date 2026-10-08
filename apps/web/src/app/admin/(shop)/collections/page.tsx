@@ -6,7 +6,7 @@ import { PageHeader } from "../PageHeader";
 export const metadata = { title: "Collections" };
 
 export default async function CollectionsPage() {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("collections");
   const collections = await listCollections(db, shop.id);
   return (
     <main className="pb-12">

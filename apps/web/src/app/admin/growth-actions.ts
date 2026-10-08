@@ -15,7 +15,7 @@ function optionalDate(v: FormDataEntryValue | null, endOfDay = false) {
 }
 
 export async function createDiscountAction(_: FormState, form: FormData): Promise<FormState> {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("marketing");
   try {
     const kind = String(form.get("kind") ?? "percent") as "percent" | "amount" | "free_shipping";
     const raw = String(form.get("value") ?? "").trim();
@@ -40,47 +40,47 @@ export async function createDiscountAction(_: FormState, form: FormData): Promis
 }
 
 export async function setDiscountActiveAction(id: string, active: boolean) {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("marketing");
   await setDiscountActive(db, shop.id, id, active);
   revalidatePath("/admin/marketing");
 }
 
 export async function setRemindersAction(form: FormData) {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("marketing");
   await setGrowthSettings(db, shop.id, { abandonedCartEmails: form.get("abandonedCartEmails") === "on" });
   revalidatePath("/admin/marketing");
 }
 
 /** Test mode only: send reminders as if an hour had passed, so they can be tried without waiting. */
 export async function sendRemindersNowAction() {
-  await requireShop();
+  await requireShop("marketing");
   if (!testPayments()) return;
   await sendAbandonedCartEmails(await fulfillment(), new Date(Date.now() + HOUR + 60_000));
   revalidatePath("/admin/marketing");
 }
 
 export async function setReviewsAutoPublishAction(form: FormData) {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("reviews");
   await setGrowthSettings(db, shop.id, { reviewsAutoPublish: form.get("reviewsAutoPublish") === "on" });
   revalidatePath("/admin/reviews");
 }
 
 export async function moderateReviewAction(id: string, status: "published" | "hidden") {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("reviews");
   await moderateReview(db, shop.id, id, { status });
   revalidatePath("/admin/reviews");
   revalidatePath("/admin", "layout");
 }
 
 export async function replyToReviewAction(id: string, _: FormState, form: FormData): Promise<FormState> {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("reviews");
   await moderateReview(db, shop.id, id, { reply: String(form.get("reply") ?? "") });
   revalidatePath("/admin/reviews");
   return { saved: true };
 }
 
 export async function setUpsellAction(productId: string, form: FormData) {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("products");
   const id = String(form.get("upsellProductId") ?? "");
   await setUpsell(db, shop.id, productId, id || null);
   revalidatePath(`/admin/products/${productId}`);

@@ -5,13 +5,14 @@ import { listPendingActions } from "../ai/runtime";
 import { listRequirements } from "../payouts";
 import { openNotices } from "../trust";
 import type { Shop } from "../ai/context";
+import { can, type Role } from "../team";
 
 export type AttentionItem = { kind: "hold" | "notice" | "problems" | "to_send" | "inbox"; title: string; body: string; url: string; tone: "critical" | "warning" | "info" };
 
 const DAY = 86_400_000;
 
 /** The app's first screen: today's numbers, what needs the merchant, and what waits for their OK. */
-export async function todaySummary(db: Db, shop: Shop, now = new Date()) {
+export async function todaySummary(db: Db, shop: Shop, now = new Date(), role: Role = "owner") {
   const startOfDay = new Date(now);
   startOfDay.setHours(0, 0, 0, 0);
   const weekAgo = new Date(now.getTime() - 7 * DAY);
@@ -46,13 +47,16 @@ export async function todaySummary(db: Db, shop: Shop, now = new Date()) {
   if (toSend) attention.push({ kind: "to_send", tone: "info", title: `${toSend} ${toSend === 1 ? "order" : "orders"} on the way to the supplier`, body: "These are sent automatically.", url: "/orders?show=to_send" });
   if (inbox) attention.push({ kind: "inbox", tone: "warning", title: `${inbox} buyer ${inbox === 1 ? "question needs" : "questions need"} you`, body: "Open the inbox on the web admin to answer.", url: "/inbox" });
 
+  // Staff see order counts and order problems, not sales totals, payouts or AI proposals.
+  const seesMoney = can(role, "money");
+  const ATTENTION_AREA = { hold: "money", notice: "trust", problems: "orders", to_send: "orders", inbox: "inbox" } as const;
   return {
     currency: shop.currency,
-    salesTodayMinor: today.reduce((s, o) => s + net(o), 0),
+    salesTodayMinor: seesMoney ? today.reduce((s, o) => s + net(o), 0) : null,
     ordersToday: today.length,
-    sales7dMinor: recent.reduce((s, o) => s + net(o), 0),
+    sales7dMinor: seesMoney ? recent.reduce((s, o) => s + net(o), 0) : null,
     orders7d: recent.length,
-    attention,
-    pending,
+    attention: attention.filter((a) => can(role, ATTENTION_AREA[a.kind])),
+    pending: can(role, "assistant") ? pending : [],
   };
 }

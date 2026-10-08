@@ -10,7 +10,7 @@ const when = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", 
 
 export default async function InboxPage({ searchParams }: { searchParams: Promise<{ show?: string }> }) {
   const { show } = await searchParams;
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("inbox");
   const all = show === "all";
   const rows = await listInbox(db, shop.id, all ? "all" : "needs_you");
   const tab = (active: boolean) => `px-3 py-1.5 rounded-md text-sm ${active ? "bg-surface border border-border font-semibold" : "text-muted hover:text-ink"}`;

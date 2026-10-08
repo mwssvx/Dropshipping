@@ -3,7 +3,7 @@ import { requireShop } from "@/lib/server";
 
 /** CSV of sales, refunds and payouts. ?from=YYYY-MM-DD&to=YYYY-MM-DD, default the last 30 days. */
 export async function GET(request: Request) {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("money");
   const q = new URL(request.url).searchParams;
   const day = (s: string | null) => (s && /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(`${s}T00:00:00Z`) : null);
   const to = day(q.get("to")) ?? new Date();

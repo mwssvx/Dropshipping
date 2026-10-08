@@ -1,14 +1,16 @@
 import Link from "next/link";
-import { formatMoney, listOrders, listProducts, listRequirements } from "@sf/core";
+import { can, formatMoney, listOrders, listProducts, listRequirements } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "./PageHeader";
 
 export const metadata = { title: "Home" };
 
-export default async function AdminHome() {
-  const { shop, db } = await requireShop();
+export default async function AdminHome({ searchParams }: { searchParams: Promise<{ denied?: string }> }) {
+  const { shop, db, role } = await requireShop("home");
+  const { denied } = await searchParams;
   const [orders, products, requirements] = await Promise.all([listOrders(db, shop.id), listProducts(db, shop.id), listRequirements(db, shop.id)]);
-  const holds = requirements.filter((r) => r.holdsPayouts);
+  const seesMoney = can(role, "money");
+  const holds = seesMoney ? requirements.filter((r) => r.holdsPayouts) : [];
   const paid = orders.filter((o) => o.paymentStatus === "paid");
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
@@ -29,11 +31,16 @@ export default async function AdminHome() {
   return (
     <main className="pb-12">
       <PageHeader title={`Welcome to ${shop.name}`} />
+      {denied && (
+        <p className="banner banner-warning mx-4 sm:mx-8 mb-6" role="status">
+          Your role on this store doesn&apos;t include that page. The owner can change your role on the Team page.
+        </p>
+      )}
       <div className="px-4 sm:px-8 grid gap-6 xl:grid-cols-[1fr_360px]">
         <div className="flex flex-col gap-6 min-w-0">
           <section className="grid grid-cols-2 sm:grid-cols-3 gap-px bg-border border border-border rounded-xl overflow-hidden">
             {[
-              ["Sales today", formatMoney(today.reduce((s, o) => s + o.totalMinor, 0), shop.currency)],
+              seesMoney ? ["Sales today", formatMoney(today.reduce((s, o) => s + o.totalMinor, 0), shop.currency)] : ["Paid orders", String(paid.length)],
               ["Orders today", String(today.length)],
               ["Products", String(products.length)],
             ].map(([k, v]) => (
@@ -75,7 +82,7 @@ export default async function AdminHome() {
             )}
           </section>
         </div>
-        <section className="card p-4 flex flex-col gap-3 self-start">
+        {role === "owner" && <section className="card p-4 flex flex-col gap-3 self-start">
           <div>
             <h2 className="font-semibold">Set up your store</h2>
             <p className="hint">{left === 0 ? "All done." : `${left} ${left === 1 ? "step" : "steps"} left`}</p>
@@ -96,7 +103,7 @@ export default async function AdminHome() {
               </li>
             ))}
           </ol>
-        </section>
+        </section>}
       </div>
     </main>
   );

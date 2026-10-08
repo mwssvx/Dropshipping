@@ -11,7 +11,7 @@ const dateFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ show?: string }> }) {
   const { show } = await searchParams;
   const problemsOnly = show === "problems";
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("orders");
   const [orders, problems] = await Promise.all([
     listOrders(db, shop.id, problemsOnly ? { fulfillmentStatus: "problem" } : {}),
     listOrders(db, shop.id, { fulfillmentStatus: "problem" }),

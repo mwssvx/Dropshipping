@@ -6,7 +6,7 @@ import { PageHeader } from "../PageHeader";
 export const metadata = { title: "Suppliers" };
 
 export default async function SuppliersPage() {
-  const { shop, db } = await requireShop();
+  const { shop, db } = await requireShop("suppliers");
   const links = await listSupplierLinks(db, shop.id);
   const available = suppliers().available;
   const cj = available.find((s) => s.name === "cj");
