@@ -1,0 +1,8 @@
+# Approve something an agent proposed from the Today tab (needs a pending proposal on the account).
+appId: com.placeholder.storefront
+---
+- runFlow: sign-in.yaml
+- scrollUntilVisible:
+    element: "Approve"
+- tapOn: "Approve"
+- assertVisible: "Done."

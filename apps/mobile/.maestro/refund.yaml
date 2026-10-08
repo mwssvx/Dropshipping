@@ -1,0 +1,10 @@
+# Refund an order in full from the phone (needs a paid order on the account).
+appId: com.placeholder.storefront
+---
+- runFlow: sign-in.yaml
+- tapOn: "Orders"
+- tapOn: "All"
+- tapOn: "Order #1001"
+- tapOn: "Refund…"
+- tapOn: "Refund .*"
+- assertVisible: "Refunded. The buyer gets an email."

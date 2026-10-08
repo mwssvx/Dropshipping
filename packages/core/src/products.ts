@@ -122,3 +122,45 @@ export async function getActiveProductByHandle(db: Db, shopId: string, handle: s
   });
   return { ...product, variants: vs };
 }
+
+const patchInput = z.object({
+  status: z.enum(["draft", "active", "archived"]).optional(),
+  variants: z
+    .array(
+      z.object({
+        id: z.string().uuid(),
+        priceMinor: z.number().int().min(0, "Price can't be negative.").optional(),
+        stock: z.number().int().min(0, "Stock can't be negative.").nullish(),
+      }),
+    )
+    .optional(),
+});
+
+/** Quick edits from the phone: status, and price or stock per variant. Everything else stays. */
+export async function patchProduct(db: Db, shopId: string, productId: string, input: z.input<typeof patchInput>) {
+  const parsed = patchInput.safeParse(input);
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]!.message);
+  const { status, variants } = parsed.data;
+  const current = await getProduct(db, shopId, productId);
+  if (status === "active" && current.variants.every((v) => v.priceMinor === 0)) throw new UserError("Set a price before making it active.");
+  await db.transaction(async (tx) => {
+    await tx.update(schema.products).set({ ...(status ? { status } : {}), updatedAt: new Date() }).where(eq(schema.products.id, productId));
+    for (const v of variants ?? []) {
+      if (!current.variants.some((c) => c.id === v.id)) throw new NotFoundError("Variant");
+      const set = { ...(v.priceMinor !== undefined ? { priceMinor: v.priceMinor } : {}), ...(v.stock !== undefined ? { stock: v.stock } : {}) };
+      if (Object.keys(set).length) await tx.update(schema.variants).set(set).where(eq(schema.variants.id, v.id));
+    }
+  });
+  return getProduct(db, shopId, productId);
+}
+
+/** A photo the merchant uploaded; the address comes from our own media route. */
+export async function setProductImage(db: Db, shopId: string, productId: string, imageUrl: string) {
+  const [row] = await db
+    .update(schema.products)
+    .set({ imageUrl, updatedAt: new Date() })
+    .where(and(eq(schema.products.id, productId), eq(schema.products.shopId, shopId)))
+    .returning();
+  if (!row) throw new NotFoundError("Product");
+  return row;
+}

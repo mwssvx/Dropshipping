@@ -8,7 +8,10 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.placeholder.storefront"
+      "bundleIdentifier": "com.placeholder.storefront",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -21,15 +24,34 @@
       "package": "com.placeholder.storefront"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "output": "single",
+      "bundler": "metro"
     },
     "scheme": "storefront",
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Choose product photos and documents for your payouts.",
+          "cameraPermission": "Take product photos and photos of documents for your payouts."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#0f6b5c"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "apiUrl": "http://localhost:3000"
     }
   }
 }

@@ -1,4 +1,4 @@
-// Milestone 1 to 5 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 6 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -30,6 +30,8 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   name: text("name"),
+  // Push notification kinds this person turned off in the app (see PUSH_KINDS).
+  pushOff: jsonb("push_off").$type<string[]>().notNull().default([]),
   createdAt: createdAt(),
 });
 
@@ -593,4 +595,55 @@ export const messages = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("messages_conversation_idx").on(t.conversationId, t.createdAt)],
+);
+
+// Phones signed in to the app that can receive push notifications (Expo push tokens).
+export const pushDevices = pgTable(
+  "push_devices",
+  {
+    id: id(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    token: text("token").notNull().unique(),
+    platform: text("platform", { enum: ["ios", "android", "web"] }).notNull(),
+    createdAt: createdAt(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("push_devices_user_idx").on(t.userId)],
+);
+
+export const PUSH_KINDS = ["new_order", "problem_order", "payout_hold", "margin_alert", "agent_proposal", "escalation_reply"] as const;
+export type PushKind = (typeof PUSH_KINDS)[number];
+
+// Every push we decided to send, one row per person per event, so an event never notifies twice.
+export const pushMessages = pgTable(
+  "push_messages",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: PUSH_KINDS }).notNull(),
+    ref: text("ref").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    url: text("url").notNull(),
+    // sent: handed to the push service. off: the person turned this kind off.
+    status: text("status", { enum: ["pending", "sent", "failed", "off"] }).notNull(),
+    error: text("error"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("push_messages_once_uq").on(t.userId, t.kind, t.ref), index("push_messages_shop_idx").on(t.shopId, t.createdAt)],
+);
+
+// Photos merchants upload from the app. Kept in the database until object storage is set up.
+export const media = pgTable(
+  "media",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    contentType: text("content_type").notNull(),
+    bytes: integer("bytes").notNull(),
+    data: bytea("data").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("media_shop_idx").on(t.shopId)],
 );

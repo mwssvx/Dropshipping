@@ -43,6 +43,13 @@
       "when": 1791484069103,
       "tag": "0005_m5_agents",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791486352725,
+      "tag": "0006_m6_mobile",
+      "breakpoints": true
     }
   ]
 }

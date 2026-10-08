@@ -1,10 +1,11 @@
-import { refreshAllVerified, routeStuckOrders, runFakePayouts, runHealthChecks, runScheduledAgents, syncTracking } from "@sf/core";
-import { agents, fulfillment, testPayments } from "@/lib/server";
+import { refreshAllVerified, routeStuckOrders, runFakePayouts, runHealthChecks, runScheduledAgents, sendAllNotifications, syncTracking } from "@sf/core";
+import { agents, fulfillment, pushSender, testPayments } from "@/lib/server";
 
 /**
  * Scheduled job: place any paid orders that were missed, then pull tracking from suppliers.
  * Also checks store health and the verified badge, and in test mode stands in for the payment
- * processor's daily payouts. Last, the AI agents look at problem orders and thin margins.
+ * processor's daily payouts. Then the AI agents look at problem orders and thin margins, and last
+ * phones get push notifications for anything new.
  * Called by the scheduler with "Authorization: Bearer $CRON_SECRET". Open in development.
  */
 export async function GET(request: Request) {
@@ -20,5 +21,6 @@ export async function GET(request: Request) {
   const health = await runHealthChecks(ctx.db);
   const verified = await refreshAllVerified(ctx.db);
   const ai = await runScheduledAgents(await agents());
-  return Response.json({ routed, tracking, payouts, health, verified, ai });
+  const push = await sendAllNotifications({ db: ctx.db, push: pushSender() });
+  return Response.json({ routed, tracking, payouts, health, verified, ai, push });
 }

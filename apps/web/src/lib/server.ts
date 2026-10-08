@@ -1,4 +1,5 @@
 import "server-only";
+import { after } from "next/server";
 import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { openDb, type Db } from "@sf/db";
@@ -10,6 +11,8 @@ import {
   mailerFromEnv,
   modelFromEnv,
   paymentProviderFromEnv,
+  pushSenderFromEnv,
+  sendShopNotifications,
   primaryDomain,
   requireMember,
   suppliersFromEnv,
@@ -21,21 +24,26 @@ import {
   type Mailer,
   type ModelClient,
   type PaymentProvider,
+  type PushSender,
   type RefundContext,
   type Suppliers,
   type TaxCalculator,
 } from "@sf/core";
 import { ROOT_DOMAIN, STORE_SUBDOMAINS } from "./brand";
 
-const g = globalThis as unknown as {
-  __sfDb?: Promise<Db>;
-  __sfPayments?: PaymentProvider;
-  __sfSuppliers?: Suppliers;
-  __sfMailer?: Mailer;
-  __sfDomainHost?: DomainHost;
-  __sfTax?: TaxCalculator;
-  __sfModel?: ModelClient;
-};
+// The database is shared across the whole server process. Everything else is kept per module
+// copy: Next bundles route handlers and pages separately, each with its own copy of @sf/core, and
+// an object made by one copy fails the other copy's instanceof checks (errors, providers).
+const g = globalThis as unknown as { __sfDb?: Promise<Db> };
+const local: {
+  payments?: PaymentProvider;
+  suppliers?: Suppliers;
+  mailer?: Mailer;
+  domainHost?: DomainHost;
+  tax?: TaxCalculator;
+  model?: ModelClient;
+  push?: PushSender;
+} = {};
 
 export function db(): Promise<Db> {
   // A failed connection isn't cached, so the next request tries again.
@@ -47,23 +55,23 @@ export function db(): Promise<Db> {
 }
 
 export function payments(): PaymentProvider {
-  g.__sfPayments ??= paymentProviderFromEnv(process.env);
-  return g.__sfPayments;
+  local.payments ??= paymentProviderFromEnv(process.env);
+  return local.payments;
 }
 
 export function tax(): TaxCalculator {
-  g.__sfTax ??= taxCalculatorFromEnv(process.env);
-  return g.__sfTax;
+  local.tax ??= taxCalculatorFromEnv(process.env);
+  return local.tax;
 }
 
 export function suppliers(): Suppliers {
-  g.__sfSuppliers ??= suppliersFromEnv(process.env);
-  return g.__sfSuppliers;
+  local.suppliers ??= suppliersFromEnv(process.env);
+  return local.suppliers;
 }
 
 export function mailer(): Mailer {
-  g.__sfMailer ??= mailerFromEnv(process.env);
-  return g.__sfMailer;
+  local.mailer ??= mailerFromEnv(process.env);
+  return local.mailer;
 }
 
 /** Platform address of a store, e.g. https://glow.example.com */
@@ -79,8 +87,8 @@ export async function storeAddress(shop: { id: string; handle: string }) {
 }
 
 export async function domains(): Promise<DomainContext> {
-  g.__sfDomainHost ??= domainHostFromEnv(process.env);
-  return { db: await db(), host: g.__sfDomainHost, platformHosts: [ROOT_DOMAIN], targets: dnsTargetsFromEnv(process.env) };
+  local.domainHost ??= domainHostFromEnv(process.env);
+  return { db: await db(), host: local.domainHost, platformHosts: [ROOT_DOMAIN], targets: dnsTargetsFromEnv(process.env) };
 }
 
 /** An absolute link back into the admin, for pages the payment provider sends the merchant back from. */
@@ -143,10 +151,26 @@ export async function requireStaff() {
 
 /** Claude when ANTHROPIC_API_KEY is set, otherwise the built-in demo brain. */
 export function aiModel(): ModelClient {
-  g.__sfModel ??= modelFromEnv(process.env);
-  return g.__sfModel;
+  local.model ??= modelFromEnv(process.env);
+  return local.model;
 }
 
 export async function agents(): Promise<AgentContext> {
   return { ...(await refunds()), model: aiModel() };
+}
+
+export function pushSender(): PushSender {
+  local.push ??= pushSenderFromEnv(process.env);
+  return local.push;
+}
+
+/** Sends any new push notifications for a store after the response is out. Safe to call often. */
+export function notifyLater(shopId: string) {
+  after(async () => {
+    try {
+      await sendShopNotifications({ db: await db(), push: pushSender() }, shopId);
+    } catch (e) {
+      console.error(`Push notifications for store ${shopId} failed; the scheduled job will retry.`, e);
+    }
+  });
 }

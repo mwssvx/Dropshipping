@@ -15,5 +15,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm --filter @sf/web build
+      # The merchant app's web build, which e2e/app.spec.ts drives on a phone-sized screen.
+      - run: pnpm --filter @sf/mobile export:web
+        env: { EXPO_OFFLINE: "1", EXPO_PUBLIC_API_URL: "http://localhost:3100" }
       - run: pnpm --filter @sf/web exec playwright install --with-deps chromium
       - run: pnpm e2e

@@ -1,0 +1,12 @@
+# Sign in with an existing merchant account. Run: maestro test .maestro (needs a build on a simulator).
+appId: com.placeholder.storefront
+---
+- launchApp:
+    clearState: true
+- tapOn: "Email"
+- inputText: ${EMAIL || "merchant@example.com"}
+- tapOn: "Password"
+- inputText: ${PASSWORD || "correct horse battery"}
+- tapOn: "Sign in"
+- assertVisible: "Today"
+- assertVisible: "Needs your attention"
