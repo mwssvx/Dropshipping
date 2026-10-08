@@ -40,8 +40,8 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
         <dl className="grid grid-cols-[1fr_auto] gap-y-1 num text-sm border-t border-border pt-3">
           <dt className="hint">Subtotal</dt><dd className="text-right">{money(quote.subtotalMinor)}</dd>
           <dt className="hint">Shipping</dt><dd className="text-right">{quote.shippingMinor ? money(quote.shippingMinor) : "Free"}</dd>
-          <dt className="hint">Tax</dt><dd className="text-right">{money(quote.taxMinor)}</dd>
-          <dt className="font-semibold text-base">Total</dt><dd className="font-semibold text-base text-right">{money(quote.totalMinor)}</dd>
+          <dt className="hint">Tax</dt><dd className="text-right hint">{quote.pricesIncludeTax ? "Included" : "Next step"}</dd>
+          <dt className="font-semibold text-base">{quote.pricesIncludeTax ? "Total" : "Total before tax"}</dt><dd className="font-semibold text-base text-right">{money(quote.totalMinor)}</dd>
         </dl>
       </aside>
     </main>

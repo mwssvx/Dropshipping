@@ -58,6 +58,7 @@ export default async function CartPage({ params }: { params: Promise<{ shop: str
             <dt className="hint">Subtotal</dt><dd className="text-right">{money(quote.subtotalMinor)}</dd>
             <dt className="hint">Shipping</dt><dd className="text-right">{quote.shippingMinor ? money(quote.shippingMinor) : "Free"}</dd>
             <dt className="font-semibold text-base">Total</dt><dd className="font-semibold text-base text-right">{money(quote.totalMinor)}</dd>
+            <dd className="col-span-2 hint text-right font-sans">{quote.pricesIncludeTax ? "Tax included where it applies." : "Tax, if any, is added at checkout."}</dd>
           </dl>
           <Link href={`${base}/checkout`} className="btn btn-primary btn-lg self-end">Check out</Link>
         </>

@@ -63,6 +63,10 @@ export const shops = pgTable(
     plan: text("plan", { enum: ["free", "starter", "growth", "scale"] }).notNull().default("free"),
     billingCustomerId: text("billing_customer_id").unique(),
     billingSubscriptionId: text("billing_subscription_id").unique(),
+    // UK and EU buyers expect prices with VAT included; US and Canadian prices show tax on top.
+    pricesIncludeTax: boolean("prices_include_tax").notNull().default(false),
+    // Set while the store meets the verified-store checklist; shown as a badge on the storefront.
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -152,6 +156,8 @@ export const customers = pgTable(
   (t) => [uniqueIndex("customers_shop_email_uq").on(t.shopId, t.email)],
 );
 
+export type TaxBreakdownLine = { jurisdiction: string; label: string; rateBps: number; amountMinor: number };
+
 export type Address = {
   name: string;
   line1: string;
@@ -191,6 +197,10 @@ export const orders = pgTable(
     platformFeeMinor: money("platform_fee_minor").notNull().default(0),
     processingFeeMinor: money("processing_fee_minor").notNull().default(0),
     refundedMinor: money("refunded_minor").notNull().default(0),
+    // When prices include tax, tax_minor is the part of the total that is tax; otherwise it's added on top.
+    taxIncluded: boolean("tax_included").notNull().default(false),
+    taxBreakdown: jsonb("tax_breakdown").$type<TaxBreakdownLine[]>().notNull().default([]),
+    taxCalculationId: text("tax_calculation_id"),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -198,7 +208,10 @@ export const orders = pgTable(
   (t) => [
     uniqueIndex("orders_shop_number_uq").on(t.shopId, t.number),
     index("orders_shop_created_idx").on(t.shopId, t.createdAt),
-    check("orders_total_matches", sql`${t.totalMinor} = ${t.subtotalMinor} + ${t.shippingMinor} + ${t.taxMinor}`),
+    check(
+      "orders_total_matches",
+      sql`${t.totalMinor} = ${t.subtotalMinor} + ${t.shippingMinor} + case when ${t.taxIncluded} then 0 else ${t.taxMinor} end`,
+    ),
     check("orders_refund_within_total", sql`${t.refundedMinor} >= 0 and ${t.refundedMinor} <= ${t.totalMinor}`),
   ],
 );
@@ -364,6 +377,7 @@ export const refunds = pgTable(
     orderId: uuid("order_id").notNull().references(() => orders.id, { onDelete: "restrict" }),
     amountMinor: money("amount_minor").notNull(),
     platformFeeRefundedMinor: money("platform_fee_refunded_minor").notNull().default(0),
+    taxRefundedMinor: money("tax_refunded_minor").notNull().default(0),
     reason: text("reason"),
     providerRefundId: text("provider_refund_id").unique(),
     createdAt: createdAt(),
@@ -425,3 +439,60 @@ export const requirementUploads = pgTable("requirement_uploads", {
   providerFileId: text("provider_file_id"),
   createdAt: createdAt(),
 });
+
+// Where a store is registered to collect tax: "GB", "EU" (OSS/IOSS), "CA" (GST/HST) or a US
+// state such as "US-TX". Tax is only charged to buyers in a registered place.
+export const taxRegistrations = pgTable(
+  "tax_registrations",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    jurisdiction: text("jurisdiction").notNull(),
+    registrationNumber: text("registration_number"),
+    providerRegistrationId: text("provider_registration_id"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("tax_registrations_shop_jurisdiction_uq").on(t.shopId, t.jurisdiction)],
+);
+
+// A message from the platform about the store's standing: a warning with a deadline, a pause,
+// or a reinstatement. Every pause comes with a reason, what to fix, and a way to appeal.
+export const storeNotices = pgTable(
+  "store_notices",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["warning", "paused", "reinstated"] }).notNull(),
+    reason: text("reason", {
+      enum: ["late_shipping", "high_refunds", "chargebacks", "prohibited_product", "misleading_listing", "customer_complaints", "identity", "other"],
+    }).notNull(),
+    explanation: text("explanation").notNull(),
+    whatToDo: text("what_to_do").notNull(),
+    dueBy: timestamp("due_by", { withTimezone: true }),
+    createdBy: text("created_by").notNull(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("store_notices_shop_idx").on(t.shopId, t.createdAt)],
+);
+
+export const appeals = pgTable(
+  "appeals",
+  {
+    id: id(),
+    noticeId: uuid("notice_id").notNull().references(() => storeNotices.id, { onDelete: "cascade" }),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    message: text("message").notNull(),
+    status: text("status", { enum: ["open", "accepted", "rejected"] }).notNull().default("open"),
+    response: text("response"),
+    decidedBy: text("decided_by"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("appeals_status_idx").on(t.status, t.createdAt),
+    // One open appeal per notice at a time.
+    uniqueIndex("appeals_open_uq").on(t.noticeId).where(sql`${t.status} = 'open'`),
+  ],
+);

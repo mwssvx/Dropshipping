@@ -12,7 +12,7 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
     if (e instanceof NotFoundError) notFound();
     throw e;
   });
-  const paid = order.paymentStatus === "paid";
+  const paid = ["paid", "partially_refunded", "refunded"].includes(order.paymentStatus);
   const shipped = order.fulfillments.filter((f) => f.trackingNumber);
   const steps = [
     { label: "Order confirmed", done: paid },
@@ -27,6 +27,11 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
         <h1 className="text-3xl font-bold tracking-tight">{paid ? `Thank you, ${order.shippingAddress.name.split(" ")[0]}!` : "We're waiting for your payment"}</h1>
         <p className="text-muted">{paid ? `We've emailed a receipt to ${order.email}. This page updates as your order moves.` : "If you've paid, this page updates in a moment."}</p>
       </div>
+      {order.refundedMinor > 0 && (
+        <p className="banner banner-info">
+          {order.paymentStatus === "refunded" ? "This order was refunded" : `${formatMoney(order.refundedMinor, order.currency)} was refunded`} to the card you paid with. Banks usually show it within 5 to 10 business days.
+        </p>
+      )}
       <ol className="grid grid-cols-4 gap-2" aria-label="Order progress">
         {steps.map((s) => (
           <li key={s.label} className="flex flex-col gap-2">
@@ -56,6 +61,9 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
         {order.lines.map((l) => (
           <div key={l.id} className="flex justify-between gap-3"><span>{l.title} × {l.quantity}</span><span className="num">{formatMoney(l.unitPriceMinor * l.quantity, order.currency)}</span></div>
         ))}
+        {order.taxMinor > 0 && (
+          <div className="flex justify-between gap-3 hint"><span>{order.taxBreakdown.map((t) => t.label).join(", ") || "Tax"}{order.taxIncluded ? " (included)" : ""}</span><span className="num">{formatMoney(order.taxMinor, order.currency)}</span></div>
+        )}
         <div className="flex justify-between gap-3 border-t border-border pt-3 font-semibold"><span>Total</span><span className="num">{formatMoney(order.totalMinor, order.currency)}</span></div>
       </section>
     </main>

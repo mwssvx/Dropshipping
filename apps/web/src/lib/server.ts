@@ -1,6 +1,6 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { openDb, type Db } from "@sf/db";
 import {
   dnsTargetsFromEnv,
@@ -12,6 +12,7 @@ import {
   primaryDomain,
   requireMember,
   suppliersFromEnv,
+  taxCalculatorFromEnv,
   type DomainContext,
   type DomainHost,
   type FulfillmentContext,
@@ -19,6 +20,7 @@ import {
   type PaymentProvider,
   type RefundContext,
   type Suppliers,
+  type TaxCalculator,
 } from "@sf/core";
 import { ROOT_DOMAIN, STORE_SUBDOMAINS } from "./brand";
 
@@ -28,6 +30,7 @@ const g = globalThis as unknown as {
   __sfSuppliers?: Suppliers;
   __sfMailer?: Mailer;
   __sfDomainHost?: DomainHost;
+  __sfTax?: TaxCalculator;
 };
 
 export function db(): Promise<Db> {
@@ -42,6 +45,11 @@ export function db(): Promise<Db> {
 export function payments(): PaymentProvider {
   g.__sfPayments ??= paymentProviderFromEnv(process.env);
   return g.__sfPayments;
+}
+
+export function tax(): TaxCalculator {
+  g.__sfTax ??= taxCalculatorFromEnv(process.env);
+  return g.__sfTax;
 }
 
 export function suppliers(): Suppliers {
@@ -119,4 +127,12 @@ export async function requireShop() {
 
 export async function refunds(): Promise<RefundContext> {
   return { ...(await fulfillment()), payments: payments() };
+}
+
+/** Platform staff, listed by email in STAFF_EMAILS. Everyone else gets a 404, so the pages stay hidden. */
+export async function requireStaff() {
+  const user = await requireUser();
+  const staff = (process.env.STAFF_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+  if (!staff.includes(user.email.toLowerCase())) notFound();
+  return { user, db: await db() };
 }

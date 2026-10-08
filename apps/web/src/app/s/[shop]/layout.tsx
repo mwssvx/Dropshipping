@@ -18,7 +18,7 @@ export default async function StoreLayout({ children, params }: { children: Reac
   const [shop, theme, base] = await Promise.all([loadShop(param), loadTheme(param), storeBase(param)]);
   const count = (await readCart(shop.id)).reduce((s, l) => s + l.quantity, 0);
   return (
-    <StoreShell doc={theme} shopName={shop.name} currency={shop.currency} base={base} cartCount={count} closed={shop.status !== "active"}>
+    <StoreShell doc={theme} shopName={shop.name} currency={shop.currency} base={base} cartCount={count} closed={shop.status !== "active"} verified={!!shop.verifiedAt && shop.status === "active"}>
       {children}
     </StoreShell>
   );

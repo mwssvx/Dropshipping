@@ -70,7 +70,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             <dl className="border-t border-border px-5 py-4 text-sm grid grid-cols-[1fr_auto] gap-y-1 num">
               <dt className="hint">Subtotal</dt><dd>{money(order.subtotalMinor)}</dd>
               <dt className="hint">Shipping</dt><dd>{order.shippingMinor ? money(order.shippingMinor) : "Free"}</dd>
-              <dt className="hint">Tax</dt><dd>{money(order.taxMinor)}</dd>
+              <dt className="hint">{order.taxBreakdown.length ? order.taxBreakdown.map((t) => t.label).join(", ") : "Tax"}{order.taxIncluded ? " (included)" : ""}</dt><dd>{money(order.taxMinor)}</dd>
               <dt className="font-semibold">Total</dt><dd className="font-semibold">{money(order.totalMinor)}</dd>
               {order.refundedMinor > 0 && <><dt className="hint">Refunded</dt><dd>−{money(order.refundedMinor)}</dd></>}
               {order.paidAt && (

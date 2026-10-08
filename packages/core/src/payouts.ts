@@ -297,6 +297,7 @@ export async function moneySummary(db: Db, shop: Shop, now = new Date()) {
       processingFees: sql<number>`coalesce(sum(${o.processingFeeMinor}), 0)::bigint`,
       refunds: sql<number>`coalesce(sum(${o.refundedMinor}), 0)::bigint`,
       shipping: sql<number>`coalesce(sum(${o.shippingMinor}) filter (where ${o.paymentStatus} <> 'refunded'), 0)::bigint`,
+      tax: sql<number>`coalesce(sum(${o.taxMinor} - round(${o.taxMinor}::numeric * ${o.refundedMinor} / nullif(${o.totalMinor}, 0))), 0)::bigint`,
     })
     .from(o)
     .where(and(eq(o.shopId, shop.id), settled, gte(o.paidAt, since)));
@@ -327,7 +328,9 @@ export async function moneySummary(db: Db, shop: Shop, now = new Date()) {
       supplierCostsMinor: n(costs?.sum),
       // The shipping charge is assumed to cover the supplier's shipping, so it isn't counted as profit.
       shippingMinor: n(month?.shipping),
-      profitMinor: n(month?.sales) - n(month?.shipping) - platformFees - n(month?.processingFees) - n(costs?.sum),
+      // Tax collected belongs to the tax office, so it isn't profit either.
+      taxMinor: n(month?.tax),
+      profitMinor: n(month?.sales) - n(month?.tax) - n(month?.shipping) - platformFees - n(month?.processingFees) - n(costs?.sum),
     },
   };
 }
@@ -397,19 +400,19 @@ export async function statementCsv(db: Db, shop: Shop, range: { from: Date; to: 
   const rows: Row[] = [
     ...orders.map((x) => ({
       at: x.paidAt!,
-      cells: ["sale", `#${x.number}`, money(x.totalMinor), money(-x.platformFeeMinor), money(-x.processingFeeMinor), money(x.totalMinor - x.platformFeeMinor - x.processingFeeMinor), x.email],
+      cells: ["sale", `#${x.number}`, money(x.totalMinor), money(x.taxMinor), money(-x.platformFeeMinor), money(-x.processingFeeMinor), money(x.totalMinor - x.platformFeeMinor - x.processingFeeMinor), x.email],
     })),
     ...refunds.map(({ refund: r, number }) => ({
       at: r.createdAt,
-      cells: ["refund", `#${number}`, money(-r.amountMinor), money(r.platformFeeRefundedMinor), money(0), money(-r.amountMinor + r.platformFeeRefundedMinor), r.reason],
+      cells: ["refund", `#${number}`, money(-r.amountMinor), money(-r.taxRefundedMinor), money(r.platformFeeRefundedMinor), money(0), money(-r.amountMinor + r.platformFeeRefundedMinor), r.reason],
     })),
     ...payouts.map((p) => ({
       at: p.createdAt,
-      cells: [`payout (${p.status.replace("_", " ")})`, p.arrivalDate ? `arrives ${p.arrivalDate}` : "", money(0), money(0), money(0), money(-p.amountMinor), null],
+      cells: [`payout (${p.status.replace("_", " ")})`, p.arrivalDate ? `arrives ${p.arrivalDate}` : "", money(0), money(0), money(0), money(0), money(-p.amountMinor), null],
     })),
   ].sort((a, b) => a.at.getTime() - b.at.getTime());
 
-  const header = ["date", "type", "reference", `amount (${shop.currency})`, "our fee", "card fee (est.)", "net", "note"];
+  const header = ["date", "type", "reference", `amount (${shop.currency})`, "of which tax", "our fee", "card fee (est.)", "net", "note"];
   return [header, ...rows.map((r) => [r.at.toISOString().slice(0, 10), ...r.cells])].map((line) => line.map(csvCell).join(",")).join("\n") + "\n";
 }
 

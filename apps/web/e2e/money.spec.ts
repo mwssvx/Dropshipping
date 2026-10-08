@@ -101,5 +101,5 @@ test("the statement downloads as CSV", async ({ page }, info) => {
   await newMerchant(page, `${info.project.name}-csv-${Date.now()}`);
   const res = await page.request.get("/admin/money/statement");
   expect(res.headers()["content-type"]).toContain("text/csv");
-  expect(await res.text()).toMatch(/^date,type,reference,amount \(USD\)/);
+  expect(await res.text()).toMatch(/^date,type,reference,amount \(USD\),of which tax/);
 });

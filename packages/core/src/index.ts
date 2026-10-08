@@ -17,3 +17,5 @@ export * from "./domains";
 export * from "./plans";
 export * from "./payouts";
 export * from "./refunds";
+export * from "./tax";
+export * from "./trust";
