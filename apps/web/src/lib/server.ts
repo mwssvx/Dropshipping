@@ -2,18 +2,59 @@ import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { openDb, type Db } from "@sf/db";
-import { getSessionUser, listShopsForUser, paymentProviderFromEnv, requireMember, type PaymentProvider } from "@sf/core";
+import {
+  getSessionUser,
+  listShopsForUser,
+  mailerFromEnv,
+  paymentProviderFromEnv,
+  requireMember,
+  suppliersFromEnv,
+  type FulfillmentContext,
+  type Mailer,
+  type PaymentProvider,
+  type Suppliers,
+} from "@sf/core";
+import { ROOT_DOMAIN, STORE_SUBDOMAINS } from "./brand";
 
-const g = globalThis as unknown as { __sfDb?: Promise<Db>; __sfPayments?: PaymentProvider };
+const g = globalThis as unknown as { __sfDb?: Promise<Db>; __sfPayments?: PaymentProvider; __sfSuppliers?: Suppliers; __sfMailer?: Mailer };
 
 export function db(): Promise<Db> {
-  g.__sfDb ??= openDb({ url: process.env.DATABASE_URL || undefined, dataDir: process.env.DATA_DIR || undefined });
+  // A failed connection isn't cached, so the next request tries again.
+  g.__sfDb ??= openDb({ url: process.env.DATABASE_URL || undefined, dataDir: process.env.DATA_DIR || undefined }).catch((e) => {
+    g.__sfDb = undefined;
+    throw e;
+  });
   return g.__sfDb;
 }
 
 export function payments(): PaymentProvider {
   g.__sfPayments ??= paymentProviderFromEnv(process.env);
   return g.__sfPayments;
+}
+
+export function suppliers(): Suppliers {
+  g.__sfSuppliers ??= suppliersFromEnv(process.env);
+  return g.__sfSuppliers;
+}
+
+export function mailer(): Mailer {
+  g.__sfMailer ??= mailerFromEnv(process.env);
+  return g.__sfMailer;
+}
+
+/** Public address of a store, e.g. https://glow.example.com */
+export function storeUrl(handle: string) {
+  const scheme = ROOT_DOMAIN.startsWith("localhost") ? "http" : "https";
+  return STORE_SUBDOMAINS ? `${scheme}://${handle}.${ROOT_DOMAIN}` : `${scheme}://${ROOT_DOMAIN}/s/${handle}`;
+}
+
+export async function fulfillment(): Promise<FulfillmentContext> {
+  return {
+    db: await db(),
+    suppliers: suppliers(),
+    mailer: mailer(),
+    orderStatusUrl: (shop, order) => `${storeUrl(shop.handle)}/orders/${order.paymentIntentId}`,
+  };
 }
 
 export const SESSION_COOKIE = "sf_session";

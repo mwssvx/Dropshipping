@@ -8,14 +8,27 @@ export const metadata = { title: "Orders" };
 
 const dateFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
-export default async function OrdersPage() {
+export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ show?: string }> }) {
+  const { show } = await searchParams;
+  const problemsOnly = show === "problems";
   const { shop, db } = await requireShop();
-  const orders = await listOrders(db, shop.id);
+  const [orders, problems] = await Promise.all([
+    listOrders(db, shop.id, problemsOnly ? { fulfillmentStatus: "problem" } : {}),
+    listOrders(db, shop.id, { fulfillmentStatus: "problem" }),
+  ]);
   return (
     <main className="pb-12">
       <PageHeader title="Orders" />
-      <div className="px-4 sm:px-8">
-        {orders.length === 0 ? (
+      <div className="px-4 sm:px-8 flex flex-col gap-4">
+        <nav className="flex gap-1" aria-label="Order filters">
+          <Link href="/admin/orders" className={`chip text-sm ${!problemsOnly ? "font-semibold border-accent" : ""}`} aria-current={!problemsOnly ? "page" : undefined}>All</Link>
+          <Link href="/admin/orders?show=problems" className={`chip text-sm ${problemsOnly ? "font-semibold border-accent" : ""}`} aria-current={problemsOnly ? "page" : undefined}>
+            Needs attention {problems.length > 0 && <span className="pill pill-critical">{problems.length}</span>}
+          </Link>
+        </nav>
+        {problemsOnly && orders.length === 0 ? (
+          <div className="card p-10 text-center hint">No problem orders. Anything a supplier refuses or doesn't ship on time shows up here.</div>
+        ) : orders.length === 0 ? (
           <div className="card p-10 flex flex-col items-center text-center gap-3">
             <h2 className="font-semibold text-lg">No orders yet</h2>
             <p className="hint max-w-sm">When a buyer checks out, the order shows up here with its payment and delivery status.</p>

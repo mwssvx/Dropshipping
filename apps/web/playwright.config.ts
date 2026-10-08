@@ -21,7 +21,7 @@ export default defineConfig({
     command: `next start -p ${PORT}`,
     url: `http://localhost:${PORT}`,
     reuseExistingServer: false,
-    env: { DATA_DIR, PAYMENTS_PROVIDER: "fake", NEXT_PUBLIC_ROOT_DOMAIN: `localhost:${PORT}` },
+    env: { DATA_DIR, PAYMENTS_PROVIDER: "fake", DEMO_SUPPLIER: "on", NEXT_PUBLIC_ROOT_DOMAIN: `localhost:${PORT}` },
     timeout: 60_000,
   },
 });

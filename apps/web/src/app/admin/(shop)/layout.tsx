@@ -29,6 +29,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <NavLink href="/admin" exact>Home</NavLink>
           <NavLink href="/admin/orders">Orders</NavLink>
           <NavLink href="/admin/products">Products</NavLink>
+          <NavLink href="/admin/suppliers">Suppliers</NavLink>
         </nav>
         <div className="mt-auto hidden lg:flex flex-col gap-2 px-4 py-4 border-t border-border">
           <span className="hint truncate">{user.email}</span>

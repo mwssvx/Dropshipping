@@ -7,3 +7,6 @@ export * from "./products";
 export * from "./orders";
 export * from "./payments";
 export * from "./suppliers";
+export * from "./email";
+export * from "./imports";
+export * from "./fulfillment";

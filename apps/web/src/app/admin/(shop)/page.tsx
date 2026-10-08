@@ -13,11 +13,12 @@ export default async function AdminHome() {
   startOfDay.setHours(0, 0, 0, 0);
   const today = paid.filter((o) => o.paidAt && o.paidAt >= startOfDay);
   const toSend = paid.filter((o) => o.fulfillmentStatus === "unfulfilled");
+  const problems = paid.filter((o) => o.fulfillmentStatus === "problem");
   const hasActive = products.some((p) => p.status === "active");
 
   const steps = [
     { done: true, title: "Create your store", href: "/admin" },
-    { done: products.length > 0, title: "Add your first product", href: "/admin/products/new" },
+    { done: products.length > 0, title: "Import your first product", href: "/admin/products/import" },
     { done: hasActive, title: "Make a product active so buyers can see it", href: "/admin/products" },
     { done: paid.length > 0, title: "Place a test order on your store", href: `/s/${shop.handle}` },
     { done: false, title: "Connect payouts so you get paid", note: "Coming soon" },
@@ -43,14 +44,22 @@ export default async function AdminHome() {
           </section>
           <section className="card">
             <h2 className="font-semibold px-4 pt-4">Needs your attention</h2>
-            {toSend.length ? (
+            {toSend.length || problems.length ? (
               <ul className="p-2">
-                <li>
+                {problems.length > 0 && (
+                  <li>
+                    <Link href="/admin/orders?show=problems" className="flex items-center justify-between gap-3 px-2 py-3 rounded-md hover:bg-sunken">
+                      <span><span className="pill pill-critical mr-2">Problem</span>{problems.length} {problems.length === 1 ? "order needs" : "orders need"} you: the supplier refused or hasn't shipped</span>
+                      <span className="hint">Fix →</span>
+                    </Link>
+                  </li>
+                )}
+                {toSend.length > 0 && <li>
                   <Link href="/admin/orders" className="flex items-center justify-between gap-3 px-2 py-3 rounded-md hover:bg-sunken">
                     <span><span className="pill pill-warning mr-2">To send</span>{toSend.length} paid {toSend.length === 1 ? "order is" : "orders are"} waiting to be sent</span>
                     <span className="hint">Review →</span>
                   </Link>
-                </li>
+                </li>}
               </ul>
             ) : (
               <p className="hint px-4 pb-4 pt-2">Nothing right now. Problem orders, payout holds and supplier issues will show up here.</p>
