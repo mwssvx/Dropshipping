@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { Section, SectionSettings } from "@sf/core/theme";
+import type { Section, SectionSettings, TrustIcon } from "@sf/core/theme";
 import type { StorefrontCatalog } from "@sf/core";
 import type { DisplayFx } from "@sf/core/money";
 import { Price } from "@/components/Price";
@@ -10,8 +10,17 @@ import { storeHref } from "./style";
  * them on the server and the editor preview renders the same ones in the browser.
  */
 
-/** fx: the buyer's currency when they picked another one. */
-export type SectionData = { base: string; currency: string; fx?: DisplayFx; catalog: StorefrontCatalog };
+/**
+ * fx: the buyer's currency when they picked another one.
+ * signup: the email signup form's server action and what happened last time (absent in the editor preview).
+ */
+export type SectionData = {
+  base: string;
+  currency: string;
+  fx?: DisplayFx;
+  catalog: StorefrontCatalog;
+  signup?: { action: (form: FormData) => Promise<void>; status: "sent" | "invalid" | null };
+};
 
 type Props<T extends keyof SectionSettings> = { s: SectionSettings[T]; data: SectionData; first: boolean };
 
@@ -59,11 +68,11 @@ function Hero({ s, data, first }: Props<"hero">) {
 
 export function ProductGrid({ products, data }: { products: StorefrontCatalog["products"]; data: SectionData }) {
   return (
-    <ul className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8">
+    <ul className="sf-grid grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8">
       {products.map((p) => (
         <li key={p.id}>
-          <Link href={`${data.base}/products/${p.handle}`} className="group flex flex-col gap-2">
-            <div className="aspect-square rounded-lg bg-sunken overflow-hidden">
+          <Link href={`${data.base}/products/${p.handle}`} className="sf-card group flex flex-col gap-2 h-full">
+            <div className="sf-media aspect-square rounded-lg bg-sunken overflow-hidden">
               {p.imageUrl && (
                 <img src={p.imageUrl} alt={p.title} width={600} height={600} loading="lazy" decoding="async"
                   className="size-full object-cover group-hover:scale-[1.02] transition-transform" />
@@ -172,6 +181,81 @@ function Faq({ s }: Props<"faq">) {
   );
 }
 
+function Testimonials({ s }: Props<"testimonials">) {
+  if (!s.items.length) return null;
+  return (
+    <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12 flex flex-col gap-6">
+      {s.heading && <h2 className="text-2xl font-bold tracking-tight">{s.heading}</h2>}
+      <ul className="grid gap-4 md:grid-cols-3">
+        {s.items.map((q, i) => (
+          <li key={i}>
+            <figure className="card h-full p-5 flex flex-col gap-3">
+              <blockquote className="leading-relaxed">&ldquo;{q.quote}&rdquo;</blockquote>
+              {q.name && <figcaption className="text-sm font-semibold text-muted mt-auto">{q.name}</figcaption>}
+            </figure>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+const ICONS: Record<TrustIcon, React.ReactNode> = {
+  shipping: <path d="M3 6h11v9H3zM14 9h4l3 3v3h-7M7 18a1.5 1.5 0 1 0 0-.01M17 18a1.5 1.5 0 1 0 0-.01" />,
+  returns: <path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3" />,
+  secure: <path d="M6 11h12v10H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3" />,
+  support: <path d="M4 5h16v11H9l-5 4z" />,
+  quality: <path d="m12 3 2.7 5.6 6.1.8-4.5 4.2 1.1 6L12 16.8 6.6 19.6l1.1-6-4.5-4.2 6.1-.8z" />,
+  eco: <path d="M5 19c0-8 5-13 14-14 0 9-5 14-13 14M5 19l7-7" />,
+};
+
+function TrustBadges({ s }: Props<"trust_badges">) {
+  if (!s.items.length) return null;
+  return (
+    <section className="max-w-6xl mx-auto px-4 sm:px-6 py-10 flex flex-col gap-6">
+      {s.heading && <h2 className="text-2xl font-bold tracking-tight text-center">{s.heading}</h2>}
+      <ul className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(180px,1fr))]">
+        {s.items.map((b, i) => (
+          <li key={i} className="flex gap-3 items-start">
+            <svg viewBox="0 0 24 24" className="size-7 shrink-0 text-accent" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              {ICONS[b.icon]}
+            </svg>
+            <div>
+              <p className="font-semibold">{b.title}</p>
+              {b.text && <p className="text-sm text-muted">{b.text}</p>}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+const SIGNUP_STATUS = {
+  sent: "Check your inbox: click the link we sent to confirm.",
+  invalid: "That email address doesn't look right. Try again.",
+};
+
+function Newsletter({ s, data }: Props<"newsletter">) {
+  const status = data.signup?.status ?? null;
+  return (
+    <section id="signup" className="bg-accent-soft">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-12 flex flex-col gap-4 items-center text-center">
+        {s.heading && <h2 className="text-2xl font-bold tracking-tight">{s.heading}</h2>}
+        {s.text && <p className="text-muted">{s.text}</p>}
+        {status && <p role="status" className={`text-sm font-medium ${status === "invalid" ? "text-critical" : ""}`}>{SIGNUP_STATUS[status]}</p>}
+        {status !== "sent" && (
+          <form action={data.signup?.action} className="flex w-full max-w-md gap-2">
+            <label htmlFor="signup-email" className="sr-only">Email for news and offers</label>
+            <input id="signup-email" name="email" type="email" required autoComplete="email" placeholder="you@example.com" className="input flex-1 min-w-0" />
+            <button className="btn btn-primary" disabled={!data.signup}>{s.buttonLabel || "Sign up"}</button>
+          </form>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export function SectionView({ section, data, first }: { section: Section; data: SectionData; first: boolean }) {
   switch (section.type) {
     case "announcement": return <Announcement s={section.settings} data={data} first={first} />;
@@ -181,6 +265,9 @@ export function SectionView({ section, data, first }: { section: Section; data: 
     case "image_with_text": return <ImageWithText s={section.settings} data={data} first={first} />;
     case "rich_text": return <RichText s={section.settings} data={data} first={first} />;
     case "faq": return <Faq s={section.settings} data={data} first={first} />;
+    case "testimonials": return <Testimonials s={section.settings} data={data} first={first} />;
+    case "trust_badges": return <TrustBadges s={section.settings} data={data} first={first} />;
+    case "newsletter": return <Newsletter s={section.settings} data={data} first={first} />;
   }
 }
 

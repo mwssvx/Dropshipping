@@ -62,7 +62,7 @@ export default async function ProductPage({ params }: { params: Promise<{ shop: 
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-10 md:grid-cols-2">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
-      <div className="aspect-square rounded-xl bg-sunken overflow-hidden">
+      <div className="sf-media aspect-square rounded-xl bg-sunken overflow-hidden">
         {product.imageUrl && <img src={product.imageUrl} alt={product.title} width={800} height={800} fetchPriority="high" className="size-full object-cover" />}
       </div>
       <div className="flex flex-col gap-5">

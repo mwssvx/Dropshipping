@@ -1,6 +1,6 @@
 "use client";
 import { useId } from "react";
-import type { MenuItem, SectionSettings, SectionType } from "@sf/core/theme";
+import { TRUST_ICONS, type MenuItem, type SectionSettings, type SectionType, type TrustIcon } from "@sf/core/theme";
 
 /*
  * Form controls for the theme editor. Every control is labelled and edits one value.
@@ -14,7 +14,16 @@ type Field =
   | { key: string; label: string; kind: "text" | "textarea" | "image" | "link"; hint?: string; max?: number }
   | { key: string; label: string; kind: "select"; options: { value: string; label: string }[] }
   | { key: string; label: string; kind: "number"; min: number; max: number }
-  | { key: string; label: string; kind: "collection" | "collections" | "faq" };
+  | { key: string; label: string; kind: "collection" | "collections" | "faq" | "quotes" | "badges" };
+
+export const TRUST_ICON_LABELS: Record<TrustIcon, string> = {
+  shipping: "Delivery truck",
+  returns: "Return arrow",
+  secure: "Padlock",
+  support: "Chat bubble",
+  quality: "Star",
+  eco: "Leaf",
+};
 
 export const SECTION_FIELDS: Record<SectionType, Field[]> = {
   announcement: [
@@ -55,6 +64,19 @@ export const SECTION_FIELDS: Record<SectionType, Field[]> = {
     { key: "heading", label: "Heading", kind: "text", max: 120 },
     { key: "items", label: "Questions", kind: "faq" },
   ],
+  testimonials: [
+    { key: "heading", label: "Heading", kind: "text", max: 120 },
+    { key: "items", label: "Quotes", kind: "quotes" },
+  ],
+  trust_badges: [
+    { key: "heading", label: "Heading (optional)", kind: "text", max: 120 },
+    { key: "items", label: "Badges", kind: "badges" },
+  ],
+  newsletter: [
+    { key: "heading", label: "Heading", kind: "text", max: 120 },
+    { key: "text", label: "Text", kind: "textarea", max: 400 },
+    { key: "buttonLabel", label: "Button label", kind: "text", max: 40, hint: "Buyers confirm by email before they're added to your list in Email campaigns." },
+  ],
 };
 
 export function LinkInput({ id, value, onChange, links }: { id: string; value: string; onChange: (v: string) => void; links: LinkOption[] }) {
@@ -90,7 +112,7 @@ export function SectionForm<T extends SectionType>({
         const v = values[f.key];
         return (
           <div key={f.key} className="field">
-            {f.kind !== "faq" && f.kind !== "collections" && <label className="label" htmlFor={id}>{f.label}</label>}
+            {!["faq", "collections", "quotes", "badges"].includes(f.kind) && <label className="label" htmlFor={id}>{f.label}</label>}
             {f.kind === "text" && <input id={id} className="input" value={String(v ?? "")} maxLength={f.max} onChange={(e) => set(f.key, e.target.value)} />}
             {f.kind === "textarea" && <textarea id={id} className="input" rows={4} value={String(v ?? "")} maxLength={f.max} onChange={(e) => set(f.key, e.target.value)} />}
             {f.kind === "image" && (
@@ -133,6 +155,18 @@ export function SectionForm<T extends SectionType>({
               </fieldset>
             )}
             {f.kind === "faq" && <FaqItems label={f.label} items={v as { question: string; answer: string }[]} onChange={(x) => set(f.key, x)} />}
+            {f.kind === "quotes" && (
+              <ListItems label={f.label} items={v as Record<string, string>[]} onChange={(x) => set(f.key, x)} max={12} noun="quote"
+                fields={[{ key: "quote", label: "Quote", textarea: true }, { key: "name", label: "Name" }]} blank={{ quote: "", name: "" }} />
+            )}
+            {f.kind === "badges" && (
+              <ListItems label={f.label} items={v as Record<string, string>[]} onChange={(x) => set(f.key, x)} max={6} noun="badge"
+                fields={[
+                  { key: "icon", label: "Icon", options: TRUST_ICONS.map((i) => ({ value: i, label: TRUST_ICON_LABELS[i] })) },
+                  { key: "title", label: "Title" },
+                  { key: "text", label: "Text" },
+                ]} blank={{ icon: "shipping", title: "New badge", text: "" }} />
+            )}
             {"hint" in f && f.hint && <span className="hint">{f.hint}</span>}
           </div>
         );
@@ -161,6 +195,52 @@ function FaqItems({ label, items, onChange }: { label: string; items: { question
       <button type="button" className="btn btn-secondary self-start" onClick={() => onChange([...items, { question: "New question", answer: "" }])}>
         Add a question
       </button>
+    </fieldset>
+  );
+}
+
+type ItemField = { key: string; label: string; textarea?: boolean; options?: { value: string; label: string }[] };
+
+/** A short list of small records (quotes, badges), each edited with its own labelled fields. */
+function ListItems({ label, items, onChange, fields, blank, max, noun }: {
+  label: string;
+  items: Record<string, string>[];
+  onChange: (v: Record<string, string>[]) => void;
+  fields: ItemField[];
+  blank: Record<string, string>;
+  max: number;
+  noun: string;
+}) {
+  const base = useId();
+  const update = (i: number, key: string, value: string) => onChange(items.map((x, j) => (j === i ? { ...x, [key]: value } : x)));
+  return (
+    <fieldset className="flex flex-col gap-3">
+      <legend className="label mb-1">{label}</legend>
+      {items.map((item, i) => (
+        <div key={i} className="card p-3 flex flex-col gap-2">
+          {fields.map((f) => {
+            const id = `${base}-${f.key}${i}`;
+            return (
+              <div key={f.key} className="field">
+                <label className="label" htmlFor={id}>{f.label} {i + 1}</label>
+                {f.options ? (
+                  <select id={id} className="input" value={item[f.key] ?? ""} onChange={(e) => update(i, f.key, e.target.value)}>
+                    {f.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                ) : f.textarea ? (
+                  <textarea id={id} className="input" rows={3} value={item[f.key] ?? ""} onChange={(e) => update(i, f.key, e.target.value)} />
+                ) : (
+                  <input id={id} className="input" value={item[f.key] ?? ""} onChange={(e) => update(i, f.key, e.target.value)} />
+                )}
+              </div>
+            );
+          })}
+          <button type="button" className="hint hover:text-critical self-end" onClick={() => onChange(items.filter((_, j) => j !== i))}>Remove {noun}</button>
+        </div>
+      ))}
+      {items.length < max && (
+        <button type="button" className="btn btn-secondary self-start" onClick={() => onChange([...items, { ...blank }])}>Add a {noun}</button>
+      )}
     </fieldset>
   );
 }

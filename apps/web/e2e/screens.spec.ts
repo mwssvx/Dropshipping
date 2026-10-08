@@ -174,8 +174,9 @@ test("screens: storefront", async ({ page, browser }) => {
   await page.getByLabel("Add a section").selectOption("collection_list");
   await page.getByLabel("Heading").fill("Shop by collection");
   await page.getByRole("button", { name: "← All sections" }).click();
+  await page.getByRole("tab", { name: "Themes" }).click();
+  await page.getByRole("button", { name: "Use Warm" }).click();
   await page.getByRole("tab", { name: "Style" }).click();
-  await page.getByRole("button", { name: "Warm" }).click();
   await page.waitForTimeout(800);
   await shot("26-theme-style", page, false);
   await page.getByRole("tab", { name: "Menus" }).click();

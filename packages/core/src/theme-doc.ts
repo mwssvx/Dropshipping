@@ -38,6 +38,10 @@ export function isSafeLink(href: string) {
 }
 const link = z.string().trim().max(500).refine(isSafeLink, "Links must start with /, https:// or mailto:.").default("");
 
+/** Icons a trust badge can show. Drawn by the storefront's section library. */
+export const TRUST_ICONS = ["shipping", "returns", "secure", "support", "quality", "eco"] as const;
+export type TrustIcon = (typeof TRUST_ICONS)[number];
+
 const menuItem = z.object({ label: z.string().trim().min(1, "Every menu item needs a label.").max(40), href: link });
 
 const sectionSchemas = {
@@ -73,6 +77,25 @@ const sectionSchemas = {
       .max(30)
       .default([]),
   }),
+  testimonials: z.object({
+    heading: text(120),
+    items: z
+      .array(z.object({ quote: z.string().trim().min(1, "Every quote needs text.").max(500), name: text(60) }))
+      .max(12)
+      .default([]),
+  }),
+  trust_badges: z.object({
+    heading: text(120),
+    items: z
+      .array(z.object({ icon: z.enum(TRUST_ICONS).default("shipping"), title: z.string().trim().min(1, "Every badge needs a title.").max(60), text: text(160) }))
+      .max(6)
+      .default([]),
+  }),
+  newsletter: z.object({
+    heading: text(120),
+    text: text(400),
+    buttonLabel: text(40),
+  }),
 } as const;
 
 export type SectionType = keyof typeof sectionSchemas;
@@ -86,6 +109,9 @@ export const SECTION_LABELS: Record<SectionType, { name: string; about: string }
   image_with_text: { name: "Image with text", about: "A picture beside a heading and a paragraph." },
   rich_text: { name: "Text", about: "A heading and a few paragraphs." },
   faq: { name: "Questions and answers", about: "A list of questions buyers can open." },
+  testimonials: { name: "Customer quotes", about: "Short quotes from happy buyers. Use real ones only." },
+  trust_badges: { name: "Trust badges", about: "Small icons with promises like free returns or secure checkout." },
+  newsletter: { name: "Email signup", about: "Buyers leave their email to hear about news and offers. They confirm it by email first." },
 };
 
 const sectionId = z.string().regex(/^[a-z0-9]{4,24}$/, "Section ids are short lowercase codes.");
@@ -103,6 +129,16 @@ const themeDoc = z.object({
     headingFont: z.enum(fontKeys).default("system"),
     bodyFont: z.enum(fontKeys).default("system"),
     corners: z.enum(["square", "soft", "round"]).default("soft"),
+    // How the store is laid out. Stores saved before layouts existed get the defaults.
+    layout: z
+      .object({
+        header: z.enum(["classic", "centered", "minimal"]).default("classic"),
+        productImage: z.enum(["square", "portrait", "landscape"]).default("square"),
+        columns: z.union([z.literal(3), z.literal(4)]).default(4),
+        cards: z.enum(["plain", "framed"]).default("plain"),
+        buttons: z.enum(["filled", "outline"]).default("filled"),
+      })
+      .default({}),
     logoText: text(60),
     logoUrl: imageUrl,
     seo: z.object({ title: text(70), description: text(320) }).default({}),
@@ -139,35 +175,174 @@ export function newSectionId() {
   return Math.random().toString(36).slice(2, 10).padEnd(8, "0");
 }
 
-/** Ready-made looks the merchant can start from. Only colors, fonts and corners change. */
-export const THEME_LOOKS = {
+type Look = Pick<ThemeDoc["settings"], "colors" | "headingFont" | "bodyFont" | "corners" | "layout">;
+type StarterSection = { id: string; type: SectionType; hidden?: boolean; settings: Record<string, unknown> };
+
+const FAQ_STARTER: StarterSection = {
+  id: "faq00001",
+  type: "faq",
+  settings: {
+    heading: "Good to know",
+    items: [
+      { question: "How long does delivery take?", answer: "Each product page shows an honest delivery estimate before you buy." },
+      { question: "Can I return an item?", answer: "Yes. Contact us within 30 days of delivery and we'll sort it out." },
+    ],
+  },
+};
+const BADGES_STARTER: StarterSection = {
+  id: "badges01",
+  type: "trust_badges",
+  settings: {
+    heading: "",
+    items: [
+      { icon: "shipping", title: "Tracked delivery", text: "Every order comes with a tracking number." },
+      { icon: "returns", title: "30-day returns", text: "Not right? Send it back within 30 days." },
+      { icon: "secure", title: "Secure checkout", text: "Card details never touch our servers." },
+    ],
+  },
+};
+const QUOTES_STARTER: StarterSection = {
+  id: "quotes01",
+  type: "testimonials",
+  hidden: true,
+  settings: { heading: "What buyers say", items: [{ quote: "Replace this with a real quote from one of your buyers.", name: "A happy buyer" }] },
+};
+const NEWSLETTER_STARTER: StarterSection = {
+  id: "signup01",
+  type: "newsletter",
+  settings: { heading: "Hear about new arrivals first", text: "News and offers now and then. Unsubscribe any time.", buttonLabel: "Sign up" },
+};
+const announce = (shown: boolean): StarterSection => ({ id: "announce1", type: "announcement", hidden: !shown, settings: { text: "Free shipping on orders over $50" } });
+const featured = (heading: string, limit = 8): StarterSection => ({ id: "featured1", type: "featured_products", settings: { heading, limit } });
+const hero = (shopName: string, s: Record<string, unknown> = {}): StarterSection => ({
+  id: "hero0001",
+  type: "hero",
+  settings: { heading: `Welcome to ${shopName}`.slice(0, 120), text: "Things we love, shipped to your door.", buttonLabel: "Shop now", buttonLink: "/collections/all", ...s },
+});
+
+/**
+ * Ready-made themes: a look (colors, fonts, corners), a layout, and a starter home page. Applying
+ * one keeps the merchant's logo, menus and search settings, and their sections unless they ask.
+ */
+export const THEME_PRESETS = {
   clean: {
     label: "Clean",
-    colors: { background: "#ffffff", text: "#151a23", accent: "#0f6b5c", accentText: "#ffffff" },
-    headingFont: "inter",
-    bodyFont: "inter",
-    corners: "soft",
+    about: "White and green, classic header. Fits almost anything.",
+    look: {
+      colors: { background: "#ffffff", text: "#151a23", accent: "#0f6b5c", accentText: "#ffffff" },
+      headingFont: "inter", bodyFont: "inter", corners: "soft",
+      layout: { header: "classic", productImage: "square", columns: 4, cards: "plain", buttons: "filled" },
+    },
+    home: (shopName: string): StarterSection[] => [announce(false), hero(shopName), featured("Featured products"), FAQ_STARTER],
   },
   bold: {
     label: "Bold",
-    colors: { background: "#0e0e10", text: "#f4f4f5", accent: "#facc15", accentText: "#0e0e10" },
-    headingFont: "space-grotesk",
-    bodyFont: "dm-sans",
-    corners: "square",
+    about: "Dark with a bright accent and big type. Gadgets and streetwear.",
+    look: {
+      colors: { background: "#0e0e10", text: "#f4f4f5", accent: "#facc15", accentText: "#0e0e10" },
+      headingFont: "space-grotesk", bodyFont: "dm-sans", corners: "square",
+      layout: { header: "minimal", productImage: "square", columns: 4, cards: "plain", buttons: "filled" },
+    },
+    home: (shopName: string): StarterSection[] => [
+      announce(true), hero(shopName, { height: "large", align: "left", text: "New drops every week." }), featured("Best sellers"), BADGES_STARTER, QUOTES_STARTER,
+    ],
   },
   warm: {
     label: "Warm",
-    colors: { background: "#fbf6ef", text: "#2b2118", accent: "#b4532a", accentText: "#ffffff" },
-    headingFont: "fraunces",
-    bodyFont: "work-sans",
-    corners: "round",
+    about: "Cream and terracotta, rounded and friendly. Home goods and gifts.",
+    look: {
+      colors: { background: "#fbf6ef", text: "#2b2118", accent: "#a6461f", accentText: "#ffffff" },
+      headingFont: "fraunces", bodyFont: "work-sans", corners: "round",
+      layout: { header: "centered", productImage: "portrait", columns: 3, cards: "framed", buttons: "filled" },
+    },
+    home: (shopName: string): StarterSection[] => [
+      hero(shopName),
+      { id: "story001", type: "image_with_text", settings: { heading: "Picked with care", text: "Tell buyers who you are and why you chose these products.", buttonLabel: "Our story", buttonLink: "/" } },
+      featured("Favorites", 6), QUOTES_STARTER, NEWSLETTER_STARTER,
+    ],
   },
-} as const satisfies Record<string, Pick<ThemeDoc["settings"], "colors" | "headingFont" | "bodyFont" | "corners"> & { label: string }>;
+  boutique: {
+    label: "Boutique",
+    about: "Serif headings, centered logo, tall photos. Fashion and beauty.",
+    look: {
+      colors: { background: "#fffaf7", text: "#1f1a17", accent: "#1f1a17", accentText: "#fffaf7" },
+      headingFont: "playfair", bodyFont: "inter", corners: "square",
+      layout: { header: "centered", productImage: "portrait", columns: 3, cards: "plain", buttons: "outline" },
+    },
+    home: (shopName: string): StarterSection[] => [
+      announce(true), hero(shopName, { height: "large", text: "The new season is here.", buttonLabel: "Shop new in" }),
+      { id: "collect1", type: "collection_list", settings: { heading: "Shop by category" } },
+      featured("New in", 6), NEWSLETTER_STARTER,
+    ],
+  },
+  market: {
+    label: "Market",
+    about: "Bright orange, framed product cards and trust badges up top. Deals and everyday items.",
+    look: {
+      colors: { background: "#ffffff", text: "#1b1f24", accent: "#c2410c", accentText: "#ffffff" },
+      headingFont: "dm-sans", bodyFont: "dm-sans", corners: "soft",
+      layout: { header: "classic", productImage: "square", columns: 4, cards: "framed", buttons: "filled" },
+    },
+    home: (shopName: string): StarterSection[] => [
+      announce(true), hero(shopName, { height: "small", align: "left", buttonLabel: "Shop today's deals" }), BADGES_STARTER,
+      featured("Today's deals", 12), { id: "collect1", type: "collection_list", settings: { heading: "Browse" } }, FAQ_STARTER,
+    ],
+  },
+  studio: {
+    label: "Studio",
+    about: "Cool blue, wide photos and rounded cards. Tech and accessories.",
+    look: {
+      colors: { background: "#f5f7fb", text: "#0b1220", accent: "#1d4ed8", accentText: "#ffffff" },
+      headingFont: "space-grotesk", bodyFont: "inter", corners: "round",
+      layout: { header: "minimal", productImage: "landscape", columns: 3, cards: "framed", buttons: "filled" },
+    },
+    home: (shopName: string): StarterSection[] => [
+      hero(shopName, { align: "left", text: "Smart gear, tested by us." }), featured("Popular now", 6),
+      { id: "story001", type: "image_with_text", settings: { heading: "Why we sell these", text: "Say what makes your products worth buying.", imagePosition: "right" } },
+      BADGES_STARTER, FAQ_STARTER,
+    ],
+  },
+  nordic: {
+    label: "Nordic",
+    about: "Black and white, lots of space, outline buttons. Minimal and calm.",
+    look: {
+      colors: { background: "#ffffff", text: "#111111", accent: "#111111", accentText: "#ffffff" },
+      headingFont: "work-sans", bodyFont: "work-sans", corners: "square",
+      layout: { header: "minimal", productImage: "portrait", columns: 4, cards: "plain", buttons: "outline" },
+    },
+    home: (shopName: string): StarterSection[] => [
+      hero(shopName, { height: "small", align: "left", text: "" }), featured("Shop", 8),
+      { id: "story002", type: "rich_text", settings: { heading: "About us", text: "A few honest lines about your store." } }, NEWSLETTER_STARTER,
+    ],
+  },
+} as const satisfies Record<string, { label: string; about: string; look: Look; home: (shopName: string) => StarterSection[] }>;
+export type ThemePresetId = keyof typeof THEME_PRESETS;
+export const THEME_PRESET_IDS = Object.keys(THEME_PRESETS) as ThemePresetId[];
+
+function presetLook(id: ThemePresetId): Look {
+  const { look } = THEME_PRESETS[id];
+  return { ...look, colors: { ...look.colors }, layout: { ...look.layout } };
+}
+
+/** Switch to a ready-made theme. Logo, menus and search settings stay; sections too unless replaced. */
+export function applyThemePreset(doc: ThemeDoc, id: ThemePresetId, opts: { replaceSections: boolean; shopName: string }): ThemeDoc {
+  return parseTheme({
+    ...doc,
+    settings: { ...doc.settings, ...presetLook(id) },
+    home: opts.replaceSections ? THEME_PRESETS[id].home(opts.shopName) : doc.home,
+  });
+}
+
+/** Which ready-made theme the store's look matches, if it hasn't been changed since. */
+export function currentPreset(doc: ThemeDoc): ThemePresetId | null {
+  const pick = ({ colors, headingFont, bodyFont, corners, layout }: Look) => JSON.stringify([colors, headingFont, bodyFont, corners, layout]);
+  const mine = pick(doc.settings);
+  return THEME_PRESET_IDS.find((id) => pick(presetLook(id)) === mine) ?? null;
+}
 
 export function defaultTheme(shopName: string): ThemeDoc {
-  const { label: _, ...look } = THEME_LOOKS.clean;
   return parseTheme({
-    settings: { ...look, colors: { ...look.colors } },
+    settings: presetLook("clean"),
     menus: {
       header: [
         { label: "Home", href: "/" },
@@ -175,34 +350,9 @@ export function defaultTheme(shopName: string): ThemeDoc {
       ],
       footer: [],
     },
-    home: [
-      { id: "announce1", type: "announcement", hidden: true, settings: { text: "Free shipping on orders over $50" } },
-      {
-        id: "hero0001",
-        type: "hero",
-        settings: {
-          heading: `Welcome to ${shopName}`.slice(0, 120),
-          text: "Things we love, shipped to your door.",
-          buttonLabel: "Shop now",
-          buttonLink: "/collections/all",
-        },
-      },
-      { id: "featured1", type: "featured_products", settings: { heading: "Featured products" } },
-      {
-        id: "faq00001",
-        type: "faq",
-        settings: {
-          heading: "Good to know",
-          items: [
-            { question: "How long does delivery take?", answer: "Each product page shows an honest delivery estimate before you buy." },
-            { question: "Can I return an item?", answer: "Yes. Contact us within 30 days of delivery and we'll sort it out." },
-          ],
-        },
-      },
-    ],
+    home: THEME_PRESETS.clean.home(shopName),
   });
 }
-
 
 /** WCAG contrast ratio between two #rrggbb colors (1 to 21). The editor warns below 4.5. */
 export function contrastRatio(a: string, b: string) {

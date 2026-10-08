@@ -3,9 +3,9 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { findUsableDiscount, getOrder, recordEvent, handleBuyerMessage, quoteCart, shopCurrencies, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
+import { findUsableDiscount, getOrder, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, shopCurrencies, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
 import { readCart, readDiscountCode, writeCart, writeDiscountCode } from "@/lib/cart";
-import { agents, db, payments, tax } from "@/lib/server";
+import { agents, campaigns, db, payments, tax } from "@/lib/server";
 import { processPaymentWebhook } from "@/lib/webhooks";
 import { loadShop, storeBase } from "./data";
 import { buyerFx, currencyCookie } from "@/lib/currency";
@@ -171,4 +171,20 @@ export async function setCurrencyAction(handle: string, form: FormData) {
   }
   const base = await storeBase(handle);
   redirect(back.startsWith("/") && !back.startsWith("//") ? back : base || "/");
+}
+
+/**
+ * The email signup section. Someone already on the list sees the same "check your inbox" message,
+ * so the form can't be used to find out who subscribes.
+ */
+export async function newsletterAction(handle: string, form: FormData) {
+  const shop = await loadShop(handle);
+  let status = "sent";
+  try {
+    await requestNewsletterSignup(await campaigns(), shop, String(form.get("email") ?? ""));
+  } catch (e) {
+    if (!(e instanceof UserError)) throw e;
+    status = "invalid";
+  }
+  redirect(`${(await storeBase(handle)) || "/"}?signup=${status}#signup`);
 }

@@ -44,9 +44,10 @@ test("the theme editor changes the home page only after publishing", async ({ pa
   await expect(buyer.getByRole("heading", { name: /Welcome to Lamp Loft/ })).toBeVisible();
   await expect(buyer.getByRole("link", { name: /Moon Lamp/ })).toBeVisible();
 
-  // Style: switch to the "Bold" look.
+  // Themes: switch to "Bold", keeping the sections.
+  await page.getByRole("tab", { name: "Themes" }).click();
+  await page.getByRole("button", { name: "Use Bold" }).click();
   await page.getByRole("tab", { name: "Style" }).click();
-  await page.getByRole("button", { name: "Bold" }).click();
   await expect(page.getByLabel("Background", { exact: true })).toHaveValue("#0e0e10");
 
   // Undo brings the old background back, redo applies it again.

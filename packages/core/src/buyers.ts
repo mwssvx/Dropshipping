@@ -167,6 +167,8 @@ export async function listCustomers(db: Db, shopId: string, opts: { query?: stri
     .leftJoin(schema.orders, and(eq(schema.orders.shopId, schema.customers.shopId), eq(schema.orders.email, schema.customers.email)))
     .where(and(eq(schema.customers.shopId, shopId), q ? sql`(lower(${schema.customers.email}) like ${`%${q}%`} or lower(coalesce(${schema.customers.name}, '')) like ${`%${q}%`})` : undefined))
     .groupBy(schema.customers.id)
+    // Leaves out addresses that only asked for the newsletter and never confirmed or bought.
+    .having(sql`count(${schema.orders.id}) > 0 or bool_or(${schema.customers.acceptsMarketing}) or max(${schema.customers.lastSignInAt}) is not null or max(${schema.customers.name}) is not null`)
     .orderBy(sql`max(${schema.orders.paidAt}) desc nulls last`, desc(schema.customers.createdAt))
     .limit(500);
   return rows;

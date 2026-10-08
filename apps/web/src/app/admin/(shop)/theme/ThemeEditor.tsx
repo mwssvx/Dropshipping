@@ -1,13 +1,17 @@
 "use client";
 import { useCallback, useEffect, useId, useReducer, useRef, useState } from "react";
 import {
+  applyThemePreset,
   contrastRatio,
+  currentPreset,
   newSectionId,
   SECTION_LABELS,
   SECTION_TYPES,
   sectionDefaults,
   THEME_FONTS,
-  THEME_LOOKS,
+  THEME_PRESET_IDS,
+  THEME_PRESETS,
+  type ThemePresetId,
   type Section,
   type SectionType,
   type ThemeDoc,
@@ -16,7 +20,7 @@ import {
 import { discardThemeAction, publishThemeAction, saveThemeAction } from "../../store-actions";
 import { MenuEditor, SectionForm, type CollectionOption, type LinkOption } from "./fields";
 
-type Tab = "sections" | "style" | "menus" | "seo";
+type Tab = "themes" | "sections" | "style" | "menus" | "seo";
 type Save = { state: "saved" | "saving" | "unsaved" | "error"; message?: string };
 
 /** What the preview frame listens for (see /admin/preview). */
@@ -56,6 +60,7 @@ export function ThemeEditor({
   links,
   collections,
   storeLink,
+  shopName,
 }: {
   initial: ThemeDoc;
   hasChanges: boolean;
@@ -63,6 +68,7 @@ export function ThemeEditor({
   links: LinkOption[];
   collections: CollectionOption[];
   storeLink: string;
+  shopName: string;
 }) {
   const [history, dispatch] = useReducer(historyReducer, { doc: initial, past: [], future: [], lastEdit: 0 });
   const { doc } = history;
@@ -196,7 +202,7 @@ export function ThemeEditor({
       <div className="flex-1 min-h-0 grid lg:grid-cols-[360px_1fr]">
         <aside className="border-r border-border bg-surface overflow-y-auto min-h-0">
           <div role="tablist" aria-label="Editor" className="flex border-b border-border sticky top-0 bg-surface z-10">
-            {([["sections", "Sections"], ["style", "Style"], ["menus", "Menus"], ["seo", "Search"]] as const).map(([k, label]) => (
+            {([["themes", "Themes"], ["sections", "Sections"], ["style", "Style"], ["menus", "Menus"], ["seo", "Search"]] as const).map(([k, label]) => (
               <button key={k} role="tab" type="button" aria-selected={tab === k} onClick={() => setTab(k)}
                 className={`flex-1 py-3 text-sm font-semibold border-b-2 ${tab === k ? "border-accent text-accent" : "border-transparent text-muted hover:text-ink"}`}>
                 {label}
@@ -223,6 +229,7 @@ export function ThemeEditor({
                 </label>
               </div>
             )}
+            {tab === "themes" && <ThemesPanel doc={doc} onChange={change} shopName={shopName} />}
             {tab === "style" && <StylePanel doc={doc} onChange={change} />}
             {tab === "menus" && (
               <>
@@ -318,25 +325,11 @@ function StylePanel({ doc, onChange }: { doc: ThemeDoc; onChange: (d: ThemeDoc) 
   const s = doc.settings;
   const set = (patch: Partial<ThemeDoc["settings"]>) => onChange({ ...doc, settings: { ...s, ...patch } });
   const setColor = (k: keyof ThemeDoc["settings"]["colors"], v: string) => set({ colors: { ...s.colors, [k]: v } });
-  const ids = { heading: useId(), body: useId(), logo: useId(), logoUrl: useId() };
+  const ids = { heading: useId(), body: useId(), logo: useId(), logoUrl: useId(), layout: useId() };
   const textContrast = contrastRatio(s.colors.text, s.colors.background);
   const buttonContrast = contrastRatio(s.colors.accentText, s.colors.accent);
   return (
     <div className="flex flex-col gap-5">
-      <fieldset className="flex flex-col gap-2">
-        <legend className="font-semibold mb-1">Start from a look</legend>
-        <div className="grid grid-cols-3 gap-2">
-          {Object.entries(THEME_LOOKS).map(([k, look]) => (
-            <button key={k} type="button" className="card p-2 flex flex-col gap-1 items-start hover:border-accent"
-              onClick={() => set({ colors: { ...look.colors }, headingFont: look.headingFont, bodyFont: look.bodyFont, corners: look.corners })}>
-              <span className="flex gap-1" aria-hidden>
-                {[look.colors.background, look.colors.text, look.colors.accent].map((c) => <span key={c} className="size-4 rounded-full border border-border" style={{ background: c }} />)}
-              </span>
-              <span className="text-sm font-semibold">{look.label}</span>
-            </button>
-          ))}
-        </div>
-      </fieldset>
       <fieldset className="flex flex-col gap-3">
         <legend className="font-semibold mb-1">Colors</legend>
         <ColorField label="Background" value={s.colors.background} onChange={(v) => setColor("background", v)} />
@@ -353,6 +346,18 @@ function StylePanel({ doc, onChange }: { doc: ThemeDoc; onChange: (d: ThemeDoc) 
             <label className="label" htmlFor={id}>{label}</label>
             <select id={id} className="input" value={s[k]} onChange={(e) => set({ [k]: e.target.value as ThemeFont })}>
               {Object.entries(THEME_FONTS).map(([f, def]) => <option key={f} value={f}>{def.label}</option>)}
+            </select>
+          </div>
+        ))}
+      </fieldset>
+      <fieldset className="flex flex-col gap-3">
+        <legend className="font-semibold mb-1">Layout</legend>
+        {LAYOUT_FIELDS.map(([k, label, options]) => (
+          <div key={k} className="field">
+            <label className="label" htmlFor={`${ids.layout}-${k}`}>{label}</label>
+            <select id={`${ids.layout}-${k}`} className="input" value={String(s.layout[k])}
+              onChange={(e) => set({ layout: { ...s.layout, [k]: k === "columns" ? Number(e.target.value) : e.target.value } as ThemeDoc["settings"]["layout"] })}>
+              {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </div>
         ))}
@@ -379,6 +384,69 @@ function StylePanel({ doc, onChange }: { doc: ThemeDoc; onChange: (d: ThemeDoc) 
           <input id={ids.logoUrl} className="input" type="url" placeholder="https://…" value={s.logoUrl} onChange={(e) => set({ logoUrl: e.target.value })} />
         </div>
       </fieldset>
+    </div>
+  );
+}
+
+const LAYOUT_FIELDS: [keyof ThemeDoc["settings"]["layout"], string, [string, string][]][] = [
+  ["header", "Header", [["classic", "Logo left, menu beside it"], ["centered", "Logo in the middle, menu below"], ["minimal", "Logo left, menu behind a button"]]],
+  ["productImage", "Product photos", [["square", "Square"], ["portrait", "Tall"], ["landscape", "Wide"]]],
+  ["columns", "Products per row on computers", [["4", "4"], ["3", "3"]]],
+  ["cards", "Product cards", [["plain", "Plain"], ["framed", "Framed"]]],
+  ["buttons", "Buttons", [["filled", "Filled"], ["outline", "Outline"]]],
+];
+
+const HEADER_SHAPES = { classic: "Menu beside logo", centered: "Centered logo", minimal: "Menu button" } as const;
+
+function ThemesPanel({ doc, onChange, shopName }: { doc: ThemeDoc; onChange: (d: ThemeDoc) => void; shopName: string }) {
+  const [replace, setReplace] = useState(false);
+  const [applied, setApplied] = useState<ThemePresetId | null>(null);
+  const current = currentPreset(doc);
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="hint">Every theme is free. Switching keeps your logo, menus and search settings; fine-tune colors and layout under Style afterwards.</p>
+      <label className="flex items-start gap-2 text-sm">
+        <input type="checkbox" className="mt-1" checked={replace} onChange={(e) => setReplace(e.target.checked)} />
+        <span>Also replace my home page sections with the theme&apos;s starter ones</span>
+      </label>
+      {applied && <p className="banner banner-info" role="status">{THEME_PRESETS[applied].label} applied to your draft. Publish to make it live, or Undo.</p>}
+      <ul className="flex flex-col gap-3">
+        {THEME_PRESET_IDS.map((id) => {
+          const p = THEME_PRESETS[id];
+          const { colors, layout } = p.look;
+          return (
+            <li key={id} className="card overflow-hidden" aria-label={`${p.label} theme`}>
+              <div className="h-20 p-3 flex flex-col justify-between" style={{ background: colors.background, color: colors.text }} aria-hidden>
+                <div className={`flex items-center gap-2 text-xs font-bold ${layout.header === "centered" ? "justify-center" : "justify-between"}`}>
+                  <span>Store</span>
+                  {layout.header !== "centered" && <span className="opacity-60 font-normal">{layout.header === "classic" ? "Home  Shop" : "☰"}</span>}
+                </div>
+                <div className="flex items-end gap-1.5">
+                  {Array.from({ length: layout.columns }).map((_, i) => (
+                    <span key={i} className="flex-1 opacity-25" style={{ background: colors.text, aspectRatio: layout.productImage === "portrait" ? "3/4" : layout.productImage === "landscape" ? "4/3" : "1", maxHeight: 34, borderRadius: p.look.corners === "square" ? 0 : p.look.corners === "soft" ? 3 : 6 }} />
+                  ))}
+                  <span className="text-[10px] px-2 py-1 font-semibold" style={layout.buttons === "outline" ? { border: `1px solid ${colors.text}` } : { background: colors.accent, color: colors.accentText }}>Buy</span>
+                </div>
+              </div>
+              <div className="p-3 flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="font-semibold">{p.label}</h3>
+                  {current === id && <span className="pill pill-success">Current</span>}
+                </div>
+                <p className="hint">{p.about}</p>
+                <p className="hint">{THEME_FONTS[p.look.headingFont].label} · {HEADER_SHAPES[layout.header]} · {layout.columns} per row</p>
+                <button type="button" className="btn btn-secondary self-start" disabled={current === id && !replace}
+                  onClick={() => {
+                    onChange(applyThemePreset(doc, id, { replaceSections: replace, shopName }));
+                    setApplied(id);
+                  }}>
+                  Use {p.label}
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

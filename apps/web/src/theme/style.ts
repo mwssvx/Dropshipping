@@ -19,6 +19,12 @@ export function themeStyle(settings: ThemeDoc["settings"]): CSSProperties {
   } as CSSProperties;
 }
 
+/** Layout choices as data attributes; globals.css turns them into grid, card, image and button styles. */
+export function themeLayoutAttrs(settings: ThemeDoc["settings"]) {
+  const l = settings.layout;
+  return { "data-header": l.header, "data-image": l.productImage, "data-cols": String(l.columns), "data-cards": l.cards, "data-buttons": l.buttons };
+}
+
 /** Turns a theme link into a real address: store paths get the store's base, others pass through. */
 export function storeHref(base: string, href: string) {
   if (!href) return base || "/";
