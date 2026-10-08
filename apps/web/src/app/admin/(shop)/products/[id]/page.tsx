@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getProduct, getSupplierLink, listProducts, NotFoundError } from "@sf/core";
+import { getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel } from "@sf/core";
 import { requireShop, suppliers } from "@/lib/server";
 import { updateProductAction } from "../../../actions";
 import { setUpsellAction } from "../../../growth-actions";
+import { setProductSupplierAction } from "../../../supplier-actions";
 import { PageHeader } from "../../PageHeader";
 import { ProductForm } from "../ProductForm";
 import { WriteListingButton } from "./WriteListingButton";
@@ -18,9 +19,10 @@ export default async function EditProductPage({ params, searchParams }: { params
     if (e instanceof NotFoundError) notFound();
     throw e;
   });
-  const provider = found.supplierId ? (await getSupplierLink(db, shop.id, found.supplierId))?.provider : undefined;
-  const label = provider ? (suppliers().available.find((s) => s.name === provider)?.label ?? provider.toUpperCase()) : undefined;
+  const link = found.supplierId ? await getSupplierLink(db, shop.id, found.supplierId) : undefined;
+  const label = link ? supplierLabel(suppliers(), link) : undefined;
   const product = { ...found, supplier: label ? { label } : null };
+  const own = await listOwnSuppliers(db, shop.id);
   const others = (await listProducts(db, shop.id)).filter((p) => p.id !== product.id && p.status !== "archived");
   return (
     <main className="pb-12">
@@ -51,6 +53,31 @@ export default async function EditProductPage({ params, searchParams }: { params
             })),
             supplier: product.supplier ? { label: product.supplier.label, sourceUrl: product.sourceUrl } : undefined,
           }} />
+        <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="sent-by-heading">
+          <div>
+            <h2 id="sent-by-heading" className="font-semibold">Who sends it</h2>
+            <p className="hint">
+              {link && link.provider !== "email"
+                ? `Orders go to ${label} automatically. Pick one of your own suppliers to send it instead; that stops ${label} orders for this product.`
+                : own.length
+                  ? "Paid orders for this product are emailed to the supplier you pick, with a link where they add tracking."
+                  : <>Add your own suppliers in <Link href="/admin/suppliers" className="underline hover:text-ink">Suppliers</Link> to have them send this product.</>}
+            </p>
+          </div>
+          {own.length > 0 && (
+            <form action={setProductSupplierAction.bind(null, product.id)} className="flex flex-wrap gap-2 items-end">
+              <div className="field flex-1 min-w-56">
+                <label className="label" htmlFor="supplierId">Sent by</label>
+                <select className="input" id="supplierId" name="supplierId" defaultValue={link?.provider === "email" ? link.id : link ? "api" : ""} key={product.supplierId ?? "none"}>
+                  {link && link.provider !== "email" && <option value="api">{label}</option>}
+                  <option value="">Me (I add tracking myself)</option>
+                  {own.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+              <button className="btn btn-secondary">Save</button>
+            </form>
+          )}
+        </section>
         <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="upsell-heading">
           <div>
             <h2 id="upsell-heading" className="font-semibold">Goes well with</h2>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { can, formatMoney, getOrder, listRefunds, listSupplierLinks, NotFoundError, PLANS, PROBLEM_FIXES, type ProblemCode } from "@sf/core";
+import { can, formatMoney, getOrder, listRefunds, listSupplierLinks, NotFoundError, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode } from "@sf/core";
 import { requireShop, suppliers } from "@/lib/server";
 import { CheckTrackingButton, ManualTrackingForm, RetryButton } from "./FulfillmentActions";
 import { RefundForm } from "./RefundForm";
@@ -25,8 +25,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const [links, refunds] = await Promise.all([listSupplierLinks(db, shop.id), listRefunds(db, order.id)]);
   const supplierLabel = (supplierId: string | null) => {
     if (!supplierId) return "Sent by you";
-    const provider = links.find((l) => l.id === supplierId)?.provider;
-    return suppliers().available.find((s) => s.name === provider)?.label ?? provider ?? "Supplier";
+    return labelFor(suppliers(), links.find((l) => l.id === supplierId));
   };
   const EMAIL_LABEL = { order_confirmation: "Order confirmation", shipping_update: "Shipping update", delivered: "Delivery confirmation", refund: "Refund", support_reply: "Reply to a question", abandoned_cart: "Checkout reminder" };
   const timeline = [
@@ -36,7 +35,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       ...(f.placedAt ? [{ at: f.placedAt, text: `Sent to ${supplierLabel(f.supplierId)} (ref ${f.supplierOrderRef ?? "n/a"})` }] : []),
       ...(f.shippedAt ? [{ at: f.shippedAt, text: `Shipped with ${f.carrier}, tracking ${f.trackingNumber}` }] : []),
       ...(f.deliveredAt ? [{ at: f.deliveredAt, text: "Delivered" }] : []),
-      ...(f.status === "failed" ? [{ at: f.updatedAt, text: `Supplier refused the order: ${f.problemMessage}` }] : []),
+      ...(f.status === "failed" ? [{ at: f.updatedAt, text: f.problemCode && f.problemMessage?.includes("can't send it") ? f.problemMessage : `Supplier refused the order: ${f.problemMessage}` }] : []),
     ]),
     ...refunds.map((r) => ({ at: r.createdAt, text: `Refunded ${money(r.amountMinor)}${r.reason ? `: ${r.reason}` : ""}` })),
     ...order.fulfillments.flatMap((f) => (f.status === "cancelled" ? [{ at: f.updatedAt, text: `Supplier order cancelled (${supplierLabel(f.supplierId)})` }] : [])),

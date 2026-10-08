@@ -94,7 +94,7 @@ export async function importProduct(db: Db, suppliers: Suppliers, shopId: string
     const [link] = await tx
       .insert(schema.suppliers)
       .values({ shopId, provider: supplier.name })
-      .onConflictDoUpdate({ target: [schema.suppliers.shopId, schema.suppliers.provider], set: { status: "connected" } })
+      .onConflictDoUpdate({ target: [schema.suppliers.shopId, schema.suppliers.provider, schema.suppliers.contactEmail], set: { status: "connected" } })
       .returning({ id: schema.suppliers.id });
     const [created] = await tx
       .insert(schema.products)

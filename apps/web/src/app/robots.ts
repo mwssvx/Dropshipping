@@ -5,5 +5,5 @@ const base = `${/^(localhost|127\.0\.0\.1)(:|$)/.test(ROOT_DOMAIN) ? "http" : "h
 
 /** The platform's own pages. Stores have their own robots.txt at their address. */
 export default function robots(): MetadataRoute.Robots {
-  return { rules: [{ userAgent: "*", allow: "/", disallow: ["/admin", "/staff", "/api", "/reset", "/dev"] }], sitemap: `${base}/sitemap.xml` };
+  return { rules: [{ userAgent: "*", allow: "/", disallow: ["/admin", "/staff", "/api", "/reset", "/dev", "/supplier"] }], sitemap: `${base}/sitemap.xml` };
 }
