@@ -68,10 +68,10 @@ test("discount codes, reminders, reviews and suggestions", async ({ page, browse
   await buyer.getByRole("button", { name: "Add Magnetic Phone Stand to cart" }).click();
   await expect(buyer.getByText("Magnetic Phone Stand").first()).toBeVisible();
   await expect(buyer.getByRole("heading", { name: "Goes well with" })).toHaveCount(0);
-  await buyer.getByLabel("Discount code").fill("nope");
+  await buyer.getByLabel("Discount or gift card code").fill("nope");
   await buyer.getByRole("button", { name: "Apply" }).click();
   await expect(buyer.getByText(`"NOPE" isn't a valid code.`)).toBeVisible();
-  await buyer.getByLabel("Discount code").fill("welcome10");
+  await buyer.getByLabel("Discount or gift card code").fill("welcome10");
   await buyer.getByRole("button", { name: "Apply" }).click();
   await expect(buyer.getByText("Discount (WELCOME10)")).toBeVisible();
   await shot(buyer, "67-cart-discount");
@@ -105,7 +105,7 @@ test("discount codes, reminders, reviews and suggestions", async ({ page, browse
   // Using the code again with the same email is refused.
   await buyer.goto(lamp.store);
   await buyer.getByRole("button", { name: "Add to cart" }).click();
-  await buyer.getByLabel("Discount code").fill("WELCOME10");
+  await buyer.getByLabel("Discount or gift card code").fill("WELCOME10");
   await buyer.getByRole("button", { name: "Apply" }).click();
   await buyer.getByRole("link", { name: "Check out" }).click();
   await fillAddress(buyer, "ada@example.com", "Ada Buyer");

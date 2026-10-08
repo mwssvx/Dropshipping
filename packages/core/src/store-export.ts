@@ -66,6 +66,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       supplier: p.supplierId ? supplierOf(supplierRows.find((s) => s.id === p.supplierId), p.supplierProductRef) : null,
       goes_well_with: p.upsellProductId ? (handleOf.get(p.upsellProductId) ?? null) : null,
       quantity_breaks: p.quantityBreaks.map((t) => ({ min_qty: t.minQty, percent_off: t.percentOff })),
+      gift_card: p.giftCard,
       variants: variants
         .filter((v) => v.productId === p.id)
         .map((v) => ({
@@ -148,6 +149,7 @@ const importSchema = z.object({
           .nullable()
           .optional(),
         goes_well_with: handle.nullable().optional(),
+        gift_card: z.boolean().optional(),
         quantity_breaks: z
           .array(z.object({ min_qty: z.number().int().min(2).max(99), percent_off: z.number().int().min(1).max(80) }))
           .max(3)
@@ -261,6 +263,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
           supplierId: key ? supplierIds.get(key)! : null,
           supplierProductRef: provider ? (x.supplier?.product_ref ?? null) : null,
           quantityBreaks: (x.quantity_breaks ?? []).map((t) => ({ minQty: t.min_qty, percentOff: t.percent_off })).sort((a, b) => a.minQty - b.minQty),
+          giftCard: x.gift_card ?? false,
         })
         .returning({ id: schema.products.id });
       productIds.set(x.handle, row!.id);

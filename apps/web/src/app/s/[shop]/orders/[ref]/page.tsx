@@ -45,7 +45,10 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
       </div>
       {order.refundedMinor > 0 && (
         <p className="banner banner-info">
-          {order.paymentStatus === "refunded" ? "This order was refunded" : `${money(due.refundedMinor)} was refunded`} to the card you paid with. Banks usually show it within 5 to 10 business days.
+          {order.paymentStatus === "refunded" ? "This order was refunded" : `${money(due.refundedMinor)} was refunded`}
+          {order.giftCardMinor
+            ? " to how you paid: card refunds take 5 to 10 business days, and gift card refunds can be used right away."
+            : " to the card you paid with. Banks usually show it within 5 to 10 business days."}
         </p>
       )}
       <ol className="grid grid-cols-4 gap-2" aria-label="Order progress">
@@ -85,6 +88,12 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
           <div className="flex justify-between gap-3 hint"><span>{order.taxBreakdown.map((t) => t.label).join(", ") || "Tax"}{order.taxIncluded ? " (included)" : ""}</span><span className="num">{money(due.taxMinor)}</span></div>
         )}
         <div className="flex justify-between gap-3 border-t border-border pt-3 font-semibold"><span>Total</span><span className="num">{money(due.totalMinor)}</span></div>
+        {due.giftCardMinor > 0 && (
+          <>
+            <div className="flex justify-between gap-3 hint"><span>Paid with gift card</span><span className="num">−{money(due.giftCardMinor)}</span></div>
+            <div className="flex justify-between gap-3 hint"><span>Paid by card</span><span className="num">{money(due.chargedMinor)}</span></div>
+          </>
+        )}
       </section>
       {reviewable.length > 0 && (
         <section id="review" className="card p-5 flex flex-col gap-4" aria-labelledby="review-heading">

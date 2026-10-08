@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { schema, type Address, type Db } from "@sf/db";
 import { z } from "zod";
@@ -11,6 +12,7 @@ import { presentQuote } from "./currency";
 import { creditableCampaign } from "./campaigns";
 import { convertAmount, formatMoney, type DisplayFx } from "./money";
 import { breakFor, describeBreak, percentOff, wholesaleTermsFor } from "./wholesale";
+import { findGiftCard } from "./gift-cards";
 
 type Shop = typeof schema.shops.$inferSelect;
 type Order = typeof schema.orders.$inferSelect;
@@ -24,9 +26,15 @@ export const FLAT_SHIPPING_MINOR = 499;
  * Price a cart from the database. Never trusts prices sent by the browser. A discount code that
  * can't be used throws a message for the buyer. `buyerEmail` is the signed-in buyer (from their
  * session, never the form): an approved wholesale buyer gets wholesale prices instead of
- * quantity discounts, and can't add a discount code.
+ * quantity discounts, and can't add a discount code. Gift cards for sale never get discounts or
+ * shipping. A gift card code pays for as much of the total as its balance covers.
  */
-export async function quoteCart(db: Db, shop: Shop, lines: CartLine[], opts: { discountCode?: string | null; email?: string; buyerEmail?: string | null } = {}) {
+export async function quoteCart(
+  db: Db,
+  shop: Shop,
+  lines: CartLine[],
+  opts: { discountCode?: string | null; email?: string; buyerEmail?: string | null; giftCardCode?: string | null } = {},
+) {
   const wanted = lines.filter((l) => l.quantity > 0);
   if (!wanted.length) throw new UserError("Your cart is empty.");
   const rows = await db
@@ -55,8 +63,9 @@ export async function quoteCart(db: Db, shop: Shop, lines: CartLine[], opts: { d
       throw new UserError(row.variant.stock > 0 ? `Only ${row.variant.stock} of ${row.product.title} left.` : `${row.product.title} is sold out.`, "unavailable");
     }
     const title = row.variant.title === "Default" ? row.product.title : `${row.product.title} – ${row.variant.title}`;
-    const tier = wholesale ? null : breakFor(row.product.quantityBreaks, perProduct.get(row.product.id) ?? l.quantity);
-    const pct = wholesale?.percentOff ?? tier?.percentOff ?? 0;
+    const giftCard = row.product.giftCard;
+    const tier = wholesale || giftCard ? null : breakFor(row.product.quantityBreaks, perProduct.get(row.product.id) ?? l.quantity);
+    const pct = giftCard ? 0 : (wholesale?.percentOff ?? tier?.percentOff ?? 0);
     const unit = pct ? percentOff(row.variant.priceMinor, pct) : row.variant.priceMinor;
     return {
       variantId: row.variant.id,
@@ -69,20 +78,31 @@ export async function quoteCart(db: Db, shop: Shop, lines: CartLine[], opts: { d
       unitPriceMinor: unit,
       unitCostMinor: row.variant.costMinor,
       lineMinor: unit * l.quantity,
-      priceNote: wholesale ? `Wholesale price, ${wholesale.percentOff}% off` : tier ? describeBreak(tier) : null,
+      priceNote: giftCard ? null : wholesale ? `Wholesale price, ${wholesale.percentOff}% off` : tier ? describeBreak(tier) : null,
+      giftCard,
     };
   });
   const subtotalMinor = items.reduce((s, i) => s + i.lineMinor, 0);
-  let shippingMinor = subtotalMinor >= FREE_SHIPPING_OVER_MINOR ? 0 : FLAT_SHIPPING_MINOR;
+  // Discounts and shipping only count goods: gift cards are sent by email at face value.
+  const goodsMinor = items.filter((i) => !i.giftCard).reduce((s, i) => s + i.lineMinor, 0);
+  const hasGoods = items.some((i) => !i.giftCard);
+  let shippingMinor = !hasGoods || goodsMinor >= FREE_SHIPPING_OVER_MINOR ? 0 : FLAT_SHIPPING_MINOR;
   let discount: { id: string; code: string; label: string; discountMinor: number } | null = null;
   if (opts.discountCode?.trim() && wholesale) throw new UserError("Discount codes don't apply to wholesale prices.", "discount_invalid");
   if (opts.discountCode?.trim()) {
-    const d = await findUsableDiscount(db, shop, opts.discountCode, { subtotalMinor, email: opts.email });
-    const applied = applyDiscount(d, subtotalMinor, shippingMinor);
+    const d = await findUsableDiscount(db, shop, opts.discountCode, { subtotalMinor: goodsMinor, email: opts.email });
+    const applied = applyDiscount(d, goodsMinor, shippingMinor);
     shippingMinor = applied.shippingMinor;
     discount = { id: d.id, code: d.code, label: describeDiscount(d, shop.currency), discountMinor: applied.discountMinor };
   }
   const discountMinor = discount?.discountMinor ?? 0;
+  const totalMinor = subtotalMinor - discountMinor + shippingMinor;
+  let giftCard: { id: string; last4: string; balanceMinor: number; appliedMinor: number } | null = null;
+  if (opts.giftCardCode?.trim()) {
+    if (!hasGoods || items.some((i) => i.giftCard)) throw new UserError("Gift cards can't be bought with a gift card.", "gift_card_invalid");
+    const card = await findGiftCard(db, shop, opts.giftCardCode);
+    giftCard = { id: card.id, last4: card.last4, balanceMinor: card.balanceMinor, appliedMinor: Math.min(card.balanceMinor, totalMinor) };
+  }
   // Tax depends on where it ships, so it's added at checkout once the address is known.
   return {
     items,
@@ -91,7 +111,10 @@ export async function quoteCart(db: Db, shop: Shop, lines: CartLine[], opts: { d
     discount,
     discountMinor,
     shippingMinor,
-    totalMinor: subtotalMinor - discountMinor + shippingMinor,
+    totalMinor,
+    giftCard,
+    /** What's left to pay by card after the gift card. Before tax, until checkout. */
+    dueMinor: totalMinor - (giftCard?.appliedMinor ?? 0),
     pricesIncludeTax: shop.pricesIncludeTax,
     wholesale: wholesale ? { ...wholesale, shortByMinor: Math.max(0, wholesale.minOrderMinor - subtotalMinor) } : null,
   };
@@ -128,6 +151,8 @@ export async function startCheckout(
     campaignId?: string | null;
     /** The signed-in buyer, from their session. Wholesale prices follow the account. */
     buyerEmail?: string | null;
+    /** A gift card code the buyer entered in the cart. */
+    giftCardCode?: string | null;
   },
   taxCalculator: TaxCalculator = new BuiltInTaxCalculator(),
 ) {
@@ -135,15 +160,21 @@ export async function startCheckout(
   const parsed = checkoutSchema.safeParse(input);
   if (!parsed.success) throw new UserError(parsed.error.issues[0]!.message);
   const { email, address } = parsed.data;
-  const cart = await quoteCart(db, shop, input.lines, { discountCode: input.discountCode, email, buyerEmail: input.buyerEmail });
+  const cart = await quoteCart(db, shop, input.lines, { discountCode: input.discountCode, email, buyerEmail: input.buyerEmail, giftCardCode: input.giftCardCode });
   if (cart.wholesale && cart.wholesale.shortByMinor > 0) {
     throw new UserError(
       `Wholesale orders start at ${formatMoney(cart.wholesale.minOrderMinor, shop.currency)}. Add ${formatMoney(cart.wholesale.shortByMinor, shop.currency)} more to check out.`,
       "wholesale_minimum",
     );
   }
-  // Tax is on what the buyer actually pays for each line, after the discount.
-  const taxed = spreadDiscount(cart.items.map((i) => i.lineMinor), cart.discountMinor);
+  // A buyer shopping in another currency is charged exactly what they saw, in that currency.
+  const fx = input.fx && input.fx.currency !== shop.currency && input.fx.rate > 0 ? input.fx : null;
+  if (fx && cart.giftCard) {
+    throw new UserError(`Gift cards are in ${shop.currency}. Switch the store to ${shop.currency} prices to use yours.`, "gift_card_currency");
+  }
+  // Tax is on what the buyer actually pays for each line, after the discount. Gift cards bought
+  // here aren't taxed: tax is paid when they're spent.
+  const taxed = spreadDiscount(cart.items.map((i) => (i.giftCard ? 0 : i.lineMinor)), cart.discountMinor);
   const tax = await taxCalculator.calculate({
     currency: cart.currency,
     lines: cart.items.map((i, n) => ({ reference: i.variantId, amountMinor: taxed[n]! })),
@@ -160,19 +191,23 @@ export async function startCheckout(
     taxBreakdown: tax.breakdown,
     totalMinor: cart.subtotalMinor - cart.discountMinor + cart.shippingMinor + (tax.included ? 0 : tax.taxMinor),
   };
-  // Our fee is on the sale, not on tax the merchant passes on to the government.
-  const platformFeeMinor = platformFeeFor(shop.plan, quote.totalMinor - quote.taxMinor);
-  // A buyer shopping in another currency is charged exactly what they saw, in that currency.
-  const fx = input.fx && input.fx.currency !== shop.currency && input.fx.rate > 0 ? input.fx : null;
+  const giftCardMinor = cart.giftCard ? Math.min(cart.giftCard.balanceMinor, quote.totalMinor) : 0;
+  const dueMinor = quote.totalMinor - giftCardMinor;
+  // Our fee is on the sale, not on tax the merchant passes on to the government, and not on the
+  // part paid with a gift card: the fee was taken when the gift card was sold.
+  const platformFeeMinor = platformFeeFor(shop.plan, Math.max(0, quote.totalMinor - quote.taxMinor - giftCardMinor));
   const presentment = fx ? presentQuote({ ...quote, pricesIncludeTax: tax.included }, fx) : null;
 
-  const intent = await payments.createPaymentIntent({
-    amountMinor: presentment?.totalMinor ?? quote.totalMinor,
-    currency: presentment?.currency ?? quote.currency,
-    shopAccountId: shop.paymentsAccountId,
-    applicationFeeMinor: fx ? convertAmount(platformFeeMinor, fx) : platformFeeMinor,
-    metadata: { shopId: shop.id },
-  });
+  // Paid in full by gift card: there's nothing to charge, so the order is paid right away.
+  const intent = dueMinor
+    ? await payments.createPaymentIntent({
+        amountMinor: presentment?.totalMinor ?? dueMinor,
+        currency: presentment?.currency ?? quote.currency,
+        shopAccountId: shop.paymentsAccountId,
+        applicationFeeMinor: fx ? convertAmount(platformFeeMinor, fx) : platformFeeMinor,
+        metadata: { shopId: shop.id },
+      })
+    : { id: `giftcard_${randomUUID()}`, clientSecret: "" };
 
   const consent = input.acceptsMarketing ? { acceptsMarketing: true, marketingConsentAt: new Date(), unsubscribedAt: null } : {};
   const campaignId = await creditableCampaign(db, shop.id, input.campaignId);
@@ -209,13 +244,24 @@ export async function startCheckout(
         taxCalculationId: tax.calculationId,
         totalMinor: quote.totalMinor,
         platformFeeMinor,
-        processingFeeMinor: estimateProcessingFee(quote.totalMinor),
+        processingFeeMinor: dueMinor ? estimateProcessingFee(dueMinor) : 0,
         presentment,
         campaignId,
         wholesale: !!cart.wholesale,
+        giftCardId: cart.giftCard?.id ?? null,
+        giftCardMinor,
         paymentIntentId: intent.id,
+        ...(dueMinor ? {} : { paymentStatus: "paid" as const, paidAt: new Date() }),
       })
       .returning();
+    if (!dueMinor) {
+      const [taken] = await tx
+        .update(schema.giftCards)
+        .set({ balanceMinor: sql`${schema.giftCards.balanceMinor} - ${giftCardMinor}` })
+        .where(and(eq(schema.giftCards.id, cart.giftCard!.id), sql`${schema.giftCards.balanceMinor} >= ${giftCardMinor}`))
+        .returning({ id: schema.giftCards.id });
+      if (!taken) throw new UserError("Your gift card balance just changed. Go back to your cart to see what's left.", "gift_card_invalid");
+    }
     await tx.insert(schema.orderLines).values(
       quote.items.map((i) => ({
         orderId: order!.id,
@@ -229,7 +275,12 @@ export async function startCheckout(
     return order!;
   });
 
-  return { order, clientSecret: intent.clientSecret, quote };
+  return { order, clientSecret: intent.clientSecret, quote, paidWithGiftCard: !dueMinor };
+}
+
+/** What the card is charged for an order: the total less any gift card, in the buyer's currency. */
+export function amountToCharge(order: Pick<Order, "totalMinor" | "giftCardMinor" | "presentment">) {
+  return order.presentment?.totalMinor ?? order.totalMinor - order.giftCardMinor;
 }
 
 /**
@@ -256,10 +307,17 @@ export async function handlePaymentEvent(db: Db, provider: string, event: Paymen
 
     let becamePaid = false;
     if (event.type === "payment.succeeded") {
-      const charged = order.presentment?.totalMinor ?? order.totalMinor;
-      if (event.amountMinor !== charged) throw new Error(`Amount mismatch on order ${order.id}`);
+      if (event.amountMinor !== amountToCharge(order)) throw new Error(`Amount mismatch on order ${order.id}`);
       if (order.paymentStatus === "pending" || order.paymentStatus === "failed") {
         becamePaid = true;
+        // The gift card is spent once the rest is paid. Checkout checked the balance; if it was spent
+        // elsewhere in between, what's left is taken.
+        if (order.giftCardId && order.giftCardMinor) {
+          await tx
+            .update(schema.giftCards)
+            .set({ balanceMinor: sql`greatest(${schema.giftCards.balanceMinor} - ${order.giftCardMinor}, 0)` })
+            .where(eq(schema.giftCards.id, order.giftCardId));
+        }
         await tx
           .update(schema.orders)
           .set({ paymentStatus: "paid", paidAt: new Date(), updatedAt: new Date() })

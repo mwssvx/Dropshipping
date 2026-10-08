@@ -22,7 +22,11 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const cost = order.lines.reduce((s, l) => s + (l.unitCostMinor ?? 0) * l.quantity, 0);
   const knownCost = order.lines.every((l) => l.unitCostMinor != null);
   const a = order.shippingAddress;
-  const [links, refunds] = await Promise.all([listSupplierLinks(db, shop.id), listRefunds(db, order.id)]);
+  const [links, refunds, giftCard] = await Promise.all([
+    listSupplierLinks(db, shop.id),
+    listRefunds(db, order.id),
+    order.giftCardId ? db.query.giftCards.findFirst({ where: (g, { eq }) => eq(g.id, order.giftCardId!), columns: { last4: true } }) : undefined,
+  ]);
   const supplierLabel = (supplierId: string | null) => {
     if (!supplierId) return "Sent by you";
     return labelFor(suppliers(), links.find((l) => l.id === supplierId));
@@ -30,7 +34,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const EMAIL_LABEL = { order_confirmation: "Order confirmation", shipping_update: "Shipping update", delivered: "Delivery confirmation", refund: "Refund", support_reply: "Reply to a question", abandoned_cart: "Checkout reminder" };
   const timeline = [
     { at: order.createdAt, text: "Order placed" },
-    ...(order.paidAt ? [{ at: order.paidAt, text: `Payment of ${money(order.totalMinor)} received` }] : []),
+    ...(order.paidAt
+      ? [{ at: order.paidAt, text: order.giftCardMinor ? `Paid: ${money(order.giftCardMinor)} by gift card${order.totalMinor > order.giftCardMinor ? `, ${money(order.totalMinor - order.giftCardMinor)} by card` : ""}` : `Payment of ${money(order.totalMinor)} received` }]
+      : []),
     ...order.fulfillments.flatMap((f) => [
       ...(f.placedAt ? [{ at: f.placedAt, text: `Sent to ${supplierLabel(f.supplierId)} (ref ${f.supplierOrderRef ?? "n/a"})` }] : []),
       ...(f.shippedAt ? [{ at: f.shippedAt, text: `Shipped with ${f.carrier}, tracking ${f.trackingNumber}` }] : []),
@@ -77,6 +83,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <dt className="font-semibold">Total</dt><dd className="font-semibold">{money(order.totalMinor)}</dd>
               {order.presentment && (
                 <><dt className="hint">Buyer paid in {order.presentment.currency}</dt><dd>{formatMoney(order.presentment.totalMinor, order.presentment.currency)}</dd></>
+              )}
+              {order.giftCardMinor > 0 && (
+                <><dt className="hint">Paid with gift card{giftCard ? ` ···· ${giftCard.last4}` : ""}</dt><dd>{money(order.giftCardMinor)}</dd></>
               )}
               {order.refundedMinor > 0 && <><dt className="hint">Refunded</dt><dd>−{money(order.refundedMinor)}</dd></>}
               {order.paidAt && seesMoney && (

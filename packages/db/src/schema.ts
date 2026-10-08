@@ -1,4 +1,4 @@
-// Milestone 1 to 15 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 16 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -156,6 +156,8 @@ export const products = pgTable(
     upsellProductId: uuid("upsell_product_id").references((): AnyPgColumn => products.id, { onDelete: "set null" }),
     // Quantity discounts, e.g. [{ minQty: 2, percentOff: 10 }, { minQty: 5, percentOff: 15 }].
     quantityBreaks: jsonb("quantity_breaks").$type<QuantityBreak[]>().notNull().default([]),
+    // A gift card sold on the store: each one bought issues a code worth its variant's price.
+    giftCard: boolean("gift_card").notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -286,6 +288,9 @@ export const orders = pgTable(
     campaignId: uuid("campaign_id").references((): AnyPgColumn => campaigns.id, { onDelete: "set null" }),
     // Placed by an approved wholesale buyer at wholesale prices.
     wholesale: boolean("wholesale").notNull().default(false),
+    // Paid in part or in full with a gift card. The card is charged total minus this.
+    giftCardId: uuid("gift_card_id").references((): AnyPgColumn => giftCards.id, { onDelete: "set null" }),
+    giftCardMinor: money("gift_card_minor").notNull().default(0),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -300,6 +305,7 @@ export const orders = pgTable(
     check("orders_discount_within_subtotal", sql`${t.discountMinor} >= 0 and ${t.discountMinor} <= ${t.subtotalMinor}`),
     index("orders_discount_idx").on(t.discountId),
     check("orders_refund_within_total", sql`${t.refundedMinor} >= 0 and ${t.refundedMinor} <= ${t.totalMinor}`),
+    check("orders_gift_card_within_total", sql`${t.giftCardMinor} >= 0 and ${t.giftCardMinor} <= ${t.totalMinor}`),
   ],
 );
 
@@ -467,6 +473,8 @@ export const refunds = pgTable(
     taxRefundedMinor: money("tax_refunded_minor").notNull().default(0),
     // In the buyer's currency, when they paid in another one.
     presentmentAmountMinor: money("presentment_amount_minor"),
+    // The part of the refund put back on the gift card the order was paid with.
+    giftCardMinor: money("gift_card_minor").notNull().default(0),
     reason: text("reason"),
     providerRefundId: text("provider_refund_id").unique(),
     createdAt: createdAt(),
@@ -963,4 +971,34 @@ export const campaignSends = pgTable(
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("campaign_sends_campaign_email_uq").on(t.campaignId, t.email), index("campaign_sends_status_idx").on(t.status, t.campaignId)],
+);
+
+// Gift cards and store credit. Only a hash of the code is kept; the buyer gets the code by email,
+// and the merchant sees the last 4 characters.
+export const giftCards = pgTable(
+  "gift_cards",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    codeHash: text("code_hash").notNull(),
+    last4: text("last4").notNull(),
+    currency: char("currency", { length: 3 }).notNull(),
+    initialMinor: money("initial_minor").notNull(),
+    balanceMinor: money("balance_minor").notNull(),
+    email: text("email").notNull(),
+    note: text("note"),
+    // Bought on the store (with the line it came from), or given by the merchant.
+    sourceOrderId: uuid("source_order_id").references((): AnyPgColumn => orders.id, { onDelete: "set null" }),
+    sourceIndex: integer("source_index"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    disabledAt: timestamp("disabled_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("gift_cards_shop_code_uq").on(t.shopId, t.codeHash),
+    uniqueIndex("gift_cards_source_uq").on(t.sourceOrderId, t.sourceIndex),
+    index("gift_cards_shop_idx").on(t.shopId, t.createdAt),
+    check("gift_cards_balance_ok", sql`${t.balanceMinor} >= 0 and ${t.balanceMinor} <= ${t.initialMinor}`),
+  ],
 );

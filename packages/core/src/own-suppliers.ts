@@ -125,6 +125,7 @@ export async function resetSupplierLink(db: Db, shopId: string, id: string) {
 export async function setProductSupplier(db: Db, shopId: string, productId: string, supplierId: string | null) {
   const product = await db.query.products.findFirst({ where: and(eq(schema.products.id, productId), eq(schema.products.shopId, shopId)) });
   if (!product) throw new NotFoundError("Product");
+  if (supplierId && product.giftCard) throw new UserError("Gift cards are sent by email, so they don't need a supplier.");
   if (supplierId) await find(db, shopId, supplierId);
   if (product.supplierId === supplierId) return;
   const current = product.supplierId ? await db.query.suppliers.findFirst({ where: eq(schema.suppliers.id, product.supplierId) }) : null;

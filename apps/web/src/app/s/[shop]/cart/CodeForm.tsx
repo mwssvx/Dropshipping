@@ -7,7 +7,7 @@ export function CodeForm({ handle }: { handle: string }) {
   const [state, action] = useActionState(applyCodeAction.bind(null, handle), {} as CodeState);
   return (
     <form action={action} className="flex flex-col gap-2 w-full max-w-xs self-end">
-      <label className="label" htmlFor="code">Discount code</label>
+      <label className="label" htmlFor="code">Discount or gift card code</label>
       <div className="flex gap-2">
         <input id="code" name="code" className="input flex-1 uppercase" autoComplete="off" aria-invalid={!!state.error} aria-describedby={state.error ? "code-error" : undefined} />
         <SubmitButton className="btn btn-secondary" pendingText="Checking…">Apply</SubmitButton>

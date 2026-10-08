@@ -38,3 +38,17 @@ export async function writeDiscountCode(shopId: string, code: string | null) {
   if (!code) jar.delete(codeName(shopId));
   else jar.set(codeName(shopId), code, { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 14 });
 }
+
+const giftName = (shopId: string) => `sf_gift_${shopId}`;
+
+/** The gift card code the buyer applied in the cart, without dashes. Checked again at checkout. */
+export async function readGiftCardCode(shopId: string): Promise<string | null> {
+  const raw = (await cookies()).get(giftName(shopId))?.value;
+  return raw && /^[A-Z0-9]{16}$/.test(raw) ? raw : null;
+}
+
+export async function writeGiftCardCode(shopId: string, code: string | null) {
+  const jar = await cookies();
+  if (!code) jar.delete(giftName(shopId));
+  else jar.set(giftName(shopId), code, { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 14 });
+}

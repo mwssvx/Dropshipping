@@ -143,6 +143,7 @@ export async function fulfillment(): Promise<FulfillmentContext> {
     orderStatusUrl: async (shop, order) => `${await storeAddress(shop)}/orders/${order.paymentIntentId}`,
     payUrl: async (shop, order) => `${await storeAddress(shop)}/pay/${order.id}`,
     supplierPortalUrl,
+    storeAddress,
   };
 }
 

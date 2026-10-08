@@ -131,6 +131,8 @@ type OrderAmounts = {
   totalMinor: number;
   refundedMinor: number;
   presentment: Presentment | null;
+  /** Paid with a gift card (store currency only, so never with a presentment). */
+  giftCardMinor?: number;
 };
 
 /**
@@ -149,6 +151,9 @@ export function buyerAmounts(order: OrderAmounts, lines: { variantId: string | n
       taxMinor: order.taxMinor,
       totalMinor: order.totalMinor,
       refundedMinor: order.refundedMinor,
+      giftCardMinor: order.giftCardMinor ?? 0,
+      /** What the card was charged. */
+      chargedMinor: order.totalMinor - (order.giftCardMinor ?? 0),
     };
   }
   const fx = { currency: p.currency, rate: p.rate, round: false };
@@ -160,6 +165,8 @@ export function buyerAmounts(order: OrderAmounts, lines: { variantId: string | n
     shippingMinor: p.shippingMinor,
     taxMinor: p.taxMinor,
     totalMinor: p.totalMinor,
+    giftCardMinor: 0,
+    chargedMinor: p.totalMinor,
     refundedMinor: refundedPresentmentMinor ?? Math.min(p.totalMinor, order.refundedMinor >= order.totalMinor ? p.totalMinor : convertAmount(order.refundedMinor, fx)),
   };
 }

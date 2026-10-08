@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { schema } from "@sf/db";
 import { NotFoundError, UserError } from "./errors";
 import { refreshOrderFulfillment, sendOrderEmail, type FulfillmentContext } from "./fulfillment";
@@ -10,7 +10,9 @@ export type RefundContext = FulfillmentContext & { payments: PaymentProvider };
 /**
  * Refund part or all of an order. Our sales fee is returned in proportion, so a merchant never
  * pays us for a sale they gave back. On a full refund, supplier orders that haven't shipped are
- * cancelled so the merchant isn't charged for goods the buyer won't get.
+ * cancelled so the merchant isn't charged for goods the buyer won't get. An order paid partly
+ * with a gift card is refunded to the card payment first, then back onto the gift card. A full
+ * refund turns off gift cards bought on the order.
  */
 export async function refundOrder(
   ctx: RefundContext,
@@ -38,6 +40,14 @@ export async function refundOrder(
     .returning();
   if (!reserved) throw new UserError("Someone else just refunded this order. Reload to see what's left.");
 
+  const [{ toGiftAlready }] = (await db
+    .select({ toGiftAlready: sql<number>`coalesce(sum(${schema.refunds.giftCardMinor}), 0)::int` })
+    .from(schema.refunds)
+    .where(eq(schema.refunds.orderId, order.id))) as [{ toGiftAlready: number }];
+  const cardLeft = order.totalMinor - order.giftCardMinor - (order.refundedMinor - Number(toGiftAlready));
+  const toCard = Math.min(amount, Math.max(cardLeft, 0));
+  const toGift = amount - toCard;
+
   // A buyer who paid in another currency is refunded in it, at the rate they paid; refunding
   // everything left returns exactly what's left of their charge.
   let presentmentAmount: number | null = null;
@@ -50,9 +60,11 @@ export async function refundOrder(
     presentmentAmount = amount === left ? presentLeft : Math.min(presentLeft, Math.round(amount * order.presentment.rate));
   }
 
-  let providerRefundId: string;
+  let providerRefundId: string | null = null;
   try {
-    ({ id: providerRefundId } = await ctx.payments.refund({ paymentIntentId: order.paymentIntentId, amountMinor: presentmentAmount ?? amount, reason }));
+    if (toCard > 0) {
+      ({ id: providerRefundId } = await ctx.payments.refund({ paymentIntentId: order.paymentIntentId, amountMinor: presentmentAmount ?? toCard, reason }));
+    }
   } catch (e) {
     await db
       .update(schema.orders)
@@ -87,10 +99,20 @@ export async function refundOrder(
         platformFeeRefundedMinor: Math.max(feeBack, 0),
         taxRefundedMinor: Math.max(taxBack, 0),
         presentmentAmountMinor: presentmentAmount,
+        giftCardMinor: toGift,
         reason,
         providerRefundId,
       })
       .returning();
+    if (toGift > 0 && order.giftCardId) {
+      await tx
+        .update(schema.giftCards)
+        .set({ balanceMinor: sql`least(${schema.giftCards.balanceMinor} + ${toGift}, ${schema.giftCards.initialMinor})` })
+        .where(eq(schema.giftCards.id, order.giftCardId));
+    }
+    if (full) {
+      await tx.update(schema.giftCards).set({ disabledAt: new Date() }).where(and(eq(schema.giftCards.sourceOrderId, order.id), isNull(schema.giftCards.disabledAt)));
+    }
     await tx
       .update(schema.orders)
       .set({ paymentStatus: full ? "refunded" : "partially_refunded", updatedAt: new Date() })
