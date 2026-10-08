@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { abandonedCartStats, describeDiscount, formatMoney, listDiscounts } from "@sf/core";
 import { requireShop, testPayments } from "@/lib/server";
 import { sendRemindersNowAction, setDiscountActiveAction, setRemindersAction } from "../../growth-actions";
@@ -21,6 +22,13 @@ export default async function MarketingPage() {
     <main className="pb-12">
       <PageHeader title="Marketing" />
       <div className="px-4 sm:px-8 flex flex-col gap-6 max-w-3xl">
+        <section className="card p-5 flex flex-wrap items-center gap-3" aria-labelledby="campaigns-link-heading">
+          <div className="flex-1 min-w-56">
+            <h2 id="campaigns-link-heading" className="font-semibold">Email campaigns</h2>
+            <p className="hint">Write to buyers who said yes to emails, and see the clicks and sales each email brings.</p>
+          </div>
+          <Link href="/admin/campaigns" className="btn btn-secondary">Open campaigns</Link>
+        </section>
         <section className="card p-5 flex flex-col gap-4" aria-labelledby="codes-heading">
           <div>
             <h2 id="codes-heading" className="font-semibold">Discount codes</h2>

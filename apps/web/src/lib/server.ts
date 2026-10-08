@@ -23,6 +23,7 @@ import {
   suppliersFromEnv,
   taxCalculatorFromEnv,
   type AgentContext,
+  type CampaignContext,
   type DomainContext,
   type DomainHost,
   type FulfillmentContext,
@@ -137,6 +138,10 @@ export async function fulfillment(): Promise<FulfillmentContext> {
     orderStatusUrl: async (shop, order) => `${await storeAddress(shop)}/orders/${order.paymentIntentId}`,
     payUrl: async (shop, order) => `${await storeAddress(shop)}/pay/${order.id}`,
   };
+}
+
+export async function campaigns(): Promise<CampaignContext> {
+  return { db: await db(), mailer: mailer(), storeAddress };
 }
 
 export const SESSION_COOKIE = "sf_session";

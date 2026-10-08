@@ -24,6 +24,10 @@ export function CheckoutForm({ handle, defaultCountry, initial }: { handle: stri
       <fieldset className="flex flex-col gap-4">
         <legend className="font-semibold mb-2">Contact</legend>
         <Field id="email" label="Email" type="email" autoComplete="email" required values={v} />
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" name="acceptsMarketing" defaultChecked={v?.acceptsMarketing === "on"} />
+          Send me news and offers
+        </label>
       </fieldset>
       <fieldset className="flex flex-col gap-4">
         <legend className="font-semibold mb-2">Delivery</legend>

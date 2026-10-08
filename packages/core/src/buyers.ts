@@ -69,7 +69,7 @@ export async function verifyBuyerCode(db: Db, shopId: string, emailInput: string
 export async function getBuyer(db: Db, shopId: string, token: string | undefined, now = new Date()) {
   if (!token) return null;
   const [row] = await db
-    .select({ id: schema.customers.id, email: schema.customers.email, name: schema.customers.name })
+    .select({ id: schema.customers.id, email: schema.customers.email, name: schema.customers.name, acceptsMarketing: schema.customers.acceptsMarketing })
     .from(schema.buyerSessions)
     .innerJoin(schema.customers, eq(schema.customers.id, schema.buyerSessions.customerId))
     .where(and(eq(schema.buyerSessions.tokenHash, sha(token)), eq(schema.buyerSessions.shopId, shopId), gt(schema.buyerSessions.expiresAt, now)))
@@ -158,6 +158,7 @@ export async function listCustomers(db: Db, shopId: string, opts: { query?: stri
       name: schema.customers.name,
       createdAt: schema.customers.createdAt,
       lastSignInAt: schema.customers.lastSignInAt,
+      acceptsMarketing: schema.customers.acceptsMarketing,
       orders: sql<number>`count(${schema.orders.id}) filter (where ${schema.orders.paymentStatus} in ('paid', 'partially_refunded', 'refunded'))`.mapWith(Number),
       spentMinor: sql<number>`coalesce(sum(${schema.orders.totalMinor} - ${schema.orders.refundedMinor}) filter (where ${schema.orders.paymentStatus} in ('paid', 'partially_refunded', 'refunded')), 0)`.mapWith(Number),
       lastOrderAt: sql<Date | null>`max(${schema.orders.paidAt})`.mapWith((v) => (v ? new Date(v) : null)),

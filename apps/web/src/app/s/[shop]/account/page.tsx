@@ -3,7 +3,7 @@ import { buyerOrders, formatMoney } from "@sf/core";
 import { currentBuyer } from "@/lib/buyer";
 import { db } from "@/lib/server";
 import { loadShop, storeBase } from "../data";
-import { buyAgainAction, buyerSignOutAction } from "./actions";
+import { buyAgainAction, buyerSignOutAction, setBuyerMarketingAction } from "./actions";
 import { SignInForm } from "./SignInForm";
 
 export const metadata = { title: "Your account", robots: { index: false } };
@@ -47,6 +47,10 @@ export default async function AccountPage({ params }: { params: Promise<{ shop: 
         </div>
         <form action={buyerSignOutAction.bind(null, handle)}><button className="btn btn-secondary">Sign out</button></form>
       </div>
+      <form action={setBuyerMarketingAction.bind(null, handle, !buyer.acceptsMarketing)} className="card p-4 flex flex-wrap items-center justify-between gap-3 text-sm">
+        <span>{buyer.acceptsMarketing ? `You get news and offers from ${shop.name} by email.` : `You don't get marketing emails from ${shop.name}.`}</span>
+        <button className="btn btn-secondary">{buyer.acceptsMarketing ? "Stop news and offers" : "Send me news and offers"}</button>
+      </form>
       {orders.length === 0 ? (
         <div className="card p-6 flex flex-col gap-3 items-start">
           <p>No orders with this email yet.</p>

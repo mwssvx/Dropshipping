@@ -1,4 +1,4 @@
-// Milestone 1 to 11 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 12 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -84,6 +84,8 @@ export const shops = pgTable(
     presentmentCurrencies: jsonb("presentment_currencies").$type<string[]>().notNull().default([]),
     // Round converted prices up to end in .99 (shipping and tax are never rounded).
     roundConvertedPrices: boolean("round_converted_prices").notNull().default(true),
+    // Printed at the foot of marketing emails, as anti-spam law requires.
+    mailingAddress: text("mailing_address"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -172,6 +174,12 @@ export const customers = pgTable(
     name: text("name"),
     // Set when the buyer signs in to their account on the store.
     lastSignInAt: timestamp("last_sign_in_at", { withTimezone: true }),
+    // Marketing email consent: given at checkout or on their account page, never assumed.
+    acceptsMarketing: boolean("accepts_marketing").notNull().default(false),
+    marketingConsentAt: timestamp("marketing_consent_at", { withTimezone: true }),
+    unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
+    // Secret in each marketing email's unsubscribe link.
+    emailToken: text("email_token").notNull().unique().default(sql`replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '')`),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("customers_shop_email_uq").on(t.shopId, t.email)],
@@ -244,6 +252,8 @@ export const orders = pgTable(
     taxBreakdown: jsonb("tax_breakdown").$type<TaxBreakdownLine[]>().notNull().default([]),
     taxCalculationId: text("tax_calculation_id"),
     presentment: jsonb("presentment").$type<Presentment>(),
+    // The email campaign the buyer came from, when they clicked one in the last week.
+    campaignId: uuid("campaign_id").references((): AnyPgColumn => campaigns.id, { onDelete: "set null" }),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -880,4 +890,45 @@ export const buyerSessions = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("buyer_sessions_customer_idx").on(t.customerId)],
+);
+
+// Email campaigns: a merchant writes one email and sends it to buyers who said yes to marketing.
+export const CAMPAIGN_AUDIENCES = ["subscribers", "customers", "not_bought", "lapsed"] as const;
+export type CampaignAudience = (typeof CAMPAIGN_AUDIENCES)[number];
+
+export const campaigns = pgTable(
+  "campaigns",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    subject: text("subject").notNull(),
+    body: text("body").notNull(),
+    buttonLabel: text("button_label"),
+    buttonPath: text("button_path"),
+    audience: text("audience", { enum: CAMPAIGN_AUDIENCES }).notNull().default("subscribers"),
+    status: text("status", { enum: ["draft", "scheduled", "sending", "sent"] }).notNull().default("draft"),
+    scheduledFor: timestamp("scheduled_for", { withTimezone: true }),
+    recipients: integer("recipients").notNull().default(0),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("campaigns_shop_idx").on(t.shopId, t.createdAt)],
+);
+
+export const campaignSends = pgTable(
+  "campaign_sends",
+  {
+    id: id(),
+    campaignId: uuid("campaign_id").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
+    customerId: uuid("customer_id").references(() => customers.id, { onDelete: "set null" }),
+    email: text("email").notNull(),
+    status: text("status", { enum: ["queued", "sent", "skipped", "failed"] }).notNull().default("queued"),
+    error: text("error"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    clickedAt: timestamp("clicked_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("campaign_sends_campaign_email_uq").on(t.campaignId, t.email), index("campaign_sends_status_idx").on(t.status, t.campaignId)],
 );

@@ -1,6 +1,6 @@
 "use server";
 import { redirect } from "next/navigation";
-import { reorderLines, requestBuyerCode, signOutBuyer, UserError, verifyBuyerCode } from "@sf/core";
+import { reorderLines, requestBuyerCode, signOutBuyer, subscribeBuyer, unsubscribeBuyer, UserError, verifyBuyerCode } from "@sf/core";
 import { readCart, writeCart } from "@/lib/cart";
 import { buyerToken, clearBuyerCookie, currentBuyer, setBuyerCookie } from "@/lib/buyer";
 import { db, mailer } from "@/lib/server";
@@ -50,4 +50,14 @@ export async function buyAgainAction(handle: string, orderId: string) {
   }
   await writeCart(shop.id, cart);
   redirect(`${base}/cart${missing ? `?unavailable=${missing}` : ""}`);
+}
+
+/** The "Send me news and offers" switch on the account page. */
+export async function setBuyerMarketingAction(handle: string, subscribe: boolean) {
+  const shop = await loadShop(handle);
+  const buyer = await currentBuyer(shop.id);
+  if (!buyer) redirect(`${await storeBase(handle)}/account`);
+  if (subscribe) await subscribeBuyer(await db(), shop.id, buyer.email);
+  else await unsubscribeBuyer(await db(), shop.id, buyer.email);
+  redirect(`${await storeBase(handle)}/account`);
 }
