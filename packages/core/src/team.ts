@@ -11,19 +11,19 @@ export type Role = (typeof schema.shopMembers.$inferSelect)["role"];
 
 /** Parts of the admin a role can be allowed into. "refunds" and "payouts" guard single actions. */
 export const AREAS = [
-  "home", "analytics", "assistant", "orders", "refunds", "inbox", "money", "payouts", "products", "collections",
+  "home", "analytics", "assistant", "orders", "refunds", "customers", "inbox", "money", "payouts", "products", "collections",
   "suppliers", "marketing", "reviews", "theme", "pages", "domains", "trust", "plan", "ai", "taxes", "developers",
   "export", "team",
 ] as const;
 export type Area = (typeof AREAS)[number];
 
-const STAFF: readonly Area[] = ["home", "orders", "inbox", "products", "collections", "reviews"];
+const STAFF: readonly Area[] = ["home", "orders", "customers", "inbox", "products", "collections", "reviews"];
 const OWNER_ONLY: readonly Area[] = ["plan", "payouts", "team", "developers", "export"];
 
 export const ROLES: Record<Role, { name: string; summary: string }> = {
   owner: { name: "Owner", summary: "Everything, including the plan, payouts, the team, API keys and exporting the store." },
   admin: { name: "Admin", summary: "Runs the store day to day: orders and refunds, products, the online store, money, marketing and settings. Not the plan, payouts, team, API keys or export." },
-  staff: { name: "Staff", summary: "Orders (without refunds), buyer messages, products, collections and reviews. No money, sales totals or settings." },
+  staff: { name: "Staff", summary: "Orders (without refunds), customers, buyer messages, products, collections and reviews. No money, sales totals or settings." },
 };
 
 export function can(role: Role, area: Area): boolean {

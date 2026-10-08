@@ -1,4 +1,4 @@
-// Milestone 1 to 9 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 10 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -166,6 +166,8 @@ export const customers = pgTable(
     shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
     email: text("email").notNull(),
     name: text("name"),
+    // Set when the buyer signs in to their account on the store.
+    lastSignInAt: timestamp("last_sign_in_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("customers_shop_email_uq").on(t.shopId, t.email)],
@@ -826,4 +828,32 @@ export const shopInvites = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("shop_invites_shop_idx").on(t.shopId, t.email)],
+);
+
+// Buyer accounts: shoppers sign in to one store with a code emailed to them (no password).
+export const buyerCodes = pgTable(
+  "buyer_codes",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    codeHash: text("code_hash").notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("buyer_codes_shop_email_idx").on(t.shopId, t.email, t.createdAt)],
+);
+
+export const buyerSessions = pgTable(
+  "buyer_sessions",
+  {
+    tokenHash: text("token_hash").primaryKey(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    customerId: uuid("customer_id").notNull().references(() => customers.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("buyer_sessions_customer_idx").on(t.customerId)],
 );

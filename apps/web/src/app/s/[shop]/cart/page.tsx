@@ -8,8 +8,9 @@ import { loadShop, storeBase } from "../data";
 
 export const metadata = { title: "Cart" };
 
-export default async function CartPage({ params }: { params: Promise<{ shop: string }> }) {
+export default async function CartPage({ params, searchParams }: { params: Promise<{ shop: string }>; searchParams: Promise<{ unavailable?: string }> }) {
   const { shop: handle } = await params;
+  const unavailable = Number((await searchParams).unavailable) || 0;
   const shop = await loadShop(handle);
   const base = await storeBase(handle);
   const lines = await readCart(shop.id);
@@ -36,6 +37,11 @@ export default async function CartPage({ params }: { params: Promise<{ shop: str
     <main className="max-w-3xl mx-auto px-4 sm:px-6 py-10 flex flex-col gap-6">
       <h1 className="text-3xl font-bold tracking-tight">Your cart</h1>
       {problem && <p className="banner banner-critical">{problem}</p>}
+      {unavailable > 0 && (
+        <p className="banner banner-warning" role="status">
+          {unavailable === 1 ? "One item from that order isn't" : `${unavailable} items from that order aren't`} for sale right now, so we left {unavailable === 1 ? "it" : "them"} out.
+        </p>
+      )}
       {!quote ? (
         <div className="flex flex-col gap-4 items-start">
           <p className="hint">Your cart is empty.</p>
