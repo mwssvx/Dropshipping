@@ -16,7 +16,7 @@ export type FulfillmentContext = {
   suppliers: Suppliers;
   mailer: Mailer;
   /** Public link to the buyer's order status page. */
-  orderStatusUrl: (shop: Shop, order: Order) => string;
+  orderStatusUrl: (shop: Shop, order: Order) => string | Promise<string>;
   now?: () => Date;
 };
 
@@ -291,7 +291,7 @@ export async function routeStuckOrders(ctx: FulfillmentContext, olderThanMs = 2 
 type EmailKind = (typeof schema.emails.$inferSelect)["kind"];
 
 async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kind: EmailKind) {
-  const link = ctx.orderStatusUrl(shop, order);
+  const link = await ctx.orderStatusUrl(shop, order);
   const first = order.shippingAddress.name.split(" ")[0];
   if (kind === "order_confirmation") {
     const lines = await ctx.db.query.orderLines.findMany({ where: eq(schema.orderLines.orderId, order.id) });

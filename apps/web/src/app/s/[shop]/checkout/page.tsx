@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { formatMoney, quoteCart, UserError } from "@sf/core";
 import { readCart } from "@/lib/cart";
 import { db } from "@/lib/server";
-import { loadShop } from "../data";
+import { loadShop, storeBase } from "../data";
 import { CheckoutForm } from "./CheckoutForm";
 
 export const metadata = { title: "Checkout" };
@@ -10,13 +10,14 @@ export const metadata = { title: "Checkout" };
 export default async function CheckoutPage({ params }: { params: Promise<{ shop: string }> }) {
   const { shop: handle } = await params;
   const shop = await loadShop(handle);
+  const base = await storeBase(handle);
   const lines = await readCart(shop.id);
-  if (!lines.length) redirect(`/s/${handle}/cart`);
+  if (!lines.length) redirect(`${base}/cart`);
   let quote;
   try {
     quote = await quoteCart(await db(), shop, lines);
   } catch (e) {
-    if (e instanceof UserError) redirect(`/s/${handle}/cart`);
+    if (e instanceof UserError) redirect(`${base}/cart`);
     throw e;
   }
   const money = (m: number) => formatMoney(m, shop.currency);

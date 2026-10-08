@@ -1,4 +1,4 @@
-// Milestone 1 and 2 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 3 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -265,4 +265,77 @@ export const emails = pgTable(
     sentAt: timestamp("sent_at", { withTimezone: true }),
   },
   (t) => [uniqueIndex("emails_order_kind_uq").on(t.orderId, t.kind), index("emails_shop_created_idx").on(t.shopId, t.createdAt)],
+);
+
+// One theme per shop. The editor writes `draft`; publishing copies it to `published`.
+// The document shape is validated in @sf/core (themes.ts), so it stays a plain jsonb here.
+export const themes = pgTable("themes", {
+  id: id(),
+  shopId: uuid("shop_id").notNull().unique().references(() => shops.id, { onDelete: "cascade" }),
+  template: text("template").notNull().default("base"),
+  draft: jsonb("draft").$type<Record<string, unknown>>().notNull(),
+  published: jsonb("published").$type<Record<string, unknown>>().notNull(),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  updatedAt: updatedAt(),
+});
+
+export const collections = pgTable(
+  "collections",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    handle: text("handle").notNull(),
+    description: text("description").notNull().default(""),
+    imageUrl: text("image_url"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("collections_shop_handle_uq").on(t.shopId, t.handle)],
+);
+
+export const collectionProducts = pgTable(
+  "collection_products",
+  {
+    collectionId: uuid("collection_id").notNull().references(() => collections.id, { onDelete: "cascade" }),
+    productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+    position: integer("position").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.collectionId, t.productId] }), index("collection_products_product_idx").on(t.productId)],
+);
+
+// Plain-text pages such as About, Shipping and Returns. Shown at /pages/<handle>.
+export const pages = pgTable(
+  "pages",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    handle: text("handle").notNull(),
+    body: text("body").notNull().default(""),
+    seoDescription: text("seo_description"),
+    published: boolean("published").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("pages_shop_handle_uq").on(t.shopId, t.handle)],
+);
+
+// Domains a merchant already owns, pointed at us. Only verified domains serve the store.
+export const domains = pgTable(
+  "domains",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    hostname: text("hostname").notNull().unique(),
+    isPrimary: boolean("is_primary").notNull().default(false),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("domains_shop_idx").on(t.shopId),
+    uniqueIndex("domains_one_primary_uq").on(t.shopId).where(sql`${t.isPrimary}`),
+  ],
 );

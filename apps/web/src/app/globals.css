@@ -74,3 +74,23 @@
   .banner-critical { background: var(--color-critical-soft); color: var(--color-critical); }
   .banner-info { background: var(--color-info-soft); color: var(--color-info); }
 }
+
+/* Storefront theming. The theme sets the --store-* values (src/theme/style.ts); the shared
+   color roles are derived from them so every component follows the merchant's look. */
+.store {
+  --color-bg: var(--store-bg);
+  --color-surface: var(--store-bg);
+  --color-ink: var(--store-text);
+  --color-muted: color-mix(in oklab, var(--store-text) 68%, var(--store-bg));
+  --color-sunken: color-mix(in oklab, var(--store-text) 6%, var(--store-bg));
+  --color-border: color-mix(in oklab, var(--store-text) 14%, var(--store-bg));
+  --color-border-strong: color-mix(in oklab, var(--store-text) 28%, var(--store-bg));
+  --color-accent: var(--store-accent);
+  --color-accent-ink: var(--store-accent-text);
+  --color-accent-soft: color-mix(in oklab, var(--store-accent) 14%, var(--store-bg));
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--store-body-font);
+}
+.store h1, .store h2, .store h3 { font-family: var(--store-heading-font); }
+.store .btn { border-radius: var(--radius-md); }

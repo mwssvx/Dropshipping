@@ -3,18 +3,19 @@ import { formatMoney, getOrder, NotFoundError } from "@sf/core";
 import { db, payments } from "@/lib/server";
 import { SubmitButton } from "@/components/SubmitButton";
 import { fakePayAction } from "../../actions";
-import { loadShop } from "../../data";
+import { loadShop, storeBase } from "../../data";
 
 export const metadata = { title: "Payment" };
 
 export default async function PayPage({ params }: { params: Promise<{ shop: string; orderId: string }> }) {
   const { shop: handle, orderId } = await params;
   const shop = await loadShop(handle);
+  const base = await storeBase(handle);
   const order = await getOrder(await db(), shop.id, orderId).catch((e) => {
     if (e instanceof NotFoundError) notFound();
     throw e;
   });
-  if (order.paymentStatus === "paid") redirect(`/s/${handle}/orders/${order.paymentIntentId}`);
+  if (order.paymentStatus === "paid") redirect(`${base}/orders/${order.paymentIntentId}`);
   const testMode = payments().name === "fake";
   return (
     <main className="max-w-md mx-auto px-4 sm:px-6 py-12 flex flex-col gap-6">

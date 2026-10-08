@@ -1,0 +1,34 @@
+import { getTheme, listCollections, listPages, listProducts } from "@sf/core";
+import { requireShop, storeAddress } from "@/lib/server";
+import { ThemeEditor } from "./ThemeEditor";
+
+export const metadata = { title: "Theme" };
+
+export default async function ThemePage() {
+  const { shop, db } = await requireShop();
+  const [theme, collections, pages, products, storeLink] = await Promise.all([
+    getTheme(db, shop),
+    listCollections(db, shop.id),
+    listPages(db, shop.id),
+    listProducts(db, shop.id),
+    storeAddress(shop),
+  ]);
+  // Suggestions for every link field: the store's own pages first.
+  const links = [
+    { label: "Home", href: "/" },
+    { label: "All products", href: "/collections/all" },
+    ...collections.map((c) => ({ label: c.title, href: `/collections/${c.handle}` })),
+    ...pages.map((p) => ({ label: p.title, href: `/pages/${p.handle}` })),
+    ...products.filter((p) => p.status === "active").slice(0, 50).map((p) => ({ label: p.title, href: `/products/${p.handle}` })),
+  ];
+  return (
+    <ThemeEditor
+      initial={theme.draft}
+      hasChanges={theme.hasChanges}
+      publishedAt={theme.publishedAt?.toISOString() ?? null}
+      links={links}
+      collections={collections.map((c) => ({ id: c.id, title: c.title }))}
+      storeLink={storeLink}
+    />
+  );
+}

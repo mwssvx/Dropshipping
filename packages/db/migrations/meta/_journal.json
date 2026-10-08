@@ -15,6 +15,13 @@
       "when": 1791474360148,
       "tag": "0001_m2_dropshipping",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791478411449,
+      "tag": "0002_m3_storefront",
+      "breakpoints": true
     }
   ]
 }
