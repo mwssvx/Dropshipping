@@ -1,8 +1,10 @@
-// Milestone 1 to 3 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 4 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
   bigint,
+  customType,
+  date,
   boolean,
   check,
   index,
@@ -55,7 +57,12 @@ export const shops = pgTable(
       .default("active"),
     statusReason: text("status_reason"),
     paymentsAccountId: text("payments_account_id").unique(),
-    plan: text("plan", { enum: ["starter", "growth", "scale"] }).notNull().default("starter"),
+    // Payout account status, mirrored from the payment provider (Stripe Connect).
+    chargesEnabled: boolean("charges_enabled").notNull().default(false),
+    payoutsEnabled: boolean("payouts_enabled").notNull().default(false),
+    plan: text("plan", { enum: ["free", "starter", "growth", "scale"] }).notNull().default("free"),
+    billingCustomerId: text("billing_customer_id").unique(),
+    billingSubscriptionId: text("billing_subscription_id").unique(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -180,6 +187,10 @@ export const orders = pgTable(
       .notNull()
       .default("unfulfilled"),
     paymentIntentId: text("payment_intent_id").unique(),
+    // Our sales fee (free plan only) and the estimated card processing fee, fixed at checkout.
+    platformFeeMinor: money("platform_fee_minor").notNull().default(0),
+    processingFeeMinor: money("processing_fee_minor").notNull().default(0),
+    refundedMinor: money("refunded_minor").notNull().default(0),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -188,6 +199,7 @@ export const orders = pgTable(
     uniqueIndex("orders_shop_number_uq").on(t.shopId, t.number),
     index("orders_shop_created_idx").on(t.shopId, t.createdAt),
     check("orders_total_matches", sql`${t.totalMinor} = ${t.subtotalMinor} + ${t.shippingMinor} + ${t.taxMinor}`),
+    check("orders_refund_within_total", sql`${t.refundedMinor} >= 0 and ${t.refundedMinor} <= ${t.totalMinor}`),
   ],
 );
 
@@ -254,7 +266,9 @@ export const emails = pgTable(
     id: id(),
     shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
     orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
-    kind: text("kind", { enum: ["order_confirmation", "shipping_update", "delivered"] }).notNull(),
+    kind: text("kind", { enum: ["order_confirmation", "shipping_update", "delivered", "refund"] }).notNull(),
+    // Tells apart emails of a kind that can repeat (one per refund). Empty for once-only kinds.
+    ref: text("ref").notNull().default(""),
     to: text("to").notNull(),
     subject: text("subject").notNull(),
     bodyText: text("body_text").notNull(),
@@ -264,7 +278,7 @@ export const emails = pgTable(
     createdAt: createdAt(),
     sentAt: timestamp("sent_at", { withTimezone: true }),
   },
-  (t) => [uniqueIndex("emails_order_kind_uq").on(t.orderId, t.kind), index("emails_shop_created_idx").on(t.shopId, t.createdAt)],
+  (t) => [uniqueIndex("emails_order_kind_ref_uq").on(t.orderId, t.kind, t.ref), index("emails_shop_created_idx").on(t.shopId, t.createdAt)],
 );
 
 // One theme per shop. The editor writes `draft`; publishing copies it to `published`.
@@ -339,3 +353,75 @@ export const domains = pgTable(
     uniqueIndex("domains_one_primary_uq").on(t.shopId).where(sql`${t.isPrimary}`),
   ],
 );
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => "bytea" });
+
+export const refunds = pgTable(
+  "refunds",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    orderId: uuid("order_id").notNull().references(() => orders.id, { onDelete: "restrict" }),
+    amountMinor: money("amount_minor").notNull(),
+    platformFeeRefundedMinor: money("platform_fee_refunded_minor").notNull().default(0),
+    reason: text("reason"),
+    providerRefundId: text("provider_refund_id").unique(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("refunds_order_idx").on(t.orderId), check("refunds_amount_pos", sql`${t.amountMinor} > 0`)],
+);
+
+// Mirror of the payment provider's payouts, so the Money page shows status and arrival dates.
+export const payouts = pgTable(
+  "payouts",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    providerPayoutId: text("provider_payout_id").unique(),
+    amountMinor: money("amount_minor").notNull(),
+    currency: char("currency", { length: 3 }).notNull(),
+    status: text("status", { enum: ["pending", "in_transit", "paid", "failed", "canceled"] }).notNull(),
+    arrivalDate: date("arrival_date", { mode: "string" }),
+    failureReason: text("failure_reason"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("payouts_shop_created_idx").on(t.shopId, t.createdAt)],
+);
+
+// Something the payment provider needs before it keeps paying out: an ID, a proof of address...
+// Each row is one card on the Money page with the reason in plain words and what to send.
+export const accountRequirements = pgTable(
+  "account_requirements",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    providerKey: text("provider_key").notNull(),
+    kind: text("kind", {
+      enum: ["identity_document", "proof_of_address", "bank_account", "business_details", "supplier_invoice", "tracking_info", "review"],
+    }).notNull(),
+    explanation: text("explanation").notNull(),
+    holdsPayouts: boolean("holds_payouts").notNull().default(true),
+    dueBy: timestamp("due_by", { withTimezone: true }),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("account_requirements_open_uq").on(t.shopId, t.providerKey).where(sql`${t.resolvedAt} is null`),
+    index("account_requirements_shop_idx").on(t.shopId),
+  ],
+);
+
+// Documents a merchant sends for a requirement. Kept in the database for now (5 MB cap);
+// moves to object storage with the media library.
+export const requirementUploads = pgTable("requirement_uploads", {
+  id: id(),
+  requirementId: uuid("requirement_id").notNull().references(() => accountRequirements.id, { onDelete: "cascade" }),
+  fileName: text("file_name").notNull(),
+  contentType: text("content_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  data: bytea("data").notNull(),
+  providerFileId: text("provider_file_id"),
+  createdAt: createdAt(),
+});

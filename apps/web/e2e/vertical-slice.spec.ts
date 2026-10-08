@@ -60,7 +60,8 @@ test("merchant opens a store, a buyer pays, the order shows up as paid", async (
   await expect(row.getByText("To send")).toBeVisible();
   await row.getByRole("link", { name: "#1001" }).click();
   await expect(page.getByText("Profit after supplier cost")).toBeVisible();
-  await expect(page.getByText("$16.99")).toBeVisible();
+  // $29.98 paid, minus our 2% ($0.60), card fee ($1.17), the shipping charge ($4.99) and cost ($8.00).
+  await expect(page.getByText("$15.22")).toBeVisible();
 });
 
 test("signed-out visitors are sent to sign in, and forged webhooks are refused", async ({ page, request }) => {

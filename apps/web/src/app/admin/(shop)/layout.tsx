@@ -1,11 +1,13 @@
+import { listRequirements } from "@sf/core";
 import { requireShop, storeAddress } from "@/lib/server";
 import { BRAND } from "@/lib/brand";
 import { switchShopAction } from "../actions";
 import { NavLink } from "./NavLink";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { user, shop, shops } = await requireShop();
-  const address = await storeAddress(shop);
+  const { user, shop, shops, db } = await requireShop();
+  const [address, requirements] = await Promise.all([storeAddress(shop), listRequirements(db, shop.id)]);
+  const holds = requirements.filter((r) => r.holdsPayouts).length;
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[232px_1fr]">
       <aside className="bg-surface border-b lg:border-b-0 lg:border-r border-border lg:min-h-dvh flex flex-col">
@@ -29,6 +31,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <nav className="flex lg:flex-col gap-1 px-2 pb-3 overflow-x-auto" aria-label="Admin">
           <NavLink href="/admin" exact>Home</NavLink>
           <NavLink href="/admin/orders">Orders</NavLink>
+          <NavLink href="/admin/money">Money{holds ? <span className="ml-2 pill pill-critical">{holds}</span> : null}</NavLink>
           <NavLink href="/admin/products">Products</NavLink>
           <NavLink href="/admin/collections">Collections</NavLink>
           <NavLink href="/admin/suppliers">Suppliers</NavLink>
@@ -36,6 +39,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <NavLink href="/admin/theme">Theme</NavLink>
           <NavLink href="/admin/pages">Pages</NavLink>
           <NavLink href="/admin/domains">Domains</NavLink>
+          <span className="hidden lg:block px-3 pt-4 pb-1 text-xs font-semibold text-muted uppercase tracking-wide">Settings</span>
+          <NavLink href="/admin/plan">Plan</NavLink>
         </nav>
         <div className="mt-auto hidden lg:flex flex-col gap-2 px-4 py-4 border-t border-border">
           <span className="hint truncate">{user.email}</span>

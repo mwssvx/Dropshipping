@@ -36,7 +36,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 - [x] M1 Vertical slice: sign up, create a store, add a product, buy it with a test payment, see it paid in admin
 - [x] M2 Dropshipping: import by link, automatic order routing, tracking sync, problem orders, order emails (CJ adapter awaits a live key)
 - [x] M3 Storefront: themes and visual editor (draft and publish), collections, pages, menus, custom domains, search basics
-- [ ] M4 Money and trust: Stripe Connect, Money page, Stripe Tax, refunds, verified badge
+- [~] M4 Money and trust. Part 1 done: plans with the free plan's 2% fee, Stripe Connect payouts, Money page with holds, refunds, statements. Part 2: Stripe Tax, store notices and appeals, verified badge
 - [ ] M5 AI agents
 - [ ] M6 Mobile app features
 - [ ] M7 Growth basics
@@ -47,6 +47,13 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. Payment webhook marks the order paid. Right after the response, the buyer gets a confirmation email and each supplier's items are placed with that supplier (`routeOrder`). One fulfilment row per supplier, claimed before the call, so retries never double-order.
 2. A refusal (out of stock, address, wallet balance) becomes a **problem order** with a plain-language fix: try again, or ship it yourself and add tracking.
 3. On a schedule (every 30 minutes on a paid Vercel plan, daily on the free one) `/api/cron/fulfillment` places any paid order that was missed and pulls tracking. The first tracking number emails the buyer; delivery emails again. No tracking 7 days after placing flags the order as late.
+
+### How merchants get paid (M4)
+
+1. **Plans** (`packages/core/src/plans.ts`): Free is $0 a month with 2% of each sale (up to 50 orders a month); Starter $19, Growth $49 and Scale $149 take 0%. The fee is fixed on the order at checkout and taken by Stripe as an application fee, so it never needs collecting later. The Plan page and Money page say when another plan would have cost less for the last 30 days. Paid plans are Stripe Billing subscriptions; `customer.subscription.*` webhooks keep the shop's plan in step.
+2. **Payouts.** Each store gets a Stripe Connect Express account. Buyers pay the platform, money goes to the store's account (destination charges) and Stripe pays it out to the merchant's bank. Admin > Money shows what's available, clearing, on the way and paid out, worked out from our own order and refund records and the payouts Stripe reports, plus the last 30 days of sales, fees, supplier costs and profit, and a CSV statement.
+3. **Holds.** Anything Stripe asks for (`account.updated` requirements) becomes one card on the Money page saying why, what to send and by when, with an upload for documents (JPG, PNG or PDF up to 5 MB, forwarded to Stripe). In test mode, Money has buttons to simulate a hold and run a payout.
+4. **Refunds** from the order page, in full or in part. Our fee comes back in proportion (the last refund returns any rounding cent), the buyer gets an email per refund, and a full refund cancels supplier orders that haven't shipped, or says which ones the supplier wouldn't stop.
 
 ### How a store looks and where it lives (M3)
 

@@ -193,6 +193,9 @@ describe("order routing and tracking", () => {
       async getTracking() {
         return null;
       },
+      async cancelOrder() {
+        return { cancelled: true, message: null };
+      },
     };
     ctx = makeCtx([flaky]);
     const s = await shop();

@@ -85,6 +85,11 @@ export class FakeSupplier implements SupplierAdapter {
     return { supplierOrderRef: `DEMO-${input.reference.slice(0, 8).toUpperCase()}-${placed}` };
   }
 
+  async cancelOrder(ref: string) {
+    if (await this.getTracking(ref)) return { cancelled: false, message: "The supplier already shipped it." };
+    return { cancelled: true, message: null };
+  }
+
   async getTracking(ref: string): Promise<Tracking | null> {
     const placedAt = parseInt(ref.split("-").at(-1) ?? "", 36);
     if (!ref.startsWith("DEMO-") || Number.isNaN(placedAt)) return null;

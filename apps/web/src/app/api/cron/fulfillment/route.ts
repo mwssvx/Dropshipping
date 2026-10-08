@@ -1,8 +1,9 @@
-import { routeStuckOrders, syncTracking } from "@sf/core";
-import { fulfillment } from "@/lib/server";
+import { routeStuckOrders, runFakePayouts, syncTracking } from "@sf/core";
+import { fulfillment, testPayments } from "@/lib/server";
 
 /**
  * Scheduled job: place any paid orders that were missed, then pull tracking from suppliers.
+ * In test mode it also stands in for the payment processor's daily payouts.
  * Called by the scheduler with "Authorization: Bearer $CRON_SECRET". Open in development.
  */
 export async function GET(request: Request) {
@@ -13,5 +14,6 @@ export async function GET(request: Request) {
   const ctx = await fulfillment();
   const routed = await routeStuckOrders(ctx);
   const tracking = await syncTracking(ctx, { limit: 200 });
-  return Response.json({ routed, tracking });
+  const payouts = testPayments() ? await runFakePayouts(ctx.db) : null;
+  return Response.json({ routed, tracking, payouts });
 }
