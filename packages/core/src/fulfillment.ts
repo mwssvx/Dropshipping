@@ -7,6 +7,7 @@ import { formatMoney } from "./money";
 import { buyerAmounts } from "./currency";
 import { SupplierError, type ProblemCode, type Suppliers } from "./suppliers";
 import { sendPurchaseOrder } from "./own-suppliers";
+import { issueGiftCardsForOrder } from "./gift-cards";
 
 type Order = typeof schema.orders.$inferSelect;
 type Fulfillment = typeof schema.fulfillments.$inferSelect;
@@ -23,6 +24,8 @@ export type FulfillmentContext = {
   payUrl?: (shop: Shop, order: Order) => string | Promise<string>;
   /** The private page where one of the merchant's own suppliers adds tracking. */
   supplierPortalUrl?: (token: string) => string;
+  /** The store's public address, for gift card emails. Defaults to the order status link's origin. */
+  storeAddress?: (shop: Shop) => string | Promise<string>;
   now?: () => Date;
 };
 
@@ -147,7 +150,22 @@ export async function refreshOrderFulfillment(db: Db, orderId: string, at = new 
 /** Called once when a payment webhook first marks an order paid. */
 export async function onOrderPaid(ctx: FulfillmentContext, orderId: string) {
   await sendOrderEmail(ctx, orderId, "order_confirmation");
-  return routeOrder(ctx, orderId);
+  return routeAndIssue(ctx, orderId);
+}
+
+/** Sends goods to suppliers and gift cards bought on the order to the buyer. Safe to repeat. */
+async function routeAndIssue(ctx: FulfillmentContext, orderId: string) {
+  const storeAddress = ctx.storeAddress ?? (async (shop: Shop) => {
+    const order = await ctx.db.query.orders.findFirst({ where: eq(schema.orders.id, orderId) });
+    return new URL(await ctx.orderStatusUrl(shop, order!)).origin;
+  });
+  const gifts = await issueGiftCardsForOrder({ db: ctx.db, mailer: ctx.mailer, storeAddress }, orderId);
+  const routed = await routeOrder(ctx, orderId);
+  // An order of only gift cards is done once the codes are out.
+  if (gifts.onlyGiftCards) {
+    await ctx.db.update(schema.orders).set({ fulfillmentStatus: "delivered", updatedAt: now(ctx) }).where(eq(schema.orders.id, orderId));
+  }
+  return routed;
 }
 
 /** Merchant pressed "Try again" on a problem order. */
@@ -294,7 +312,7 @@ export async function routeStuckOrders(ctx: FulfillmentContext, olderThanMs = 2 
     .limit(100);
   let routed = 0;
   for (const r of rows) {
-    const res = await routeOrder(ctx, r.id);
+    const res = await routeAndIssue(ctx, r.id);
     if (res.placed || res.failed) routed++;
   }
   return { routed };
@@ -321,6 +339,7 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
         ...lines.map((l, n) => `  ${l.title} × ${l.quantity}  ${formatMoney(paid.lines[n]!, paid.currency)}`),
         ``,
         `Total: ${formatMoney(paid.totalMinor, paid.currency)}`,
+        ...(paid.giftCardMinor ? [`Left to pay after your gift card: ${formatMoney(paid.chargedMinor, paid.currency)}`] : []),
         ``,
         `Finish your order: ${pay}`,
         ``,
@@ -332,15 +351,25 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
     const refund = await ctx.db.query.refunds.findFirst({ where: eq(schema.refunds.id, ref) });
     if (!refund) throw new NotFoundError("Refund");
     const full = order.refundedMinor >= order.totalMinor;
+    const toGift = refund.giftCardMinor;
+    const toCardMinor = refund.amountMinor - toGift;
+    const where =
+      toGift && toCardMinor
+        ? `${formatMoney(toCardMinor, order.currency)} to the card you paid with and ${formatMoney(toGift, order.currency)} back onto your gift card`
+        : toGift
+          ? `${formatMoney(toGift, order.currency)} back onto your gift card`
+          : null;
     return {
       subject: `Refund for order #${order.number}`,
       text: [
         `Hi ${first},`,
         ``,
-        `${shop.name} refunded ${refund.presentmentAmountMinor != null && order.presentment ? formatMoney(refund.presentmentAmountMinor, order.presentment.currency) : formatMoney(refund.amountMinor, order.currency)} to the card you paid with${full ? " (the whole order)" : ""}.`,
+        where
+          ? `${shop.name} refunded ${where}${full ? " (the whole order)" : ""}.`
+          : `${shop.name} refunded ${refund.presentmentAmountMinor != null && order.presentment ? formatMoney(refund.presentmentAmountMinor, order.presentment.currency) : formatMoney(refund.amountMinor, order.currency)} to the card you paid with${full ? " (the whole order)" : ""}.`,
         ...(refund.reason ? [``, `Reason: ${refund.reason}`] : []),
         ``,
-        `Banks usually show it within 5 to 10 business days.`,
+        toCardMinor ? `Banks usually show card refunds within 5 to 10 business days.` : `You can use the gift card again right away.`,
         ``,
         `Order status: ${link}`,
       ].join("\n"),
@@ -358,7 +387,10 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
         ``,
         ...lines.map((l, n) => `  ${l.title} × ${l.quantity}  ${formatMoney(paid.lines[n]!, paid.currency)}`),
         ``,
-        `Total paid: ${formatMoney(paid.totalMinor, paid.currency)}`,
+        `${paid.giftCardMinor ? "Total" : "Total paid"}: ${formatMoney(paid.totalMinor, paid.currency)}`,
+        ...(paid.giftCardMinor
+          ? [`Paid with gift card: ${formatMoney(paid.giftCardMinor, paid.currency)}`, ...(paid.chargedMinor ? [`Paid by card: ${formatMoney(paid.chargedMinor, paid.currency)}`] : [])]
+          : []),
         ``,
         `We'll email you again when it ships. Track your order any time: ${link}`,
       ].join("\n"),

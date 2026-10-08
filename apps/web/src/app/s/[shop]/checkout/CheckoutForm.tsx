@@ -15,7 +15,7 @@ function Field({ id, label, values, ...rest }: { id: string; label: string; valu
   );
 }
 
-export function CheckoutForm({ handle, defaultCountry, initial }: { handle: string; defaultCountry: string; initial?: Record<string, string> }) {
+export function CheckoutForm({ handle, defaultCountry, initial, paidByGiftCard }: { handle: string; defaultCountry: string; initial?: Record<string, string>; paidByGiftCard?: boolean }) {
   const [state, action] = useActionState(checkoutAction.bind(null, handle), {});
   const v = state.values ?? initial;
   return (
@@ -46,7 +46,7 @@ export function CheckoutForm({ handle, defaultCountry, initial }: { handle: stri
           </select>
         </div>
       </fieldset>
-      <SubmitButton className="btn btn-primary btn-lg" pendingText="Continuing…">Continue to payment</SubmitButton>
+      <SubmitButton className="btn btn-primary btn-lg" pendingText="Continuing…">{paidByGiftCard ? "Place order" : "Continue to payment"}</SubmitButton>
     </form>
   );
 }

@@ -3,10 +3,10 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { findUsableDiscount, getOrder, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, shopCurrencies, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
-import { readCart, readDiscountCode, writeCart, writeDiscountCode } from "@/lib/cart";
+import { amountToCharge, getOrder, normalizeGiftCardCode, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, shopCurrencies, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
+import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
 import { agents, campaigns, db, payments, tax } from "@/lib/server";
-import { processPaymentWebhook } from "@/lib/webhooks";
+import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
 import { loadShop, storeBase } from "./data";
 import { buyerFx, currencyCookie } from "@/lib/currency";
 import { campaignCookie } from "@/lib/campaigns";
@@ -47,21 +47,43 @@ export async function updateCartAction(handle: string, form: FormData) {
 export type CodeState = { error?: string };
 
 /** Apply a discount code in the cart. It's checked against the cart now and again at checkout. */
+/** The cart's one code box takes discount codes and gift card codes. */
 export async function applyCodeAction(handle: string, _: CodeState, form: FormData): Promise<CodeState> {
   const shop = await loadShop(handle);
   const code = String(form.get("code") ?? "").trim().toUpperCase();
   if (!code) return { error: "Enter a code." };
+  const lines = await readCart(shop.id);
+  const buyerEmail = (await currentBuyer(shop.id))?.email ?? null;
+  const giftCardCode = normalizeGiftCardCode(code);
+  let giftError: string | null = null;
   try {
-    const cart = await quoteCart(await db(), shop, await readCart(shop.id), { buyerEmail: (await currentBuyer(shop.id))?.email ?? null });
-    if (cart.wholesale) return { error: "Discount codes don't apply to wholesale prices." };
-    await findUsableDiscount(await db(), shop, code, { subtotalMinor: cart.subtotalMinor });
+    if (giftCardCode) {
+      try {
+        await quoteCart(await db(), shop, lines, { buyerEmail, giftCardCode });
+        await writeGiftCardCode(shop.id, giftCardCode);
+        revalidatePath(`/s/${shop.handle}/cart`);
+        return {};
+      } catch (e) {
+        if (!(e instanceof UserError)) throw e;
+        giftError = e.message; // it may still be a discount code that happens to look like one
+      }
+    }
+    const cart = await quoteCart(await db(), shop, lines, { buyerEmail });
+    if (cart.wholesale) return { error: giftError ?? "Discount codes don't apply to wholesale prices." };
+    await quoteCart(await db(), shop, lines, { buyerEmail, discountCode: code });
   } catch (e) {
-    if (e instanceof UserError) return { error: e.message };
+    if (e instanceof UserError) return { error: giftError ?? e.message };
     throw e;
   }
   await writeDiscountCode(shop.id, code);
   revalidatePath(`/s/${shop.handle}/cart`);
   return {};
+}
+
+export async function removeGiftCardAction(handle: string) {
+  const shop = await loadShop(handle);
+  await writeGiftCardCode(shop.id, null);
+  redirect(`${await storeBase(handle)}/cart`);
 }
 
 export async function removeCodeAction(handle: string) {
@@ -76,8 +98,9 @@ export async function checkoutAction(handle: string, _: CheckoutState, form: For
   const shop = await loadShop(handle);
   const values = Object.fromEntries([...form.entries()].map(([k, v]) => [k, String(v)]));
   let orderId: string;
+  let paidRef: string | null = null;
   try {
-    const { order } = await startCheckout(await db(), payments(), shop, {
+    const { order, paidWithGiftCard } = await startCheckout(await db(), payments(), shop, {
       email: values.email ?? "",
       address: {
         name: values.name ?? "",
@@ -94,13 +117,23 @@ export async function checkoutAction(handle: string, _: CheckoutState, form: For
       acceptsMarketing: values.acceptsMarketing === "on",
       campaignId: (await cookies()).get(campaignCookie(shop.id))?.value ?? null,
       buyerEmail: (await currentBuyer(shop.id))?.email ?? null,
+      giftCardCode: await readGiftCardCode(shop.id),
     }, tax());
     orderId = order.id;
     await track(shop.id, "checkout_start");
+    // Paid in full by gift card: no card form, straight to the order.
+    if (paidWithGiftCard) {
+      afterOrderPaid(order.id);
+      await writeCart(shop.id, []);
+      await writeDiscountCode(shop.id, null);
+      await writeGiftCardCode(shop.id, null);
+      paidRef = order.paymentIntentId;
+    }
   } catch (e) {
     if (e instanceof UserError) return { error: e.message, values };
     throw e;
   }
+  if (paidRef) redirect(`${await storeBase(handle)}/orders/${paidRef}`);
   redirect(`${await storeBase(handle)}/pay/${orderId}`);
 }
 
@@ -113,10 +146,11 @@ export async function fakePayAction(handle: string, orderId: string) {
   if (!(provider instanceof FakePaymentProvider)) throw new Error("Test payments are off.");
   const shop = await loadShop(handle);
   const order = await getOrder(await db(), shop.id, orderId);
-  const { body, signature } = provider.succeededEvent(order.paymentIntentId!, order.presentment?.totalMinor ?? order.totalMinor);
+  const { body, signature } = provider.succeededEvent(order.paymentIntentId!, amountToCharge(order));
   await processPaymentWebhook(body, signature);
   await writeCart(shop.id, []);
   await writeDiscountCode(shop.id, null);
+  await writeGiftCardCode(shop.id, null);
   redirect(`${await storeBase(handle)}/orders/${order.paymentIntentId}`);
 }
 

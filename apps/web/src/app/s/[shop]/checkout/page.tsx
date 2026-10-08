@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { formatMoney, lastCheckoutDetails, presentQuote, quoteCart, UserError } from "@sf/core";
 import { buyerFx } from "@/lib/currency";
 import { currentBuyer } from "@/lib/buyer";
-import { readCart, readDiscountCode } from "@/lib/cart";
+import { readCart, readDiscountCode, readGiftCardCode } from "@/lib/cart";
 import { db } from "@/lib/server";
 import { loadShop, storeBase } from "../data";
 import { CheckoutForm } from "./CheckoutForm";
@@ -18,7 +18,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
   const buyer = await currentBuyer(shop.id);
   let quote;
   try {
-    quote = await quoteCart(await db(), shop, lines, { discountCode: await readDiscountCode(shop.id), buyerEmail: buyer?.email });
+    quote = await quoteCart(await db(), shop, lines, { discountCode: await readDiscountCode(shop.id), giftCardCode: await readGiftCardCode(shop.id), buyerEmail: buyer?.email });
   } catch (e) {
     if (e instanceof UserError) redirect(`${base}/cart`);
     throw e;
@@ -34,7 +34,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
     <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10 grid gap-10 md:grid-cols-[1fr_340px] items-start">
       <div className="flex flex-col gap-6 min-w-0">
         <h1 className="text-3xl font-bold tracking-tight">Checkout</h1>
-        <CheckoutForm handle={handle} defaultCountry={shop.country} initial={initial} />
+        <CheckoutForm handle={handle} defaultCountry={shop.country} initial={initial} paidByGiftCard={!!quote.giftCard && quote.dueMinor === 0} />
       </div>
       <aside className="card p-5 flex flex-col gap-4 md:sticky md:top-6 bg-sunken border-0">
         <h2 className="font-semibold">Order summary</h2>
@@ -56,6 +56,13 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
           <dt className="hint">Shipping</dt><dd className="text-right">{shown.shippingMinor ? money(shown.shippingMinor) : "Free"}</dd>
           <dt className="hint">Tax</dt><dd className="text-right hint">{quote.pricesIncludeTax ? "Included" : "Next step"}</dd>
           <dt className="font-semibold text-base">{quote.pricesIncludeTax ? "Total" : "Total before tax"}</dt><dd className="font-semibold text-base text-right">{money(shown.totalMinor)}</dd>
+          {quote.giftCard && (
+            <>
+              <dt className="hint">Gift card ···· {quote.giftCard.last4}</dt>
+              <dd className="text-right">−{money(quote.giftCard.appliedMinor)}{quote.pricesIncludeTax ? "" : "+"}</dd>
+              <dd className="col-span-2 hint text-right font-sans">The gift card pays as much as its balance covers, tax included. Anything left goes on your card.</dd>
+            </>
+          )}
         </dl>
         {fx.rate !== 1 && <p className="hint text-xs">Prices in {fx.currency} at today's exchange rate. You pay exactly the total shown.</p>}
       </aside>

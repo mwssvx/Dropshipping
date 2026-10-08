@@ -106,7 +106,6 @@ test("a business buyer applies, gets approved, and buys at wholesale prices abov
   await expect(buyer.getByText("Wholesale price, 30% off")).toBeVisible();
   await expect(buyer.getByRole("status").filter({ hasText: "wholesale prices" })).toContainText("Wholesale orders start at $1,000.00");
   await expect(buyer.getByRole("link", { name: "Check out" })).toHaveCount(0);
-  await expect(buyer.getByLabel("Discount code")).toHaveCount(0);
   await shot(buyer, "104-wholesale-cart");
   await buyer.goto(`${store}/checkout`);
   await expect(buyer).toHaveURL(/\/cart$/);

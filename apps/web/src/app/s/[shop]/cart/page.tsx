@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { convertPrice, formatMoney, presentQuote, quoteCart, upsellsFor, UserError } from "@sf/core";
 import { buyerFx } from "@/lib/currency";
-import { readCart, readDiscountCode } from "@/lib/cart";
+import { readCart, readDiscountCode, readGiftCardCode } from "@/lib/cart";
 import { db } from "@/lib/server";
 import { currentBuyer } from "@/lib/buyer";
-import { addToCartAction, removeCodeAction, updateCartAction } from "../actions";
+import { addToCartAction, removeCodeAction, removeGiftCardAction, updateCartAction } from "../actions";
 import { CodeForm } from "./CodeForm";
 import { loadShop, storeBase } from "../data";
 
@@ -22,16 +22,21 @@ export default async function CartPage({ params, searchParams }: { params: Promi
   let codeProblem: string | null = null;
   // Signed-in wholesale buyers get their prices here and at checkout.
   const buyerEmail = (await currentBuyer(shop.id))?.email ?? null;
-  if (lines.length) {
+  const opts = { discountCode: code, giftCardCode: await readGiftCardCode(shop.id), buyerEmail };
+  // A code that stopped working (cart below its minimum, expired, gift card used up) shouldn't
+  // hide the cart: it's shown as a problem and the cart is priced without it.
+  for (let tries = 0; lines.length && !quote && !problem && tries < 3; tries++) {
     try {
-      quote = await quoteCart(await db(), shop, lines, { discountCode: code, buyerEmail });
+      quote = await quoteCart(await db(), shop, lines, opts);
     } catch (e) {
       if (!(e instanceof UserError)) throw e;
-      // A code that stopped working (cart below its minimum, expired) shouldn't hide the cart.
-      if (e.code === "discount_invalid") {
-        codeProblem = e.message;
-        quote = await quoteCart(await db(), shop, lines, { buyerEmail }).catch(() => null);
-      } else problem = e.message;
+      if (e.code === "discount_invalid" && opts.discountCode) opts.discountCode = null;
+      else if (e.code === "gift_card_invalid" && opts.giftCardCode) opts.giftCardCode = null;
+      else {
+        problem = e.message;
+        break;
+      }
+      codeProblem = e.message;
     }
   }
   const variants = quote ? await (await db()).query.variants.findMany({ where: (v, { inArray }) => inArray(v.id, quote!.items.map((i) => i.variantId)) }) : [];
@@ -40,6 +45,7 @@ export default async function CartPage({ params, searchParams }: { params: Promi
   const fx = await buyerFx(shop);
   const shown = quote ? presentQuote({ ...quote, taxMinor: 0 }, fx) : null;
   const money = (m: number) => formatMoney(m, fx.currency);
+  const otherCurrency = fx.currency !== shop.currency;
   return (
     <main className="max-w-3xl mx-auto px-4 sm:px-6 py-10 flex flex-col gap-6">
       <h1 className="text-3xl font-bold tracking-tight">Your cart</h1>
@@ -96,19 +102,35 @@ export default async function CartPage({ params, searchParams }: { params: Promi
             )}
             <dt className="hint">Shipping</dt><dd className="text-right">{shown!.shippingMinor ? money(shown!.shippingMinor) : "Free"}</dd>
             <dt className="font-semibold text-base">Total</dt><dd className="font-semibold text-base text-right">{money(shown!.totalMinor)}</dd>
+            {quote.giftCard && !otherCurrency && (
+              <>
+                <dt className="hint">Gift card ···· {quote.giftCard.last4}</dt><dd className="text-right">−{money(quote.giftCard.appliedMinor)}</dd>
+                <dt className="font-semibold">To pay</dt><dd className="font-semibold text-right">{money(quote.dueMinor)}</dd>
+              </>
+            )}
             <dd className="col-span-2 hint text-right font-sans">{quote.pricesIncludeTax ? "Tax included where it applies." : "Tax, if any, is added at checkout."}</dd>
           </dl>
-          {quote.discount ? (
+          {quote.discount && (
             <form action={removeCodeAction.bind(null, handle)} className="self-end flex items-center gap-2 text-sm">
               <span className="pill pill-success">{quote.discount.code}: {quote.discount.label}</span>
               <button className="underline">Remove</button>
             </form>
-          ) : quote.wholesale ? null : (
-            <>
-              {codeProblem && <p className="banner banner-warning self-end" role="alert">{codeProblem}</p>}
-              <CodeForm handle={handle} />
-            </>
           )}
+          {quote.giftCard && (
+            <form action={removeGiftCardAction.bind(null, handle)} className="self-end flex flex-col items-end gap-1 text-sm">
+              <span className="flex items-center gap-2">
+                <span className="pill pill-success">Gift card ···· {quote.giftCard.last4}</span>
+                <button className="underline">Remove</button>
+              </span>
+              <span className="hint num">
+                {otherCurrency
+                  ? `Gift cards are in ${shop.currency}. Switch to ${shop.currency} prices to use yours.`
+                  : `${formatMoney(quote.giftCard.balanceMinor - quote.giftCard.appliedMinor, shop.currency)} stays on the card after this order.`}
+              </span>
+            </form>
+          )}
+          {codeProblem && <p className="banner banner-warning self-end" role="alert">{codeProblem}</p>}
+          {(!quote.discount || !quote.giftCard) && <CodeForm handle={handle} />}
           {quote.wholesale && quote.wholesale.shortByMinor > 0 ? (
             <Link href={base || "/"} className="btn btn-secondary btn-lg self-end">Keep shopping</Link>
           ) : (

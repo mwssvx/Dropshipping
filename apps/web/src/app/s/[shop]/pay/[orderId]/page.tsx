@@ -22,7 +22,7 @@ export default async function PayPage({ params }: { params: Promise<{ shop: stri
   // What the buyer pays, in their own currency when they shopped in one.
   const due = buyerAmounts(order, order.lines);
   const money = (m: number) => formatMoney(m, due.currency);
-  const payLabel = `Pay ${money(due.totalMinor)}`;
+  const payLabel = `Pay ${money(due.chargedMinor)}`;
   const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
   let card: React.ReactNode = null;
   if (provider.name === "stripe" && publishableKey) {
@@ -56,7 +56,13 @@ export default async function PayPage({ params }: { params: Promise<{ shop: stri
             <dd className="text-right">{money(due.taxMinor)}</dd>
           </>
         )}
-        <dt className="font-semibold text-base">Total due</dt><dd className="font-semibold text-base text-right">{money(due.totalMinor)}</dd>
+        {due.giftCardMinor > 0 && (
+          <>
+            <dt className="hint">Total</dt><dd className="text-right">{money(due.totalMinor)}</dd>
+            <dt className="hint">Gift card</dt><dd className="text-right">−{money(due.giftCardMinor)}</dd>
+          </>
+        )}
+        <dt className="font-semibold text-base">Total due</dt><dd className="font-semibold text-base text-right">{money(due.chargedMinor)}</dd>
       </dl>
       {order.paymentStatus === "failed" && <p className="banner banner-critical">The last attempt didn't go through. You can try again.</p>}
       {provider.name === "fake" ? (
