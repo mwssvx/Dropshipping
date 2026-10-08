@@ -8,6 +8,7 @@ import { applyMoneyEvent } from "./payouts";
 import { estimateProcessingFee, platformFeeFor } from "./plans";
 import { BuiltInTaxCalculator, listTaxRegistrations, type TaxCalculator } from "./tax";
 import { presentQuote } from "./currency";
+import { creditableCampaign } from "./campaigns";
 import { convertAmount, type DisplayFx } from "./money";
 
 type Shop = typeof schema.shops.$inferSelect;
@@ -97,7 +98,17 @@ export async function startCheckout(
   db: Db,
   payments: PaymentProvider,
   shop: Shop,
-  input: { email: string; address: Address; lines: CartLine[]; discountCode?: string | null; fx?: DisplayFx | null },
+  input: {
+    email: string;
+    address: Address;
+    lines: CartLine[];
+    discountCode?: string | null;
+    fx?: DisplayFx | null;
+    /** The buyer ticked "Send me news and offers". Unticked never withdraws an earlier yes. */
+    acceptsMarketing?: boolean;
+    /** From the campaign click cookie; checked to belong to this store. */
+    campaignId?: string | null;
+  },
   taxCalculator: TaxCalculator = new BuiltInTaxCalculator(),
 ) {
   if (shop.status !== "active") throw new UserError("This store isn't taking orders right now.", "shop_inactive");
@@ -137,11 +148,14 @@ export async function startCheckout(
     metadata: { shopId: shop.id },
   });
 
+  const consent = input.acceptsMarketing ? { acceptsMarketing: true, marketingConsentAt: new Date(), unsubscribedAt: null } : {};
+  const campaignId = await creditableCampaign(db, shop.id, input.campaignId);
+
   const order = await db.transaction(async (tx) => {
     const [customer] = await tx
       .insert(schema.customers)
-      .values({ shopId: shop.id, email, name: address.name })
-      .onConflictDoUpdate({ target: [schema.customers.shopId, schema.customers.email], set: { name: address.name } })
+      .values({ shopId: shop.id, email, name: address.name, ...consent })
+      .onConflictDoUpdate({ target: [schema.customers.shopId, schema.customers.email], set: { name: address.name, ...consent } })
       .returning({ id: schema.customers.id });
     // Lock the shop row so two checkouts can't take the same order number.
     await tx.execute(sql`select 1 from ${schema.shops} where ${schema.shops.id} = ${shop.id} for update`);
@@ -171,6 +185,7 @@ export async function startCheckout(
         platformFeeMinor,
         processingFeeMinor: estimateProcessingFee(quote.totalMinor),
         presentment,
+        campaignId,
         paymentIntentId: intent.id,
       })
       .returning();

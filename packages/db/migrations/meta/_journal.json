@@ -92,6 +92,13 @@
       "when": 1791495017018,
       "tag": "0012_currencies",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791496224625,
+      "tag": "0013_m12_campaigns",
+      "breakpoints": true
     }
   ]
 }

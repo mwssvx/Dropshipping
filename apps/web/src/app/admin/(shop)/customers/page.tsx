@@ -40,6 +40,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                   {seesMoney && <th className="font-medium px-4 py-3 text-right">Spent</th>}
                   <th className="font-medium px-4 py-3">Last order</th>
                   <th className="font-medium px-4 py-3">Account</th>
+                  <th className="font-medium px-4 py-3">Emails</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -53,6 +54,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                     {seesMoney && <td className="px-4 py-3 text-right num">{formatMoney(c.spentMinor, shop.currency)}</td>}
                     <td className="px-4 py-3 whitespace-nowrap">{date(c.lastOrderAt)}</td>
                     <td className="px-4 py-3">{c.lastSignInAt ? <span className="pill pill-success">Signed in {date(c.lastSignInAt)}</span> : <span className="hint">Guest</span>}</td>
+                    <td className="px-4 py-3">{c.acceptsMarketing ? <span className="pill pill-info">Subscribed</span> : <span className="hint">No</span>}</td>
                   </tr>
                 ))}
               </tbody>

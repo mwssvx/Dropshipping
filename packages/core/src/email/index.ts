@@ -1,4 +1,4 @@
-export type OutgoingEmail = { to: string; subject: string; text: string; replyTo?: string };
+export type OutgoingEmail = { to: string; subject: string; text: string; replyTo?: string; headers?: Record<string, string> };
 
 export interface Mailer {
   readonly name: "log" | "resend";
@@ -28,7 +28,7 @@ export class ResendMailer implements Mailer {
     const res = await this.fetchImpl("https://api.resend.com/emails", {
       method: "POST",
       headers: { authorization: `Bearer ${this.apiKey}`, "content-type": "application/json" },
-      body: JSON.stringify({ from: this.from, to: [email.to], subject: email.subject, text: email.text, reply_to: email.replyTo }),
+      body: JSON.stringify({ from: this.from, to: [email.to], subject: email.subject, text: email.text, reply_to: email.replyTo, headers: email.headers }),
     });
     const json = (await res.json().catch(() => ({}))) as { id?: string; message?: string };
     if (!res.ok || !json.id) throw new Error(`Resend: ${json.message ?? res.status}`);

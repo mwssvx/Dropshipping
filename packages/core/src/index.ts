@@ -32,3 +32,4 @@ export * from "./launch";
 export * from "./team";
 export * from "./buyers";
 export * from "./currency";
+export * from "./campaigns";
