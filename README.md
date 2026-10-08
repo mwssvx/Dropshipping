@@ -43,6 +43,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 - [x] M8 Launch prep: public site and pricing calculator, draft legal pages, password reset, sign-in limits, security headers, health check, launch preflight (the go-live itself needs accounts; see `docs/launch.md`)
 
 - [x] After launch, part 1: staff accounts with roles (owner, admin, staff), email invites, and ownership hand-over
+- [x] After launch, part 2: buyer accounts (sign in with an emailed code, order history, buy again, saved checkout details) and a Customers page
 ### How an order moves (M2)
 
 1. Payment webhook marks the order paid. Right after the response, the buyer gets a confirmation email and each supplier's items are placed with that supplier (`routeOrder`). One fulfilment row per supplier, claimed before the call, so retries never double-order.
@@ -120,3 +121,10 @@ See `.env.example` and `docs/accounts.md` for the real services.
 2. **Invites**: the owner invites by email from the Team page. The link works for a week, only for that email, and leads through sign-up or sign-in back to "Join". Inviting again replaces the link; invites can be cancelled.
 3. **Seats** follow the plan (`teamSeats` in `plans.ts`: Scale includes 15). A plan with fewer seats than the team can't be chosen until people are removed.
 4. **Changes**: the owner changes roles, removes people, or hands the store to someone else and stays on as an admin. Anyone else can leave.
+
+### Buyer accounts (after launch, part 2)
+
+1. **Sign-in without a password** (`packages/core/src/buyers.ts`): the shopper enters their email on the store's Account page and gets a six-digit code, valid for ten minutes. Five wrong tries use a code up, and at most five codes go to one email an hour. The session is for that store only (cookie `sf_buyer_<store id>`, 60 days).
+2. **Account page** (`/account` on the store): every paid order with that email, its status, a Track link, and **Buy again**, which puts what's still for sale back in the cart and says what was left out. Order pages link to it.
+3. **Faster checkout**: signed-in shoppers start checkout with the email, name and address from their last order.
+4. **Customers page** in the admin (staff included): orders, spend (hidden from staff), last order and whether they've signed in, with search.

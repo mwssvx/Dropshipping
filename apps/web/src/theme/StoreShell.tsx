@@ -60,6 +60,7 @@ export function StoreShell({
                 </nav>
               </details>
             )}
+            <Link href={`${base}/account`} className="text-sm font-medium hover:text-accent px-2">Account</Link>
             <Link href={`${base}/cart`} className="btn btn-secondary" aria-label={`Cart, ${cartCount} items`}>
               Cart{cartCount > 0 && <span className="num rounded-full bg-ink text-surface text-xs px-1.5 py-0.5">{cartCount}</span>}
             </Link>

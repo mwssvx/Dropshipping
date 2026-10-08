@@ -78,6 +78,13 @@
       "when": 1791493153921,
       "tag": "0010_m9_team",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791494237020,
+      "tag": "0011_buyer_accounts",
+      "breakpoints": true
     }
   ]
 }

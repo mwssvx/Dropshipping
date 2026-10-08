@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { formatMoney, quoteCart, UserError } from "@sf/core";
+import { formatMoney, lastCheckoutDetails, quoteCart, UserError } from "@sf/core";
+import { currentBuyer } from "@/lib/buyer";
 import { readCart, readDiscountCode } from "@/lib/cart";
 import { db } from "@/lib/server";
 import { loadShop, storeBase } from "../data";
@@ -21,11 +22,15 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
     throw e;
   }
   const money = (m: number) => formatMoney(m, shop.currency);
+  // Signed-in buyers start with the details from their last order.
+  const buyer = await currentBuyer(shop.id);
+  const saved = buyer ? await lastCheckoutDetails(await db(), shop.id, buyer.email) : null;
+  const initial = saved ? { email: saved.email, ...(saved.address ? Object.fromEntries(Object.entries(saved.address).map(([k, v]) => [k, String(v ?? "")])) : {}) } : undefined;
   return (
     <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10 grid gap-10 md:grid-cols-[1fr_340px] items-start">
       <div className="flex flex-col gap-6 min-w-0">
         <h1 className="text-3xl font-bold tracking-tight">Checkout</h1>
-        <CheckoutForm handle={handle} defaultCountry={shop.country} />
+        <CheckoutForm handle={handle} defaultCountry={shop.country} initial={initial} />
       </div>
       <aside className="card p-5 flex flex-col gap-4 md:sticky md:top-6 bg-sunken border-0">
         <h2 className="font-semibold">Order summary</h2>

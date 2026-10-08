@@ -15,6 +15,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ shop
     `Disallow: ${base}/checkout`,
     `Disallow: ${base}/pay/`,
     `Disallow: ${base}/orders/`,
+    `Disallow: ${base}/account`,
     `Sitemap: ${origin}${base}/sitemap.xml`,
     "",
   ].join("\n");

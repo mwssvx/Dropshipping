@@ -15,9 +15,9 @@ function Field({ id, label, values, ...rest }: { id: string; label: string; valu
   );
 }
 
-export function CheckoutForm({ handle, defaultCountry }: { handle: string; defaultCountry: string }) {
+export function CheckoutForm({ handle, defaultCountry, initial }: { handle: string; defaultCountry: string; initial?: Record<string, string> }) {
   const [state, action] = useActionState(checkoutAction.bind(null, handle), {});
-  const v = state.values;
+  const v = state.values ?? initial;
   return (
     <form action={action} className="flex flex-col gap-6">
       <FormError message={state.error} />
