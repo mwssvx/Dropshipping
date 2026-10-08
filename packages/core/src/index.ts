@@ -10,3 +10,7 @@ export * from "./suppliers";
 export * from "./email";
 export * from "./imports";
 export * from "./fulfillment";
+export * from "./themes";
+export * from "./collections";
+export * from "./pages";
+export * from "./domains";

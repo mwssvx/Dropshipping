@@ -3,13 +3,14 @@ import { formatMoney, quoteCart, UserError } from "@sf/core";
 import { readCart } from "@/lib/cart";
 import { db } from "@/lib/server";
 import { updateCartAction } from "../actions";
-import { loadShop } from "../data";
+import { loadShop, storeBase } from "../data";
 
 export const metadata = { title: "Cart" };
 
 export default async function CartPage({ params }: { params: Promise<{ shop: string }> }) {
   const { shop: handle } = await params;
   const shop = await loadShop(handle);
+  const base = await storeBase(handle);
   const lines = await readCart(shop.id);
   let quote: Awaited<ReturnType<typeof quoteCart>> | null = null;
   let problem: string | null = null;
@@ -29,7 +30,7 @@ export default async function CartPage({ params }: { params: Promise<{ shop: str
       {!quote ? (
         <div className="flex flex-col gap-4 items-start">
           <p className="hint">Your cart is empty.</p>
-          <Link href={`/s/${handle}`} className="btn btn-secondary">Keep shopping</Link>
+          <Link href={base || "/"} className="btn btn-secondary">Keep shopping</Link>
         </div>
       ) : (
         <>
@@ -40,7 +41,7 @@ export default async function CartPage({ params }: { params: Promise<{ shop: str
                   {i.imageUrl && <img src={i.imageUrl} alt="" className="size-full object-cover" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <Link href={`/s/${handle}/products/${i.productHandle}`} className="font-medium hover:underline">{i.title}</Link>
+                  <Link href={`${base}/products/${i.productHandle}`} className="font-medium hover:underline">{i.title}</Link>
                   <p className="hint num">{money(i.unitPriceMinor)} each</p>
                 </div>
                 <form action={updateCartAction.bind(null, handle)} className="flex items-center gap-2">
@@ -58,7 +59,7 @@ export default async function CartPage({ params }: { params: Promise<{ shop: str
             <dt className="hint">Shipping</dt><dd className="text-right">{quote.shippingMinor ? money(quote.shippingMinor) : "Free"}</dd>
             <dt className="font-semibold text-base">Total</dt><dd className="font-semibold text-base text-right">{money(quote.totalMinor)}</dd>
           </dl>
-          <Link href={`/s/${handle}/checkout`} className="btn btn-primary btn-lg self-end">Check out</Link>
+          <Link href={`${base}/checkout`} className="btn btn-primary btn-lg self-end">Check out</Link>
         </>
       )}
     </main>

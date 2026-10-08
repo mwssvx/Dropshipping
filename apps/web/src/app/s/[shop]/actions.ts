@@ -4,7 +4,7 @@ import { getOrder, startCheckout, FakePaymentProvider, UserError } from "@sf/cor
 import { readCart, writeCart } from "@/lib/cart";
 import { db, payments } from "@/lib/server";
 import { processPaymentWebhook } from "@/lib/webhooks";
-import { loadShop } from "./data";
+import { loadShop, storeBase } from "./data";
 
 export async function addToCartAction(handle: string, form: FormData) {
   const shop = await loadShop(handle);
@@ -15,7 +15,7 @@ export async function addToCartAction(handle: string, form: FormData) {
   if (line) line.quantity = Math.min(99, line.quantity + quantity);
   else cart.push({ variantId, quantity });
   await writeCart(shop.id, cart);
-  redirect(`/s/${handle}/cart`);
+  redirect(`${await storeBase(handle)}/cart`);
 }
 
 export async function updateCartAction(handle: string, form: FormData) {
@@ -24,7 +24,7 @@ export async function updateCartAction(handle: string, form: FormData) {
   const quantity = Math.min(99, Math.max(0, Number(form.get("quantity") ?? 0) || 0));
   const cart = (await readCart(shop.id)).map((l) => (l.variantId === variantId ? { ...l, quantity } : l));
   await writeCart(shop.id, cart);
-  redirect(`/s/${handle}/cart`);
+  redirect(`${await storeBase(handle)}/cart`);
 }
 
 export type CheckoutState = { error?: string; values?: Record<string, string> };
@@ -52,7 +52,7 @@ export async function checkoutAction(handle: string, _: CheckoutState, form: For
     if (e instanceof UserError) return { error: e.message, values };
     throw e;
   }
-  redirect(`/s/${handle}/pay/${orderId}`);
+  redirect(`${await storeBase(handle)}/pay/${orderId}`);
 }
 
 /**
@@ -67,5 +67,5 @@ export async function fakePayAction(handle: string, orderId: string) {
   const { body, signature } = provider.succeededEvent(order.paymentIntentId!, order.totalMinor);
   await processPaymentWebhook(body, signature);
   await writeCart(shop.id, []);
-  redirect(`/s/${handle}/orders/${order.paymentIntentId}`);
+  redirect(`${await storeBase(handle)}/orders/${order.paymentIntentId}`);
 }

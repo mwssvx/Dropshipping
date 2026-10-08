@@ -1,4 +1,4 @@
-import { formatMoney } from "@sf/core";
+import { formatMoney } from "@sf/core/money";
 
 export function Price({ minor, compareAt, currency }: { minor: number; compareAt?: number | null; currency: string }) {
   return (

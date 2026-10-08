@@ -11,7 +11,11 @@ export default defineConfig({
   use: {
     baseURL: `http://localhost:${PORT}`,
     trace: "retain-on-failure",
-    launchOptions: process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
+    launchOptions: {
+      ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
+      // Made-up custom domains for the domain tests resolve to this machine.
+      args: ["--host-resolver-rules=MAP *.lamptest 127.0.0.1"],
+    },
   },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"] } },
@@ -21,7 +25,7 @@ export default defineConfig({
     command: `next start -p ${PORT}`,
     url: `http://localhost:${PORT}`,
     reuseExistingServer: false,
-    env: { DATA_DIR, PAYMENTS_PROVIDER: "fake", DEMO_SUPPLIER: "on", NEXT_PUBLIC_ROOT_DOMAIN: `localhost:${PORT}` },
+    env: { DATA_DIR, PAYMENTS_PROVIDER: "fake", DEMO_SUPPLIER: "on", DOMAIN_CHECKS: "off", NEXT_PUBLIC_ROOT_DOMAIN: `localhost:${PORT}` },
     timeout: 60_000,
   },
 });

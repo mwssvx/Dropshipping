@@ -18,7 +18,33 @@ async function load(shopHandle: string, handle: string) {
 
 export async function generateMetadata({ params }: { params: Promise<{ shop: string; handle: string }> }) {
   const { shop, handle } = await params;
-  return { title: (await load(shop, handle)).product.title };
+  const { product } = await load(shop, handle);
+  const description = summary(product.descriptionHtml) || undefined;
+  const images = product.imageUrl ? [{ url: product.imageUrl }] : undefined;
+  return { title: product.title, description, openGraph: { title: product.title, description, images, type: "website" } };
+}
+
+function summary(text: string) {
+  const flat = text.replace(/\s+/g, " ").trim();
+  return flat.length > 160 ? `${flat.slice(0, 157).trimEnd()}...` : flat;
+}
+
+/** Product data for search engines (schema.org), so results can show price and stock. */
+function productJsonLd(product: Awaited<ReturnType<typeof load>>["product"], currency: string) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.title,
+    description: summary(product.descriptionHtml) || undefined,
+    image: product.imageUrl ?? undefined,
+    offers: product.variants.map((x) => ({
+      "@type": "Offer",
+      name: x.title,
+      price: (x.priceMinor / 100).toFixed(2),
+      priceCurrency: currency,
+      availability: `https://schema.org/${x.stock === null || x.stock > 0 ? "InStock" : "OutOfStock"}`,
+    })),
+  };
 }
 
 export default async function ProductPage({ params }: { params: Promise<{ shop: string; handle: string }> }) {
@@ -27,10 +53,12 @@ export default async function ProductPage({ params }: { params: Promise<{ shop: 
   const buyable = product.variants.filter((x) => x.stock === null || x.stock > 0);
   const v = buyable[0] ?? product.variants[0];
   const many = product.variants.length > 1;
+  const jsonLd = JSON.stringify(productJsonLd(product, shop.currency)).replace(/</g, "\\u003c");
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-10 md:grid-cols-2">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       <div className="aspect-square rounded-xl bg-sunken overflow-hidden">
-        {product.imageUrl && <img src={product.imageUrl} alt={product.title} className="size-full object-cover" />}
+        {product.imageUrl && <img src={product.imageUrl} alt={product.title} width={800} height={800} fetchPriority="high" className="size-full object-cover" />}
       </div>
       <div className="flex flex-col gap-5">
         <h1 className="text-3xl font-bold tracking-tight">{product.title}</h1>

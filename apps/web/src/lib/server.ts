@@ -3,12 +3,17 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { openDb, type Db } from "@sf/db";
 import {
+  dnsTargetsFromEnv,
+  domainHostFromEnv,
   getSessionUser,
   listShopsForUser,
   mailerFromEnv,
   paymentProviderFromEnv,
+  primaryDomain,
   requireMember,
   suppliersFromEnv,
+  type DomainContext,
+  type DomainHost,
   type FulfillmentContext,
   type Mailer,
   type PaymentProvider,
@@ -16,7 +21,13 @@ import {
 } from "@sf/core";
 import { ROOT_DOMAIN, STORE_SUBDOMAINS } from "./brand";
 
-const g = globalThis as unknown as { __sfDb?: Promise<Db>; __sfPayments?: PaymentProvider; __sfSuppliers?: Suppliers; __sfMailer?: Mailer };
+const g = globalThis as unknown as {
+  __sfDb?: Promise<Db>;
+  __sfPayments?: PaymentProvider;
+  __sfSuppliers?: Suppliers;
+  __sfMailer?: Mailer;
+  __sfDomainHost?: DomainHost;
+};
 
 export function db(): Promise<Db> {
   // A failed connection isn't cached, so the next request tries again.
@@ -42,10 +53,21 @@ export function mailer(): Mailer {
   return g.__sfMailer;
 }
 
-/** Public address of a store, e.g. https://glow.example.com */
+/** Platform address of a store, e.g. https://glow.example.com */
 export function storeUrl(handle: string) {
   const scheme = ROOT_DOMAIN.startsWith("localhost") ? "http" : "https";
   return STORE_SUBDOMAINS ? `${scheme}://${handle}.${ROOT_DOMAIN}` : `${scheme}://${ROOT_DOMAIN}/s/${handle}`;
+}
+
+/** The address buyers should see: the store's main custom domain once one is connected. */
+export async function storeAddress(shop: { id: string; handle: string }) {
+  const domain = await primaryDomain(await db(), shop.id);
+  return domain ? `https://${domain}` : storeUrl(shop.handle);
+}
+
+export async function domains(): Promise<DomainContext> {
+  g.__sfDomainHost ??= domainHostFromEnv(process.env);
+  return { db: await db(), host: g.__sfDomainHost, platformHosts: [ROOT_DOMAIN], targets: dnsTargetsFromEnv(process.env) };
 }
 
 export async function fulfillment(): Promise<FulfillmentContext> {
@@ -53,7 +75,7 @@ export async function fulfillment(): Promise<FulfillmentContext> {
     db: await db(),
     suppliers: suppliers(),
     mailer: mailer(),
-    orderStatusUrl: (shop, order) => `${storeUrl(shop.handle)}/orders/${order.paymentIntentId}`,
+    orderStatusUrl: async (shop, order) => `${await storeAddress(shop)}/orders/${order.paymentIntentId}`,
   };
 }
 
