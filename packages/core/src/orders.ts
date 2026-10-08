@@ -31,6 +31,9 @@ export async function quoteCart(db: Db, shop: Shop, lines: CartLine[]) {
     const row = rows.find((r) => r.variant.id === l.variantId);
     if (!row) throw new UserError("An item in your cart is no longer available.", "unavailable");
     if (!Number.isInteger(l.quantity) || l.quantity > 99) throw new UserError("Quantity must be between 1 and 99.");
+    if (row.variant.stock !== null && row.variant.stock < l.quantity) {
+      throw new UserError(row.variant.stock > 0 ? `Only ${row.variant.stock} of ${row.product.title} left.` : `${row.product.title} is sold out.`, "unavailable");
+    }
     const title = row.variant.title === "Default" ? row.product.title : `${row.product.title} – ${row.variant.title}`;
     return {
       variantId: row.variant.id,

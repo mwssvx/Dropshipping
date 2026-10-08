@@ -114,3 +114,11 @@ export async function importProduct(db: Db, suppliers: Suppliers, shopId: string
     return created!;
   });
 }
+
+export async function getSupplierLink(db: Db, shopId: string, supplierId: string) {
+  return db.query.suppliers.findFirst({ where: and(eq(schema.suppliers.id, supplierId), eq(schema.suppliers.shopId, shopId)) });
+}
+
+export async function listSupplierLinks(db: Db, shopId: string) {
+  return db.query.suppliers.findMany({ where: eq(schema.suppliers.shopId, shopId) });
+}

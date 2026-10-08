@@ -4,14 +4,16 @@ import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import type { FormState } from "../../actions";
 
+export type VariantValues = { title: string; price: string; compareAt: string; cost: string; stock?: number | null };
+
 type Values = {
   title: string;
   description: string;
   imageUrl: string;
   status: "draft" | "active" | "archived";
-  price: string;
-  compareAt: string;
-  cost: string;
+  variants: VariantValues[];
+  /** Shown when the product came from a supplier. */
+  supplier?: { label: string; sourceUrl: string | null };
 };
 
 const toNumber = (s: string) => {
@@ -31,12 +33,7 @@ export function ProductForm({
   submitLabel: string;
 }) {
   const [state, formAction] = useActionState(action, {});
-  const [price, setPrice] = useState(initial.price);
-  const [cost, setCost] = useState(initial.cost);
-  const p = toNumber(price);
-  const c = toNumber(cost);
-  const margin = p && c !== null && p > 0 ? Math.round(((p - c) / p) * 100) : null;
-  const fmt = new Intl.NumberFormat("en-US", { style: "currency", currency });
+  const many = initial.variants.length > 1;
 
   return (
     <form action={formAction} className="grid gap-6 lg:grid-cols-[1fr_300px] items-start">
@@ -60,28 +57,18 @@ export function ProductForm({
           </div>
         </section>
         <section className="card p-5 flex flex-col gap-4">
-          <h2 className="font-semibold">Pricing</h2>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="field">
-              <label className="label" htmlFor="price">Price</label>
-              <input className="input num" id="price" name="price" inputMode="decimal" required value={price}
-                onChange={(e) => setPrice(e.target.value)} placeholder="24.99" />
-            </div>
-            <div className="field">
-              <label className="label" htmlFor="compareAt">Compare-at price</label>
-              <input className="input num" id="compareAt" name="compareAt" inputMode="decimal" defaultValue={initial.compareAt} placeholder="Optional" />
-            </div>
-            <div className="field">
-              <label className="label" htmlFor="cost">Your cost</label>
-              <input className="input num" id="cost" name="cost" inputMode="decimal" value={cost}
-                onChange={(e) => setCost(e.target.value)} placeholder="Supplier price" />
-            </div>
+          <div className="flex justify-between gap-3 flex-wrap items-baseline">
+            <h2 className="font-semibold">{many ? "Options and pricing" : "Pricing"}</h2>
+            {initial.supplier && (
+              <span className="hint">
+                From {initial.supplier.label}
+                {initial.supplier.sourceUrl && <> · <a className="underline hover:text-ink" href={initial.supplier.sourceUrl} target="_blank" rel="noreferrer">listing ↗</a></>}
+              </span>
+            )}
           </div>
-          <p className="hint num" aria-live="polite">
-            {margin === null
-              ? "Add your cost to see profit and margin."
-              : <>Profit {fmt.format((p ?? 0) - (c ?? 0))} per sale · <span className={margin < 20 ? "text-critical font-semibold" : "text-success font-semibold"}>{margin}% margin</span></>}
-          </p>
+          {initial.variants.map((v, i) => (
+            <VariantRow key={i} index={i} initial={v} currency={currency} showTitle={many} />
+          ))}
         </section>
       </div>
       <aside className="card p-5 flex flex-col gap-4 lg:sticky lg:top-6">
@@ -95,5 +82,49 @@ export function ProductForm({
         <SubmitButton>{submitLabel}</SubmitButton>
       </aside>
     </form>
+  );
+}
+
+function VariantRow({ index, initial, currency, showTitle }: { index: number; initial: VariantValues; currency: string; showTitle: boolean }) {
+  const [price, setPrice] = useState(initial.price);
+  const [cost, setCost] = useState(initial.cost);
+  const p = toNumber(price);
+  const c = toNumber(cost);
+  const margin = p && c !== null && p > 0 ? Math.round(((p - c) / p) * 100) : null;
+  const fmt = new Intl.NumberFormat("en-US", { style: "currency", currency });
+  const id = (k: string) => `${k}-${index}`;
+  return (
+    <fieldset className={`flex flex-col gap-3 ${showTitle ? "border-t border-border pt-4 first-of-type:border-0 first-of-type:pt-0" : ""}`}>
+      {showTitle ? (
+        <div className="field">
+          <label className="label" htmlFor={id("variantTitle")}>Option name</label>
+          <input className="input" id={id("variantTitle")} name={`variantTitle.${index}`} required defaultValue={initial.title} />
+        </div>
+      ) : (
+        <input type="hidden" name={`variantTitle.${index}`} value={initial.title || "Default"} />
+      )}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="field">
+          <label className="label" htmlFor={id("price")}>Price</label>
+          <input className="input num" id={id("price")} name={`price.${index}`} inputMode="decimal" required value={price}
+            onChange={(e) => setPrice(e.target.value)} placeholder="24.99" />
+        </div>
+        <div className="field">
+          <label className="label" htmlFor={id("compareAt")}>Compare-at price</label>
+          <input className="input num" id={id("compareAt")} name={`compareAt.${index}`} inputMode="decimal" defaultValue={initial.compareAt} placeholder="Optional" />
+        </div>
+        <div className="field">
+          <label className="label" htmlFor={id("cost")}>Your cost</label>
+          <input className="input num" id={id("cost")} name={`cost.${index}`} inputMode="decimal" value={cost}
+            onChange={(e) => setCost(e.target.value)} placeholder="Supplier price" />
+        </div>
+      </div>
+      <p className="hint num" aria-live="polite">
+        {margin === null
+          ? "Add your cost to see profit and margin."
+          : <>Profit {fmt.format((p ?? 0) - (c ?? 0))} per sale · <span className={margin < 20 ? "text-critical font-semibold" : "text-success font-semibold"}>{margin}% margin</span></>}
+        {initial.stock != null && <> · {initial.stock === 0 ? <span className="text-critical">Sold out at supplier</span> : `${initial.stock} in stock at supplier`}</>}
+      </p>
+    </fieldset>
   );
 }

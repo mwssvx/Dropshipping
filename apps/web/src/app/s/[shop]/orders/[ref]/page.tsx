@@ -13,9 +13,10 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
     throw e;
   });
   const paid = order.paymentStatus === "paid";
+  const shipped = order.fulfillments.filter((f) => f.trackingNumber);
   const steps = [
     { label: "Order confirmed", done: paid },
-    { label: "Sent to our warehouse", done: order.fulfillmentStatus !== "unfulfilled" },
+    { label: "Being prepared", done: order.fulfillments.some((f) => f.placedAt || f.shippedAt) },
     { label: "On its way", done: ["shipped", "delivered"].includes(order.fulfillmentStatus) },
     { label: "Delivered", done: order.fulfillmentStatus === "delivered" },
   ];
@@ -34,6 +35,23 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
           </li>
         ))}
       </ol>
+      {shipped.length > 0 && (
+        <section className="card p-5 flex flex-col gap-2 text-sm" aria-labelledby="tracking">
+          <h2 id="tracking" className="font-semibold">Tracking</h2>
+          {shipped.map((f) => (
+            <p key={f.id}>
+              {f.carrier}:{" "}
+              {f.trackingUrl ? <a className="underline num" href={f.trackingUrl} target="_blank" rel="noreferrer">{f.trackingNumber}</a> : <span className="num">{f.trackingNumber}</span>}
+              {f.status === "delivered" && <span className="hint"> · delivered</span>}
+            </p>
+          ))}
+        </section>
+      )}
+      {paid && shipped.length === 0 && (
+        <p className="hint text-sm">
+          {order.lines.length === 1 ? "Your item usually ships" : "Your items usually ship"} within a few days. We&apos;ll email tracking to {order.email} as soon as it&apos;s on its way.
+        </p>
+      )}
       <section className="card p-5 flex flex-col gap-3 text-sm">
         {order.lines.map((l) => (
           <div key={l.id} className="flex justify-between gap-3"><span>{l.title} × {l.quantity}</span><span className="num">{formatMoney(l.unitPriceMinor * l.quantity, order.currency)}</span></div>

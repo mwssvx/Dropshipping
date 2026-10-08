@@ -30,7 +30,7 @@ import {
 } from "../src";
 
 const address = { name: "Ada Buyer", line1: "1 Main St", city: "Austin", region: "TX", postalCode: "78701", country: "US" };
-const [LAMP, STAND, SOLD_OUT] = DEMO_SUPPLIER_LINKS as [string, string, string];
+const [LAMP, STAND, LOW_STOCK] = DEMO_SUPPLIER_LINKS as [string, string, string];
 const DAY = 86_400_000;
 
 let db: Db;
@@ -157,7 +157,7 @@ describe("order routing and tracking", () => {
 
   it("turns a supplier refusal into a problem order with a fix, and the merchant can ship it themselves", async () => {
     const s = await shop();
-    const order = await paidOrder(s, SOLD_OUT);
+    const order = await paidOrder(s, LOW_STOCK);
     await onOrderPaid(ctx, order.id);
     let full = await getOrder(db, s.id, order.id);
     expect(full.fulfillmentStatus).toBe("problem");

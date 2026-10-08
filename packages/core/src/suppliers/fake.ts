@@ -3,13 +3,14 @@ import { SupplierError, type PlaceOrderInput, type SupplierAdapter, type Supplie
 /**
  * A stand-in supplier so the whole dropshipping flow runs without a supplier account.
  * Links look like https://demo-supplier.test/p/<slug>. Products are made up from the slug:
- * a slug containing "sold-out" has no stock, and orders to countries outside the launch list fail.
+ * a slug containing "low-stock" sells out by the time an order is placed, and orders to countries
+ * outside the launch list fail.
  */
 export const DEMO_SUPPLIER_HOST = "demo-supplier.test";
 export const DEMO_SUPPLIER_LINKS = [
   `https://${DEMO_SUPPLIER_HOST}/p/sunset-projection-lamp`,
   `https://${DEMO_SUPPLIER_HOST}/p/magnetic-phone-stand`,
-  `https://${DEMO_SUPPLIER_HOST}/p/sold-out-galaxy-projector`,
+  `https://${DEMO_SUPPLIER_HOST}/p/galaxy-projector-low-stock`,
 ];
 const SHIPS_TO = new Set(
   "US GB CA AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE".split(" "),
@@ -53,7 +54,7 @@ export class FakeSupplier implements SupplierAdapter {
     }
     const h = hash(slug);
     const title = slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-    const soldOut = slug.includes("sold-out");
+    const lowStock = slug.includes("low-stock");
     const baseCost = 300 + (h % 1500);
     const sizes = h % 3 === 0 ? ["Default"] : ["Small", "Large"];
     return {
@@ -66,7 +67,7 @@ export class FakeSupplier implements SupplierAdapter {
         ref: `demo-${slug}-${size.toLowerCase()}`,
         title: size,
         costMinor: baseCost + i * 250,
-        stock: soldOut ? 0 : 50 + (h % 400),
+        stock: lowStock ? 2 : 50 + (h % 400),
         shipDaysMin: 6,
         shipDaysMax: 10,
       })),
@@ -77,7 +78,7 @@ export class FakeSupplier implements SupplierAdapter {
     if (!SHIPS_TO.has(input.address.country)) {
       throw new SupplierError("address_unsupported", `The supplier doesn't ship to ${input.address.country}.`);
     }
-    if (input.lines.some((l) => l.variantRef.includes("sold-out"))) {
+    if (input.lines.some((l) => l.variantRef.includes("low-stock"))) {
       throw new SupplierError("out_of_stock", "The supplier is out of stock for an item in this order.");
     }
     const placed = this.now().toString(36);

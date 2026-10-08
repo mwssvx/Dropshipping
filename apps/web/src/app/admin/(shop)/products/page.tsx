@@ -11,13 +11,19 @@ export default async function ProductsPage() {
   const products = await listProducts(db, shop.id);
   return (
     <main className="pb-12">
-      <PageHeader title="Products" actions={<Link href="/admin/products/new" className="btn btn-primary">Add product</Link>} />
+      <PageHeader title="Products" actions={<>
+        <Link href="/admin/products/new" className="btn btn-secondary">Add by hand</Link>
+        <Link href="/admin/products/import" className="btn btn-primary">Import from supplier</Link>
+      </>} />
       <div className="px-4 sm:px-8">
         {products.length === 0 ? (
           <div className="card p-10 flex flex-col items-center text-center gap-3">
             <h2 className="font-semibold text-lg">Add your first product</h2>
-            <p className="hint max-w-sm">Add one by hand now. Importing from your supplier with one link is coming next.</p>
-            <Link href="/admin/products/new" className="btn btn-primary">Add product</Link>
+            <p className="hint max-w-sm">Paste a product link from your supplier and we fill in the title, options and costs. Orders for it go to the supplier automatically.</p>
+            <div className="flex gap-2 flex-wrap justify-center">
+              <Link href="/admin/products/import" className="btn btn-primary">Import from supplier</Link>
+              <Link href="/admin/products/new" className="btn btn-secondary">Add by hand</Link>
+            </div>
           </div>
         ) : (
           <div className="card overflow-x-auto">
