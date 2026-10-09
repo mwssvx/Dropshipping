@@ -83,7 +83,7 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
         {order.discountMinor > 0 && (
           <div className="flex justify-between gap-3 hint"><span>Discount ({order.discountCode})</span><span className="num">−{money(due.discountMinor)}</span></div>
         )}
-        <div className="flex justify-between gap-3 hint"><span>Shipping</span><span className="num">{due.shippingMinor ? money(due.shippingMinor) : "Free"}</span></div>
+        <div className="flex justify-between gap-3 hint"><span>Shipping{order.shippingMethod ? ` (${order.shippingMethod})` : ""}</span><span className="num">{due.shippingMinor ? money(due.shippingMinor) : "Free"}</span></div>
         {order.taxMinor > 0 && (
           <div className="flex justify-between gap-3 hint"><span>{order.taxBreakdown.map((t) => t.label).join(", ") || "Tax"}{order.taxIncluded ? " (included)" : ""}</span><span className="num">{money(due.taxMinor)}</span></div>
         )}

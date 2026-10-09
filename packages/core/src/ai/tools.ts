@@ -8,7 +8,7 @@ import { estimateProcessingFee, planAdvice, platformFeeFor, PLANS } from "../pla
 import { moneySummary } from "../payouts";
 import { refundOrder } from "../refunds";
 import { openNotices } from "../trust";
-import { FLAT_SHIPPING_MINOR, FREE_SHIPPING_OVER_MINOR } from "../orders";
+import { describeShipping } from "../shipping";
 import { setPricesIncludeTax } from "../tax";
 import type { ProblemCode } from "../suppliers";
 import { AUTO, blocked, needsOk, untrusted, type Decision, type RunScope } from "./context";
@@ -374,7 +374,7 @@ const buyerTools = [
     async run(_, run) {
       const pages = await run.ctx.db.query.pages.findMany({ where: and(eq(schema.pages.shopId, run.shop.id), eq(schema.pages.published, true)) });
       return {
-        shipping_price: `${money(run, FLAT_SHIPPING_MINOR)}, free on orders over ${money(run, FREE_SHIPPING_OVER_MINOR)}`,
+        shipping_prices: await describeShipping(run.ctx.db, run.shop),
         pages: pages.map((p) => ({ title: p.title, text: p.body.slice(0, 3000) })),
         note: pages.length ? null : "The store hasn't published a returns or shipping page.",
       };

@@ -1,4 +1,4 @@
-// Milestone 1 to 16 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 17 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -291,6 +291,8 @@ export const orders = pgTable(
     // Paid in part or in full with a gift card. The card is charged total minus this.
     giftCardId: uuid("gift_card_id").references((): AnyPgColumn => giftCards.id, { onDelete: "set null" }),
     giftCardMinor: money("gift_card_minor").notNull().default(0),
+    // The shipping option the buyer picked, as named when they bought ("Express").
+    shippingMethod: text("shipping_method"),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -1000,5 +1002,41 @@ export const giftCards = pgTable(
     uniqueIndex("gift_cards_source_uq").on(t.sourceOrderId, t.sourceIndex),
     index("gift_cards_shop_idx").on(t.shopId, t.createdAt),
     check("gift_cards_balance_ok", sql`${t.balanceMinor} >= 0 and ${t.balanceMinor} <= ${t.initialMinor}`),
+  ],
+);
+
+// Where a store ships and what it charges. A zone lists countries ("*" is everywhere else); each
+// zone has one or more rates the buyer picks from at checkout. A store with no zones uses the
+// built-in default (one rate, everywhere).
+export const shippingZones = pgTable(
+  "shipping_zones",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    countries: jsonb("countries").$type<string[]>().notNull().default([]),
+    createdAt: createdAt(),
+  },
+  (t) => [index("shipping_zones_shop_idx").on(t.shopId)],
+);
+
+export const shippingRates = pgTable(
+  "shipping_rates",
+  {
+    id: id(),
+    zoneId: uuid("zone_id").notNull().references(() => shippingZones.id, { onDelete: "cascade" }),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    priceMinor: money("price_minor").notNull(),
+    // Free when the goods in the cart reach this amount.
+    freeOverMinor: money("free_over_minor"),
+    minDays: integer("min_days"),
+    maxDays: integer("max_days"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("shipping_rates_zone_idx").on(t.zoneId),
+    check("shipping_rates_price_ok", sql`${t.priceMinor} >= 0`),
+    check("shipping_rates_days_ok", sql`${t.minDays} is null or ${t.maxDays} is null or ${t.minDays} <= ${t.maxDays}`),
   ],
 );

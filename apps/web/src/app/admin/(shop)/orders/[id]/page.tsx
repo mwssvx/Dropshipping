@@ -78,7 +78,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <dt className="hint">Subtotal</dt><dd>{money(order.subtotalMinor)}</dd>
               {order.discountMinor > 0 && <><dt className="hint">Discount ({order.discountCode})</dt><dd>−{money(order.discountMinor)}</dd></>}
               {!order.discountMinor && order.discountCode && <><dt className="hint">Code</dt><dd>{order.discountCode} (free shipping)</dd></>}
-              <dt className="hint">Shipping</dt><dd>{order.shippingMinor ? money(order.shippingMinor) : "Free"}</dd>
+              <dt className="hint">Shipping{order.shippingMethod ? ` (${order.shippingMethod})` : ""}</dt><dd>{order.shippingMinor ? money(order.shippingMinor) : "Free"}</dd>
               <dt className="hint">{order.taxBreakdown.length ? order.taxBreakdown.map((t) => t.label).join(", ") : "Tax"}{order.taxIncluded ? " (included)" : ""}</dt><dd>{money(order.taxMinor)}</dd>
               <dt className="font-semibold">Total</dt><dd className="font-semibold">{money(order.totalMinor)}</dd>
               {order.presentment && (

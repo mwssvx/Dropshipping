@@ -13,14 +13,12 @@ import { creditableCampaign } from "./campaigns";
 import { convertAmount, formatMoney, type DisplayFx } from "./money";
 import { breakFor, describeBreak, percentOff, wholesaleTermsFor } from "./wholesale";
 import { findGiftCard } from "./gift-cards";
+import { countryName, listShippingZones, priceRate, zoneFor } from "./shipping";
 
 type Shop = typeof schema.shops.$inferSelect;
 type Order = typeof schema.orders.$inferSelect;
 export type CartLine = { variantId: string; quantity: number };
 
-// Milestone 1 shipping rule until shipping zones arrive (M3): free over 50.00, else 4.99.
-export const FREE_SHIPPING_OVER_MINOR = 5000;
-export const FLAT_SHIPPING_MINOR = 499;
 
 /**
  * Price a cart from the database. Never trusts prices sent by the browser. A discount code that
@@ -33,7 +31,15 @@ export async function quoteCart(
   db: Db,
   shop: Shop,
   lines: CartLine[],
-  opts: { discountCode?: string | null; email?: string; buyerEmail?: string | null; giftCardCode?: string | null } = {},
+  opts: {
+    discountCode?: string | null;
+    email?: string;
+    buyerEmail?: string | null;
+    giftCardCode?: string | null;
+    /** Where it ships. Without it (the cart), shipping is estimated for the store's own country. */
+    country?: string | null;
+    shippingRateId?: string | null;
+  } = {},
 ) {
   const wanted = lines.filter((l) => l.quantity > 0);
   if (!wanted.length) throw new UserError("Your cart is empty.");
@@ -86,14 +92,26 @@ export async function quoteCart(
   // Discounts and shipping only count goods: gift cards are sent by email at face value.
   const goodsMinor = items.filter((i) => !i.giftCard).reduce((s, i) => s + i.lineMinor, 0);
   const hasGoods = items.some((i) => !i.giftCard);
-  let shippingMinor = !hasGoods || goodsMinor >= FREE_SHIPPING_OVER_MINOR ? 0 : FLAT_SHIPPING_MINOR;
-  let discount: { id: string; code: string; label: string; discountMinor: number } | null = null;
+  let shippingMinor = 0;
+  let shipping: { rateId: string; name: string; minDays: number | null; maxDays: number | null } | null = null;
+  if (hasGoods) {
+    const { zones } = await listShippingZones(db, shop.id);
+    const rates = zoneFor(zones, opts.country ?? shop.country)?.rates ?? [];
+    if (!rates.length && opts.country) throw new UserError(`${shop.name} doesn't ship to ${countryName(opts.country)} yet.`, "no_shipping");
+    // The rate the buyer picked, or the cheapest for this cart.
+    const rate = rates.find((r) => r.id === opts.shippingRateId) ?? [...rates].sort((a, b) => priceRate(a, goodsMinor) - priceRate(b, goodsMinor))[0];
+    if (rate) {
+      shippingMinor = priceRate(rate, goodsMinor);
+      shipping = { rateId: rate.id, name: rate.name, minDays: rate.minDays, maxDays: rate.maxDays };
+    }
+  }
+  let discount: { id: string; code: string; label: string; discountMinor: number; freeShipping: boolean } | null = null;
   if (opts.discountCode?.trim() && wholesale) throw new UserError("Discount codes don't apply to wholesale prices.", "discount_invalid");
   if (opts.discountCode?.trim()) {
     const d = await findUsableDiscount(db, shop, opts.discountCode, { subtotalMinor: goodsMinor, email: opts.email });
     const applied = applyDiscount(d, goodsMinor, shippingMinor);
     shippingMinor = applied.shippingMinor;
-    discount = { id: d.id, code: d.code, label: describeDiscount(d, shop.currency), discountMinor: applied.discountMinor };
+    discount = { id: d.id, code: d.code, label: describeDiscount(d, shop.currency), discountMinor: applied.discountMinor, freeShipping: d.kind === "free_shipping" };
   }
   const discountMinor = discount?.discountMinor ?? 0;
   const totalMinor = subtotalMinor - discountMinor + shippingMinor;
@@ -112,6 +130,9 @@ export async function quoteCart(
     discountMinor,
     shippingMinor,
     totalMinor,
+    goodsMinor,
+    /** The rate used. Null when nothing needs shipping, or the cart's estimate country has no zone. */
+    shipping,
     giftCard,
     /** What's left to pay by card after the gift card. Before tax, until checkout. */
     dueMinor: totalMinor - (giftCard?.appliedMinor ?? 0),
@@ -153,6 +174,8 @@ export async function startCheckout(
     buyerEmail?: string | null;
     /** A gift card code the buyer entered in the cart. */
     giftCardCode?: string | null;
+    /** The shipping rate picked at checkout; the cheapest for the address if missing. */
+    shippingRateId?: string | null;
   },
   taxCalculator: TaxCalculator = new BuiltInTaxCalculator(),
 ) {
@@ -160,7 +183,14 @@ export async function startCheckout(
   const parsed = checkoutSchema.safeParse(input);
   if (!parsed.success) throw new UserError(parsed.error.issues[0]!.message);
   const { email, address } = parsed.data;
-  const cart = await quoteCart(db, shop, input.lines, { discountCode: input.discountCode, email, buyerEmail: input.buyerEmail, giftCardCode: input.giftCardCode });
+  const cart = await quoteCart(db, shop, input.lines, {
+    discountCode: input.discountCode,
+    email,
+    buyerEmail: input.buyerEmail,
+    giftCardCode: input.giftCardCode,
+    country: address.country,
+    shippingRateId: input.shippingRateId,
+  });
   if (cart.wholesale && cart.wholesale.shortByMinor > 0) {
     throw new UserError(
       `Wholesale orders start at ${formatMoney(cart.wholesale.minOrderMinor, shop.currency)}. Add ${formatMoney(cart.wholesale.shortByMinor, shop.currency)} more to check out.`,
@@ -250,6 +280,7 @@ export async function startCheckout(
         wholesale: !!cart.wholesale,
         giftCardId: cart.giftCard?.id ?? null,
         giftCardMinor,
+        shippingMethod: cart.shipping?.name ?? null,
         paymentIntentId: intent.id,
         ...(dueMinor ? {} : { paymentStatus: "paid" as const, paidAt: new Date() }),
       })
