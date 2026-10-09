@@ -200,3 +200,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **The rule** (Products → Pricing; `packages/core/src/pricing.ts`, `shops.pricing_rule`): multiply supplier cost (1.05× to 20×) or add a fixed amount, round up to .99, .95, a whole amount or not at all, a lowest price, and optionally a crossed-out "was" price a percentage higher (with a note on consumer law). Stores without a rule keep the old default, 2.5× ending in .99. The page shows sample costs with the price and what the merchant keeps after card and plan fees.
 2. **Where it applies**: new imports start at the rule's prices (and its crossed-out price). Existing products whose supplier cost is known can be brought in line: the page lists every option the rule would change, now and new, and "Update N products" applies them all. Options without a known cost are left alone, and gift cards are never repriced.
+
+### Customer profiles (after launch, part 15)
+
+1. **Profiles** (Customers → a name; `packages/core/src/customers.ts`): each buyer's orders, spend and average order (hidden from staff, like other sales numbers), addresses, store credit, returns and whether they get marketing emails. Orders link back to the profile.
+2. **Notes and tags**: a private note and up to 10 tags per customer (`customers.note`, `customers.tags`). The list filters by tag.
+3. **Privacy requests** (owners and admins; the new `privacy` area): "Download their data" gives a JSON file of everything the store holds about the buyer. "Erase their data" removes their name, email, street address, messages, email history, sign-in codes and campaign history, and shows their reviews as "Verified buyer". Orders stay for the store's sales and tax records with only the amounts, country, region and postcode. Erasing waits until no order is still on its way and no return is open, and the merchant types the buyer's email to confirm.

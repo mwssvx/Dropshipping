@@ -13,7 +13,7 @@ export type Role = (typeof schema.shopMembers.$inferSelect)["role"];
 export const AREAS = [
   "home", "analytics", "assistant", "orders", "refunds", "customers", "inbox", "money", "payouts", "products", "collections",
   "suppliers", "marketing", "reviews", "theme", "pages", "domains", "trust", "plan", "ai", "taxes", "currencies", "developers",
-  "export", "team", "wholesale", "gift_cards", "shipping", "returns",
+  "export", "team", "wholesale", "gift_cards", "shipping", "returns", "privacy",
 ] as const;
 export type Area = (typeof AREAS)[number];
 
@@ -22,7 +22,7 @@ const OWNER_ONLY: readonly Area[] = ["plan", "payouts", "team", "developers", "e
 
 export const ROLES: Record<Role, { name: string; summary: string }> = {
   owner: { name: "Owner", summary: "Everything, including the plan, payouts, the team, API keys and exporting the store." },
-  admin: { name: "Admin", summary: "Runs the store day to day: orders and refunds, products, the online store, money, marketing and settings. Not the plan, payouts, team, API keys or export." },
+  admin: { name: "Admin", summary: "Runs the store day to day: orders and refunds, products, the online store, money, marketing, settings and customer data requests. Not the plan, payouts, team, API keys or export." },
   staff: { name: "Staff", summary: "Orders (without refunds), customers, buyer messages, products, collections and reviews. No money, sales totals or settings." },
 };
 

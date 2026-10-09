@@ -183,6 +183,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
             <h2 className="font-semibold mb-1">Customer</h2>
             <p>{a.name}</p>
             <p className="hint break-all">{order.email}</p>
+            {order.customerId && <Link href={`/admin/customers/${order.customerId}`} className="underline">View customer</Link>}
           </div>
           <div>
             <h2 className="font-semibold mb-1">Ship to</h2>

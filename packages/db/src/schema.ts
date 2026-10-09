@@ -1,4 +1,4 @@
-// Milestone 1 to 21 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 22 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -219,6 +219,9 @@ export const customers = pgTable(
     wholesaleTaxId: text("wholesale_tax_id"),
     wholesaleMessage: text("wholesale_message"),
     wholesaleRequestedAt: timestamp("wholesale_requested_at", { withTimezone: true }),
+    // The merchant's own notes and labels ("vip", "wholesale lead"). Never shown to the buyer.
+    note: text("note"),
+    tags: jsonb("tags").$type<string[]>().notNull().default([]),
     // Secret in each marketing email's unsubscribe link.
     emailToken: text("email_token").notNull().unique().default(sql`replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '')`),
     createdAt: createdAt(),
