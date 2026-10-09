@@ -155,6 +155,13 @@
       "when": 1791514620250,
       "tag": "0021_m20_payment_links",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1791515517167,
+      "tag": "0022_m21_pricing",
+      "breakpoints": true
     }
   ]
 }

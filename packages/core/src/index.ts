@@ -15,6 +15,7 @@ export * from "./collections";
 export * from "./search";
 export * from "./blog";
 export * from "./payment-links";
+export * from "./pricing";
 export * from "./pages";
 export * from "./domains";
 export * from "./plans";

@@ -76,6 +76,7 @@ export function ImportForm({ url, preview, currency }: { url: string; preview: I
             })}
           </tbody>
         </table>
+        <p className="hint text-sm px-4 py-3 border-t border-border">Starting prices follow your <a href="/admin/pricing" className="underline">pricing rule</a>.</p>
       </section>
 
       <div className="flex gap-2 flex-wrap justify-end">
