@@ -51,7 +51,7 @@ export default async function PayPage({ params }: { params: Promise<{ shop: stri
         ))}
         {order.discountMinor > 0 && (
           <>
-            <dt className="hint border-t border-border pt-2 mt-1">{t.discount} ({order.discountCode})</dt>
+            <dt className="hint border-t border-border pt-2 mt-1">{order.discountCode ? `${t.discount} (${order.discountCode})` : `${t.bundle} (${order.bundleTitle})`}</dt>
             <dd className="text-right border-t border-border pt-2 mt-1">−{money(due.discountMinor)}</dd>
           </>
         )}

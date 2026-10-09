@@ -1,5 +1,5 @@
 // Take your store with you: everything that makes up a store (products, collections, pages, theme,
-// codes, settings, translations) as one JSON file that loads into a new store, plus products as CSV.
+// codes, bundles, settings, translations) as one JSON file that loads into a new store, plus products as CSV.
 // Orders and customers stay out of the JSON file: they belong to the payments account.
 import { asc, eq, inArray } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
@@ -12,6 +12,7 @@ import { addRedirect } from "./redirects";
 import { parseTheme } from "./theme-doc";
 import { listShippingZones } from "./shipping";
 import { LANGUAGE_CODES, saveTranslation } from "./languages";
+import { createBundle, MAX_BUNDLES } from "./bundles";
 
 export const EXPORT_FORMAT = "storefront-store";
 
@@ -25,7 +26,7 @@ function supplierOf(link: typeof schema.suppliers.$inferSelect | undefined, prod
 export async function exportStore(db: Db, shopId: string, now = new Date()) {
   const shop = await db.query.shops.findFirst({ where: eq(schema.shops.id, shopId) });
   if (!shop) throw new NotFoundError("Store");
-  const [products, collections, links, pages, theme, discounts, supplierRows, posts, redirectRows, translationRows] = await Promise.all([
+  const [products, collections, links, pages, theme, discounts, supplierRows, posts, redirectRows, translationRows, bundleRows] = await Promise.all([
     db.query.products.findMany({ where: eq(schema.products.shopId, shopId), orderBy: asc(schema.products.createdAt) }),
     db.query.collections.findMany({ where: eq(schema.collections.shopId, shopId), orderBy: asc(schema.collections.createdAt) }),
     db
@@ -41,6 +42,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
     db.query.blogPosts.findMany({ where: eq(schema.blogPosts.shopId, shopId), orderBy: asc(schema.blogPosts.createdAt) }),
     db.query.redirects.findMany({ where: eq(schema.redirects.shopId, shopId), orderBy: asc(schema.redirects.fromPath) }),
     db.query.translations.findMany({ where: eq(schema.translations.shopId, shopId), orderBy: [asc(schema.translations.language), asc(schema.translations.kind)] }),
+    db.query.bundles.findMany({ where: eq(schema.bundles.shopId, shopId), orderBy: asc(schema.bundles.createdAt) }),
   ]);
   const variants = products.length
     ? await db.query.variants.findMany({ where: inArray(schema.variants.productId, products.map((p) => p.id)), orderBy: asc(schema.variants.position) })
@@ -136,6 +138,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       active: d.active,
     })),
     redirects: redirectRows.map((r) => ({ from: r.fromPath, to: r.toPath })),
+    bundles: bundleRows.map((b) => ({ title: b.title, products: b.productIds.map((id) => handleOf.get(id)).filter((h): h is string => !!h), percent_off: b.percentOff, active: b.active })),
     // Products, collections and pages are matched by handle; the theme has none.
     translations: translationRows.flatMap((t) => {
       const ref = t.kind === "theme" ? null : handleByKind[t.kind].get(t.refId);
@@ -256,6 +259,10 @@ const importSchema = z.object({
   redirects: z
     .array(z.object({ from: str(500), to: str(2000) }))
     .max(2000)
+    .default([]),
+  bundles: z
+    .array(z.object({ title: str(80), products: z.array(handle).max(4), percent_off: z.number().int(), active: z.boolean().default(true) }))
+    .max(MAX_BUNDLES)
     .default([]),
   translations: z
     .array(
@@ -478,6 +485,16 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
         }
       }
     }
+    // Bundles go through the same checks as the Bundles page; any that don't fit are left out.
+    let bundlesAdded = 0;
+    for (const b of data.bundles) {
+      try {
+        await createBundle(tx as unknown as Db, shopId, { title: b.title, productIds: b.products.map((h) => productIds.get(h)!).filter(Boolean), percentOff: b.percent_off, active: b.active });
+        bundlesAdded++;
+      } catch (e) {
+        if (!(e instanceof UserError)) throw e;
+      }
+    }
     // Translations go through the same checks as the editor; any that don't fit are left out.
     let translationsAdded = 0;
     if (data.translations.length) {
@@ -502,6 +519,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
       discountCodes: data.discount_codes.length,
       redirects: redirectsAdded,
       translations: translationsAdded,
+      bundles: bundlesAdded,
       theme: !!theme,
       currencyDiffers: typeof data.store.currency === "string" && data.store.currency !== shop.currency,
     };

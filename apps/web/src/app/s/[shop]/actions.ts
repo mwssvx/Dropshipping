@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { amountToCharge, getOrder, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
+import { amountToCharge, getOrder, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
 import { agents, campaigns, db, payments, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
@@ -34,6 +34,27 @@ export async function addToCartAction(handle: string, form: FormData) {
   const variant = await (await db()).query.variants.findFirst({ where: (v, { eq }) => eq(v.id, variantId), columns: { productId: true } }).catch(() => undefined);
   await track(shop.id, "add_to_cart", variant?.productId);
   redirect(`${await storeBase(handle)}/cart`);
+}
+
+/** Adds one of each product in a bundle, with the options the buyer picked. */
+export async function addBundleAction(handle: string, bundleId: string, form: FormData) {
+  const shop = await loadShop(handle);
+  const base = await storeBase(handle);
+  const picked: Record<string, string> = {};
+  for (const [key, value] of form.entries()) if (key.startsWith("v_") && typeof value === "string") picked[key.slice(2)] = value;
+  const variantIds = await pickBundleVariants(await db(), shop.id, bundleId, picked).catch((e) => {
+    if (e instanceof UserError) redirect(`${base}/cart`);
+    throw e;
+  });
+  const cart = await readCart(shop.id);
+  for (const variantId of variantIds) {
+    const line = cart.find((l) => l.variantId === variantId);
+    if (line) line.quantity = Math.min(99, line.quantity + 1);
+    else cart.push({ variantId, quantity: 1 });
+  }
+  await writeCart(shop.id, cart);
+  await track(shop.id, "add_to_cart");
+  redirect(`${base}/cart`);
 }
 
 export async function updateCartAction(handle: string, form: FormData) {

@@ -204,6 +204,13 @@
       "when": 1791540450152,
       "tag": "0028_m28_languages",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1791543186636,
+      "tag": "0029_m30_bundles",
+      "breakpoints": true
     }
   ]
 }

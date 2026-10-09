@@ -82,9 +82,9 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
           </ul>
           <dl className="grid grid-cols-[1fr_auto] gap-y-1 num text-sm border-t border-border pt-3">
             <dt className="hint">{t.subtotal}</dt><dd className="text-right">{money(shown.subtotalMinor)}</dd>
-            {quote.discount && shown.discountMinor > 0 && (
+            {(quote.discount || quote.bundle) && shown.discountMinor > 0 && (
               <>
-                <dt className="hint">{t.discount} ({quote.discount.code})</dt><dd className="text-right">−{money(shown.discountMinor)}</dd>
+                <dt className="hint">{quote.discount ? `${t.discount} (${quote.discount.code})` : `${t.bundle} (${quote.bundle!.title})`}</dt><dd className="text-right">−{money(shown.discountMinor)}</dd>
               </>
             )}
           </dl>

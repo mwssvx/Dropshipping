@@ -245,3 +245,10 @@ See `.env.example` and `docs/accounts.md` for the real services.
 3. **The merchant's own words**: products, collections, pages, menus and home page text are translated on the new Languages page, by hand or with the new **Translator** AI agent, a batch per press. Anything not yet translated shows in English. When the English changes, the translation is marked out of date until someone checks it.
 4. **Store file**: languages and translations travel in the store export and load into a new store.
 5. **Not yet translated**: order and account pages, emails, search (it matches the English text), option names and SEO descriptions.
+
+### Bundles (after launch, part 22)
+
+1. **Bundles** (`packages/core/src/bundles.ts`): two to four products sold together for up to 50% off, made on the new Bundles page under Marketing. Each bundle can be turned off without deleting it, and it hides itself while one of its products isn't on sale.
+2. **Store**: a bundle shows on each of its products' pages with an option picker per product and one "Add all to cart" button, in every store language.
+3. **Pricing**: the cart takes the bundle's percentage off every full set. Each item counts towards one bundle at most, bigger discounts first and cheapest items first. Bundles and discount codes don't combine: the cart uses whichever saves the buyer more and says so. Wholesale buyers keep their own prices.
+4. **Orders** show the saving as "Bundle (name)" to the buyer, in admin, in the mobile app and in the public API (`bundle_title`). Bundles travel in the store file.
