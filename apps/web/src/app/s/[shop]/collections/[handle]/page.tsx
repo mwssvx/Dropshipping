@@ -1,24 +1,23 @@
-import { notFound } from "next/navigation";
 import { browseProducts, compactProducts, getCollectionByHandle, NotFoundError } from "@sf/core";
 import { db } from "@/lib/server";
 import { buyerFx } from "@/lib/currency";
 import { BrowseBar, browseOptions, type BrowseParams } from "@/theme/Browse";
 import { ProductGrid } from "@/theme/Sections";
-import { loadShop, storeBase } from "../../data";
+import { loadShop, storeBase, missing } from "../../data";
 
-async function load(param: string, handle: string) {
+async function load(param: string, handle: string, count = true) {
   const shop = await loadShop(param);
   try {
     return { shop, ...(await getCollectionByHandle(await db(), shop.id, handle)) };
   } catch (e) {
-    if (e instanceof NotFoundError) notFound();
+    if (e instanceof NotFoundError) return missing(param, `/collections/${handle}`, count);
     throw e;
   }
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ shop: string; handle: string }> }) {
   const { shop, handle } = await params;
-  const { collection } = await load(shop, handle);
+  const { collection } = await load(shop, handle, false);
   const description = collection.description.replace(/\s+/g, " ").trim().slice(0, 160) || undefined;
   return { title: collection.title, description, openGraph: { title: collection.title, description, images: collection.imageUrl ? [{ url: collection.imageUrl }] : undefined } };
 }

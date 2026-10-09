@@ -45,3 +45,4 @@ export * from "./wholesale";
 export * from "./gift-cards";
 export * from "./shipping";
 export * from "./returns";
+export * from "./redirects";

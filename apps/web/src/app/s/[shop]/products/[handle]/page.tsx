@@ -1,4 +1,3 @@
-import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Track } from "@/components/Track";
 import { describeBreak, getActiveProductByHandle, NotFoundError, percentOff, productPhotos, productReviews, upsellsFor, wholesaleTermsFor } from "@sf/core";
@@ -8,22 +7,22 @@ import { db } from "@/lib/server";
 import { buyerFx } from "@/lib/currency";
 import { SubmitButton } from "@/components/SubmitButton";
 import { addToCartAction, stockAlertAction } from "../../actions";
-import { loadShop, storeBase } from "../../data";
+import { loadShop, storeBase, missing } from "../../data";
 import { Price } from "@/components/Price";
 
-async function load(shopHandle: string, handle: string) {
+async function load(shopHandle: string, handle: string, count = true) {
   const shop = await loadShop(shopHandle);
   try {
     return { shop, product: await getActiveProductByHandle(await db(), shop.id, handle) };
   } catch (e) {
-    if (e instanceof NotFoundError) notFound();
+    if (e instanceof NotFoundError) return missing(shopHandle, `/products/${handle}`, count);
     throw e;
   }
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ shop: string; handle: string }> }) {
   const { shop, handle } = await params;
-  const { product } = await load(shop, handle);
+  const { product } = await load(shop, handle, false);
   const description = summary(product.descriptionHtml) || undefined;
   const photos = productPhotos(product);
   const images = photos.length ? photos.map((url) => ({ url })) : undefined;

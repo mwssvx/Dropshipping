@@ -1,4 +1,4 @@
-// Milestone 1 to 25 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 26 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -1130,4 +1130,21 @@ export const stockAlerts = pgTable(
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("stock_alerts_variant_email_uq").on(t.variantId, t.email), index("stock_alerts_shop_idx").on(t.shopId, t.notifiedAt)],
+);
+
+// Old store links that should keep working: a renamed product, or a page from a store moved here.
+export const redirects = pgTable(
+  "redirects",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    /** A store path, lowercased, like /products/old-name. */
+    fromPath: text("from_path").notNull(),
+    /** A store path, or a full https address. */
+    toPath: text("to_path").notNull(),
+    hits: integer("hits").notNull().default(0),
+    lastHitAt: timestamp("last_hit_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("redirects_shop_from_uq").on(t.shopId, t.fromPath)],
 );

@@ -1,26 +1,25 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { getPublishedPostByHandle, NotFoundError, postBlocks, postSummary, readingMinutes } from "@sf/core";
 import { db } from "@/lib/server";
 import { buyerFx } from "@/lib/currency";
 import { ProductGrid } from "@/theme/Sections";
-import { loadShop, storeBase } from "../../data";
+import { loadShop, storeBase, missing } from "../../data";
 
 const date = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric" });
 
-async function load(param: string, handle: string) {
+async function load(param: string, handle: string, count = true) {
   const shop = await loadShop(param);
   try {
     return { shop, ...(await getPublishedPostByHandle(await db(), shop.id, handle)) };
   } catch (e) {
-    if (e instanceof NotFoundError) notFound();
+    if (e instanceof NotFoundError) return missing(param, `/blog/${handle}`, count);
     throw e;
   }
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ shop: string; handle: string }> }) {
   const { shop, handle } = await params;
-  const { post } = await load(shop, handle);
+  const { post } = await load(shop, handle, false);
   const description = postSummary(post) || undefined;
   const images = post.imageUrl ? [{ url: post.imageUrl }] : undefined;
   return { title: post.title, description, openGraph: { title: post.title, description, images, type: "article", publishedTime: post.publishedAt?.toISOString() } };
