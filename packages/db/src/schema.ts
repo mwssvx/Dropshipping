@@ -1,4 +1,4 @@
-// Milestone 1 to 29 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 30 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -282,10 +282,13 @@ export const orders = pgTable(
     currency: char("currency", { length: 3 }).notNull(),
     subtotalMinor: money("subtotal_minor").notNull(),
     shippingMinor: money("shipping_minor").notNull(),
-    // Taken off the subtotal by a discount code. A free-shipping code sets shipping to 0 instead.
+    // Taken off the subtotal by a discount code, or by a bundle when there's no code (they don't
+    // combine). A free-shipping code sets shipping to 0 instead.
     discountMinor: money("discount_minor").notNull().default(0),
     discountId: uuid("discount_id"),
     discountCode: text("discount_code"),
+    /** The bundle names when the discount is bundle savings, like "Desk set". */
+    bundleTitle: text("bundle_title"),
     taxMinor: money("tax_minor").notNull(),
     totalMinor: money("total_minor").notNull(),
     paymentStatus: text("payment_status", {
@@ -1195,4 +1198,21 @@ export const translations = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [uniqueIndex("translations_ref_uq").on(t.shopId, t.language, t.kind, t.refId)],
+);
+
+// Products sold together for less: buying one of each takes percent_off off those items.
+export const bundles = pgTable(
+  "bundles",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    /** Two to four products, in the order they're shown. */
+    productIds: jsonb("product_ids").$type<string[]>().notNull(),
+    percentOff: integer("percent_off").notNull(),
+    active: boolean("active").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("bundles_shop_idx").on(t.shopId)],
 );

@@ -84,7 +84,7 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
           <div key={l.id} className="flex justify-between gap-3"><span>{l.title} × {l.quantity}</span><span className="num">{money(due.lines[n]!)}</span></div>
         ))}
         {order.discountMinor > 0 && (
-          <div className="flex justify-between gap-3 hint"><span>Discount ({order.discountCode})</span><span className="num">−{money(due.discountMinor)}</span></div>
+          <div className="flex justify-between gap-3 hint"><span>{order.discountCode ? `Discount (${order.discountCode})` : `Bundle (${order.bundleTitle})`}</span><span className="num">−{money(due.discountMinor)}</span></div>
         )}
         <div className="flex justify-between gap-3 hint"><span>Shipping{order.shippingMethod ? ` (${order.shippingMethod})` : ""}</span><span className="num">{due.shippingMinor ? money(due.shippingMinor) : "Free"}</span></div>
         {order.taxMinor > 0 && (

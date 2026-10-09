@@ -68,6 +68,7 @@ export function publicOrder(o: Order & { lines?: Line[]; fulfillments?: Fulfillm
     subtotal: o.subtotalMinor,
     discount: o.discountMinor,
     discount_code: o.discountCode,
+    bundle_title: o.bundleTitle,
     shipping: o.shippingMinor,
     tax: o.taxMinor,
     tax_included: o.taxIncluded,

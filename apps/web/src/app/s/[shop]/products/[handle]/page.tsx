@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { Track } from "@/components/Track";
-import { getActiveProductByHandle, NotFoundError, percentOff, productPhotos, productReviews, upsellsFor, wholesaleTermsFor } from "@sf/core";
+import { bundlesForProduct, getActiveProductByHandle, NotFoundError, percentOff, productPhotos, productReviews, upsellsFor, wholesaleTermsFor } from "@sf/core";
 import { ProductGallery } from "@/components/ProductGallery";
 import { currentBuyer } from "@/lib/buyer";
 import { db } from "@/lib/server";
 import { buyerFx } from "@/lib/currency";
 import { SubmitButton } from "@/components/SubmitButton";
-import { addToCartAction, stockAlertAction, toggleSavedAction } from "../../actions";
+import { addBundleAction, addToCartAction, stockAlertAction, toggleSavedAction } from "../../actions";
 import { savedIds } from "@/lib/saved";
 import { loadShop, localProducts, storeBase, storeT, missing } from "../../data";
 import { Price } from "@/components/Price";
@@ -79,6 +79,9 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const soldOut = product.variants.filter((x) => x.stock !== null && x.stock <= 0);
   const isSaved = (await savedIds(shop.id)).includes(product.id);
   const tiers = wholesale ? [] : product.quantityBreaks;
+  // Wholesale buyers have their own prices, so bundles aren't offered to them.
+  const bundles = wholesale ? [] : await bundlesForProduct(await db(), shop.id, product.id);
+  const bundleTitles = new Map((await localProducts(shopHandle, bundles.flatMap((b) => b.products))).map((p) => [p.id, p.title]));
   const jsonLd = JSON.stringify(productJsonLd(product, shop.currency, reviews)).replace(/</g, "\\u003c");
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-10 md:grid-cols-2">
@@ -195,6 +198,37 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           <li>{t.secureCheckout}</li>
           <li>{t.questions}</li>
         </ul>
+        {bundles.map((b) => (
+          <section key={b.id} className="card p-4 flex flex-col gap-3" aria-labelledby={`bundle-${b.id}`}>
+            <div>
+              <h2 id={`bundle-${b.id}`} className="font-semibold">{t.bundleHeading(b.percentOff)}</h2>
+              <p className="hint text-sm">{b.title}</p>
+            </div>
+            <form action={addBundleAction.bind(null, shopHandle, b.id)} className="flex flex-col gap-3">
+              <ul className="flex flex-col gap-2">
+                {b.products.map((p) => {
+                  const title = bundleTitles.get(p.id) ?? p.title;
+                  const options = p.variants.filter((x) => x.available);
+                  return (
+                    <li key={p.id} className="flex items-center gap-3">
+                      <span className="size-12 rounded-md bg-sunken overflow-hidden shrink-0">{p.imageUrl && <img src={p.imageUrl} alt="" className="size-full object-cover" />}</span>
+                      <span className="flex-1 min-w-0 flex flex-col gap-1">
+                        {p.id === product.id ? <span className="text-sm font-medium">{title}</span> : <Link href={`${base}/products/${p.handle}`} className="text-sm font-medium hover:underline">{title}</Link>}
+                        {options.length > 1 && (
+                          <select name={`v_${p.id}`} aria-label={t.bundleOption(title)} className="input py-1 text-sm" defaultValue={p.id === product.id ? v?.id : options[0]!.id}>
+                            {options.map((o) => <option key={o.id} value={o.id}>{o.title}</option>)}
+                          </select>
+                        )}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="flex items-baseline gap-2 text-sm">{t.bundleTogether}: <Price minor={b.bundleMinor} compareAt={b.fullMinor} currency={shop.currency} fx={fx} /></p>
+              <SubmitButton className="btn btn-secondary" pendingText={t.adding}>{t.bundleAdd(b.products.length)}</SubmitButton>
+            </form>
+          </section>
+        ))}
         {upsells.length > 0 && (
           <section className="flex flex-col gap-3 border-t border-border pt-4" aria-labelledby="goes-well">
             <h2 id="goes-well" className="font-semibold">{t.goesWellWith}</h2>

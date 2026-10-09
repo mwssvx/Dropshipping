@@ -179,6 +179,7 @@ const routes: Record<string, Handler> = {
       shippingMinor: o.shippingMinor,
       discountMinor: o.discountMinor,
       discountCode: o.discountCode,
+      bundleTitle: o.bundleTitle,
       taxMinor: o.taxMinor,
       lines: o.lines.map((l) => ({ title: l.title, quantity: l.quantity, unitPriceMinor: l.unitPriceMinor })),
       fulfillments: o.fulfillments.map((f) => ({

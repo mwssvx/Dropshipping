@@ -103,6 +103,12 @@ export default async function CartPage({ params, searchParams }: { params: Promi
                 <dd className="text-right">{shown!.discountMinor ? `−${money(shown!.discountMinor)}` : quote.discount.label}</dd>
               </>
             )}
+            {quote.bundle && (
+              <>
+                <dt className="hint">{t.bundle} ({quote.bundle.title})</dt>
+                <dd className="text-right">−{money(shown!.discountMinor)}</dd>
+              </>
+            )}
             <dt className="hint">{t.shipping}</dt>
             <dd className="text-right">{shown!.shippingMinor ? money(shown!.shippingMinor) : quote.shipping || quote.items.every((i) => i.giftCard) ? t.free : t.atCheckout}</dd>
             <dt className="font-semibold text-base">{t.total}</dt><dd className="font-semibold text-base text-right">{money(shown!.totalMinor)}</dd>
@@ -134,7 +140,13 @@ export default async function CartPage({ params, searchParams }: { params: Promi
             </form>
           )}
           {codeProblem && <p className="banner banner-warning self-end" role="alert">{codeProblem}</p>}
-          {(!quote.discount || !quote.giftCard) && <CodeForm handle={handle} text={{ label: t.codeLabel, apply: t.apply, checking: t.checking }} />}
+          {quote.codeNotUsed && (
+            <form action={removeCodeAction.bind(null, handle)} className="self-end flex flex-col items-end gap-1 text-sm">
+              <p className="banner banner-info" role="status">{t.bundleBeatsCode(quote.codeNotUsed)}</p>
+              <button className="underline">{t.remove} {quote.codeNotUsed}</button>
+            </form>
+          )}
+          {(!(quote.discount || quote.codeNotUsed) || !quote.giftCard) && <CodeForm handle={handle} text={{ label: t.codeLabel, apply: t.apply, checking: t.checking }} />}
           {quote.wholesale && quote.wholesale.shortByMinor > 0 ? (
             <Link href={base || "/"} className="btn btn-secondary btn-lg self-end">{t.keepShopping}</Link>
           ) : (

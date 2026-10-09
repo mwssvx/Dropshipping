@@ -13,6 +13,7 @@ import { creditableCampaign } from "./campaigns";
 import { convertAmount, formatMoney, type DisplayFx } from "./money";
 import { breakFor, describeBreak, percentOff, wholesaleTermsFor } from "./wholesale";
 import { findGiftCard } from "./gift-cards";
+import { bundleSavings, bundlesInCart } from "./bundles";
 import { countryName, listShippingZones, priceRate, zoneFor } from "./shipping";
 
 type Shop = typeof schema.shops.$inferSelect;
@@ -25,7 +26,8 @@ export type CartLine = { variantId: string; quantity: number };
  * can't be used throws a message for the buyer. `buyerEmail` is the signed-in buyer (from their
  * session, never the form): an approved wholesale buyer gets wholesale prices instead of
  * quantity discounts, and can't add a discount code. Gift cards for sale never get discounts or
- * shipping. A gift card code pays for as much of the total as its balance covers.
+ * shipping. A gift card code pays for as much of the total as its balance covers. Bundles take
+ * their percentage off full sets; they don't combine with a code, so whichever saves more is used.
  */
 export async function quoteCart(
   db: Db,
@@ -75,6 +77,7 @@ export async function quoteCart(
     const unit = pct ? percentOff(row.variant.priceMinor, pct) : row.variant.priceMinor;
     return {
       variantId: row.variant.id,
+      productId: row.product.id,
       productHandle: row.product.handle,
       title,
       imageUrl: row.product.imageUrl,
@@ -105,15 +108,28 @@ export async function quoteCart(
       shipping = { rateId: rate.id, name: rate.name, minDays: rate.minDays, maxDays: rate.maxDays };
     }
   }
+  // Wholesale buyers already have their own prices.
+  const goods = items.filter((i) => !i.giftCard);
+  const savings = wholesale ? [] : bundleSavings(await bundlesInCart(db, shop.id, [...new Set(goods.map((i) => i.productId))]), goods);
+  let bundle = savings.length
+    ? { title: savings.map((b) => b.title).join(" + "), savings, discountMinor: savings.reduce((s, b) => s + b.savingMinor, 0) }
+    : null;
   let discount: { id: string; code: string; label: string; discountMinor: number; freeShipping: boolean } | null = null;
+  /** A valid code the cart didn't use because the bundle saves more. */
+  let codeNotUsed: string | null = null;
   if (opts.discountCode?.trim() && wholesale) throw new UserError("Discount codes don't apply to wholesale prices.", "discount_invalid");
   if (opts.discountCode?.trim()) {
     const d = await findUsableDiscount(db, shop, opts.discountCode, { subtotalMinor: goodsMinor, email: opts.email });
     const applied = applyDiscount(d, goodsMinor, shippingMinor);
-    shippingMinor = applied.shippingMinor;
-    discount = { id: d.id, code: d.code, label: describeDiscount(d, shop.currency), discountMinor: applied.discountMinor, freeShipping: d.kind === "free_shipping" };
+    if (bundle && bundle.discountMinor > applied.discountMinor + (shippingMinor - applied.shippingMinor)) {
+      codeNotUsed = d.code;
+    } else {
+      bundle = null;
+      shippingMinor = applied.shippingMinor;
+      discount = { id: d.id, code: d.code, label: describeDiscount(d, shop.currency), discountMinor: applied.discountMinor, freeShipping: d.kind === "free_shipping" };
+    }
   }
-  const discountMinor = discount?.discountMinor ?? 0;
+  const discountMinor = discount?.discountMinor ?? bundle?.discountMinor ?? 0;
   const totalMinor = subtotalMinor - discountMinor + shippingMinor;
   let giftCard: { id: string; last4: string; balanceMinor: number; appliedMinor: number } | null = null;
   if (opts.giftCardCode?.trim()) {
@@ -127,6 +143,9 @@ export async function quoteCart(
     currency: shop.currency,
     subtotalMinor,
     discount,
+    /** Bundle savings, when they're used instead of a code. */
+    bundle,
+    codeNotUsed,
     discountMinor,
     shippingMinor,
     totalMinor,
@@ -267,6 +286,7 @@ export async function startCheckout(
         discountMinor: quote.discountMinor,
         discountId: quote.discount?.id ?? null,
         discountCode: quote.discount?.code ?? null,
+        bundleTitle: quote.bundle?.title ?? null,
         shippingMinor: quote.shippingMinor,
         taxMinor: quote.taxMinor,
         taxIncluded: quote.taxIncluded,

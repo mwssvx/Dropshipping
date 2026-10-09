@@ -96,7 +96,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
             </ul>
             <dl className="border-t border-border px-5 py-4 text-sm grid grid-cols-[1fr_auto] gap-y-1 num">
               <dt className="hint">Subtotal</dt><dd>{money(order.subtotalMinor)}</dd>
-              {order.discountMinor > 0 && <><dt className="hint">Discount ({order.discountCode})</dt><dd>−{money(order.discountMinor)}</dd></>}
+              {order.discountMinor > 0 && <><dt className="hint">{order.discountCode ? `Discount (${order.discountCode})` : `Bundle (${order.bundleTitle})`}</dt><dd>−{money(order.discountMinor)}</dd></>}
               {!order.discountMinor && order.discountCode && <><dt className="hint">Code</dt><dd>{order.discountCode} (free shipping)</dd></>}
               <dt className="hint">Shipping{order.shippingMethod ? ` (${order.shippingMethod})` : ""}</dt><dd>{order.shippingMinor ? money(order.shippingMinor) : "Free"}</dd>
               <dt className="hint">{order.taxBreakdown.length ? order.taxBreakdown.map((t) => t.label).join(", ") : "Tax"}{order.taxIncluded ? " (included)" : ""}</dt><dd>{money(order.taxMinor)}</dd>
