@@ -67,6 +67,9 @@ export function StoreShell({
               </details>
             )}
             {picker && picker.currencies.length > 1 && <CurrencyPicker {...picker} />}
+            <Link href={`${base}/search`} className="p-2 hover:text-accent" aria-label="Search">
+              <svg viewBox="0 0 20 20" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden><circle cx="8.5" cy="8.5" r="5.5" /><path d="M13 13l4.5 4.5" strokeLinecap="round" /></svg>
+            </Link>
             <Link href={`${base}/account`} className="text-sm font-medium hover:text-accent px-2">Account</Link>
             <Link href={`${base}/cart`} className="btn btn-secondary" aria-label={`Cart, ${cartCount} items`}>
               Cart{cartCount > 0 && <span className="num rounded-full bg-ink text-surface text-xs px-1.5 py-0.5">{cartCount}</span>}

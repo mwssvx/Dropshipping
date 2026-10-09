@@ -12,6 +12,7 @@ export * from "./imports";
 export * from "./fulfillment";
 export * from "./themes";
 export * from "./collections";
+export * from "./search";
 export * from "./pages";
 export * from "./domains";
 export * from "./plans";
