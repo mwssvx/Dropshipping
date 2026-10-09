@@ -118,6 +118,7 @@ export async function checkoutAction(handle: string, _: CheckoutState, form: For
       campaignId: (await cookies()).get(campaignCookie(shop.id))?.value ?? null,
       buyerEmail: (await currentBuyer(shop.id))?.email ?? null,
       giftCardCode: await readGiftCardCode(shop.id),
+      shippingRateId: values.shippingRateId || null,
     }, tax());
     orderId = order.id;
     await track(shop.id, "checkout_start");

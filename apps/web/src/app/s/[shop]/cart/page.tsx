@@ -100,7 +100,8 @@ export default async function CartPage({ params, searchParams }: { params: Promi
                 <dd className="text-right">{shown!.discountMinor ? `−${money(shown!.discountMinor)}` : quote.discount.label}</dd>
               </>
             )}
-            <dt className="hint">Shipping</dt><dd className="text-right">{shown!.shippingMinor ? money(shown!.shippingMinor) : "Free"}</dd>
+            <dt className="hint">Shipping</dt>
+            <dd className="text-right">{shown!.shippingMinor ? money(shown!.shippingMinor) : quote.shipping || quote.items.every((i) => i.giftCard) ? "Free" : "At checkout"}</dd>
             <dt className="font-semibold text-base">Total</dt><dd className="font-semibold text-base text-right">{money(shown!.totalMinor)}</dd>
             {quote.giftCard && !otherCurrency && (
               <>

@@ -8,6 +8,7 @@ import { NotFoundError, UserError } from "./errors";
 import { CURRENCIES } from "./currency";
 import { csvCell } from "./payouts";
 import { parseTheme } from "./theme-doc";
+import { listShippingZones } from "./shipping";
 
 export const EXPORT_FORMAT = "storefront-store";
 
@@ -40,6 +41,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
     : [];
   const handleOf = new Map(products.map((p) => [p.id, p.handle]));
   const iso = (d: Date | null) => (d ? d.toISOString() : null);
+  const shipping = await listShippingZones(db, shopId);
   return {
     format: EXPORT_FORMAT,
     version: 1,
@@ -54,6 +56,14 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       presentment_currencies: shop.presentmentCurrencies,
       round_converted_prices: shop.roundConvertedPrices,
       wholesale: { enabled: shop.wholesaleEnabled, percent_off: shop.wholesalePercentOff, min_order_minor: shop.wholesaleMinOrderMinor },
+      // Missing means the built-in default rate.
+      shipping_zones: shipping.isDefault
+        ? undefined
+        : shipping.zones.map((z) => ({
+            name: z.name,
+            countries: z.countries,
+            rates: z.rates.map((r) => ({ name: r.name, price_minor: r.priceMinor, free_over_minor: r.freeOverMinor, min_days: r.minDays, max_days: r.maxDays })),
+          })),
     },
     theme: theme ? { template: theme.template, draft: theme.draft, published: theme.published } : null,
     products: products.map((p) => ({
@@ -125,6 +135,26 @@ const importSchema = z.object({
       round_converted_prices: z.boolean().optional(),
       wholesale: z
         .object({ enabled: z.boolean(), percent_off: z.number().int().min(1).max(80), min_order_minor: z.number().int().min(0).max(100_000_000) })
+        .optional(),
+      shipping_zones: z
+        .array(
+          z.object({
+            name: str(60),
+            countries: z.array(z.string().regex(/^([A-Z]{2}|\*)$/)).min(1).max(60),
+            rates: z
+              .array(
+                z.object({
+                  name: str(40),
+                  price_minor: z.number().int().min(0).max(1_000_000),
+                  free_over_minor: z.number().int().min(1).max(100_000_000).nullable(),
+                  min_days: z.number().int().min(0).max(120).nullable(),
+                  max_days: z.number().int().min(0).max(120).nullable(),
+                }),
+              )
+              .max(5),
+          }),
+        )
+        .max(50)
         .optional(),
     })
     .passthrough(),
@@ -343,6 +373,25 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
       });
     }
     if (Object.keys(settings).length) await tx.update(schema.shops).set(settings).where(eq(schema.shops.id, shopId));
+    if (data.store.shipping_zones) {
+      await tx.delete(schema.shippingZones).where(eq(schema.shippingZones.shopId, shopId));
+      for (const zone of data.store.shipping_zones) {
+        const [row] = await tx.insert(schema.shippingZones).values({ shopId, name: zone.name, countries: [...new Set(zone.countries)] }).returning();
+        if (zone.rates.length) {
+          await tx.insert(schema.shippingRates).values(
+            zone.rates.map((r) => ({
+              zoneId: row!.id,
+              shopId,
+              name: r.name,
+              priceMinor: r.price_minor,
+              freeOverMinor: r.free_over_minor,
+              minDays: r.min_days,
+              maxDays: r.min_days !== null && r.max_days !== null && r.max_days < r.min_days ? r.min_days : r.max_days,
+            })),
+          );
+        }
+      }
+    }
     return {
       products: data.products.length,
       collections: data.collections.length,
