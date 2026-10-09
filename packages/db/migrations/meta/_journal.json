@@ -162,6 +162,13 @@
       "when": 1791515517167,
       "tag": "0022_m21_pricing",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791516933648,
+      "tag": "0023_m22_customers",
+      "breakpoints": true
     }
   ]
 }

@@ -149,8 +149,9 @@ export async function reorderLines(db: Db, shopId: string, buyerEmail: string, o
 }
 
 /** Customers for the merchant: who bought, how often, how much and when last. */
-export async function listCustomers(db: Db, shopId: string, opts: { query?: string } = {}) {
+export async function listCustomers(db: Db, shopId: string, opts: { query?: string; tag?: string } = {}) {
   const q = opts.query?.trim().toLowerCase();
+  const tag = opts.tag?.trim().toLowerCase();
   const rows = await db
     .select({
       id: schema.customers.id,
@@ -159,16 +160,23 @@ export async function listCustomers(db: Db, shopId: string, opts: { query?: stri
       createdAt: schema.customers.createdAt,
       lastSignInAt: schema.customers.lastSignInAt,
       acceptsMarketing: schema.customers.acceptsMarketing,
+      tags: schema.customers.tags,
       orders: sql<number>`count(${schema.orders.id}) filter (where ${schema.orders.paymentStatus} in ('paid', 'partially_refunded', 'refunded'))`.mapWith(Number),
       spentMinor: sql<number>`coalesce(sum(${schema.orders.totalMinor} - ${schema.orders.refundedMinor}) filter (where ${schema.orders.paymentStatus} in ('paid', 'partially_refunded', 'refunded')), 0)`.mapWith(Number),
       lastOrderAt: sql<Date | null>`max(${schema.orders.paidAt})`.mapWith((v) => (v ? new Date(v) : null)),
     })
     .from(schema.customers)
     .leftJoin(schema.orders, and(eq(schema.orders.shopId, schema.customers.shopId), eq(schema.orders.email, schema.customers.email)))
-    .where(and(eq(schema.customers.shopId, shopId), q ? sql`(lower(${schema.customers.email}) like ${`%${q}%`} or lower(coalesce(${schema.customers.name}, '')) like ${`%${q}%`})` : undefined))
+    .where(
+      and(
+        eq(schema.customers.shopId, shopId),
+        q ? sql`(lower(${schema.customers.email}) like ${`%${q}%`} or lower(coalesce(${schema.customers.name}, '')) like ${`%${q}%`})` : undefined,
+        tag ? sql`${schema.customers.tags} @> ${JSON.stringify([tag])}::jsonb` : undefined,
+      ),
+    )
     .groupBy(schema.customers.id)
     // Leaves out addresses that only asked for the newsletter and never confirmed or bought.
-    .having(sql`count(${schema.orders.id}) > 0 or bool_or(${schema.customers.acceptsMarketing}) or max(${schema.customers.lastSignInAt}) is not null or max(${schema.customers.name}) is not null or bool_or(${schema.customers.wholesaleStatus} = 'approved')`)
+    .having(sql`count(${schema.orders.id}) > 0 or bool_or(${schema.customers.acceptsMarketing}) or max(${schema.customers.lastSignInAt}) is not null or max(${schema.customers.name}) is not null or bool_or(${schema.customers.wholesaleStatus} = 'approved') or max(jsonb_array_length(${schema.customers.tags})) > 0`)
     .orderBy(sql`max(${schema.orders.paidAt}) desc nulls last`, desc(schema.customers.createdAt))
     .limit(500);
   return rows;
