@@ -176,6 +176,13 @@
       "when": 1791518200721,
       "tag": "0024_m23_stock",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791535248171,
+      "tag": "0025_m24_gallery",
+      "breakpoints": true
     }
   ]
 }

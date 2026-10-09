@@ -1,4 +1,4 @@
-// Milestone 1 to 24 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 25 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -157,7 +157,10 @@ export const products = pgTable(
     title: text("title").notNull(),
     handle: text("handle").notNull(),
     descriptionHtml: text("description_html").notNull().default(""),
+    /** The cover photo, kept equal to images[0] so lists and emails need only one field. */
     imageUrl: text("image_url"),
+    /** Every photo in order, cover first. */
+    images: jsonb("images").$type<string[]>().notNull().default([]),
     status: text("status", { enum: ["draft", "active", "archived"] }).notNull().default("draft"),
     supplierId: uuid("supplier_id").references(() => suppliers.id, { onDelete: "set null" }),
     supplierProductRef: text("supplier_product_ref"),

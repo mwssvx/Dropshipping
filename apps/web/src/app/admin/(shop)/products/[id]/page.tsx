@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct } from "@sf/core";
+import { getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos } from "@sf/core";
 import { requireShop, suppliers } from "@/lib/server";
 import { updateProductAction } from "../../../actions";
 import { setUpsellAction } from "../../../growth-actions";
@@ -8,6 +8,7 @@ import { setProductSupplierAction } from "../../../supplier-actions";
 import { PageHeader } from "../../PageHeader";
 import { ProductForm } from "../ProductForm";
 import { QuantityBreaksForm } from "./QuantityBreaksForm";
+import { PhotosPanel } from "./PhotosPanel";
 import { StockPanel } from "./StockPanel";
 import { WriteListingButton } from "./WriteListingButton";
 
@@ -54,7 +55,6 @@ export default async function EditProductPage({ params, searchParams }: { params
           initial={{
             title: product.title,
             description: product.descriptionHtml,
-            imageUrl: product.imageUrl ?? "",
             status: product.status,
             variants: product.variants.map((v) => ({
               title: v.title,
@@ -66,6 +66,7 @@ export default async function EditProductPage({ params, searchParams }: { params
             })),
             supplier: product.supplier ? { label: product.supplier.label, sourceUrl: product.sourceUrl } : undefined,
           }} />
+        <PhotosPanel productId={product.id} title={product.title} photos={productPhotos(product)} max={MAX_PHOTOS} />
         {product.giftCard ? (
           <p className="banner banner-info max-w-3xl">
             This is your gift card. Each option&apos;s price is what the card is worth, and codes are emailed to the buyer when they pay.

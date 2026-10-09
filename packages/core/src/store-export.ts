@@ -7,6 +7,7 @@ import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
 import { CURRENCIES } from "./currency";
 import { csvCell } from "./payouts";
+import { photoColumns } from "./gallery";
 import { parseTheme } from "./theme-doc";
 import { listShippingZones } from "./shipping";
 
@@ -72,6 +73,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       title: p.title,
       description_html: p.descriptionHtml,
       image_url: p.imageUrl,
+      images: p.images,
       status: p.status,
       source_url: p.sourceUrl,
       supplier: p.supplierId ? supplierOf(supplierRows.find((s) => s.id === p.supplierId), p.supplierProductRef) : null,
@@ -176,6 +178,7 @@ const importSchema = z.object({
         title: str(200).min(1),
         description_html: str(100_000).default(""),
         image_url: str(2000).nullable().optional(),
+        images: z.array(str(2000)).max(10).optional(),
         status: z.enum(["draft", "active", "archived"]),
         source_url: str(2000).nullable().optional(),
         supplier: z
@@ -312,7 +315,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
           handle: x.handle,
           title: x.title,
           descriptionHtml: x.description_html,
-          imageUrl: x.image_url ?? null,
+          ...photoColumns(x.images?.length ? x.images : x.image_url ? [x.image_url] : []),
           status: x.status,
           sourceUrl: x.source_url ?? null,
           supplierId: key ? supplierIds.get(key)! : null,

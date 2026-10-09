@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Track } from "@/components/Track";
-import { describeBreak, getActiveProductByHandle, NotFoundError, percentOff, productReviews, upsellsFor, wholesaleTermsFor } from "@sf/core";
+import { describeBreak, getActiveProductByHandle, NotFoundError, percentOff, productPhotos, productReviews, upsellsFor, wholesaleTermsFor } from "@sf/core";
+import { ProductGallery } from "@/components/ProductGallery";
 import { currentBuyer } from "@/lib/buyer";
 import { db } from "@/lib/server";
 import { buyerFx } from "@/lib/currency";
@@ -24,7 +25,8 @@ export async function generateMetadata({ params }: { params: Promise<{ shop: str
   const { shop, handle } = await params;
   const { product } = await load(shop, handle);
   const description = summary(product.descriptionHtml) || undefined;
-  const images = product.imageUrl ? [{ url: product.imageUrl }] : undefined;
+  const photos = productPhotos(product);
+  const images = photos.length ? photos.map((url) => ({ url })) : undefined;
   return { title: product.title, description, openGraph: { title: product.title, description, images, type: "website" } };
 }
 
@@ -40,7 +42,7 @@ function productJsonLd(product: Awaited<ReturnType<typeof load>>["product"], cur
     "@type": "Product",
     name: product.title,
     description: summary(product.descriptionHtml) || undefined,
-    image: product.imageUrl ?? undefined,
+    image: productPhotos(product).length ? productPhotos(product) : undefined,
     offers: product.variants.map((x) => ({
       "@type": "Offer",
       name: x.title,
@@ -75,9 +77,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-10 md:grid-cols-2">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
-      <div className="sf-media aspect-square rounded-xl bg-sunken overflow-hidden">
-        {product.imageUrl && <img src={product.imageUrl} alt={product.title} width={800} height={800} fetchPriority="high" className="size-full object-cover" />}
-      </div>
+      <ProductGallery title={product.title} photos={productPhotos(product)} />
       <div className="flex flex-col gap-5">
         <Track shopId={shop.id} kind="product_view" productId={product.id} />
         <h1 className="text-3xl font-bold tracking-tight">{product.title}</h1>

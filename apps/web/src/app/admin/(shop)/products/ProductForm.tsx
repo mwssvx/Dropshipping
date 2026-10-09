@@ -9,7 +9,8 @@ export type VariantValues = { title: string; price: string; compareAt: string; c
 type Values = {
   title: string;
   description: string;
-  imageUrl: string;
+  /** Only when adding a product; after that, photos have their own editor. */
+  imageUrl?: string;
   status: "draft" | "active" | "archived";
   variants: VariantValues[];
   /** Shown when the product came from a supplier. */
@@ -50,11 +51,13 @@ export function ProductForm({
             <textarea className="input" id="description" name="description" rows={6} defaultValue={initial.description}
               placeholder="What it is, who it's for, and why it's worth it." />
           </div>
-          <div className="field">
-            <label className="label" htmlFor="imageUrl">Image address</label>
-            <input className="input" id="imageUrl" name="imageUrl" type="url" defaultValue={initial.imageUrl} placeholder="https://…" />
-            <span className="hint">Uploads and supplier images arrive with supplier import.</span>
-          </div>
+          {initial.imageUrl !== undefined && (
+            <div className="field">
+              <label className="label" htmlFor="imageUrl">Photo address</label>
+              <input className="input" id="imageUrl" name="imageUrl" type="url" defaultValue={initial.imageUrl} placeholder="https://…" />
+              <span className="hint">You can upload more photos once the product is added.</span>
+            </div>
+          )}
         </section>
         <section className="card p-5 flex flex-col gap-4">
           <div className="flex justify-between gap-3 flex-wrap items-baseline">
