@@ -1,4 +1,4 @@
-// Milestone 1 to 26 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 27 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -214,6 +214,8 @@ export const customers = pgTable(
     lastSignInAt: timestamp("last_sign_in_at", { withTimezone: true }),
     // Marketing email consent: given at checkout or on their account page, never assumed.
     acceptsMarketing: boolean("accepts_marketing").notNull().default(false),
+    /** Emails when an item they saved gets cheaper. Asked for by the buyer, so separate from marketing. */
+    priceAlerts: boolean("price_alerts").notNull().default(true),
     marketingConsentAt: timestamp("marketing_consent_at", { withTimezone: true }),
     unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
     // When we last emailed a "confirm your signup" link, so a signup form can't be used to flood an inbox.
@@ -1147,4 +1149,22 @@ export const redirects = pgTable(
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("redirects_shop_from_uq").on(t.shopId, t.fromPath)],
+);
+
+// Products a signed-in buyer saved for later. Guests keep theirs in a cookie until they sign in.
+export const savedItems = pgTable(
+  "saved_items",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    customerId: uuid("customer_id").notNull().references(() => customers.id, { onDelete: "cascade" }),
+    productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+    /** The lowest price when they saved it, shown as "was" on their Saved page. */
+    priceMinor: integer("price_minor").notNull(),
+    /** The price the next price-drop email is measured against: the saved price, then each price we told them about. */
+    alertPriceMinor: integer("alert_price_minor").notNull(),
+    lastAlertAt: timestamp("last_alert_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("saved_items_customer_product_uq").on(t.customerId, t.productId), index("saved_items_shop_product_idx").on(t.shopId, t.productId)],
 );

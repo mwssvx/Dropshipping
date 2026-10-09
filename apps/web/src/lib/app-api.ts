@@ -27,6 +27,7 @@ import {
   NotFoundError,
   patchProduct,
   productPhotos,
+  sendPriceDrops,
   sendStockAlerts,
   previewImport,
   refundOrder,
@@ -216,7 +217,9 @@ const routes: Record<string, Handler> = {
   "GET products/:id": async ({ params, db, shop }) => productView(await getProduct(db, shop.id, params.id!)),
   "PATCH products/:id": async ({ req, params, db, shop }) => {
     const product = await patchProduct(db, shop.id, params.id!, await body(req));
-    await sendStockAlerts(await stock(), { shopId: shop.id });
+    const ctx = await stock();
+    await sendStockAlerts(ctx, { shopId: shop.id });
+    await sendPriceDrops(ctx, { shopId: shop.id });
     return productView(product);
   },
   "POST products/:id/listing": async ({ params, shop }) => {

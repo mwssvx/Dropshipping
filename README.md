@@ -224,3 +224,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Product web addresses** (`packages/core/src/redirects.ts`): the product page has a Web address card to change a product's address (its handle). The old address keeps working through a redirect, and earlier redirects to it are pointed straight at the new one, so there are no chains.
 2. **Redirects page** (Online store → Redirects, owners and admins): paste old links one per line, the old address then where it goes, from a spreadsheet or a previous store's export. Full addresses are trimmed to their path; lines that can't be used (like the cart or checkout) stay in the box with the reason. Each redirect shows its visits and can be removed. Up to 2,000 per store.
 3. **On the store**: a redirect is only used when nothing on the store is at that address, so it never hides a real page. Product, collection, page and blog addresses, and any other unknown path, check redirects before showing "not found". Redirects travel in the store file.
+
+### Saved items and price drops (after launch, part 19)
+
+1. **Saving** (`packages/core/src/saved.ts`, `saved_items`): the product page has "Save for later", and the heart in the store header opens the Saved items page. Guests' saves live in a cookie for 90 days and move into their account when they sign in. Up to 50 per buyer. The page marks items that got cheaper since they were saved and items that sold out.
+2. **Price-drop emails**: when a saved item's price drops by at least 1%, whether from the merchant's edit, a repricing or the daily job, the buyer gets one email listing everything that got cheaper, at most once a day. Buyers can turn these off on the Saved items page (`customers.price_alerts`). Saved items are part of a buyer's data export and are removed when their data is erased.
+3. **Admin**: the product page shows how many buyers saved it, so the merchant knows a price cut will reach them.

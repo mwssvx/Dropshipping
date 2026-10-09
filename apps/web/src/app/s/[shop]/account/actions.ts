@@ -1,9 +1,10 @@
 "use server";
 import { redirect } from "next/navigation";
-import { applyForWholesale, reorderLines, requestBuyerCode, signOutBuyer, subscribeBuyer, unsubscribeBuyer, UserError, verifyBuyerCode } from "@sf/core";
+import { applyForWholesale, mergeSaved, reorderLines, requestBuyerCode, signOutBuyer, subscribeBuyer, unsubscribeBuyer, UserError, verifyBuyerCode } from "@sf/core";
 import { readCart, writeCart } from "@/lib/cart";
 import { buyerToken, clearBuyerCookie, currentBuyer, setBuyerCookie } from "@/lib/buyer";
 import { db, mailer } from "@/lib/server";
+import { readGuestSaved, writeGuestSaved } from "@/lib/saved";
 import { loadShop, storeBase } from "../data";
 
 export type SignInState = { step?: "email" | "code"; email?: string; error?: string };
@@ -18,13 +19,19 @@ export async function buyerSignInAction(handle: string, _: SignInState, form: Fo
       const sent = await requestBuyerCode({ db: await db(), mailer: mailer() }, shop, email);
       return { step: "code", email: sent.email };
     }
-    const { token } = await verifyBuyerCode(await db(), shop.id, email, String(code));
+    const { token, customer } = await verifyBuyerCode(await db(), shop.id, email, String(code));
     await setBuyerCookie(shop.id, token);
+    // Anything they saved as a guest moves to their account.
+    const guest = await readGuestSaved(shop.id);
+    if (guest.length) {
+      await mergeSaved(await db(), shop.id, customer.id, guest);
+      await writeGuestSaved(shop.id, []);
+    }
   } catch (e) {
     if (e instanceof UserError) return { step: code === null ? "email" : "code", email, error: e.message };
     throw e;
   }
-  redirect(`${await storeBase(handle)}/account`);
+  redirect(`${await storeBase(handle)}${form.get("next") === "saved" ? "/saved" : "/account"}`);
 }
 
 export async function buyerSignOutAction(handle: string) {

@@ -1,8 +1,8 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { applyRepricing, parseMoney, setPricingRule, UserError } from "@sf/core";
-import { requireShop } from "@/lib/server";
+import { applyRepricing, parseMoney, sendPriceDrops, setPricingRule, UserError } from "@sf/core";
+import { requireShop, stock } from "@/lib/server";
 import type { FormState } from "./actions";
 
 export type RepriceState = FormState;
@@ -44,6 +44,8 @@ export async function repriceAction(_: RepriceState): Promise<RepriceState> {
     if (e instanceof UserError) return { error: e.message };
     throw e;
   }
+  // Buyers who saved a product hear about it right away when the new rule makes it cheaper.
+  await sendPriceDrops(await stock(), { shopId: shop.id });
   revalidatePath("/admin/products");
   revalidatePath(`/s/${shop.handle}`, "layout");
   // The list empties once everything follows the rule, so the result is said on the page itself.

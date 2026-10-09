@@ -10,6 +10,7 @@ import {
   parseMoney,
   requireMember,
   retryOrder,
+  sendPriceDrops,
   sendStockAlerts,
   syncTracking,
   updateProduct,
@@ -112,6 +113,8 @@ export async function updateProductAction(productId: string, _: FormState, form:
   }
   // Buyers waiting on an option that's back hear straight away.
   const { sent } = await sendStockAlerts(await stock(), { shopId: shop.id });
+  // Buyers who saved it hear if it got cheaper.
+  await sendPriceDrops(await stock(), { shopId: shop.id });
   revalidatePath("/admin/products");
   revalidatePath(`/s/${shop.handle}`, "layout");
   // The form remounts with the saved values, so the confirmation rides on the address.
