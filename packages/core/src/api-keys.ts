@@ -2,6 +2,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { and, asc, desc, eq, gte, inArray, isNull, type SQL } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
+import { productPhotos } from "./gallery";
 import { NotFoundError, UserError } from "./errors";
 
 const hash = (key: string) => createHash("sha256").update(key).digest("hex");
@@ -95,6 +96,7 @@ export function publicProduct(p: Product & { variants: Variant[] }) {
     title: p.title,
     description_html: p.descriptionHtml,
     image_url: p.imageUrl,
+    images: productPhotos(p),
     status: p.status,
     created_at: iso(p.createdAt),
     updated_at: iso(p.updatedAt),

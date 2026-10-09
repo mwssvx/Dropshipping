@@ -89,7 +89,11 @@ test("the owner invites staff, who only see orders and products, then makes them
   const row = page.getByRole("listitem", { name: staffEmail });
   await expect(row).toBeVisible();
   await row.getByLabel(`Role for ${staffEmail}`).selectOption("admin");
+  // The select shows "admin" before the save lands, so wait for the server's answer.
+  const saved = page.waitForResponse((r) => r.request().method() === "POST" && r.url().includes("/admin/team"));
   await row.getByRole("button", { name: "Save" }).click();
+  await saved;
+  await page.reload();
   await expect(page.getByLabel(`Role for ${staffEmail}`)).toHaveValue("admin");
 
   await sam.goto("/admin/money");

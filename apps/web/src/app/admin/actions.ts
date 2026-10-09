@@ -83,7 +83,7 @@ function readProduct(form: FormData): ProductInput {
   return {
     title: String(form.get("title") ?? ""),
     descriptionHtml: String(form.get("description") ?? ""),
-    imageUrl: String(form.get("imageUrl") ?? ""),
+    imageUrl: form.has("imageUrl") ? String(form.get("imageUrl")) : undefined,
     status: form.get("status") === "active" ? "active" : "draft",
     variants,
   };

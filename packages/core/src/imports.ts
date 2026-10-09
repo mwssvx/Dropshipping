@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { schema, type Db, type PricingRule } from "@sf/db";
 import { z } from "zod";
 import { UserError } from "./errors";
+import { photoColumns } from "./gallery";
 import { uniqueHandle } from "./handles";
 import { compareAtFor, DEFAULT_PRICING_RULE, priceFromCost, pricingRuleOf } from "./pricing";
 import { SupplierError, type SupplierAdapter, type SupplierProduct, type Suppliers } from "./suppliers";
@@ -112,7 +113,7 @@ export async function importProduct(db: Db, suppliers: Suppliers, shopId: string
         title: data.title,
         handle,
         descriptionHtml: data.description ?? product.description,
-        imageUrl: product.images[0] ?? null,
+        ...photoColumns(product.images),
         status: data.publish ? "active" : "draft",
         supplierId: link!.id,
         supplierProductRef: product.ref,

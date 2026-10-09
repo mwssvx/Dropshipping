@@ -95,6 +95,9 @@ test("too many wrong passwords pause sign-in for that email", async ({ page }, i
     await page.getByRole("button", { name: "Sign in" }).click();
     await answered;
     await expect(page.getByText("That email and password don't match.")).toBeVisible();
+    // React clears the password once the answer renders; typing before then would be wiped,
+    // and the browser won't submit an empty required field.
+    await expect(page.getByLabel("Password")).toHaveValue("");
   }
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill("wrong password 9");

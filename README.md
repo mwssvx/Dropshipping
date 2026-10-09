@@ -212,3 +212,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Supplier stock sync** (`packages/core/src/stock.ts`): the scheduled job re-reads each imported product's stock and cost from its supplier once a day, so the store stops selling what the supplier ran out of and margins follow cost changes. A listing the supplier took down sells out. The product page has "Check supplier now" for an instant check (`products.stock_checked_at`).
 2. **Stock by hand**: each option has a Stock field (blank means not counted). Products from your own suppliers or added by hand keep what you set; supplier products follow the supplier.
 3. **Back-in-stock alerts** (`stock_alerts`): a sold-out option shows "Email me when it's back" on the store. When it has stock again, whether from the daily sync, the merchant's edit, the app or the API, each waiting buyer gets one email. The product page shows how many buyers are waiting for each option. Requests are part of a buyer's data export and are removed when their data is erased.
+
+### Product photos (after launch, part 17)
+
+1. **Galleries** (`packages/core/src/gallery.ts`): each product keeps up to 10 photos in order (`products.images`); the first is the main photo and is also kept in `products.image_url`, which lists, carts, emails and search read. Imports keep every photo the supplier lists, and existing products start with their one photo.
+2. **Editing**: the product page has a Photos card to upload a photo (JPG, PNG or WebP up to 5 MB, stored like app uploads) or paste an https address, make one the main photo, move them, and remove them. A photo taken in the phone app becomes the main photo.
+3. **Store**: the product page shows the main photo large with thumbnails to switch, and gives every photo to search engines and link previews. The public API, the app API and the store file include the full list.

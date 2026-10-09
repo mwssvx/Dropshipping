@@ -3,6 +3,7 @@ import { schema, type Db } from "@sf/db";
 import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
 import { uniqueHandle } from "./handles";
+import { editProductPhotos, photoColumns } from "./gallery";
 
 const variantInput = z.object({
   title: z.string().trim().min(1).default("Default"),
@@ -36,7 +37,7 @@ function parse(input: ProductInput) {
 }
 
 export async function createProduct(db: Db, shopId: string, input: ProductInput) {
-  const { variants, ...data } = parse(input);
+  const { variants, imageUrl, ...data } = parse(input);
   const handle = await uniqueHandle(data.title, async (h) =>
     !!(await db.query.products.findFirst({
       where: and(eq(schema.products.shopId, shopId), eq(schema.products.handle, h)),
@@ -44,14 +45,16 @@ export async function createProduct(db: Db, shopId: string, input: ProductInput)
     })),
   );
   return db.transaction(async (tx) => {
-    const [product] = await tx.insert(schema.products).values({ ...data, shopId, handle }).returning();
+    const [product] = await tx.insert(schema.products).values({ ...data, ...photoColumns(imageUrl ? [imageUrl] : []), shopId, handle }).returning();
     await tx.insert(schema.variants).values(variants.map((v, i) => ({ ...v, productId: product!.id, position: i })));
     return product!;
   });
 }
 
 export async function updateProduct(db: Db, shopId: string, productId: string, input: ProductInput) {
-  const { variants, ...data } = parse(input);
+  const { variants, imageUrl, ...data } = parse(input);
+  // Photos have their own editor; an image address given here (the API) becomes the cover.
+  if (imageUrl) await editProductPhotos(db, shopId, productId, { kind: "add", url: imageUrl, cover: true });
   return db.transaction(async (tx) => {
     const [product] = await tx
       .update(schema.products)
@@ -154,13 +157,8 @@ export async function patchProduct(db: Db, shopId: string, productId: string, in
   return getProduct(db, shopId, productId);
 }
 
-/** A photo the merchant uploaded; the address comes from our own media route. */
+/** A photo the merchant uploaded from the app becomes the cover; the address is our own media route. */
 export async function setProductImage(db: Db, shopId: string, productId: string, imageUrl: string) {
-  const [row] = await db
-    .update(schema.products)
-    .set({ imageUrl, updatedAt: new Date() })
-    .where(and(eq(schema.products.id, productId), eq(schema.products.shopId, shopId)))
-    .returning();
-  if (!row) throw new NotFoundError("Product");
-  return row;
+  await editProductPhotos(db, shopId, productId, { kind: "add", url: imageUrl, cover: true });
+  return (await db.query.products.findFirst({ where: eq(schema.products.id, productId) }))!;
 }
