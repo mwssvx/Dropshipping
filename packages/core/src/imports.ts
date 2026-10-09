@@ -1,13 +1,19 @@
 import { and, eq } from "drizzle-orm";
-import { schema, type Db } from "@sf/db";
+import { schema, type Db, type PricingRule } from "@sf/db";
 import { z } from "zod";
 import { UserError } from "./errors";
 import { uniqueHandle } from "./handles";
+import { compareAtFor, DEFAULT_PRICING_RULE, priceFromCost, pricingRuleOf } from "./pricing";
 import { SupplierError, type SupplierAdapter, type SupplierProduct, type Suppliers } from "./suppliers";
 
-/** Starting retail price: about 2.5x cost, ending in .99. The merchant can change it before import. */
-export function suggestPrice(costMinor: number): number {
-  return Math.max(99, Math.ceil((costMinor * 2.5) / 100) * 100 - 1);
+/** Starting retail price from the store's pricing rule. The merchant can change it before import. */
+export function suggestPrice(costMinor: number, rule: PricingRule = DEFAULT_PRICING_RULE): number {
+  return priceFromCost(costMinor, rule);
+}
+
+async function ruleFor(db: Db, shopId: string) {
+  const shop = await db.query.shops.findFirst({ where: eq(schema.shops.id, shopId), columns: { pricingRule: true } });
+  return shop ? pricingRuleOf(shop) : DEFAULT_PRICING_RULE;
 }
 
 export type ImportPreview = {
@@ -38,10 +44,11 @@ async function findExisting(db: Db, shopId: string, ref: string) {
 
 export async function previewImport(db: Db, suppliers: Suppliers, shopId: string, url: string): Promise<ImportPreview> {
   const { supplier, product } = await fetchProduct(suppliers, url);
+  const rule = await ruleFor(db, shopId);
   return {
     supplier: { name: supplier.name, label: supplier.label },
     product,
-    suggestedPrices: Object.fromEntries(product.variants.map((v) => [v.ref, suggestPrice(v.costMinor)])),
+    suggestedPrices: Object.fromEntries(product.variants.map((v) => [v.ref, suggestPrice(v.costMinor, rule)])),
     alreadyImported: await findExisting(db, shopId, product.ref),
   };
 }
@@ -66,12 +73,14 @@ export async function importProduct(db: Db, suppliers: Suppliers, shopId: string
   const existing = await findExisting(db, shopId, product.ref);
   if (existing) throw new UserError(`You've already imported this product as "${existing.title}".`, "duplicate");
 
+  const rule = await ruleFor(db, shopId);
   const variants = product.variants.map((v, i) => {
-    const price = data.prices[v.ref] ?? suggestPrice(v.costMinor);
+    const price = data.prices[v.ref] ?? suggestPrice(v.costMinor, rule);
     return {
       title: v.title,
       supplierVariantRef: v.ref,
       priceMinor: price,
+      compareAtMinor: compareAtFor(price, rule),
       costMinor: v.costMinor,
       stock: v.stock,
       shipDaysMin: v.shipDaysMin,

@@ -195,3 +195,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Building the order** (Orders → Create payment link; `packages/core/src/payment-links.ts`): the merchant picks products and quantities, enters the customer's email and address, and can add one of their discount codes and a note. The order goes through the same `startCheckout` as the store, so prices, shipping zones, tax and fees match exactly. It's marked `orders.source = 'payment_link'`.
 2. **Paying**: the customer gets "Your order from … is ready to pay" with the note and a link to the store's pay page, which shows the note too. Once paid it's an ordinary order (receipt, supplier, tracking). The order page shows the link with Copy and "Email the link again" (up to 5 sends). Payment links are left out of abandoned-checkout reminders.
+
+### Pricing rules (after launch, part 14)
+
+1. **The rule** (Products → Pricing; `packages/core/src/pricing.ts`, `shops.pricing_rule`): multiply supplier cost (1.05× to 20×) or add a fixed amount, round up to .99, .95, a whole amount or not at all, a lowest price, and optionally a crossed-out "was" price a percentage higher (with a note on consumer law). Stores without a rule keep the old default, 2.5× ending in .99. The page shows sample costs with the price and what the merchant keeps after card and plan fees.
+2. **Where it applies**: new imports start at the rule's prices (and its crossed-out price). Existing products whose supplier cost is known can be brought in line: the page lists every option the rule would change, now and new, and "Update N products" applies them all. Options without a known cost are left alone, and gift cards are never repriced.

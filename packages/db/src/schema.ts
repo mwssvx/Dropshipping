@@ -1,4 +1,4 @@
-// Milestone 1 to 20 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 21 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -48,6 +48,12 @@ export const sessions = pgTable(
   (t) => [index("sessions_user_idx").on(t.userId)],
 );
 
+/**
+ * cost × multiplier, or cost + fixed amount; then rounded up to end in .99, .95 or .00 (or left
+ * exact); an optional "was" price a percentage higher shows as a crossed-out price.
+ */
+export type PricingRule = { kind: "multiplier" | "fixed"; value: number; ending: "99" | "95" | "00" | "none"; compareAtPercent: number | null; minPriceMinor: number };
+
 export const shops = pgTable(
   "shops",
   {
@@ -94,6 +100,8 @@ export const shops = pgTable(
     // Buyers can ask for a return this many days after delivery; 0 turns the form off.
     returnWindowDays: integer("return_window_days").notNull().default(30),
     returnInstructions: text("return_instructions"),
+    // How supplier cost becomes a retail price, for imports and "reprice everything".
+    pricingRule: jsonb("pricing_rule").$type<PricingRule>(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
