@@ -8,6 +8,7 @@ import { NotFoundError, UserError } from "./errors";
 import { CURRENCIES } from "./currency";
 import { csvCell } from "./payouts";
 import { photoColumns } from "./gallery";
+import { addRedirect } from "./redirects";
 import { parseTheme } from "./theme-doc";
 import { listShippingZones } from "./shipping";
 
@@ -23,7 +24,7 @@ function supplierOf(link: typeof schema.suppliers.$inferSelect | undefined, prod
 export async function exportStore(db: Db, shopId: string, now = new Date()) {
   const shop = await db.query.shops.findFirst({ where: eq(schema.shops.id, shopId) });
   if (!shop) throw new NotFoundError("Store");
-  const [products, collections, links, pages, theme, discounts, supplierRows, posts] = await Promise.all([
+  const [products, collections, links, pages, theme, discounts, supplierRows, posts, redirectRows] = await Promise.all([
     db.query.products.findMany({ where: eq(schema.products.shopId, shopId), orderBy: asc(schema.products.createdAt) }),
     db.query.collections.findMany({ where: eq(schema.collections.shopId, shopId), orderBy: asc(schema.collections.createdAt) }),
     db
@@ -37,6 +38,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
     db.query.discounts.findMany({ where: eq(schema.discounts.shopId, shopId), orderBy: asc(schema.discounts.createdAt) }),
     db.query.suppliers.findMany({ where: eq(schema.suppliers.shopId, shopId) }),
     db.query.blogPosts.findMany({ where: eq(schema.blogPosts.shopId, shopId), orderBy: asc(schema.blogPosts.createdAt) }),
+    db.query.redirects.findMany({ where: eq(schema.redirects.shopId, shopId), orderBy: asc(schema.redirects.fromPath) }),
   ]);
   const variants = products.length
     ? await db.query.variants.findMany({ where: inArray(schema.variants.productId, products.map((p) => p.id)), orderBy: asc(schema.variants.position) })
@@ -125,6 +127,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       ends_at: iso(d.endsAt),
       active: d.active,
     })),
+    redirects: redirectRows.map((r) => ({ from: r.fromPath, to: r.toPath })),
   };
 }
 
@@ -235,6 +238,10 @@ const importSchema = z.object({
       }),
     )
     .max(1000)
+    .default([]),
+  redirects: z
+    .array(z.object({ from: str(500), to: str(2000) }))
+    .max(2000)
     .default([]),
   discount_codes: z
     .array(
@@ -393,6 +400,16 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
         })
         .onConflictDoNothing();
     }
+    // Redirects are checked one by one; any the store can't use are left out.
+    let redirectsAdded = 0;
+    for (const r of data.redirects) {
+      try {
+        await addRedirect(tx as unknown as Db, shopId, r);
+        redirectsAdded++;
+      } catch (e) {
+        if (!(e instanceof UserError)) throw e;
+      }
+    }
     if (theme) {
       // Home sections that showed a collection point at its new copy, or at all products.
       const remap = (doc: typeof theme.draft) => ({
@@ -440,6 +457,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
       collections: data.collections.length,
       pages: data.pages.length,
       discountCodes: data.discount_codes.length,
+      redirects: redirectsAdded,
       theme: !!theme,
       currencyDiffers: typeof data.store.currency === "string" && data.store.currency !== shop.currency,
     };

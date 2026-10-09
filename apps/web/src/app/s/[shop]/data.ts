@@ -1,8 +1,8 @@
 import "server-only";
 import { cache } from "react";
 import { headers } from "next/headers";
-import { notFound } from "next/navigation";
-import { getPublishedTheme, getShopByHandle, getShopByHostname, NotFoundError } from "@sf/core";
+import { notFound, permanentRedirect } from "next/navigation";
+import { findRedirect, getPublishedTheme, getShopByHandle, getShopByHostname, NotFoundError } from "@sf/core";
 import { db } from "@/lib/server";
 import { STORE_HOST_HEADER } from "@/lib/brand";
 
@@ -35,3 +35,16 @@ export const loadTheme = cache(async (param: string) => {
   const shop = await loadShop(param);
   return getPublishedTheme(await db(), shop);
 });
+
+
+/**
+ * Nothing on the store answers this path: send the buyer on if the merchant set up a redirect
+ * (a renamed product, or a link from their old store), otherwise show the not-found page.
+ */
+export async function missing(param: string, path: string, count = true): Promise<never> {
+  const shop = await loadShop(param);
+  // Page metadata asks too; only the page itself counts the visit.
+  const to = await findRedirect(await db(), shop.id, path, { count });
+  if (!to) notFound();
+  permanentRedirect(to.startsWith("https://") ? to : `${await storeBase(param)}${to}`);
+}

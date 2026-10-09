@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos } from "@sf/core";
-import { requireShop, suppliers } from "@/lib/server";
+import { requireShop, storeAddress, suppliers } from "@/lib/server";
 import { updateProductAction } from "../../../actions";
 import { setUpsellAction } from "../../../growth-actions";
 import { setProductSupplierAction } from "../../../supplier-actions";
 import { PageHeader } from "../../PageHeader";
 import { ProductForm } from "../ProductForm";
 import { QuantityBreaksForm } from "./QuantityBreaksForm";
+import { AddressForm } from "./AddressForm";
 import { PhotosPanel } from "./PhotosPanel";
 import { StockPanel } from "./StockPanel";
 import { WriteListingButton } from "./WriteListingButton";
@@ -67,6 +68,7 @@ export default async function EditProductPage({ params, searchParams }: { params
             supplier: product.supplier ? { label: product.supplier.label, sourceUrl: product.sourceUrl } : undefined,
           }} />
         <PhotosPanel productId={product.id} title={product.title} photos={productPhotos(product)} max={MAX_PHOTOS} />
+        <AddressForm productId={product.id} handle={product.handle} prefix={(await storeAddress(shop)).replace(/^https?:\/\//, "")} />
         {product.giftCard ? (
           <p className="banner banner-info max-w-3xl">
             This is your gift card. Each option&apos;s price is what the card is worth, and codes are emailed to the buyer when they pay.

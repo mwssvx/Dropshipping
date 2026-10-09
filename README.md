@@ -218,3 +218,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Galleries** (`packages/core/src/gallery.ts`): each product keeps up to 10 photos in order (`products.images`); the first is the main photo and is also kept in `products.image_url`, which lists, carts, emails and search read. Imports keep every photo the supplier lists, and existing products start with their one photo.
 2. **Editing**: the product page has a Photos card to upload a photo (JPG, PNG or WebP up to 5 MB, stored like app uploads) or paste an https address, make one the main photo, move them, and remove them. A photo taken in the phone app becomes the main photo.
 3. **Store**: the product page shows the main photo large with thumbnails to switch, and gives every photo to search engines and link previews. The public API, the app API and the store file include the full list.
+
+### Web addresses and redirects (after launch, part 18)
+
+1. **Product web addresses** (`packages/core/src/redirects.ts`): the product page has a Web address card to change a product's address (its handle). The old address keeps working through a redirect, and earlier redirects to it are pointed straight at the new one, so there are no chains.
+2. **Redirects page** (Online store → Redirects, owners and admins): paste old links one per line, the old address then where it goes, from a spreadsheet or a previous store's export. Full addresses are trimmed to their path; lines that can't be used (like the cart or checkout) stay in the box with the reason. Each redirect shows its visits and can be removed. Up to 2,000 per store.
+3. **On the store**: a redirect is only used when nothing on the store is at that address, so it never hides a real page. Product, collection, page and blog addresses, and any other unknown path, check redirects before showing "not found". Redirects travel in the store file.

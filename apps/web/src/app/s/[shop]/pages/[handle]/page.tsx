@@ -1,21 +1,20 @@
-import { notFound } from "next/navigation";
 import { getPublishedPageByHandle, NotFoundError, paragraphs } from "@sf/core";
 import { db } from "@/lib/server";
-import { loadShop } from "../../data";
+import { loadShop, missing } from "../../data";
 
-async function load(param: string, handle: string) {
+async function load(param: string, handle: string, count = true) {
   const shop = await loadShop(param);
   try {
     return await getPublishedPageByHandle(await db(), shop.id, handle);
   } catch (e) {
-    if (e instanceof NotFoundError) notFound();
+    if (e instanceof NotFoundError) return missing(param, `/pages/${handle}`, count);
     throw e;
   }
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ shop: string; handle: string }> }) {
   const { shop, handle } = await params;
-  const page = await load(shop, handle);
+  const page = await load(shop, handle, false);
   const description = page.seoDescription ?? (page.body.replace(/\s+/g, " ").trim().slice(0, 160) || undefined);
   return { title: page.title, description };
 }
