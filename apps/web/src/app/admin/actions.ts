@@ -10,12 +10,13 @@ import {
   parseMoney,
   requireMember,
   retryOrder,
+  sendStockAlerts,
   syncTracking,
   updateProduct,
   UserError,
   type ProductInput,
 } from "@sf/core";
-import { db, fulfillment, notifyLater, requireShop, requireUser, SHOP_COOKIE, suppliers } from "@/lib/server";
+import { db, fulfillment, notifyLater, requireShop, requireUser, SHOP_COOKIE, stock, suppliers } from "@/lib/server";
 
 export type FormState = { error?: string; saved?: boolean };
 
@@ -47,6 +48,16 @@ function optionalMoney(v: FormDataEntryValue | null) {
   return s ? parseMoney(s) : null;
 }
 
+/** Blank stock means it isn't counted; a missing field leaves it as it was. */
+function readStock(v: FormDataEntryValue | null) {
+  if (v === null) return undefined;
+  const s = String(v).trim();
+  if (s === "") return null;
+  const n = Number(s.replace(/,/g, ""));
+  if (!Number.isInteger(n) || n < 0) throw new UserError("Enter stock as a whole number, or leave it blank to stop counting.");
+  return n;
+}
+
 function readProduct(form: FormData): ProductInput {
   const count = [...form.keys()].filter((k) => k.startsWith("price.")).length;
   const variants = Array.from({ length: count }, (_, i) => {
@@ -56,12 +67,14 @@ function readProduct(form: FormData): ProductInput {
     } catch {
       throw new UserError("Enter a price like 24.99.");
     }
+    const stock = readStock(form.get(`stock.${i}`));
     try {
       return {
         title: String(form.get(`variantTitle.${i}`) ?? "Default") || "Default",
         priceMinor: price,
         compareAtMinor: optionalMoney(form.get(`compareAt.${i}`)),
         costMinor: optionalMoney(form.get(`cost.${i}`)),
+        stock,
       };
     } catch {
       throw new UserError("Enter prices like 24.99.");
@@ -97,9 +110,12 @@ export async function updateProductAction(productId: string, _: FormState, form:
     if (e instanceof UserError) return { error: e.message };
     throw e;
   }
+  // Buyers waiting on an option that's back hear straight away.
+  const { sent } = await sendStockAlerts(await stock(), { shopId: shop.id });
   revalidatePath("/admin/products");
   revalidatePath(`/s/${shop.handle}`, "layout");
-  return { saved: true };
+  // The form remounts with the saved values, so the confirmation rides on the address.
+  redirect(`/admin/products/${productId}?saved=1${sent ? `&emailed=${sent}` : ""}`);
 }
 
 export async function importProductAction(_: FormState, form: FormData): Promise<FormState> {

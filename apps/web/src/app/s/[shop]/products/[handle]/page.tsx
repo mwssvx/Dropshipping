@@ -6,7 +6,7 @@ import { currentBuyer } from "@/lib/buyer";
 import { db } from "@/lib/server";
 import { buyerFx } from "@/lib/currency";
 import { SubmitButton } from "@/components/SubmitButton";
-import { addToCartAction } from "../../actions";
+import { addToCartAction, stockAlertAction } from "../../actions";
 import { loadShop, storeBase } from "../../data";
 import { Price } from "@/components/Price";
 
@@ -52,14 +52,24 @@ function productJsonLd(product: Awaited<ReturnType<typeof load>>["product"], cur
   };
 }
 
-export default async function ProductPage({ params }: { params: Promise<{ shop: string; handle: string }> }) {
+const ALERT_MESSAGES: Record<string, { text: string; ok: boolean }> = {
+  sent: { text: "Done. We'll email you once when it's back.", ok: true },
+  back: { text: "Good news: it's in stock now.", ok: true },
+  many: { text: "You're already waiting on lots of items here. We'll email you as they come back.", ok: false },
+  invalid: { text: "Enter your email address and pick an option.", ok: false },
+};
+
+export default async function ProductPage({ params, searchParams }: { params: Promise<{ shop: string; handle: string }>; searchParams: Promise<{ alert?: string }> }) {
   const { shop: shopHandle, handle } = await params;
+  const alert = ALERT_MESSAGES[(await searchParams).alert ?? ""];
   const { shop, product } = await load(shopHandle, handle);
   const buyable = product.variants.filter((x) => x.stock === null || x.stock > 0);
   const v = buyable[0] ?? product.variants[0];
   const many = product.variants.length > 1;
   const [reviews, upsells, base, fx] = await Promise.all([productReviews(await db(), product.id), upsellsFor(await db(), shop.id, [product.id]), storeBase(shopHandle), buyerFx(shop)]);
-  const wholesale = await wholesaleTermsFor(await db(), shop, (await currentBuyer(shop.id))?.email);
+  const buyer = await currentBuyer(shop.id);
+  const wholesale = await wholesaleTermsFor(await db(), shop, buyer?.email);
+  const soldOut = product.variants.filter((x) => x.stock !== null && x.stock <= 0);
   const tiers = wholesale ? [] : product.quantityBreaks;
   const jsonLd = JSON.stringify(productJsonLd(product, shop.currency, reviews)).replace(/</g, "\\u003c");
   return (
@@ -129,6 +139,34 @@ export default async function ProductPage({ params }: { params: Promise<{ shop: 
           </form>
         )}
         {v && buyable.length === 0 && <p className="banner banner-info">Sold out for now.</p>}
+        {(soldOut.length > 0 || alert) && (
+          <form id="stock-alert" action={stockAlertAction.bind(null, shopHandle, product.handle)} className="card p-4 flex flex-col gap-3" aria-labelledby="stock-alert-h">
+            <h2 id="stock-alert-h" className="font-semibold">{buyable.length === 0 ? "Email me when it's back" : "Option sold out? Email me when it's back"}</h2>
+            {alert && <p role="status" className={`banner ${alert.ok ? "banner-success" : "banner-critical"}`}>{alert.text}</p>}
+            {soldOut.length > 0 && (
+              <>
+                {soldOut.length === 1 && !many ? (
+                  <input type="hidden" name="variantId" value={soldOut[0]!.id} />
+                ) : (
+                  <div className="field">
+                    <label className="label" htmlFor="alert-variant">Option</label>
+                    <select className="input" id="alert-variant" name="variantId">
+                      {soldOut.map((x) => <option key={x.id} value={x.id}>{x.title}</option>)}
+                    </select>
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-2 items-end">
+                  <div className="field flex-1 min-w-48">
+                    <label className="label" htmlFor="alert-email">Email</label>
+                    <input className="input" id="alert-email" name="email" type="email" required autoComplete="email" defaultValue={buyer?.email ?? ""} placeholder="you@example.com" />
+                  </div>
+                  <SubmitButton className="btn btn-secondary">Notify me</SubmitButton>
+                </div>
+                <p className="hint text-sm">One email when it&apos;s back, nothing else. We don&apos;t add you to any list.</p>
+              </>
+            )}
+          </form>
+        )}
         {v?.shipDaysMin != null && v.shipDaysMax != null && (
           <p className="text-sm">Arrives in {v.shipDaysMin}–{v.shipDaysMax} days</p>
         )}

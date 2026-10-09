@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel } from "@sf/core";
+import { getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct } from "@sf/core";
 import { requireShop, suppliers } from "@/lib/server";
 import { updateProductAction } from "../../../actions";
 import { setUpsellAction } from "../../../growth-actions";
@@ -8,13 +8,15 @@ import { setProductSupplierAction } from "../../../supplier-actions";
 import { PageHeader } from "../../PageHeader";
 import { ProductForm } from "../ProductForm";
 import { QuantityBreaksForm } from "./QuantityBreaksForm";
+import { StockPanel } from "./StockPanel";
 import { WriteListingButton } from "./WriteListingButton";
 
 const toPrice = (m: number | null | undefined) => (m == null ? "" : (m / 100).toFixed(2));
 
-export default async function EditProductPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string; imported?: string }> }) {
+export default async function EditProductPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string; imported?: string; saved?: string; emailed?: string }> }) {
   const { id } = await params;
-  const { created, imported } = await searchParams;
+  const { created, imported, saved, emailed } = await searchParams;
+  const sentCount = Number(emailed) || 0;
   const { shop, db } = await requireShop("products");
   const found = await getProduct(db, shop.id, id).catch((e) => {
     if (e instanceof NotFoundError) notFound();
@@ -24,6 +26,8 @@ export default async function EditProductPage({ params, searchParams }: { params
   const label = link ? supplierLabel(suppliers(), link) : undefined;
   const product = { ...found, supplier: label ? { label } : null };
   const own = await listOwnSuppliers(db, shop.id);
+  const waitingBy = await waitingForProduct(db, shop.id, product.id);
+  const waiting = product.variants.filter((v) => waitingBy.has(v.id)).map((v) => ({ option: v.title, count: waitingBy.get(v.id)! }));
   const others = (await listProducts(db, shop.id)).filter((p) => p.id !== product.id && p.status !== "archived");
   return (
     <main className="pb-12">
@@ -31,6 +35,11 @@ export default async function EditProductPage({ params, searchParams }: { params
         actions={product.status === "active" ? <a className="btn btn-secondary" href={`/s/${shop.handle}/products/${product.handle}`} target="_blank">View on store ↗</a> : undefined} />
       <div className="px-4 sm:px-8 flex flex-col gap-4">
         {created && <p role="status" className="banner banner-info">Product added.</p>}
+        {saved && (
+          <p role="status" className="banner banner-info">
+            Saved.{sentCount > 0 && ` ${sentCount === 1 ? "1 buyer who was" : `${sentCount} buyers who were`} waiting got a back-in-stock email.`}
+          </p>
+        )}
         {imported && (
           <p role="status" className="banner banner-info">
             {product.status === "active"
@@ -39,6 +48,8 @@ export default async function EditProductPage({ params, searchParams }: { params
           </p>
         )}
         <WriteListingButton productId={product.id} live={product.status === "active"} />
+        <StockPanel productId={product.id} waiting={waiting} linked={!!product.sourceUrl && !product.giftCard}
+          checkedAt={product.stockCheckedAt ? product.stockCheckedAt.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : null} />
         <ProductForm key={product.updatedAt.getTime()} action={updateProductAction.bind(null, product.id)} currency={shop.currency} submitLabel="Save changes"
           initial={{
             title: product.title,
@@ -50,7 +61,8 @@ export default async function EditProductPage({ params, searchParams }: { params
               price: toPrice(v.priceMinor),
               compareAt: toPrice(v.compareAtMinor),
               cost: toPrice(v.costMinor),
-              stock: v.supplierVariantRef ? v.stock : undefined,
+              stock: v.stock,
+              fromSupplier: !!v.supplierVariantRef,
             })),
             supplier: product.supplier ? { label: product.supplier.label, sourceUrl: product.sourceUrl } : undefined,
           }} />

@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { amountToCharge, getOrder, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, shopCurrencies, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
+import { amountToCharge, getOrder, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestStockAlert, shopCurrencies, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
 import { agents, campaigns, db, payments, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
@@ -225,6 +225,19 @@ export async function newsletterAction(handle: string, form: FormData) {
     status = "invalid";
   }
   redirect(`${(await storeBase(handle)) || "/"}?signup=${status}#signup`);
+}
+
+/** A buyer asks for an email when a sold-out option is back. */
+export async function stockAlertAction(handle: string, productHandle: string, form: FormData) {
+  const shop = await loadShop(handle);
+  let status = "sent";
+  try {
+    await requestStockAlert(await db(), shop.id, { variantId: String(form.get("variantId") ?? ""), email: String(form.get("email") ?? "") });
+  } catch (e) {
+    if (!(e instanceof UserError)) throw e;
+    status = e.code === "in_stock" ? "back" : e.code === "too_many" ? "many" : "invalid";
+  }
+  redirect(`${await storeBase(handle)}/products/${productHandle}?alert=${status}#stock-alert`);
 }
 
 export type ReturnState = { error?: string };

@@ -1,8 +1,9 @@
-import { pruneAuthRecords, pruneBuyerRecords, pruneInvites, pruneEvents, refreshAllVerified, runWebhooks, routeStuckOrders, sendCampaignBatches, runFakePayouts, runHealthChecks, runScheduledAgents, sendAbandonedCartEmails, sendAllNotifications, syncTracking } from "@sf/core";
-import { agents, campaigns, fulfillment, pushSender, testPayments, webhooks } from "@/lib/server";
+import { pruneAuthRecords, pruneBuyerRecords, pruneStockAlerts, sendStockAlerts, syncSupplierStock, pruneInvites, pruneEvents, refreshAllVerified, runWebhooks, routeStuckOrders, sendCampaignBatches, runFakePayouts, runHealthChecks, runScheduledAgents, sendAbandonedCartEmails, sendAllNotifications, syncTracking } from "@sf/core";
+import { agents, campaigns, fulfillment, pushSender, stock, testPayments, webhooks } from "@/lib/server";
 
 /**
- * Scheduled job: place any paid orders that were missed, then pull tracking from suppliers.
+ * Scheduled job: place any paid orders that were missed, then pull tracking from suppliers, and
+ * stock and costs for products (buyers waiting on something back in stock get their email).
  * Also checks store health and the verified badge, and in test mode stands in for the payment
  * processor's daily payouts. Buyers who left a checkout get one reminder, and email campaigns go out in batches. Then the AI agents look at problem orders and thin margins, and last
  * phones get push notifications and webhooks go out for anything new. Old visitor events are pruned.
@@ -16,6 +17,8 @@ export async function GET(request: Request) {
   const ctx = await fulfillment();
   const routed = await routeStuckOrders(ctx);
   const tracking = await syncTracking(ctx, { limit: 200 });
+  const stockSync = await syncSupplierStock(ctx);
+  const restocked = await sendStockAlerts(await stock());
   const payouts = testPayments() ? await runFakePayouts(ctx.db) : null;
   // Store health warnings and the verified badge.
   const health = await runHealthChecks(ctx.db);
@@ -29,5 +32,6 @@ export async function GET(request: Request) {
   await pruneAuthRecords(ctx.db);
   await pruneInvites(ctx.db);
   await pruneBuyerRecords(ctx.db);
-  return Response.json({ routed, tracking, payouts, health, verified, reminders, campaigns: campaignEmails, ai, push, webhooks: hooks, pruned });
+  await pruneStockAlerts(ctx.db);
+  return Response.json({ routed, tracking, stock: stockSync, restocked, payouts, health, verified, reminders, campaigns: campaignEmails, ai, push, webhooks: hooks, pruned });
 }

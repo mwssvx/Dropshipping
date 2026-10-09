@@ -1,4 +1,4 @@
-// Milestone 1 to 22 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 24 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -169,6 +169,8 @@ export const products = pgTable(
     quantityBreaks: jsonb("quantity_breaks").$type<QuantityBreak[]>().notNull().default([]),
     // A gift card sold on the store: each one bought issues a code worth its variant's price.
     giftCard: boolean("gift_card").notNull().default(false),
+    // When stock and cost were last read from the supplier; the daily sync starts with the oldest.
+    stockCheckedAt: timestamp("stock_checked_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -1110,4 +1112,19 @@ export const blogPosts = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [uniqueIndex("blog_posts_shop_handle_uq").on(t.shopId, t.handle), index("blog_posts_shop_status_idx").on(t.shopId, t.status, t.publishedAt)],
+);
+
+// Back-in-stock requests: a buyer leaves their email on a sold-out option and gets one email when
+// it can be bought again. Requests for things that never come back are dropped after six months.
+export const stockAlerts = pgTable(
+  "stock_alerts",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    variantId: uuid("variant_id").notNull().references(() => variants.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    notifiedAt: timestamp("notified_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("stock_alerts_variant_email_uq").on(t.variantId, t.email), index("stock_alerts_shop_idx").on(t.shopId, t.notifiedAt)],
 );

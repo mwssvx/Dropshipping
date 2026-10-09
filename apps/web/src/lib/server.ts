@@ -135,6 +135,11 @@ export async function adminUrl(path: string) {
 /** Test mode: no real money moves, so the admin offers buttons to simulate payouts and holds. */
 export const testPayments = () => payments().name === "fake";
 
+/** Supplier stock sync and back-in-stock emails. */
+export async function stock() {
+  return { ...(await fulfillment()), storeAddress };
+}
+
 export async function fulfillment(): Promise<FulfillmentContext> {
   return {
     db: await db(),

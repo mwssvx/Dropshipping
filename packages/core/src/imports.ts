@@ -117,6 +117,7 @@ export async function importProduct(db: Db, suppliers: Suppliers, shopId: string
         supplierId: link!.id,
         supplierProductRef: product.ref,
         sourceUrl: product.sourceUrl,
+        stockCheckedAt: new Date(),
       })
       .returning();
     await tx.insert(schema.variants).values(variants.map((v) => ({ ...v, productId: created!.id })));
