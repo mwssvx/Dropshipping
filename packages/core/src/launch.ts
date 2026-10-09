@@ -64,9 +64,9 @@ export function launchChecks(env: Env): LaunchCheck[] {
     id: "demo-supplier", area: "Suppliers", label: "Demo supplier is off", severity: "blocker",
     fix: "Set DEMO_SUPPLIER=off so stores can't sell demo products nobody will ship.",
   });
-  add(set("CJ_API_KEY"), {
-    id: "cj", area: "Suppliers", label: "CJ Dropshipping is connected", severity: "blocker",
-    fix: "Set CJ_API_KEY and place one test order end to end before launch.",
+  add(set("CJ_API_KEY") || (set("ALIEXPRESS_APP_KEY") && set("ALIEXPRESS_APP_SECRET") && set("ALIEXPRESS_ACCESS_TOKEN")), {
+    id: "supplier", area: "Suppliers", label: "A real supplier is connected", severity: "blocker",
+    fix: "Set CJ_API_KEY, or ALIEXPRESS_APP_KEY, ALIEXPRESS_APP_SECRET and ALIEXPRESS_ACCESS_TOKEN, and place one test order end to end before launch.",
   });
   add(set("VERCEL_API_TOKEN") && set("VERCEL_PROJECT_ID"), {
     id: "domains", area: "Domains", label: "Custom domains get certificates", severity: "warning",
@@ -96,7 +96,7 @@ export const LAUNCH_TASKS = [
   "Pick the final name and run a trademark search.",
   "Have a lawyer review the terms, privacy policy, acceptable use policy and merchant agreement drafts.",
   "Activate Stripe (live mode, Connect platform profile, payouts) and confirm the countries we launch in.",
-  "Create the CJ Dropshipping account and place one test order end to end.",
+  "Create the CJ Dropshipping account (and the AliExpress Open Platform app, if selling AliExpress products) and place one test order end to end with each.",
   "Set up Supabase (production project, backups on) and Resend (verified sending domain).",
   "Buy the domain and point it, with a wildcard for store subdomains, at Vercel.",
   "Create the Apple and Google developer accounts; send the app to TestFlight and Play internal testing.",

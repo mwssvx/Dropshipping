@@ -34,6 +34,10 @@ describe("launch preflight", () => {
     expect(failing({ ...PROD, STRIPE_SECRET_KEY: "sk_test_1" })).toEqual(["stripe-live"]);
     expect(failing({ ...PROD, DEMO_SUPPLIER: "on", WEBHOOKS_ALLOW_PRIVATE: "on" })).toEqual(["demo-supplier", "test-switches"]);
     expect(failing({ ...PROD, NEXT_PUBLIC_ROOT_DOMAIN: "storefront-test.vercel.app", CRON_SECRET: "short" })).toEqual(["domain", "cron"]);
+    const aliexpress = { ALIEXPRESS_APP_KEY: "k", ALIEXPRESS_APP_SECRET: "s", ALIEXPRESS_ACCESS_TOKEN: "t" };
+    expect(failing({ ...PROD, CJ_API_KEY: "" })).toEqual(["supplier"]);
+    expect(failing({ ...PROD, CJ_API_KEY: "", ...aliexpress })).toEqual([]);
+    expect(failing({ ...PROD, CJ_API_KEY: "", ...aliexpress, ALIEXPRESS_ACCESS_TOKEN: "" })).toEqual(["supplier"]);
     const blank = launchChecks({});
     expect(blank.filter((c) => !c.ok && c.severity === "blocker").length).toBeGreaterThan(8);
   });

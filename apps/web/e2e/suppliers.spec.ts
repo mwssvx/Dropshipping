@@ -18,6 +18,10 @@ async function setUp(page: Page, id: string) {
   await page.getByRole("button", { name: "Create store" }).click();
   await expect(page.getByRole("heading", { name: /Welcome to Oak/ })).toBeVisible();
   await page.goto("/admin/products/import");
+  // AliExpress links are recognised, and say what's missing until AliExpress is connected.
+  await page.getByLabel("Product link").fill("https://www.aliexpress.com/item/1005001234567890.html");
+  await page.getByRole("button", { name: "Look up" }).click();
+  await expect(page.getByText("AliExpress isn't connected yet.", { exact: false })).toBeVisible();
   await page.getByRole("link", { name: /sunset projection lamp/i }).click();
   await page.getByRole("button", { name: "Import and publish" }).click();
   await expect(page.getByText("Imported and live on your store.")).toBeVisible();
@@ -26,6 +30,8 @@ async function setUp(page: Page, id: string) {
 
   const supplierEmail = `orders-${id}@woodworks.example`;
   await page.goto("/admin/suppliers");
+  await expect(page.getByRole("region", { name: "AliExpress" })).toContainText("Not connected");
+  await expect(page.getByRole("region", { name: "CJ Dropshipping" })).toContainText("Not connected");
   await page.getByLabel("Supplier name").fill("Austin Woodworks");
   await page.getByLabel("Orders go to").fill(supplierEmail);
   await page.getByRole("button", { name: "Add supplier" }).click();

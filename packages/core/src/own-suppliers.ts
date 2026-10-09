@@ -19,7 +19,7 @@ const ownSupplierInput = z.object({
   email: z.string().trim().toLowerCase().email("Enter the email address orders should go to."),
 });
 
-const API_LABELS: Record<string, string> = { fake: "Demo supplier", cj: "CJ Dropshipping" };
+const API_LABELS: Record<string, string> = { fake: "Demo supplier", cj: "CJ Dropshipping", aliexpress: "AliExpress" };
 
 /** What merchants call a supplier link: the name they gave their own supplier, or the service's name. */
 export function supplierLabel(suppliers: Suppliers, link: Pick<SupplierLink, "provider" | "name"> | null | undefined) {

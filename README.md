@@ -230,3 +230,10 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Saving** (`packages/core/src/saved.ts`, `saved_items`): the product page has "Save for later", and the heart in the store header opens the Saved items page. Guests' saves live in a cookie for 90 days and move into their account when they sign in. Up to 50 per buyer. The page marks items that got cheaper since they were saved and items that sold out.
 2. **Price-drop emails**: when a saved item's price drops by at least 1%, whether from the merchant's edit, a repricing or the daily job, the buyer gets one email listing everything that got cheaper, at most once a day. Buyers can turn these off on the Saved items page (`customers.price_alerts`). Saved items are part of a buyer's data export and are removed when their data is erased.
 3. **Admin**: the product page shows how many buyers saved it, so the merchant knows a price cut will reach them.
+
+### AliExpress as a second supplier (after launch, part 20)
+
+1. **The connection** (`packages/core/src/suppliers/aliexpress.ts`): AliExpress's Open Platform dropshipping APIs, signed with the app secret. It turns on when `ALIEXPRESS_APP_KEY`, `ALIEXPRESS_APP_SECRET` and `ALIEXPRESS_ACCESS_TOKEN` are set (see `docs/accounts.md`). It is written from AliExpress's reference and tested with recorded-shape replies, but not yet run against a live account.
+2. **Importing**: paste an AliExpress item link (aliexpress.com or aliexpress.us). Each option comes in with its cost, stock and delivery time, so the daily stock sync and back-in-stock emails work for AliExpress products too.
+3. **Orders**: a paid order goes to AliExpress with the cheapest delivery option for each item and our reference, and is paid with the authorised account's saved card. AliExpress splits orders by seller, so tracking follows every part and only shows once all of them have shipped. AliExpress doesn't let apps cancel orders, so a cancel tells the merchant to do it in AliExpress.
+4. **Admin**: the Suppliers page shows AliExpress next to CJ, and the launch preflight accepts either one as the real supplier.

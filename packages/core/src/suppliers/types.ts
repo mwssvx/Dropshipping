@@ -1,6 +1,6 @@
 import type { Address } from "@sf/db";
 
-export type SupplierName = "fake" | "cj";
+export type SupplierName = "fake" | "cj" | "aliexpress";
 
 export type SupplierProduct = {
   ref: string;
