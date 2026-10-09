@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Track } from "@/components/Track";
-import { describeBreak, getActiveProductByHandle, NotFoundError, percentOff, productPhotos, productReviews, upsellsFor, wholesaleTermsFor } from "@sf/core";
+import { getActiveProductByHandle, NotFoundError, percentOff, productPhotos, productReviews, upsellsFor, wholesaleTermsFor } from "@sf/core";
 import { ProductGallery } from "@/components/ProductGallery";
 import { currentBuyer } from "@/lib/buyer";
 import { db } from "@/lib/server";
@@ -8,13 +8,14 @@ import { buyerFx } from "@/lib/currency";
 import { SubmitButton } from "@/components/SubmitButton";
 import { addToCartAction, stockAlertAction, toggleSavedAction } from "../../actions";
 import { savedIds } from "@/lib/saved";
-import { loadShop, storeBase, missing } from "../../data";
+import { loadShop, localProducts, storeBase, storeT, missing } from "../../data";
 import { Price } from "@/components/Price";
 
 async function load(shopHandle: string, handle: string, count = true) {
   const shop = await loadShop(shopHandle);
   try {
-    return { shop, product: await getActiveProductByHandle(await db(), shop.id, handle) };
+    const product = await getActiveProductByHandle(await db(), shop.id, handle);
+    return { shop, product: (await localProducts(shopHandle, [product]))[0]! };
   } catch (e) {
     if (e instanceof NotFoundError) return missing(shopHandle, `/products/${handle}`, count);
     throw e;
@@ -54,22 +55,25 @@ function productJsonLd(product: Awaited<ReturnType<typeof load>>["product"], cur
   };
 }
 
-const ALERT_MESSAGES: Record<string, { text: string; ok: boolean }> = {
-  sent: { text: "Done. We'll email you once when it's back.", ok: true },
-  back: { text: "Good news: it's in stock now.", ok: true },
-  many: { text: "You're already waiting on lots of items here. We'll email you as they come back.", ok: false },
-  invalid: { text: "Enter your email address and pick an option.", ok: false },
-};
+const ALERT_MESSAGES = {
+  sent: { key: "alertSent", ok: true },
+  back: { key: "alertBack", ok: true },
+  many: { key: "alertMany", ok: false },
+  invalid: { key: "alertInvalid", ok: false },
+} as const;
 
 export default async function ProductPage({ params, searchParams }: { params: Promise<{ shop: string; handle: string }>; searchParams: Promise<{ alert?: string; saved?: string }> }) {
   const { shop: shopHandle, handle } = await params;
   const query = await searchParams;
-  const alert = ALERT_MESSAGES[query.alert ?? ""];
+  const t = await storeT(shopHandle);
+  const alertKind = ALERT_MESSAGES[(query.alert ?? "") as keyof typeof ALERT_MESSAGES];
+  const alert = alertKind ? { text: t[alertKind.key], ok: alertKind.ok } : undefined;
   const { shop, product } = await load(shopHandle, handle);
   const buyable = product.variants.filter((x) => x.stock === null || x.stock > 0);
   const v = buyable[0] ?? product.variants[0];
   const many = product.variants.length > 1;
-  const [reviews, upsells, base, fx] = await Promise.all([productReviews(await db(), product.id), upsellsFor(await db(), shop.id, [product.id]), storeBase(shopHandle), buyerFx(shop)]);
+  const [reviews, rawUpsells, base, fx] = await Promise.all([productReviews(await db(), product.id), upsellsFor(await db(), shop.id, [product.id]), storeBase(shopHandle), buyerFx(shop)]);
+  const upsells = await localProducts(shopHandle, rawUpsells);
   const buyer = await currentBuyer(shop.id);
   const wholesale = await wholesaleTermsFor(await db(), shop, buyer?.email);
   const soldOut = product.variants.filter((x) => x.stock !== null && x.stock <= 0);
@@ -85,24 +89,24 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
         <h1 className="text-3xl font-bold tracking-tight">{product.title}</h1>
         {reviews.count > 0 && (
           <a href="#reviews" className="text-sm flex items-center gap-2">
-            <Stars value={reviews.average ?? 0} />
-            <span className="hint">{reviews.average} · {reviews.count} {reviews.count === 1 ? "review" : "reviews"}</span>
+            <Stars value={reviews.average ?? 0} label={t.stars(reviews.average ?? 0)} />
+            <span className="hint">{reviews.average} · {t.reviewCount(reviews.count)}</span>
           </a>
         )}
         {v && <div className="text-xl"><Price minor={v.priceMinor} compareAt={v.compareAtMinor} currency={shop.currency} fx={fx} /></div>}
         {v && wholesale && (
           <p className="banner banner-info" role="status">
-            Your wholesale price: <strong className="num"><Price minor={percentOff(v.priceMinor, wholesale.percentOff)} currency={shop.currency} fx={fx} /></strong> ({wholesale.percentOff}% off)
+            {t.wholesalePrice} <strong className="num"><Price minor={percentOff(v.priceMinor, wholesale.percentOff)} currency={shop.currency} fx={fx} /></strong> ({t.percentOff(wholesale.percentOff)})
           </p>
         )}
         {v && tiers.length > 0 && (
           <section aria-labelledby="bulk" className="card p-4 flex flex-col gap-2">
-            <h2 id="bulk" className="font-semibold">Buy more, save more</h2>
+            <h2 id="bulk" className="font-semibold">{t.buyMore}</h2>
             <ul className="text-sm flex flex-col gap-1">
-              {tiers.map((t) => (
-                <li key={t.minQty} className="flex justify-between gap-3">
-                  <span>{describeBreak(t)}</span>
-                  <span className="num"><Price minor={percentOff(v.priceMinor, t.percentOff)} currency={shop.currency} fx={fx} /> each</span>
+              {tiers.map((tier) => (
+                <li key={tier.minQty} className="flex justify-between gap-3">
+                  <span>{t.buyQty(tier.minQty, tier.percentOff)}</span>
+                  <span className="num"><Price minor={percentOff(v.priceMinor, tier.percentOff)} currency={shop.currency} fx={fx} /> {t.each}</span>
                 </li>
               ))}
             </ul>
@@ -112,7 +116,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           <form action={addToCartAction.bind(null, shopHandle)} className="flex flex-col gap-4">
             {many ? (
               <fieldset className="flex flex-col gap-2">
-                <legend className="label mb-2">Option</legend>
+                <legend className="label mb-2">{t.option}</legend>
                 <div className="flex flex-wrap gap-2">
                   {product.variants.map((x) => {
                     const out = x.stock !== null && x.stock <= 0;
@@ -131,33 +135,33 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
             )}
             {tiers.length > 0 || wholesale ? (
               <div className="field w-28">
-                <label className="label" htmlFor="quantity">Quantity</label>
+                <label className="label" htmlFor="quantity">{t.quantity}</label>
                 <input className="input num" id="quantity" name="quantity" type="number" min={1} max={99} defaultValue={1} />
               </div>
             ) : (
               <input type="hidden" name="quantity" value="1" />
             )}
-            <SubmitButton className="btn btn-primary btn-lg" pendingText="Adding…">Add to cart</SubmitButton>
+            <SubmitButton className="btn btn-primary btn-lg" pendingText={t.adding}>{t.addToCart}</SubmitButton>
           </form>
         )}
-        {v && buyable.length === 0 && <p className="banner banner-info">Sold out for now.</p>}
+        {v && buyable.length === 0 && <p className="banner banner-info">{t.soldOutForNow}</p>}
         <form action={toggleSavedAction.bind(null, shopHandle, product.id, "product")} className="flex flex-wrap items-center gap-3">
           <input type="hidden" name="handle" value={product.handle} />
           <input type="hidden" name="save" value={isSaved ? "0" : "1"} />
           <button className="btn btn-secondary" aria-pressed={isSaved}>
-            <span aria-hidden className={isSaved ? "text-critical" : ""}>{isSaved ? "♥" : "♡"}</span> {isSaved ? "Saved" : "Save for later"}
+            <span aria-hidden className={isSaved ? "text-critical" : ""}>{isSaved ? "♥" : "♡"}</span> {isSaved ? t.saved : t.saveForLater}
           </button>
           {query.saved === "saved" && isSaved && (
             <span role="status" className="text-sm">
-              Saved. <Link href={`${base}/saved`} className="underline">See your saved items</Link>
-              {!buyer && <span className="hint"> · Sign in there to get an email if the price drops.</span>}
+              {t.savedDone} <Link href={`${base}/saved`} className="underline">{t.seeSaved}</Link>
+              {!buyer && <span className="hint"> · {t.signInForDrops}</span>}
             </span>
           )}
-          {query.saved === "full" && <span role="status" className="text-sm text-critical">Your saved list is full. Remove something to save this.</span>}
+          {query.saved === "full" && <span role="status" className="text-sm text-critical">{t.savedFull}</span>}
         </form>
         {(soldOut.length > 0 || alert) && (
           <form id="stock-alert" action={stockAlertAction.bind(null, shopHandle, product.handle)} className="card p-4 flex flex-col gap-3" aria-labelledby="stock-alert-h">
-            <h2 id="stock-alert-h" className="font-semibold">{buyable.length === 0 ? "Email me when it's back" : "Option sold out? Email me when it's back"}</h2>
+            <h2 id="stock-alert-h" className="font-semibold">{buyable.length === 0 ? t.alertTitle : t.alertTitleOption}</h2>
             {alert && <p role="status" className={`banner ${alert.ok ? "banner-success" : "banner-critical"}`}>{alert.text}</p>}
             {soldOut.length > 0 && (
               <>
@@ -165,7 +169,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                   <input type="hidden" name="variantId" value={soldOut[0]!.id} />
                 ) : (
                   <div className="field">
-                    <label className="label" htmlFor="alert-variant">Option</label>
+                    <label className="label" htmlFor="alert-variant">{t.option}</label>
                     <select className="input" id="alert-variant" name="variantId">
                       {soldOut.map((x) => <option key={x.id} value={x.id}>{x.title}</option>)}
                     </select>
@@ -173,27 +177,27 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                 )}
                 <div className="flex flex-wrap gap-2 items-end">
                   <div className="field flex-1 min-w-48">
-                    <label className="label" htmlFor="alert-email">Email</label>
+                    <label className="label" htmlFor="alert-email">{t.email}</label>
                     <input className="input" id="alert-email" name="email" type="email" required autoComplete="email" defaultValue={buyer?.email ?? ""} placeholder="you@example.com" />
                   </div>
-                  <SubmitButton className="btn btn-secondary">Notify me</SubmitButton>
+                  <SubmitButton className="btn btn-secondary">{t.notifyMe}</SubmitButton>
                 </div>
-                <p className="hint text-sm">One email when it&apos;s back, nothing else. We don&apos;t add you to any list.</p>
+                <p className="hint text-sm">{t.alertNote}</p>
               </>
             )}
           </form>
         )}
         {v?.shipDaysMin != null && v.shipDaysMax != null && (
-          <p className="text-sm">Arrives in {v.shipDaysMin}–{v.shipDaysMax} days</p>
+          <p className="text-sm">{t.arrivesIn(v.shipDaysMin, v.shipDaysMax)}</p>
         )}
         {product.descriptionHtml && <div className="text-muted whitespace-pre-line leading-relaxed">{product.descriptionHtml}</div>}
         <ul className="hint flex flex-col gap-1 border-t border-border pt-4">
-          <li>Secure checkout. Card details never touch this store.</li>
-          <li>Questions about your order? Reply to your confirmation email.</li>
+          <li>{t.secureCheckout}</li>
+          <li>{t.questions}</li>
         </ul>
         {upsells.length > 0 && (
           <section className="flex flex-col gap-3 border-t border-border pt-4" aria-labelledby="goes-well">
-            <h2 id="goes-well" className="font-semibold">Goes well with</h2>
+            <h2 id="goes-well" className="font-semibold">{t.goesWellWith}</h2>
             {upsells.map((u) => (
               <Link key={u.id} href={`${base}/products/${u.handle}`} className="flex items-center gap-3 hover:underline">
                 <span className="size-12 rounded-md bg-sunken overflow-hidden shrink-0">{u.imageUrl && <img src={u.imageUrl} alt="" className="size-full object-cover" />}</span>
@@ -205,14 +209,14 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
         )}
       </div>
       <section id="reviews" className="md:col-span-2 flex flex-col gap-4 border-t border-border pt-8" aria-labelledby="reviews-heading">
-        <h2 id="reviews-heading" className="text-xl font-semibold">Reviews</h2>
+        <h2 id="reviews-heading" className="text-xl font-semibold">{t.reviews}</h2>
         {reviews.count === 0 ? (
-          <p className="hint">No reviews yet. Buyers can leave one from their order page once it has shipped.</p>
+          <p className="hint">{t.noReviews}</p>
         ) : (
           <ul className="grid gap-4 sm:grid-cols-2">
             {reviews.reviews.map((r) => (
               <li key={r.id} className="card p-4 flex flex-col gap-2">
-                <div className="flex items-center gap-2"><Stars value={r.rating} /><span className="font-medium text-sm">{r.name}</span></div>
+                <div className="flex items-center gap-2"><Stars value={r.rating} label={t.stars(r.rating)} /><span className="font-medium text-sm">{r.name}</span></div>
                 <p className="text-sm whitespace-pre-line">{r.body}</p>
                 {r.reply && <p className="text-sm hint border-l-2 border-border pl-3"><span className="font-medium">{shop.name}: </span>{r.reply}</p>}
               </li>
@@ -224,10 +228,10 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   );
 }
 
-function Stars({ value }: { value: number }) {
+function Stars({ value, label }: { value: number; label: string }) {
   const full = Math.round(value);
   return (
-    <span className="text-warning tracking-tight" role="img" aria-label={`${value} out of 5 stars`}>
+    <span className="text-warning tracking-tight" role="img" aria-label={label}>
       {"★".repeat(full)}
       <span className="text-border">{"★".repeat(5 - full)}</span>
     </span>

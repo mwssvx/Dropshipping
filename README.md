@@ -237,3 +237,11 @@ See `.env.example` and `docs/accounts.md` for the real services.
 2. **Importing**: paste an AliExpress item link (aliexpress.com or aliexpress.us). Each option comes in with its cost, stock and delivery time, so the daily stock sync and back-in-stock emails work for AliExpress products too.
 3. **Orders**: a paid order goes to AliExpress with the cheapest delivery option for each item and our reference, and is paid with the authorised account's saved card. AliExpress splits orders by seller, so tracking follows every part and only shows once all of them have shipped. AliExpress doesn't let apps cancel orders, so a cancel tells the merchant to do it in AliExpress.
 4. **Admin**: the Suppliers page shows AliExpress next to CJ, and the launch preflight accepts either one as the real supplier.
+
+### Store languages (after launch, part 21)
+
+1. **Languages** (`packages/core/src/languages.ts`): a store can add German, French, Spanish, Italian and Dutch next to English. Each language has its own address (`/de`, `/fr`, …) that search engines list, and buyers switch from the footer.
+2. **Fixed text** (`apps/web/src/lib/store-text.ts`): buttons, the product page, cart, checkout and card form come translated in every language.
+3. **The merchant's own words**: products, collections, pages, menus and home page text are translated on the new Languages page, by hand or with the new **Translator** AI agent, a batch per press. Anything not yet translated shows in English. When the English changes, the translation is marked out of date until someone checks it.
+4. **Store file**: languages and translations travel in the store export and load into a new store.
+5. **Not yet translated**: order and account pages, emails, search (it matches the English text), option names and SEO descriptions.

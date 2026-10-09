@@ -1,11 +1,12 @@
-import { getPublishedPageByHandle, NotFoundError, paragraphs } from "@sf/core";
+import { getPublishedPageByHandle, localizePage, NotFoundError, paragraphs } from "@sf/core";
 import { db } from "@/lib/server";
-import { loadShop, missing } from "../../data";
+import { loadShop, missing, storeLang } from "../../data";
 
 async function load(param: string, handle: string, count = true) {
   const shop = await loadShop(param);
   try {
-    return await getPublishedPageByHandle(await db(), shop.id, handle);
+    const page = await getPublishedPageByHandle(await db(), shop.id, handle);
+    return await localizePage(await db(), shop.id, await storeLang(param), page);
   } catch (e) {
     if (e instanceof NotFoundError) return missing(param, `/pages/${handle}`, count);
     throw e;

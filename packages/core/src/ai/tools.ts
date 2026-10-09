@@ -11,6 +11,7 @@ import { openNotices } from "../trust";
 import { describeShipping } from "../shipping";
 import { setPricesIncludeTax } from "../tax";
 import { createPost } from "../blog";
+import { isLanguage, LANGUAGES, saveTranslation } from "../languages";
 import type { ProblemCode } from "../suppliers";
 import { AUTO, blocked, needsOk, untrusted, type Decision, type RunScope } from "./context";
 import { addMessage, BUYER_TOPICS, discardDrafts, sendBuyerMessage, setConversationStatus, type BuyerTopic } from "./conversations";
@@ -764,6 +765,47 @@ export async function setAiSettings(
 /** What AI each plan includes per month, in US cents of model usage. */
 export const PLAN_AI_BUDGET_MINOR: Record<keyof typeof PLANS, number> = { free: 100, starter: 500, growth: 2000, scale: 5000 };
 
+/* ───────────── Translator: the store's own words in another language ───────────── */
+
+const translatorTools = [
+  tool({
+    name: "save_translations",
+    kind: "change",
+    description:
+      "Save translations of the items you were given, all in the one language you were asked for. For each item send its kind and ref_id as given, and fields with the same keys as its source, each translated. Plain text only, keeping line breaks, '• ' bullets and '## ' subheadings where the source has them.",
+    input: z.object({
+      language: z.string().describe("The two-letter language code you were asked to translate into."),
+      items: z
+        .array(
+          z.object({
+            kind: z.enum(["product", "collection", "page", "theme"]),
+            ref_id: z.string(),
+            fields: z.record(z.string(), z.string()).describe("Same keys as the item's source; values translated."),
+          }),
+        )
+        .min(1)
+        .max(20),
+    }),
+    // The merchant asked for these, and they can read and change each one on the Languages page.
+    policy: () => AUTO,
+    summary: (i) => `Translated ${i.items.length} item${i.items.length === 1 ? "" : "s"} into ${isLanguage(i.language) ? LANGUAGES[i.language].english : i.language}`,
+    async run(i, run) {
+      if (!isLanguage(i.language) || !(run.shop.languages ?? []).includes(i.language)) throw new UserError("That language isn't turned on for this store.");
+      let saved = 0;
+      const problems: string[] = [];
+      for (const item of i.items) {
+        try {
+          const r = await saveTranslation(run.ctx.db, run.shop, { language: i.language, kind: item.kind, refId: item.ref_id, fields: item.fields }, { byAi: true });
+          if (r.saved) saved++;
+        } catch (e) {
+          problems.push(`${item.kind} ${item.ref_id}: ${e instanceof Error ? e.message : "couldn't be saved"}`);
+        }
+      }
+      return { saved, problems };
+    },
+  }),
+];
+
 export const AGENT_TOOLS: Record<AgentName, AgentTool[]> = {
   listing: listingTools,
   assistant: assistantTools,
@@ -771,6 +813,7 @@ export const AGENT_TOOLS: Record<AgentName, AgentTool[]> = {
   fulfilment: fulfilmentTools,
   margin: marginTools,
   writer: writerTools,
+  translator: translatorTools,
 };
 
 export function findTool(agent: AgentName, name: string) {

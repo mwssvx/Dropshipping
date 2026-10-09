@@ -78,6 +78,7 @@ export async function deleteCollection(db: Db, shopId: string, collectionId: str
     .where(and(eq(schema.collections.id, collectionId), eq(schema.collections.shopId, shopId)))
     .returning({ id: schema.collections.id });
   if (!row) throw new NotFoundError("Collection");
+  await db.delete(schema.translations).where(and(eq(schema.translations.shopId, shopId), eq(schema.translations.kind, "collection"), eq(schema.translations.refId, collectionId)));
 }
 
 export async function listCollections(db: Db, shopId: string) {
