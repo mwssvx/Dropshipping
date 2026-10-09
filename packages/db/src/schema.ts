@@ -1,4 +1,4 @@
-// Milestone 1 to 18 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 19 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -601,7 +601,7 @@ export const appeals = pgTable(
 
 // AI agents. Every run is recorded with its token use and cost, and every tool call it makes is an
 // agent action: reads run straight away, changes may wait for the merchant's approval.
-export const AGENTS = ["listing", "assistant", "buyer_support", "fulfilment", "margin"] as const;
+export const AGENTS = ["listing", "assistant", "buyer_support", "fulfilment", "margin", "writer"] as const;
 export type AgentName = (typeof AGENTS)[number];
 
 export const agentRuns = pgTable(
@@ -1073,4 +1073,26 @@ export const returnRequests = pgTable(
     index("return_requests_shop_idx").on(t.shopId, t.status),
     uniqueIndex("return_requests_one_open_uq").on(t.orderId).where(sql`${t.status} in ('requested', 'approved')`),
   ],
+);
+
+// The store's blog. Like pages, the body is plain text ("## " starts a subheading, "• " a bullet),
+// so nothing pasted can run in a buyer's browser. Posts can feature products from the store.
+export const blogPosts = pgTable(
+  "blog_posts",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    handle: text("handle").notNull(),
+    excerpt: text("excerpt"),
+    body: text("body").notNull().default(""),
+    imageUrl: text("image_url"),
+    productIds: jsonb("product_ids").$type<string[]>().notNull().default([]),
+    status: text("status", { enum: ["draft", "published"] }).notNull().default("draft"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    aiGenerated: boolean("ai_generated").notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("blog_posts_shop_handle_uq").on(t.shopId, t.handle), index("blog_posts_shop_status_idx").on(t.shopId, t.status, t.publishedAt)],
 );

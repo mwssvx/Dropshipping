@@ -17,6 +17,8 @@ export default async function ThemePage() {
   const links = [
     { label: "Home", href: "/" },
     { label: "All products", href: "/collections/all" },
+    { label: "Blog", href: "/blog" },
+    { label: "Search", href: "/search" },
     ...collections.map((c) => ({ label: c.title, href: `/collections/${c.handle}` })),
     ...pages.map((p) => ({ label: p.title, href: `/pages/${p.handle}` })),
     ...products.filter((p) => p.status === "active").slice(0, 50).map((p) => ({ label: p.title, href: `/products/${p.handle}` })),

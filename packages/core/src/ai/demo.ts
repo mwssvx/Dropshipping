@@ -89,6 +89,35 @@ function listing(s: State): BetaContentBlock[] {
   return [text(waiting(saved) ? `I wrote a new title (“${saved.input.title}”) and description. The product is on sale, so it's waiting for your OK.` : `I saved a new title (“${saved.input.title}”) and a clearer description with bullet points. The product is still a draft.`)];
 }
 
+/* ───────────── Blog writer ───────────── */
+
+function writer(s: State): BetaContentBlock[] {
+  const read = s.has("read_products");
+  const picked = s.prompt.match(/Feature these products: (.+)/)?.[1]?.split(/,\s*/) ?? [];
+  if (!read) return [toolCall("read_products", picked.length ? { product_ids: picked } : {})];
+  const saved = s.has("save_post_draft");
+  if (!saved || saved.isError) {
+    const topic = strip(s.prompt.match(/Topic: (.+)/)?.[1] ?? "our favourite things").replace(/[.?!]+$/, "");
+    const title = topic.charAt(0).toUpperCase() + topic.slice(1);
+    const products = (read.result?.products ?? []).slice(0, 3) as { id: string; title: string; price_from: string }[];
+    const store = read.result?.store?.name ?? "our store";
+    const body = [
+      `If you've been wondering about ${topic.toLowerCase()}, you're not alone. It's one of the questions we hear most at ${store}, so here's a short, practical guide.`,
+      "## Start with what you need",
+      "Think about where and how you'll use it before you think about looks. A quick list of must-haves saves a lot of second-guessing later, and makes it easier to compare options side by side.",
+      "## What to look for",
+      "• Something that fits the space and the way you live\n• Simple to set up and easy to look after\n• A price that feels right for how often you'll use it",
+      ...(products.length
+        ? ["## Our picks", products.map((p) => `• ${p.title}, from ${p.price_from}`).join("\n"), "Each of these is one we'd happily recommend to a friend. Tap any of them below to see the details."]
+        : []),
+      "## The short version",
+      "Keep it simple, buy for the way you actually live, and don't be afraid to ask us if you're unsure. We read every message.",
+    ].join("\n\n");
+    return [toolCall("save_post_draft", { title, excerpt: `A short, practical guide to ${topic.toLowerCase()}, with a few of our favourite picks.`, body, product_ids: products.map((p) => p.id) })];
+  }
+  return [text(`I drafted “${saved.input.title}”. It's saved as a draft, so read it over, change anything you like, and publish when you're happy.`)];
+}
+
 /* ───────────── Buyer support ───────────── */
 
 function buyerSupport(s: State): BetaContentBlock[] {
@@ -280,6 +309,7 @@ function assistant(s: State, req: ModelRequest): BetaContentBlock[] {
 
 const BRAINS: Record<ModelRequest["agent"], (s: State, req: ModelRequest) => BetaContentBlock[]> = {
   listing,
+  writer,
   buyer_support: buyerSupport,
   fulfilment,
   margin,

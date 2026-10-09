@@ -184,3 +184,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Search** (`packages/core/src/search.ts`): every store header has a search icon that opens `/search`. Words match in any order across the title, the description and option names; plurals and accents don't matter, every word has to match, and title matches rank first. Drafts never show. Result pages are kept out of search engines.
 2. **Sort and filter**: search results and collection pages (when they have more than one product) can be sorted by best match or featured, best selling (units on paid orders), price either way, or newest, and filtered by a price range in the buyer's currency and "In stock only". It's a plain GET form, so it works without scripts and every result has a shareable address. Grid prices now start from a product's cheapest option.
+
+### Store blog (after launch, part 12)
+
+1. **Posts** (`packages/core/src/blog.ts`, `blog_posts` table): title, address, plain-text body ("## " subheadings, "• " or "- " bullets, blank lines between paragraphs), optional summary and image, and up to 8 featured products. Drafts stay hidden; publishing keeps the first publish date. Admin: Blog (under Online store), using the same permission as Pages.
+2. **AI first drafts**: a sixth agent, the blog writer (`writer`), reads the store's products and saves a draft on the merchant's topic, featuring the products they picked. It only ever saves drafts; it counts against the store's AI budget like the other agents, and the demo model writes a templated post without an API key.
+3. **On the store**: `/blog` lists posts newest first with reading time, `/blog/<address>` shows the post with "In this post" products and BlogPosting structured data, `/blog/feed.xml` is an RSS feed, and posts are in the sitemap and the store export file. "Blog" and "Search" are now suggested links in the theme menu editor.

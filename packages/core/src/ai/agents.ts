@@ -72,6 +72,17 @@ ${RULES}`,
 Don't touch products with healthy margins. Finish with a short list for the merchant of what you changed or proposed and why.
 ${RULES}`,
   },
+  writer: {
+    agent: "writer",
+    effort: "medium",
+    maxTokens: 8192,
+    system: (shop) => `You write blog posts for ${shop.name}, an online store selling to ${shop.country === "US" ? "the US" : shop.country}. The merchant gives you a topic and maybe some products.
+Call read_products (with the merchant's product ids if they gave any), then save_post_draft once, then tell the merchant in one or two sentences what you wrote.
+Write something genuinely useful to a shopper reading about the topic: practical advice, ideas or a short guide, 400 to 900 words, in a warm, plain voice. Use two to four subheadings ("## ") and a bullet list where it helps. Mention the store's products only where they fit naturally, by name, and feature the ones you mention.
+Don't invent facts about the products (materials, sizes, certifications, reviews) beyond what read_products says, and don't promise prices, discounts or delivery times.
+${RULES}
+- The rule about markdown headings is for your messages to the merchant. Inside the post itself, use "## " subheadings as described above.`,
+  },
 } satisfies Record<string, AgentSpec>;
 
 /** Ask the listing writer to improve one product's title and description. */
@@ -83,6 +94,28 @@ export async function writeListing(ctx: AgentContext, shop: Shop, productId: str
     productId,
     messages: [{ role: "user", content: `Rewrite the listing for product ${productId}. Today is ${today()}.` }],
   });
+}
+
+/**
+ * Ask the blog writer for a first draft on a topic, optionally featuring some products. Returns
+ * the new draft's id when it saved one; the merchant edits and publishes it.
+ */
+export async function draftPostWithAi(ctx: AgentContext, shop: Shop, input: { topic: string; productIds?: string[] }) {
+  const topic = input.topic.replace(/\s+/g, " ").trim().slice(0, 300);
+  if (topic.length < 3) throw new UserError("Say what the post should be about, like \"how to pick a night light for a kid's room\".");
+  const ids = (input.productIds ?? []).slice(0, 8);
+  const run = await runAgent(ctx, AGENT_SPECS.writer, shop, {
+    trigger: "merchant",
+    messages: [
+      {
+        role: "user",
+        content: `Write a blog post. Today is ${today()}.\nTopic: ${topic}\n${ids.length ? `Feature these products: ${ids.join(", ")}` : "Pick products from the store that fit, if any do."}`,
+      },
+    ],
+  });
+  const saved = run.actions.find((a) => a.tool === "save_post_draft" && a.status === "done");
+  const postId = (saved?.result as { post_id?: string } | null)?.post_id ?? null;
+  return { ...run, postId };
 }
 
 /** The merchant says something to their assistant. Earlier turns are replayed as plain text. */

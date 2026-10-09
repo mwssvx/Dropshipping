@@ -22,7 +22,7 @@ function supplierOf(link: typeof schema.suppliers.$inferSelect | undefined, prod
 export async function exportStore(db: Db, shopId: string, now = new Date()) {
   const shop = await db.query.shops.findFirst({ where: eq(schema.shops.id, shopId) });
   if (!shop) throw new NotFoundError("Store");
-  const [products, collections, links, pages, theme, discounts, supplierRows] = await Promise.all([
+  const [products, collections, links, pages, theme, discounts, supplierRows, posts] = await Promise.all([
     db.query.products.findMany({ where: eq(schema.products.shopId, shopId), orderBy: asc(schema.products.createdAt) }),
     db.query.collections.findMany({ where: eq(schema.collections.shopId, shopId), orderBy: asc(schema.collections.createdAt) }),
     db
@@ -35,6 +35,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
     db.query.themes.findFirst({ where: eq(schema.themes.shopId, shopId) }),
     db.query.discounts.findMany({ where: eq(schema.discounts.shopId, shopId), orderBy: asc(schema.discounts.createdAt) }),
     db.query.suppliers.findMany({ where: eq(schema.suppliers.shopId, shopId) }),
+    db.query.blogPosts.findMany({ where: eq(schema.blogPosts.shopId, shopId), orderBy: asc(schema.blogPosts.createdAt) }),
   ]);
   const variants = products.length
     ? await db.query.variants.findMany({ where: inArray(schema.variants.productId, products.map((p) => p.id)), orderBy: asc(schema.variants.position) })
@@ -102,6 +103,15 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       products: links.filter(({ l }) => l.collectionId === c.id).map(({ l }) => handleOf.get(l.productId)!),
     })),
     pages: pages.map((p) => ({ handle: p.handle, title: p.title, body: p.body, seo_description: p.seoDescription, published: p.published })),
+    blog_posts: posts.map((p) => ({
+      handle: p.handle,
+      title: p.title,
+      excerpt: p.excerpt,
+      body: p.body,
+      image_url: p.imageUrl,
+      products: p.productIds.map((id) => handleOf.get(id)).filter((h): h is string => !!h),
+      published_at: p.status === "published" ? p.publishedAt?.toISOString() ?? null : null,
+    })),
     discount_codes: discounts.map((d) => ({
       code: d.code,
       kind: d.kind,
@@ -209,6 +219,20 @@ const importSchema = z.object({
     .max(500)
     .default([]),
   pages: z.array(z.object({ handle, title: str(200).min(1), body: str(100_000).default(""), seo_description: str(320).nullable().optional(), published: z.boolean().default(true) })).max(200).default([]),
+  blog_posts: z
+    .array(
+      z.object({
+        handle,
+        title: str(200).min(1),
+        excerpt: str(320).nullable().optional(),
+        body: str(60_000).default(""),
+        image_url: str(2000).nullable().optional(),
+        products: z.array(handle).max(8).default([]),
+        published_at: z.string().datetime().nullable().optional(),
+      }),
+    )
+    .max(1000)
+    .default([]),
   discount_codes: z
     .array(
       z.object({
@@ -248,6 +272,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
   unique(data.products.map((p) => p.handle), "products");
   unique(data.collections.map((c) => c.handle), "collections");
   unique(data.pages.map((p) => p.handle), "pages");
+  unique(data.blog_posts.map((p) => p.handle), "blog posts");
   unique(data.discount_codes.map((d) => d.code), "codes");
   const theme = data.theme ? { draft: parseTheme(data.theme.draft), published: parseTheme(data.theme.published) } : null;
 
@@ -332,6 +357,21 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
     }
     if (data.pages.length) {
       await tx.insert(schema.pages).values(data.pages.map((x) => ({ shopId, handle: x.handle, title: x.title, body: x.body, seoDescription: x.seo_description ?? null, published: x.published })));
+    }
+    if (data.blog_posts.length) {
+      await tx.insert(schema.blogPosts).values(
+        data.blog_posts.map((x) => ({
+          shopId,
+          handle: x.handle,
+          title: x.title,
+          excerpt: x.excerpt ?? null,
+          body: x.body.replace(/<[^>]*>/g, ""),
+          imageUrl: x.image_url && /^https:\/\//.test(x.image_url) ? x.image_url : null,
+          productIds: x.products.map((h) => productIds.get(h)).filter((id): id is string => !!id),
+          status: x.published_at ? ("published" as const) : ("draft" as const),
+          publishedAt: x.published_at ? new Date(x.published_at) : null,
+        })),
+      );
     }
     for (const d of data.discount_codes) {
       await tx
