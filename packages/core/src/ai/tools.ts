@@ -10,6 +10,7 @@ import { refundOrder } from "../refunds";
 import { openNotices } from "../trust";
 import { describeShipping } from "../shipping";
 import { setPricesIncludeTax } from "../tax";
+import { createPost } from "../blog";
 import type { ProblemCode } from "../suppliers";
 import { AUTO, blocked, needsOk, untrusted, type Decision, type RunScope } from "./context";
 import { addMessage, BUYER_TOPICS, discardDrafts, sendBuyerMessage, setConversationStatus, type BuyerTopic } from "./conversations";
@@ -143,6 +144,60 @@ const listingTools = [
         .returning({ id: schema.products.id });
       if (!p) throw new UserError("Product not found.");
       return { saved: true };
+    },
+  }),
+];
+
+/* ───────────── Blog writer: saves drafts, the merchant publishes ───────────── */
+
+const writerTools = [
+  tool({
+    name: "read_products",
+    kind: "read",
+    description: "Read products from the store: title, price and description. Pass product_ids for the ones the merchant picked, or none for up to 30 products on sale.",
+    input: z.object({ product_ids: z.array(z.string()).max(8).optional() }),
+    summary: () => "Read the store's products",
+    async run(i, run) {
+      const { db } = run.ctx;
+      const ids = (i.product_ids ?? []).filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+      const rows = await db.query.products.findMany({
+        where: and(eq(schema.products.shopId, run.shop.id), eq(schema.products.status, "active"), ids.length ? inArray(schema.products.id, ids) : undefined),
+        orderBy: desc(schema.products.createdAt),
+        limit: 30,
+      });
+      const variants = rows.length ? await db.query.variants.findMany({ where: inArray(schema.variants.productId, rows.map((r) => r.id)) }) : [];
+      return {
+        store: { name: run.shop.name, country: run.shop.country },
+        products: rows.map((p) => ({
+          id: p.id,
+          title: p.title,
+          price_from: money(run, Math.min(...variants.filter((v) => v.productId === p.id).map((v) => v.priceMinor))),
+          description: untrusted("product", p.descriptionHtml.slice(0, 1500)),
+        })),
+      };
+    },
+  }),
+  tool({
+    name: "save_post_draft",
+    kind: "change",
+    description:
+      "Save the blog post as a draft. The merchant reads and publishes it. Plain text only: blank lines between paragraphs, '## ' at the start of a line for a subheading, '• ' for a bullet.",
+    input: z.object({
+      title: z.string().min(5).max(140).describe("A title people would search for, not clickbait."),
+      excerpt: z.string().min(20).max(300).describe("One or two sentences for the blog list and search engines."),
+      body: z.string().min(300).max(20_000).describe("The post, plain text, about 400 to 900 words."),
+      product_ids: z.array(z.string()).max(8).describe("Products the post features, shown under it with a link."),
+    }),
+    policy: () => AUTO,
+    summary: (i) => `Drafted a blog post: “${i.title}”`,
+    async run(i, run) {
+      const post = await createPost(
+        run.ctx.db,
+        run.shop.id,
+        { title: i.title, excerpt: i.excerpt, body: i.body, productIds: i.product_ids.filter((id) => /^[0-9a-f-]{36}$/i.test(id)) },
+        { aiGenerated: true },
+      );
+      return { saved: true, post_id: post.id };
     },
   }),
 ];
@@ -715,6 +770,7 @@ export const AGENT_TOOLS: Record<AgentName, AgentTool[]> = {
   buyer_support: buyerTools,
   fulfilment: fulfilmentTools,
   margin: marginTools,
+  writer: writerTools,
 };
 
 export function findTool(agent: AgentName, name: string) {

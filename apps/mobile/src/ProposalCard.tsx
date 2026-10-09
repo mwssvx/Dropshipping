@@ -10,6 +10,7 @@ export const AGENT_LABEL: Record<string, string> = {
   buyer_support: "Buyer support",
   fulfilment: "Order fixer",
   margin: "Margin watch",
+  writer: "Blog writer",
 };
 
 export type Proposal = { id: string; agent: string; summary: string; reason: string | null; input: Record<string, unknown> };

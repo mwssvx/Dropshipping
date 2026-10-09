@@ -20,6 +20,7 @@ const WHAT = {
   buyer_support: "Answers buyers' questions from their order page, or drafts a reply, or hands it to you.",
   fulfilment: "Looks at orders the supplier couldn't take: retries, or proposes a refund and an apology for you to approve.",
   margin: "Once a day, checks supplier costs. Only runs the model if a product on sale keeps less than 10%.",
+  writer: "Drafts blog posts when you press “Write a draft” on the Blog page. Posts stay drafts until you publish them.",
 };
 
 export default async function AiSettingsPage() {
