@@ -1,4 +1,4 @@
-// Milestone 1 to 19 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 20 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -278,6 +278,10 @@ export const orders = pgTable(
       .notNull()
       .default("unfulfilled"),
     paymentIntentId: text("payment_intent_id").unique(),
+    // "payment_link": the merchant built the order (for a buyer who asked by message or phone)
+    // and emailed a link to pay. Their note to the buyer shows in the email and on the pay page.
+    source: text("source", { enum: ["checkout", "payment_link"] }).notNull().default("checkout"),
+    note: text("note"),
     // Our sales fee (free plan only) and the estimated card processing fee, fixed at checkout.
     platformFeeMinor: money("platform_fee_minor").notNull().default(0),
     processingFeeMinor: money("processing_fee_minor").notNull().default(0),
@@ -377,7 +381,7 @@ export const emails = pgTable(
     id: id(),
     shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
     orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
-    kind: text("kind", { enum: ["order_confirmation", "shipping_update", "delivered", "refund", "support_reply", "abandoned_cart"] }).notNull(),
+    kind: text("kind", { enum: ["order_confirmation", "shipping_update", "delivered", "refund", "support_reply", "abandoned_cart", "payment_link"] }).notNull(),
     // Tells apart emails of a kind that can repeat (one per refund). Empty for once-only kinds.
     ref: text("ref").notNull().default(""),
     to: text("to").notNull(),
