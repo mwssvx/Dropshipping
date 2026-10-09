@@ -10,7 +10,20 @@ export default async function SuppliersPage() {
   const { shop, db } = await requireShop("suppliers");
   const [links, own] = await Promise.all([listSupplierLinks(db, shop.id), listOwnSuppliers(db, shop.id)]);
   const available = suppliers().available;
-  const cj = available.find((s) => s.name === "cj");
+  const services = [
+    {
+      name: "cj",
+      label: "CJ Dropshipping",
+      on: "Import products from CJ links. Orders are placed with the cheapest shipping option and paid from your CJ wallet.",
+      off: "Connecting needs a CJ Dropshipping account and its API key. Self-serve connect arrives with accounts; for now the key is set on the server (CJ_API_KEY).",
+    },
+    {
+      name: "aliexpress",
+      label: "AliExpress",
+      on: "Import products from AliExpress item links, with each option's stock and delivery time. Orders go to each seller with the cheapest delivery and are paid with the AliExpress account's saved card. AliExpress can't cancel orders for apps, so cancel those in AliExpress.",
+      off: "Connecting needs an AliExpress Open Platform app and an AliExpress account that authorises it. For now they're set on the server (ALIEXPRESS_APP_KEY, ALIEXPRESS_APP_SECRET, ALIEXPRESS_ACCESS_TOKEN).",
+    },
+  ].map((s) => ({ ...s, connected: available.some((a) => a.name === s.name) }));
   const demo = available.find((s) => s.name === "fake");
   const used = (name: string) => links.some((l) => l.provider === name);
 
@@ -19,17 +32,18 @@ export default async function SuppliersPage() {
       <PageHeader title="Suppliers" />
       <div className="px-4 sm:px-8 flex flex-col gap-4 max-w-3xl">
         <p className="hint">When a customer pays, their order goes to the supplier of each item automatically, and tracking comes back to you and the customer.</p>
-        <section className="card p-5 flex flex-col gap-2">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="font-semibold">CJ Dropshipping</h2>
-            <span className={`pill ${cj ? "pill-success" : "pill-neutral"}`}>{cj ? "Connected" : "Not connected"}</span>
-          </div>
-          <p className="text-sm hint">
-            {cj
-              ? "Import products from CJ links. Orders are placed with the cheapest shipping option and paid from your CJ wallet."
-              : "Connecting needs a CJ Dropshipping account and its API key. Self-serve connect arrives with accounts; for now the key is set on the server (CJ_API_KEY)."}
-          </p>
-        </section>
+        {services.map((s) => (
+          <section key={s.name} className="card p-5 flex flex-col gap-2" aria-label={s.label}>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-semibold">{s.label}</h2>
+              <span className={`pill ${s.connected ? "pill-success" : "pill-neutral"}`}>{s.connected ? "Connected" : "Not connected"}</span>
+            </div>
+            <p className="text-sm hint">
+              {s.connected ? s.on : s.off}
+              {used(s.name) ? " Some of your products use it." : ""}
+            </p>
+          </section>
+        ))}
         <section className="flex flex-col gap-3" aria-labelledby="own-heading">
           <div className="card p-5 flex flex-col gap-3">
             <div>

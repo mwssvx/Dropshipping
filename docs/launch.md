@@ -13,7 +13,7 @@ Run `pnpm preflight` with the production settings (for example `node --env-file=
 | Email | real sending | `RESEND_API_KEY`, `EMAIL_FROM` on a verified domain (password resets depend on it) |
 | Operations | protected scheduled job | `CRON_SECRET` of 32+ characters; schedule `/api/cron/fulfillment` every 10 to 30 minutes (needs a paid Vercel plan, or an external scheduler) |
 | Operations | staff for appeals (warning) | `STAFF_EMAILS` |
-| Suppliers | demo off, CJ on | `DEMO_SUPPLIER=off`, `CJ_API_KEY` |
+| Suppliers | demo off, a real supplier on | `DEMO_SUPPLIER=off`, and `CJ_API_KEY` or the three `ALIEXPRESS_*` keys |
 | Domains | certificates for merchants' domains (warning) | `VERCEL_API_TOKEN`, `VERCEL_PROJECT_ID` |
 | AI | real model (warning) | `ANTHROPIC_API_KEY`, with a monthly spend limit in the Anthropic console |
 | App | push via Expo (warning) | leave `PUSH_PROVIDER` empty |
@@ -24,7 +24,7 @@ Run `pnpm preflight` with the production settings (for example `node --env-file=
 1. Pick the final name and run a trademark search (USPTO, UKIPO, EUIPO, CIPO) in the launch countries.
 2. Have a lawyer review the four drafts at `/legal/terms`, `/legal/privacy`, `/legal/acceptable-use` and `/legal/merchant-agreement` (source: `apps/web/src/app/(marketing)/legal/docs.ts`), fill the `[bracketed]` details, then remove the "Draft for review" banner.
 3. Activate Stripe: live mode, Connect platform profile, the countries we launch in, and the webhook endpoints in `docs/accounts.md`.
-4. CJ Dropshipping: account, API key, wallet auto-pay, and one real test order end to end.
+4. CJ Dropshipping: account, API key, wallet auto-pay, and one real test order end to end. The same for AliExpress if stores will sell from it.
 5. Supabase production project and Resend sending domain.
 6. Buy the domain and point it, plus a wildcard, at Vercel.
 7. Apple and Google developer accounts; TestFlight and Play internal testing builds (`eas build`, `eas submit`).

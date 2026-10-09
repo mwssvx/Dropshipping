@@ -131,7 +131,7 @@ export const suppliers = pgTable(
   {
     id: id(),
     shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
-    provider: text("provider", { enum: ["fake", "cj", "email"] }).notNull(),
+    provider: text("provider", { enum: ["fake", "cj", "aliexpress", "email"] }).notNull(),
     credentialsRef: text("credentials_ref"),
     status: text("status", { enum: ["connected", "error", "disconnected"] }).notNull().default("connected"),
     name: text("name"),

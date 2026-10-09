@@ -21,6 +21,10 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
     }
   }
   const demo = available.some((s) => s.name === "fake");
+  const notConnected = [
+    ["cj", "CJ Dropshipping"],
+    ["aliexpress", "AliExpress"],
+  ].filter(([name]) => !available.some((s) => s.name === name)).map(([, label]) => label);
 
   return (
     <main className="pb-12">
@@ -29,12 +33,12 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
         <form method="get" className="card p-5 flex flex-col gap-3">
           <label className="label" htmlFor="url">Product link</label>
           <div className="flex gap-2 flex-col sm:flex-row">
-            <input className="input" id="url" name="url" type="url" required defaultValue={url} placeholder="https://cjdropshipping.com/product/…" />
+            <input className="input" id="url" name="url" type="url" required defaultValue={url} placeholder="https://www.aliexpress.com/item/…" />
             <button className="btn btn-primary shrink-0">Look up</button>
           </div>
           <p className="hint">
             Paste a product page from {available.filter((s) => s.name !== "fake").map((s) => s.label).join(", ") || "your supplier"}.
-            {!available.some((s) => s.name === "cj") && " CJ Dropshipping links work once CJ is connected."}
+            {notConnected.length > 0 && ` ${notConnected.join(" and ")} links work once ${notConnected.length > 1 ? "they're" : "it's"} connected.`}
           </p>
           {demo && (
             <div className="flex flex-wrap gap-2 items-center">

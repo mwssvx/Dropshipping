@@ -186,7 +186,7 @@ const importSchema = z.object({
         source_url: str(2000).nullable().optional(),
         supplier: z
           .object({
-            provider: z.enum(["fake", "cj", "email"]).nullable(),
+            provider: z.enum(["fake", "cj", "aliexpress", "email"]).nullable(),
             product_ref: str(200).nullable(),
             // Own suppliers only.
             name: str(100).nullable().optional(),
