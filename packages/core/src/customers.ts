@@ -150,6 +150,11 @@ export async function exportCustomerData(db: Db, shop: { id: string; name: strin
     .innerJoin(schema.variants, eq(schema.variants.id, schema.stockAlerts.variantId))
     .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
     .where(and(eq(schema.stockAlerts.shopId, shop.id), eq(schema.stockAlerts.email, customer.email)));
+  const saved = await db
+    .select({ product: schema.products.title, priceMinor: schema.savedItems.priceMinor, createdAt: schema.savedItems.createdAt })
+    .from(schema.savedItems)
+    .innerJoin(schema.products, eq(schema.products.id, schema.savedItems.productId))
+    .where(eq(schema.savedItems.customerId, customer.id));
   const numbers = new Map(orders.map((o) => [o.id, o.number]));
 
   return {
@@ -161,6 +166,7 @@ export async function exportCustomerData(db: Db, shop: { id: string; name: strin
       created_at: customer.createdAt.toISOString(),
       last_sign_in_at: customer.lastSignInAt?.toISOString() ?? null,
       accepts_marketing: customer.acceptsMarketing,
+      price_drop_emails: customer.priceAlerts,
       marketing_consent_at: customer.marketingConsentAt?.toISOString() ?? null,
       unsubscribed_at: customer.unsubscribedAt?.toISOString() ?? null,
       wholesale: customer.wholesaleStatus === "none" ? null : { status: customer.wholesaleStatus, company: customer.wholesaleCompany, tax_id: customer.wholesaleTaxId, message: customer.wholesaleMessage },
@@ -190,6 +196,7 @@ export async function exportCustomerData(db: Db, shop: { id: string; name: strin
     messages: messages.map((m) => ({ conversation: conversations.find((c) => c.id === m.conversationId)!.subject, from: m.author === "buyer" ? "you" : "store", body: m.body, at: m.createdAt.toISOString() })),
     emails_sent: emails.map((e) => ({ subject: e.subject, kind: e.kind, status: e.status, at: (e.sentAt ?? e.createdAt).toISOString() })),
     back_in_stock_requests: alerts.map((a) => ({ product: a.product, option: a.option, asked_at: a.createdAt.toISOString(), emailed_at: a.notifiedAt?.toISOString() ?? null })),
+    saved_items: saved.map((x) => ({ product: x.product, price_when_saved: x.priceMinor, saved_at: x.createdAt.toISOString() })),
     gift_cards: giftCards.map((g) => ({ ending: g.last4, currency: g.currency, initial: g.initialMinor, balance: g.balanceMinor, created_at: g.createdAt.toISOString() })),
   };
 }

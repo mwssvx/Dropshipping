@@ -12,6 +12,7 @@ import {
   getProduct,
   NotFoundError,
   patchProduct,
+  sendPriceDrops,
   sendStockAlerts,
   publicOrder,
   publicProduct,
@@ -102,7 +103,9 @@ const routes: Record<string, Handler> = {
         }))
       : undefined;
     await patchProduct(db, shop.id, params.id!, { status: oneOf(typeof b.status === "string" ? b.status : null, STATUS, "status"), variants });
-    await sendStockAlerts(await stock(), { shopId: shop.id });
+    const ctx = await stock();
+    await sendStockAlerts(ctx, { shopId: shop.id });
+    await sendPriceDrops(ctx, { shopId: shop.id });
     notifyLater(shop.id);
     return { product: publicProduct(await getProduct(db, shop.id, params.id!)) };
   },

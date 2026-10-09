@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { amountToCharge, getOrder, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestStockAlert, shopCurrencies, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
+import { amountToCharge, getOrder, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
 import { agents, campaigns, db, payments, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
@@ -11,6 +11,7 @@ import { loadShop, storeBase } from "./data";
 import { buyerFx, currencyCookie } from "@/lib/currency";
 import { campaignCookie } from "@/lib/campaigns";
 import { currentBuyer } from "@/lib/buyer";
+import { readGuestSaved, writeGuestSaved } from "@/lib/saved";
 
 /** The visit id the store's tracker set, for the funnel. */
 async function track(shopId: string, kind: "add_to_cart" | "checkout_start", productId?: string | null) {
@@ -238,6 +239,43 @@ export async function stockAlertAction(handle: string, productHandle: string, fo
     status = e.code === "in_stock" ? "back" : e.code === "too_many" ? "many" : "invalid";
   }
   redirect(`${await storeBase(handle)}/products/${productHandle}?alert=${status}#stock-alert`);
+}
+
+/** The heart on a product: saves it, or takes it off the list. Comes back to the page it was pressed on. */
+export async function toggleSavedAction(handle: string, productId: string, back: "product" | "saved", form: FormData) {
+  const shop = await loadShop(handle);
+  const save = form.get("save") === "1";
+  const buyer = await currentBuyer(shop.id);
+  let status = save ? "saved" : "removed";
+  if (buyer) {
+    try {
+      if (save) await saveItem(await db(), shop.id, buyer.id, productId);
+      else await unsaveItem(await db(), buyer.id, productId);
+    } catch (e) {
+      if (!(e instanceof UserError)) throw e;
+      status = "full";
+    }
+  } else {
+    const ids = (await readGuestSaved(shop.id)).filter((id) => id !== productId);
+    if (save) {
+      if (ids.length >= 50) status = "full";
+      else ids.push(productId);
+    }
+    await writeGuestSaved(shop.id, ids);
+  }
+  revalidatePath(`/s/${handle}`, "layout");
+  const base = await storeBase(handle);
+  if (back === "saved") redirect(`${base}/saved`);
+  const product = String(form.get("handle") ?? "");
+  redirect(`${base}/products/${encodeURIComponent(product)}?saved=${status}`);
+}
+
+/** Signed-in buyers turn price-drop emails on or off from their Saved page. */
+export async function priceAlertsAction(handle: string, on: boolean) {
+  const shop = await loadShop(handle);
+  const buyer = await currentBuyer(shop.id);
+  if (buyer) await setPriceAlerts(await db(), shop.id, buyer.id, on);
+  redirect(`${await storeBase(handle)}/saved`);
 }
 
 export type ReturnState = { error?: string };

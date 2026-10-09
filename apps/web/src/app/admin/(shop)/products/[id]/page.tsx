@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos } from "@sf/core";
+import { getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount } from "@sf/core";
 import { requireShop, storeAddress, suppliers } from "@/lib/server";
 import { updateProductAction } from "../../../actions";
 import { setUpsellAction } from "../../../growth-actions";
@@ -29,6 +29,7 @@ export default async function EditProductPage({ params, searchParams }: { params
   const product = { ...found, supplier: label ? { label } : null };
   const own = await listOwnSuppliers(db, shop.id);
   const waitingBy = await waitingForProduct(db, shop.id, product.id);
+  const saves = await savedCount(db, shop.id, product.id);
   const waiting = product.variants.filter((v) => waitingBy.has(v.id)).map((v) => ({ option: v.title, count: waitingBy.get(v.id)! }));
   const others = (await listProducts(db, shop.id)).filter((p) => p.id !== product.id && p.status !== "archived");
   return (
@@ -47,6 +48,11 @@ export default async function EditProductPage({ params, searchParams }: { params
             {product.status === "active"
               ? "Imported and live on your store. Orders for it go to the supplier automatically."
               : "Imported as a draft. Check the description and prices, then set it to Active."}
+          </p>
+        )}
+        {saves > 0 && (
+          <p className="banner banner-info">
+            {saves === 1 ? "1 buyer saved" : `${saves} buyers saved`} this for later. If you lower the price, signed-in buyers get one email about it.
           </p>
         )}
         <WriteListingButton productId={product.id} live={product.status === "active"} />

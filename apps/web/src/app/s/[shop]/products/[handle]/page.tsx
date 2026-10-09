@@ -6,7 +6,8 @@ import { currentBuyer } from "@/lib/buyer";
 import { db } from "@/lib/server";
 import { buyerFx } from "@/lib/currency";
 import { SubmitButton } from "@/components/SubmitButton";
-import { addToCartAction, stockAlertAction } from "../../actions";
+import { addToCartAction, stockAlertAction, toggleSavedAction } from "../../actions";
+import { savedIds } from "@/lib/saved";
 import { loadShop, storeBase, missing } from "../../data";
 import { Price } from "@/components/Price";
 
@@ -60,9 +61,10 @@ const ALERT_MESSAGES: Record<string, { text: string; ok: boolean }> = {
   invalid: { text: "Enter your email address and pick an option.", ok: false },
 };
 
-export default async function ProductPage({ params, searchParams }: { params: Promise<{ shop: string; handle: string }>; searchParams: Promise<{ alert?: string }> }) {
+export default async function ProductPage({ params, searchParams }: { params: Promise<{ shop: string; handle: string }>; searchParams: Promise<{ alert?: string; saved?: string }> }) {
   const { shop: shopHandle, handle } = await params;
-  const alert = ALERT_MESSAGES[(await searchParams).alert ?? ""];
+  const query = await searchParams;
+  const alert = ALERT_MESSAGES[query.alert ?? ""];
   const { shop, product } = await load(shopHandle, handle);
   const buyable = product.variants.filter((x) => x.stock === null || x.stock > 0);
   const v = buyable[0] ?? product.variants[0];
@@ -71,6 +73,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const buyer = await currentBuyer(shop.id);
   const wholesale = await wholesaleTermsFor(await db(), shop, buyer?.email);
   const soldOut = product.variants.filter((x) => x.stock !== null && x.stock <= 0);
+  const isSaved = (await savedIds(shop.id)).includes(product.id);
   const tiers = wholesale ? [] : product.quantityBreaks;
   const jsonLd = JSON.stringify(productJsonLd(product, shop.currency, reviews)).replace(/</g, "\\u003c");
   return (
@@ -138,6 +141,20 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           </form>
         )}
         {v && buyable.length === 0 && <p className="banner banner-info">Sold out for now.</p>}
+        <form action={toggleSavedAction.bind(null, shopHandle, product.id, "product")} className="flex flex-wrap items-center gap-3">
+          <input type="hidden" name="handle" value={product.handle} />
+          <input type="hidden" name="save" value={isSaved ? "0" : "1"} />
+          <button className="btn btn-secondary" aria-pressed={isSaved}>
+            <span aria-hidden className={isSaved ? "text-critical" : ""}>{isSaved ? "♥" : "♡"}</span> {isSaved ? "Saved" : "Save for later"}
+          </button>
+          {query.saved === "saved" && isSaved && (
+            <span role="status" className="text-sm">
+              Saved. <Link href={`${base}/saved`} className="underline">See your saved items</Link>
+              {!buyer && <span className="hint"> · Sign in there to get an email if the price drops.</span>}
+            </span>
+          )}
+          {query.saved === "full" && <span role="status" className="text-sm text-critical">Your saved list is full. Remove something to save this.</span>}
+        </form>
         {(soldOut.length > 0 || alert) && (
           <form id="stock-alert" action={stockAlertAction.bind(null, shopHandle, product.handle)} className="card p-4 flex flex-col gap-3" aria-labelledby="stock-alert-h">
             <h2 id="stock-alert-h" className="font-semibold">{buyable.length === 0 ? "Email me when it's back" : "Option sold out? Email me when it's back"}</h2>

@@ -70,6 +70,9 @@ export function StoreShell({
             <Link href={`${base}/search`} className="p-2 hover:text-accent" aria-label="Search">
               <svg viewBox="0 0 20 20" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden><circle cx="8.5" cy="8.5" r="5.5" /><path d="M13 13l4.5 4.5" strokeLinecap="round" /></svg>
             </Link>
+            <Link href={`${base}/saved`} className="p-2 hover:text-accent" aria-label="Saved items">
+              <svg viewBox="0 0 20 20" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden><path d="M10 17s-6.5-4.1-6.5-8.6A3.4 3.4 0 0 1 10 6a3.4 3.4 0 0 1 6.5 2.4C16.5 12.9 10 17 10 17z" strokeLinejoin="round" /></svg>
+            </Link>
             <Link href={`${base}/account`} className="text-sm font-medium hover:text-accent px-2">Account</Link>
             <Link href={`${base}/cart`} className="btn btn-secondary" aria-label={`Cart, ${cartCount} items`}>
               Cart{cartCount > 0 && <span className="num rounded-full bg-ink text-surface text-xs px-1.5 py-0.5">{cartCount}</span>}
