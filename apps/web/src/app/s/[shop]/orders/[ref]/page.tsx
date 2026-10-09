@@ -1,10 +1,11 @@
 import { notFound } from "next/navigation";
-import { buyerAmounts, buyerThread, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, reviewableItems } from "@sf/core";
+import { buyerAmounts, buyerThread, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, RETURN_REASON_LABELS, returnOptions, reviewableItems } from "@sf/core";
 import Link from "next/link";
 import { db } from "@/lib/server";
 import { loadShop, storeBase } from "../../data";
 import { ReviewForm } from "./ReviewForm";
 import { QuestionForm } from "./QuestionForm";
+import { ReturnForm } from "./ReturnForm";
 
 const time = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
@@ -21,6 +22,8 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
   const thread = paid ? await buyerThread(await db(), shop.id, ref) : [];
   const reviewable = paid ? await reviewableItems(await db(), shop.id, ref) : [];
   const base = await storeBase(handle);
+  const returns = paid ? await returnOptions(await db(), shop, order) : null;
+  const day = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric" });
   // Amounts as the buyer paid them, in their own currency when they shopped in one.
   const refunds = order.presentment && order.refundedMinor ? await listRefunds(await db(), order.id) : [];
   const due = buyerAmounts(order, order.lines, order.presentment ? refunds.reduce((s, r) => s + (r.presentmentAmountMinor ?? 0), 0) : undefined);
@@ -107,6 +110,33 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
             ) : (
               <ReviewForm key={item.productId} handle={handle} orderRef={ref} productId={item.productId} title={item.title} name={order.shippingAddress.name.split(" ")[0] ?? ""} />
             ),
+          )}
+        </section>
+      )}
+      {returns && (returns.latest || returns.canRequest || returns.blocked) && (
+        <section id="returns" className="card p-5 flex flex-col gap-3" aria-labelledby="returns-heading">
+          <h2 id="returns-heading" className="font-semibold">Returns</h2>
+          {returns.latest && (
+            <div className="flex flex-col gap-1 text-sm" role="status">
+              <p>
+                {returns.latest.items.map((i) => `${i.title} × ${i.quantity}`).join(", ")}:{" "}
+                {{
+                  requested: `you asked for a return. ${shop.name} will email you when they've looked at it.`,
+                  approved: `${shop.name} approved your return.`,
+                  refunded: `refunded ${returns.latest.resolvedMinor ? formatMoney(returns.latest.resolvedMinor, order.currency) : ""}.`,
+                  credited: `${returns.latest.resolvedMinor ? formatMoney(returns.latest.resolvedMinor, order.currency) : ""} in store credit, sent by email.`,
+                  declined: `${shop.name} couldn't accept this return.`,
+                }[returns.latest.status]}
+              </p>
+              {returns.latest.merchantMessage && (returns.latest.status === "approved" || returns.latest.status === "declined") && (
+                <p className="border-l-2 border-border pl-3 whitespace-pre-line">{returns.latest.merchantMessage}</p>
+              )}
+            </div>
+          )}
+          {returns.blocked && !returns.open && <p className="text-sm hint">{returns.blocked}</p>}
+          {returns.canRequest && (
+            <ReturnForm handle={handle} orderRef={ref} lines={returns.lines.map((l) => ({ id: l.id, title: l.title, quantity: l.quantity }))}
+              reasons={Object.entries(RETURN_REASON_LABELS)} closes={returns.closesAt ? day.format(returns.closesAt) : null} />
           )}
         </section>
       )}

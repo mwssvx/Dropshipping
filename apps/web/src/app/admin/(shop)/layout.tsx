@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { can, countNeedsYou, countPendingReviews, countPendingWholesale, listPendingActions, listRequirements, openNotices, ROLES, type Area } from "@sf/core";
+import { can, countNeedsYou, countPendingReviews, countOpenReturns, countPendingWholesale, listPendingActions, listRequirements, openNotices, ROLES, type Area } from "@sf/core";
 import { requireShop, storeAddress } from "@/lib/server";
 import { BRAND } from "@/lib/brand";
 import { switchShopAction } from "../actions";
@@ -8,7 +8,7 @@ import { NavLink } from "./NavLink";
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, shop, shops, db, role } = await requireShop();
   const show = (area: Area) => can(role, area);
-  const [address, requirements, notices, pending, inbox, reviews, wholesale] = await Promise.all([
+  const [address, requirements, notices, pending, inbox, reviews, wholesale, returns] = await Promise.all([
     storeAddress(shop),
     listRequirements(db, shop.id),
     openNotices(db, shop.id),
@@ -16,6 +16,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     countNeedsYou(db, shop.id),
     countPendingReviews(db, shop.id),
     show("wholesale") ? countPendingWholesale(db, shop.id) : 0,
+    show("returns") ? countOpenReturns(db, shop.id) : 0,
   ]);
   const approvals = pending.filter((p) => !("message_id" in p.input)).length;
   const pause = notices.find((n) => n.kind === "paused");
@@ -46,6 +47,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           {show("analytics") && <NavLink href="/admin/analytics">Analytics</NavLink>}
           {show("assistant") && <NavLink href="/admin/assistant">Assistant{approvals ? <span className="ml-2 pill pill-warning">{approvals}</span> : null}</NavLink>}
           {show("orders") && <NavLink href="/admin/orders">Orders</NavLink>}
+          {show("returns") && <NavLink href="/admin/returns">Returns{returns ? <span className="ml-2 pill pill-warning">{returns}</span> : null}</NavLink>}
           {show("customers") && <NavLink href="/admin/customers">Customers</NavLink>}
           {show("inbox") && <NavLink href="/admin/inbox">Inbox{inbox ? <span className="ml-2 pill pill-warning">{inbox}</span> : null}</NavLink>}
           {show("money") && <NavLink href="/admin/money">Money{holds ? <span className="ml-2 pill pill-critical">{holds}</span> : null}</NavLink>}

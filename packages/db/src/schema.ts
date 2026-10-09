@@ -1,4 +1,4 @@
-// Milestone 1 to 17 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 18 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -91,6 +91,9 @@ export const shops = pgTable(
     wholesaleEnabled: boolean("wholesale_enabled").notNull().default(false),
     wholesalePercentOff: integer("wholesale_percent_off").notNull().default(20),
     wholesaleMinOrderMinor: money("wholesale_min_order_minor").notNull().default(0),
+    // Buyers can ask for a return this many days after delivery; 0 turns the form off.
+    returnWindowDays: integer("return_window_days").notNull().default(30),
+    returnInstructions: text("return_instructions"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -1038,5 +1041,36 @@ export const shippingRates = pgTable(
     index("shipping_rates_zone_idx").on(t.zoneId),
     check("shipping_rates_price_ok", sql`${t.priceMinor} >= 0`),
     check("shipping_rates_days_ok", sql`${t.minDays} is null or ${t.maxDays} is null or ${t.minDays} <= ${t.maxDays}`),
+  ],
+);
+
+// A buyer asking to return items from an order. The merchant approves it (with instructions),
+// refunds it, gives store credit, or declines it.
+export const RETURN_REASONS = ["damaged", "wrong_item", "not_as_described", "too_small_or_big", "changed_mind", "other"] as const;
+export type ReturnItem = { lineId: string; title: string; quantity: number };
+
+export const returnRequests = pgTable(
+  "return_requests",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    orderId: uuid("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+    status: text("status", { enum: ["requested", "approved", "refunded", "credited", "declined"] }).notNull().default("requested"),
+    reason: text("reason", { enum: RETURN_REASONS }).notNull(),
+    note: text("note"),
+    items: jsonb("items").$type<ReturnItem[]>().notNull(),
+    // What the items cost the buyer, after discounts and with tax: the default refund.
+    suggestedMinor: money("suggested_minor").notNull(),
+    resolvedMinor: money("resolved_minor"),
+    merchantMessage: text("merchant_message"),
+    refundId: uuid("refund_id").references(() => refunds.id, { onDelete: "set null" }),
+    giftCardId: uuid("gift_card_id").references(() => giftCards.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("return_requests_shop_idx").on(t.shopId, t.status),
+    uniqueIndex("return_requests_one_open_uq").on(t.orderId).where(sql`${t.status} in ('requested', 'approved')`),
   ],
 );

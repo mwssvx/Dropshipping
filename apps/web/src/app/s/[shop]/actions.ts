@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { amountToCharge, getOrder, normalizeGiftCardCode, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, shopCurrencies, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
+import { amountToCharge, getOrder, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, shopCurrencies, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
 import { agents, campaigns, db, payments, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
@@ -225,4 +225,23 @@ export async function newsletterAction(handle: string, form: FormData) {
     status = "invalid";
   }
   redirect(`${(await storeBase(handle)) || "/"}?signup=${status}#signup`);
+}
+
+export type ReturnState = { error?: string };
+
+/** The buyer asks to return items, from their order page. */
+export async function returnAction(handle: string, ref: string, _: ReturnState, form: FormData): Promise<ReturnState> {
+  const shop = await loadShop(handle);
+  try {
+    const order = await getOrderByPaymentIntent(await db(), shop.id, ref);
+    await requestReturn(await db(), shop, order, {
+      reason: String(form.get("reason") ?? "") as never,
+      note: String(form.get("note") ?? ""),
+      items: form.getAll("lineId").map((id) => ({ lineId: String(id), quantity: Number(form.get(`qty-${id}`) ?? 0) || 0 })),
+    });
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  redirect(`${await storeBase(handle)}/orders/${ref}`);
 }

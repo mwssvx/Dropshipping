@@ -22,10 +22,11 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const cost = order.lines.reduce((s, l) => s + (l.unitCostMinor ?? 0) * l.quantity, 0);
   const knownCost = order.lines.every((l) => l.unitCostMinor != null);
   const a = order.shippingAddress;
-  const [links, refunds, giftCard] = await Promise.all([
+  const [links, refunds, giftCard, returns] = await Promise.all([
     listSupplierLinks(db, shop.id),
     listRefunds(db, order.id),
     order.giftCardId ? db.query.giftCards.findFirst({ where: (g, { eq }) => eq(g.id, order.giftCardId!), columns: { last4: true } }) : undefined,
+    db.query.returnRequests.findMany({ where: (r, { eq }) => eq(r.orderId, order.id), orderBy: (r, { desc }) => desc(r.createdAt) }),
   ]);
   const supplierLabel = (supplierId: string | null) => {
     if (!supplierId) return "Sent by you";
@@ -43,6 +44,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
       ...(f.deliveredAt ? [{ at: f.deliveredAt, text: "Delivered" }] : []),
       ...(f.status === "failed" ? [{ at: f.updatedAt, text: f.problemCode && f.problemMessage?.includes("can't send it") ? f.problemMessage : `Supplier refused the order: ${f.problemMessage}` }] : []),
     ]),
+    ...returns.map((r) => ({ at: r.createdAt, text: `Buyer asked to return ${r.items.map((i) => `${i.title} × ${i.quantity}`).join(", ")}` })),
     ...refunds.map((r) => ({ at: r.createdAt, text: `Refunded ${money(r.amountMinor)}${r.reason ? `: ${r.reason}` : ""}` })),
     ...order.fulfillments.flatMap((f) => (f.status === "cancelled" ? [{ at: f.updatedAt, text: `Supplier order cancelled (${supplierLabel(f.supplierId)})` }] : [])),
     ...order.emails.map((e) => ({
@@ -64,6 +66,12 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         actions={<div className="flex gap-2 items-center">{order.wholesale && <span className="pill pill-info">Wholesale order</span>}<PaymentStatus value={order.paymentStatus} /><FulfilmentStatus value={order.fulfillmentStatus} /></div>} />
       <div className="px-4 sm:px-8 grid gap-6 lg:grid-cols-[1fr_320px] items-start">
         <div className="flex flex-col gap-6 min-w-0">
+          {returns[0] && (returns[0].status === "requested" || returns[0].status === "approved") && (
+            <p className="banner banner-warning" role="status">
+              {returns[0].status === "requested" ? "The buyer asked to return items from this order." : "You approved a return on this order and haven't refunded it yet."}{" "}
+              <Link href="/admin/returns" className="underline">Answer it in Returns</Link>
+            </p>
+          )}
           <section className="card">
             <h2 className="font-semibold px-5 pt-4 pb-2">Items</h2>
             <ul className="divide-y divide-border">
