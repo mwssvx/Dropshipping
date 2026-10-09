@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount } from "@sf/core";
+import { getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, shopLanguages, LANGUAGES } from "@sf/core";
 import { requireShop, storeAddress, suppliers } from "@/lib/server";
 import { updateProductAction } from "../../../actions";
 import { setUpsellAction } from "../../../growth-actions";
@@ -75,6 +75,14 @@ export default async function EditProductPage({ params, searchParams }: { params
           }} />
         <PhotosPanel productId={product.id} title={product.title} photos={productPhotos(product)} max={MAX_PHOTOS} />
         <AddressForm productId={product.id} handle={product.handle} prefix={(await storeAddress(shop)).replace(/^https?:\/\//, "")} />
+        {shopLanguages(shop).length > 0 && (
+          <p className="text-sm max-w-3xl">
+            <span className="hint">Translations: </span>
+            {shopLanguages(shop).map((l, n) => (
+              <span key={l}>{n > 0 && " · "}<Link href={`/admin/languages/${l}/product/${product.id}`} className="underline">{LANGUAGES[l].english}</Link></span>
+            ))}
+          </p>
+        )}
         {product.giftCard ? (
           <p className="banner banner-info max-w-3xl">
             This is your gift card. Each option&apos;s price is what the card is worth, and codes are emailed to the buyer when they pay.

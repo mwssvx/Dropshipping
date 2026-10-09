@@ -21,6 +21,7 @@ const WHAT = {
   fulfilment: "Looks at orders the supplier couldn't take: retries, or proposes a refund and an apology for you to approve.",
   margin: "Once a day, checks supplier costs. Only runs the model if a product on sale keeps less than 10%.",
   writer: "Drafts blog posts when you press “Write a draft” on the Blog page. Posts stay drafts until you publish them.",
+  translator: "Translates your store when you press “Translate with AI” on the Languages page. You can edit any translation afterwards.",
 };
 
 export default async function AiSettingsPage() {

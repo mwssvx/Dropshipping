@@ -4,7 +4,7 @@ import { db } from "@/lib/server";
 import { buyerFx } from "@/lib/currency";
 import { BrowseBar, browseOptions, type BrowseParams } from "@/theme/Browse";
 import { ProductGrid } from "@/theme/Sections";
-import { loadShop, storeBase } from "../data";
+import { loadShop, localProducts, storeBase, storeT } from "../data";
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<BrowseParams> }) {
   const { q } = await searchParams;
@@ -18,17 +18,18 @@ export default async function SearchPage({ params, searchParams }: { params: Pro
   const shop = await loadShop(param);
   const [base, fx] = await Promise.all([storeBase(param), buyerFx(shop)]);
   const { products, sort } = await searchProducts(await db(), shop.id, browseOptions(query), fx);
-  const compact = compactProducts(products);
+  const compact = await localProducts(param, compactProducts(products));
+  const t = await storeT(param);
   const q = query.q?.trim();
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 flex flex-col gap-8">
-      <h1 className="text-3xl font-bold tracking-tight">{q ? <>Results for &ldquo;{q}&rdquo;</> : "Search"}</h1>
-      <BrowseBar action={`${base}/search`} params={query} sort={sort} currency={fx.currency} search count={compact.length} />
+      <h1 className="text-3xl font-bold tracking-tight">{q ? t.resultsFor(q) : t.search}</h1>
+      <BrowseBar action={`${base}/search`} params={query} sort={sort} currency={fx.currency} search count={compact.length} t={t} />
       {compact.length ? (
-        <ProductGrid products={compact} data={{ base, currency: shop.currency, fx, catalog: { products: compact, collections: [] } }} />
+        <ProductGrid products={compact} data={{ base, currency: shop.currency, fx, t, catalog: { products: compact, collections: [] } }} />
       ) : (
         <p className="hint">
-          Nothing matches{q ? <> &ldquo;{q}&rdquo;</> : null}. Try fewer words, or <Link href={`${base}/collections/all`} className="underline">see everything</Link>.
+          {t.nothingMatches(q ?? null)} {t.tryFewer} <Link href={`${base}/collections/all`} className="underline">{t.seeEverything}</Link>.
         </p>
       )}
     </main>

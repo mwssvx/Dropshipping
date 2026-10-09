@@ -1,4 +1,4 @@
-// Milestone 1 to 27 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 29 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -102,6 +102,9 @@ export const shops = pgTable(
     returnInstructions: text("return_instructions"),
     // How supplier cost becomes a retail price, for imports and "reprice everything".
     pricingRule: jsonb("pricing_rule").$type<PricingRule>(),
+    // Languages the store is also shown in, besides English, like ["de", "fr"]. Buyers pick one
+    // in the footer; each has its own address (/de/...).
+    languages: jsonb("languages").$type<string[]>().notNull().default([]),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -623,7 +626,7 @@ export const appeals = pgTable(
 
 // AI agents. Every run is recorded with its token use and cost, and every tool call it makes is an
 // agent action: reads run straight away, changes may wait for the merchant's approval.
-export const AGENTS = ["listing", "assistant", "buyer_support", "fulfilment", "margin", "writer"] as const;
+export const AGENTS = ["listing", "assistant", "buyer_support", "fulfilment", "margin", "writer", "translator"] as const;
 export type AgentName = (typeof AGENTS)[number];
 
 export const agentRuns = pgTable(
@@ -1167,4 +1170,29 @@ export const savedItems = pgTable(
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("saved_items_customer_product_uq").on(t.customerId, t.productId), index("saved_items_shop_product_idx").on(t.shopId, t.productId)],
+);
+
+// A store's own words in another language: a product's title and description, a collection, a
+// page, or the theme's text (menus, home page sections). Written by the AI translator or the
+// merchant. source_hash is the original text when it was translated, so the admin can say which
+// translations are out of date after the original changes.
+export const TRANSLATABLE = ["product", "collection", "page", "theme"] as const;
+export type TranslatableKind = (typeof TRANSLATABLE)[number];
+
+export const translations = pgTable(
+  "translations",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    language: text("language").notNull(),
+    kind: text("kind", { enum: TRANSLATABLE }).notNull(),
+    /** The product, collection or page id; the shop id for the theme. */
+    refId: uuid("ref_id").notNull(),
+    /** product and collection: title, description. page: title, body. theme: original text -> translated text. */
+    fields: jsonb("fields").$type<Record<string, string>>().notNull(),
+    sourceHash: text("source_hash").notNull(),
+    byAi: boolean("by_ai").notNull().default(false),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("translations_ref_uq").on(t.shopId, t.language, t.kind, t.refId)],
 );

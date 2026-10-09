@@ -63,6 +63,7 @@ export async function deletePage(db: Db, shopId: string, pageId: string) {
     .where(and(eq(schema.pages.id, pageId), eq(schema.pages.shopId, shopId)))
     .returning({ id: schema.pages.id });
   if (!row) throw new NotFoundError("Page");
+  await db.delete(schema.translations).where(and(eq(schema.translations.shopId, shopId), eq(schema.translations.kind, "page"), eq(schema.translations.refId, pageId)));
 }
 
 export async function listPages(db: Db, shopId: string) {

@@ -1,5 +1,5 @@
 // Take your store with you: everything that makes up a store (products, collections, pages, theme,
-// codes, settings) as one JSON file that loads into a new store, plus products as CSV.
+// codes, settings, translations) as one JSON file that loads into a new store, plus products as CSV.
 // Orders and customers stay out of the JSON file: they belong to the payments account.
 import { asc, eq, inArray } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
@@ -11,6 +11,7 @@ import { photoColumns } from "./gallery";
 import { addRedirect } from "./redirects";
 import { parseTheme } from "./theme-doc";
 import { listShippingZones } from "./shipping";
+import { LANGUAGE_CODES, saveTranslation } from "./languages";
 
 export const EXPORT_FORMAT = "storefront-store";
 
@@ -24,7 +25,7 @@ function supplierOf(link: typeof schema.suppliers.$inferSelect | undefined, prod
 export async function exportStore(db: Db, shopId: string, now = new Date()) {
   const shop = await db.query.shops.findFirst({ where: eq(schema.shops.id, shopId) });
   if (!shop) throw new NotFoundError("Store");
-  const [products, collections, links, pages, theme, discounts, supplierRows, posts, redirectRows] = await Promise.all([
+  const [products, collections, links, pages, theme, discounts, supplierRows, posts, redirectRows, translationRows] = await Promise.all([
     db.query.products.findMany({ where: eq(schema.products.shopId, shopId), orderBy: asc(schema.products.createdAt) }),
     db.query.collections.findMany({ where: eq(schema.collections.shopId, shopId), orderBy: asc(schema.collections.createdAt) }),
     db
@@ -39,11 +40,17 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
     db.query.suppliers.findMany({ where: eq(schema.suppliers.shopId, shopId) }),
     db.query.blogPosts.findMany({ where: eq(schema.blogPosts.shopId, shopId), orderBy: asc(schema.blogPosts.createdAt) }),
     db.query.redirects.findMany({ where: eq(schema.redirects.shopId, shopId), orderBy: asc(schema.redirects.fromPath) }),
+    db.query.translations.findMany({ where: eq(schema.translations.shopId, shopId), orderBy: [asc(schema.translations.language), asc(schema.translations.kind)] }),
   ]);
   const variants = products.length
     ? await db.query.variants.findMany({ where: inArray(schema.variants.productId, products.map((p) => p.id)), orderBy: asc(schema.variants.position) })
     : [];
   const handleOf = new Map(products.map((p) => [p.id, p.handle]));
+  const handleByKind: Record<"product" | "collection" | "page", Map<string, string>> = {
+    product: handleOf,
+    collection: new Map(collections.map((c) => [c.id, c.handle])),
+    page: new Map(pages.map((p) => [p.id, p.handle])),
+  };
   const iso = (d: Date | null) => (d ? d.toISOString() : null);
   const shipping = await listShippingZones(db, shopId);
   return {
@@ -59,6 +66,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       reviews_auto_publish: shop.reviewsAutoPublish,
       presentment_currencies: shop.presentmentCurrencies,
       round_converted_prices: shop.roundConvertedPrices,
+      languages: shop.languages,
       wholesale: { enabled: shop.wholesaleEnabled, percent_off: shop.wholesalePercentOff, min_order_minor: shop.wholesaleMinOrderMinor },
       // Missing means the built-in default rate.
       shipping_zones: shipping.isDefault
@@ -128,6 +136,11 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       active: d.active,
     })),
     redirects: redirectRows.map((r) => ({ from: r.fromPath, to: r.toPath })),
+    // Products, collections and pages are matched by handle; the theme has none.
+    translations: translationRows.flatMap((t) => {
+      const ref = t.kind === "theme" ? null : handleByKind[t.kind].get(t.refId);
+      return ref === undefined ? [] : [{ language: t.language, kind: t.kind, ref, fields: t.fields }];
+    }),
   };
 }
 
@@ -148,6 +161,7 @@ const importSchema = z.object({
       reviews_auto_publish: z.boolean().optional(),
       presentment_currencies: z.array(z.enum(CURRENCIES)).max(CURRENCIES.length).optional(),
       round_converted_prices: z.boolean().optional(),
+      languages: z.array(z.enum(LANGUAGE_CODES as [string, ...string[]])).max(LANGUAGE_CODES.length).optional(),
       wholesale: z
         .object({ enabled: z.boolean(), percent_off: z.number().int().min(1).max(80), min_order_minor: z.number().int().min(0).max(100_000_000) })
         .optional(),
@@ -242,6 +256,17 @@ const importSchema = z.object({
   redirects: z
     .array(z.object({ from: str(500), to: str(2000) }))
     .max(2000)
+    .default([]),
+  translations: z
+    .array(
+      z.object({
+        language: str(5),
+        kind: z.enum(["product", "collection", "page", "theme"]),
+        ref: handle.nullable(),
+        fields: z.record(str(200_000), str(50_000)),
+      }),
+    )
+    .max(5000)
     .default([]),
   discount_codes: z
     .array(
@@ -425,6 +450,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
     if (data.store.reviews_auto_publish !== undefined) settings.reviewsAutoPublish = data.store.reviews_auto_publish;
     if (data.store.presentment_currencies !== undefined) settings.presentmentCurrencies = [...new Set(data.store.presentment_currencies)];
     if (data.store.round_converted_prices !== undefined) settings.roundConvertedPrices = data.store.round_converted_prices;
+    if (data.store.languages !== undefined) settings.languages = LANGUAGE_CODES.filter((l) => data.store.languages!.includes(l));
     if (data.store.wholesale) {
       Object.assign(settings, {
         wholesaleEnabled: data.store.wholesale.enabled,
@@ -452,12 +478,30 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
         }
       }
     }
+    // Translations go through the same checks as the editor; any that don't fit are left out.
+    let translationsAdded = 0;
+    if (data.translations.length) {
+      const fresh = (await tx.query.shops.findFirst({ where: eq(schema.shops.id, shopId) }))!;
+      const pageIds = new Map((await tx.query.pages.findMany({ where: eq(schema.pages.shopId, shopId), columns: { id: true, handle: true } })).map((x) => [x.handle, x.id]));
+      const collectionByHandle = new Map((await tx.query.collections.findMany({ where: eq(schema.collections.shopId, shopId), columns: { id: true, handle: true } })).map((x) => [x.handle, x.id]));
+      const idOf = { product: productIds, collection: collectionByHandle, page: pageIds };
+      for (const t of data.translations) {
+        const refId = t.kind === "theme" ? shopId : t.ref ? idOf[t.kind].get(t.ref) : undefined;
+        if (!refId) continue;
+        try {
+          if ((await saveTranslation(tx as unknown as Db, fresh, { language: t.language, kind: t.kind, refId, fields: t.fields })).saved) translationsAdded++;
+        } catch (e) {
+          if (!(e instanceof UserError || e instanceof NotFoundError)) throw e;
+        }
+      }
+    }
     return {
       products: data.products.length,
       collections: data.collections.length,
       pages: data.pages.length,
       discountCodes: data.discount_codes.length,
       redirects: redirectsAdded,
+      translations: translationsAdded,
       theme: !!theme,
       currencyDiffers: typeof data.store.currency === "string" && data.store.currency !== shop.currency,
     };

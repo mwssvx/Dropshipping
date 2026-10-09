@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Section, SectionSettings, TrustIcon } from "@sf/core/theme";
 import type { StorefrontCatalog } from "@sf/core";
+import { storeText, type StoreText } from "@/lib/store-text";
 import type { DisplayFx } from "@sf/core/money";
 import { Price } from "@/components/Price";
 import { storeHref } from "./style";
@@ -20,6 +21,8 @@ export type SectionData = {
   fx?: DisplayFx;
   catalog: StorefrontCatalog;
   signup?: { action: (form: FormData) => Promise<void>; status: "sent" | "invalid" | null };
+  /** The store's fixed words in the buyer's language; English when left out. */
+  t?: StoreText;
 };
 
 type Props<T extends keyof SectionSettings> = { s: SectionSettings[T]; data: SectionData; first: boolean };
@@ -87,12 +90,12 @@ export function ProductGrid({ products, data }: { products: StorefrontCatalog["p
   );
 }
 
-function SectionHeading({ text, link, base }: { text: string; link?: string; base: string }) {
+function SectionHeading({ text, link, base, viewAll = "View all" }: { text: string; link?: string; base: string; viewAll?: string }) {
   if (!text) return null;
   return (
     <div className="flex items-end justify-between gap-4">
       <h2 className="text-2xl font-bold tracking-tight">{text}</h2>
-      {link && <Link href={storeHref(base, link)} className="text-sm font-semibold text-accent hover:underline">View all</Link>}
+      {link && <Link href={storeHref(base, link)} className="text-sm font-semibold text-accent hover:underline">{viewAll}</Link>}
     </div>
   );
 }
@@ -106,8 +109,8 @@ function FeaturedProducts({ s, data }: Props<"featured_products">) {
   const shown = list.slice(0, s.limit);
   return (
     <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12 flex flex-col gap-6">
-      <SectionHeading text={s.heading} base={data.base} link={`/collections/${collection?.handle ?? "all"}`} />
-      {shown.length ? <ProductGrid products={shown} data={data} /> : <p className="hint">New products are on the way. Check back soon.</p>}
+      <SectionHeading text={s.heading} base={data.base} link={`/collections/${collection?.handle ?? "all"}`} viewAll={(data.t ?? storeText(null)).viewAll} />
+      {shown.length ? <ProductGrid products={shown} data={data} /> : <p className="hint">{(data.t ?? storeText(null)).productsComing}</p>}
     </section>
   );
 }
@@ -231,24 +234,20 @@ function TrustBadges({ s }: Props<"trust_badges">) {
   );
 }
 
-const SIGNUP_STATUS = {
-  sent: "Check your inbox: click the link we sent to confirm.",
-  invalid: "That email address doesn't look right. Try again.",
-};
-
 function Newsletter({ s, data }: Props<"newsletter">) {
   const status = data.signup?.status ?? null;
+  const t = data.t ?? storeText(null);
   return (
     <section id="signup" className="bg-accent-soft">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-12 flex flex-col gap-4 items-center text-center">
         {s.heading && <h2 className="text-2xl font-bold tracking-tight">{s.heading}</h2>}
         {s.text && <p className="text-muted">{s.text}</p>}
-        {status && <p role="status" className={`text-sm font-medium ${status === "invalid" ? "text-critical" : ""}`}>{SIGNUP_STATUS[status]}</p>}
+        {status && <p role="status" className={`text-sm font-medium ${status === "invalid" ? "text-critical" : ""}`}>{status === "sent" ? t.signupSent : t.signupInvalid}</p>}
         {status !== "sent" && (
           <form action={data.signup?.action} className="flex w-full max-w-md gap-2">
-            <label htmlFor="signup-email" className="sr-only">Email for news and offers</label>
+            <label htmlFor="signup-email" className="sr-only">{t.signupEmail}</label>
             <input id="signup-email" name="email" type="email" required autoComplete="email" placeholder="you@example.com" className="input flex-1 min-w-0" />
-            <button className="btn btn-primary" disabled={!data.signup}>{s.buttonLabel || "Sign up"}</button>
+            <button className="btn btn-primary" disabled={!data.signup}>{s.buttonLabel || t.signUp}</button>
           </form>
         )}
       </div>

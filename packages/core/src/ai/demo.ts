@@ -118,6 +118,32 @@ function writer(s: State): BetaContentBlock[] {
   return [text(`I drafted “${saved.input.title}”. It's saved as a draft, so read it over, change anything you like, and publish when you're happy.`)];
 }
 
+/* ───────────── Translator ───────────── */
+
+// The demo can't really translate, so it marks each text with the language, which is enough to
+// see translations flow through the admin and the store.
+function translator(s: State): BetaContentBlock[] {
+  const saved = s.has("save_translations");
+  const language = s.prompt.match(/language code ([a-z]{2})/)?.[1] ?? "de";
+  if (!saved) {
+    let items: { kind: string; ref_id: string; source: Record<string, string> }[] = [];
+    try {
+      items = JSON.parse(strip(s.prompt.slice(s.prompt.indexOf("<untrusted_data"))).replace(/^source="[^"]*">/, "").trim());
+    } catch {
+      return [text("I couldn't read the items to translate.")];
+    }
+    const tag = `[${language.toUpperCase()}]`;
+    return [
+      toolCall("save_translations", {
+        language,
+        items: items.map((i) => ({ kind: i.kind, ref_id: i.ref_id, fields: Object.fromEntries(Object.entries(i.source).map(([k, v]) => [k, `${tag} ${v}`])) })),
+      }),
+    ];
+  }
+  const n = saved.result?.saved ?? 0;
+  return [text(`I translated ${n} item${n === 1 ? "" : "s"}. Read them over on the Languages page and change anything that doesn't sound right.`)];
+}
+
 /* ───────────── Buyer support ───────────── */
 
 function buyerSupport(s: State): BetaContentBlock[] {
@@ -310,6 +336,7 @@ function assistant(s: State, req: ModelRequest): BetaContentBlock[] {
 const BRAINS: Record<ModelRequest["agent"], (s: State, req: ModelRequest) => BetaContentBlock[]> = {
   listing,
   writer,
+  translator,
   buyer_support: buyerSupport,
   fulfilment,
   margin,

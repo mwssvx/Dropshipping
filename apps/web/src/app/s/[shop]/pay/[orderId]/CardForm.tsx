@@ -10,15 +10,17 @@ const stripeFor = (key: string) => {
 };
 
 /** Stripe's card form (with Apple Pay and Google Pay where the device offers them). */
-export function CardForm({ publishableKey, clientSecret, returnUrl, payLabel }: { publishableKey: string; clientSecret: string; returnUrl: string; payLabel: string }) {
+type Text = { paying: string; note: string; failed: string };
+
+export function CardForm({ publishableKey, clientSecret, returnUrl, payLabel, locale, text }: { publishableKey: string; clientSecret: string; returnUrl: string; payLabel: string; locale: string; text: Text }) {
   return (
-    <Elements stripe={stripeFor(publishableKey)} options={{ clientSecret, appearance: { theme: "stripe", variables: { borderRadius: "8px" } } }}>
-      <Inner returnUrl={returnUrl} payLabel={payLabel} />
+    <Elements stripe={stripeFor(publishableKey)} options={{ clientSecret, locale: locale as "auto", appearance: { theme: "stripe", variables: { borderRadius: "8px" } } }}>
+      <Inner returnUrl={returnUrl} payLabel={payLabel} text={text} />
     </Elements>
   );
 }
 
-function Inner({ returnUrl, payLabel }: { returnUrl: string; payLabel: string }) {
+function Inner({ returnUrl, payLabel, text }: { returnUrl: string; payLabel: string; text: Text }) {
   const stripe = useStripe();
   const elements = useElements();
   const [error, setError] = useState<string | null>(null);
@@ -33,16 +35,16 @@ function Inner({ returnUrl, payLabel }: { returnUrl: string; payLabel: string })
         setError(null);
         const result = await stripe.confirmPayment({ elements, confirmParams: { return_url: returnUrl } });
         // Only reached when the payment didn't go through; on success Stripe sends the buyer to returnUrl.
-        setError(result.error?.message ?? "The payment didn't go through. Try again.");
+        setError(result.error?.message ?? text.failed);
         setBusy(false);
       }}
     >
       <PaymentElement />
       {error && <p role="alert" className="banner banner-critical">{error}</p>}
       <button type="submit" className="btn btn-primary btn-lg" disabled={!stripe || busy} aria-busy={busy}>
-        {busy ? "Paying…" : payLabel}
+        {busy ? text.paying : payLabel}
       </button>
-      <p className="hint text-center">Payments are processed securely by Stripe. Card details never touch this store.</p>
+      <p className="hint text-center">{text.note}</p>
     </form>
   );
 }
