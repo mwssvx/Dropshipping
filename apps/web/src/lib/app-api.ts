@@ -26,6 +26,7 @@ import {
   moneySummary,
   NotFoundError,
   patchProduct,
+  sendStockAlerts,
   previewImport,
   refundOrder,
   registerDevice,
@@ -47,7 +48,7 @@ import {
   type Shop,
 } from "@sf/core";
 import type { Db } from "@sf/db";
-import { agents, db, fulfillment, notifyLater, payments, refunds, storeAddress, suppliers, testPayments } from "./server";
+import { agents, db, fulfillment, notifyLater, payments, refunds, stock, storeAddress, suppliers, testPayments } from "./server";
 
 type User = { id: string; email: string };
 type ShopLink = { id: string; name: string; handle: string; role: string };
@@ -211,7 +212,11 @@ const routes: Record<string, Handler> = {
 
   "GET products": async ({ db, shop }) => ({ products: (await listProducts(db, shop.id)).map(productView) }),
   "GET products/:id": async ({ params, db, shop }) => productView(await getProduct(db, shop.id, params.id!)),
-  "PATCH products/:id": async ({ req, params, db, shop }) => productView(await patchProduct(db, shop.id, params.id!, await body(req))),
+  "PATCH products/:id": async ({ req, params, db, shop }) => {
+    const product = await patchProduct(db, shop.id, params.id!, await body(req));
+    await sendStockAlerts(await stock(), { shopId: shop.id });
+    return productView(product);
+  },
   "POST products/:id/listing": async ({ params, shop }) => {
     const run = await writeListing(await agents(), shop, params.id!);
     return { ok: true, message: run.text };

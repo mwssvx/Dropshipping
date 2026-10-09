@@ -12,13 +12,14 @@ import {
   getProduct,
   NotFoundError,
   patchProduct,
+  sendStockAlerts,
   publicOrder,
   publicProduct,
   UserError,
   type Shop,
 } from "@sf/core";
 import type { Db } from "@sf/db";
-import { db, fulfillment, notifyLater, storeAddress } from "./server";
+import { db, fulfillment, notifyLater, stock, storeAddress } from "./server";
 
 type Ctx = { req: Request; url: URL; params: Record<string, string>; db: Db; shop: Shop; write: boolean };
 type Handler = (c: Ctx) => Promise<unknown>;
@@ -101,6 +102,7 @@ const routes: Record<string, Handler> = {
         }))
       : undefined;
     await patchProduct(db, shop.id, params.id!, { status: oneOf(typeof b.status === "string" ? b.status : null, STATUS, "status"), variants });
+    await sendStockAlerts(await stock(), { shopId: shop.id });
     notifyLater(shop.id);
     return { product: publicProduct(await getProduct(db, shop.id, params.id!)) };
   },

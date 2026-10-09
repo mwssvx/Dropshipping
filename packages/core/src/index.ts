@@ -36,6 +36,7 @@ export * from "./launch";
 export * from "./team";
 export * from "./buyers";
 export * from "./customers";
+export * from "./stock";
 export * from "./currency";
 export * from "./campaigns";
 export * from "./own-suppliers";

@@ -4,7 +4,7 @@ import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import type { FormState } from "../../actions";
 
-export type VariantValues = { title: string; price: string; compareAt: string; cost: string; stock?: number | null };
+export type VariantValues = { title: string; price: string; compareAt: string; cost: string; stock?: number | null; fromSupplier?: boolean };
 
 type Values = {
   title: string;
@@ -103,7 +103,7 @@ function VariantRow({ index, initial, currency, showTitle }: { index: number; in
       ) : (
         <input type="hidden" name={`variantTitle.${index}`} value={initial.title || "Default"} />
       )}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="field">
           <label className="label" htmlFor={id("price")}>Price</label>
           <input className="input num" id={id("price")} name={`price.${index}`} inputMode="decimal" required value={price}
@@ -118,12 +118,16 @@ function VariantRow({ index, initial, currency, showTitle }: { index: number; in
           <input className="input num" id={id("cost")} name={`cost.${index}`} inputMode="decimal" value={cost}
             onChange={(e) => setCost(e.target.value)} placeholder="Supplier price" />
         </div>
+        <div className="field">
+          <label className="label" htmlFor={id("stock")}>Stock</label>
+          <input className="input num" id={id("stock")} name={`stock.${index}`} inputMode="numeric" defaultValue={initial.stock ?? ""} placeholder="Not tracked" />
+        </div>
       </div>
       <p className="hint num" aria-live="polite">
         {margin === null
           ? "Add your cost to see profit and margin."
           : <>Profit {fmt.format((p ?? 0) - (c ?? 0))} per sale · <span className={margin < 20 ? "text-critical font-semibold" : "text-success font-semibold"}>{margin}% margin</span></>}
-        {initial.stock != null && <> · {initial.stock === 0 ? <span className="text-critical">Sold out at supplier</span> : `${initial.stock} in stock at supplier`}</>}
+        {initial.fromSupplier && <> · Stock and cost follow the supplier daily</>}
       </p>
     </fieldset>
   );

@@ -144,6 +144,12 @@ export async function exportCustomerData(db: Db, shop: { id: string; name: strin
     : [];
   const emails = await db.query.emails.findMany({ where: and(eq(schema.emails.shopId, shop.id), eq(schema.emails.to, customer.email)), orderBy: schema.emails.createdAt });
   const giftCards = await db.query.giftCards.findMany({ where: and(eq(schema.giftCards.shopId, shop.id), eq(schema.giftCards.email, customer.email)) });
+  const alerts = await db
+    .select({ product: schema.products.title, option: schema.variants.title, notifiedAt: schema.stockAlerts.notifiedAt, createdAt: schema.stockAlerts.createdAt })
+    .from(schema.stockAlerts)
+    .innerJoin(schema.variants, eq(schema.variants.id, schema.stockAlerts.variantId))
+    .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
+    .where(and(eq(schema.stockAlerts.shopId, shop.id), eq(schema.stockAlerts.email, customer.email)));
   const numbers = new Map(orders.map((o) => [o.id, o.number]));
 
   return {
@@ -183,6 +189,7 @@ export async function exportCustomerData(db: Db, shop: { id: string; name: strin
     returns: returns.map((r) => ({ order: numbers.get(r.orderId), status: r.status, reason: r.reason, note: r.note, items: r.items.map((i) => ({ title: i.title, quantity: i.quantity })), created_at: r.createdAt.toISOString() })),
     messages: messages.map((m) => ({ conversation: conversations.find((c) => c.id === m.conversationId)!.subject, from: m.author === "buyer" ? "you" : "store", body: m.body, at: m.createdAt.toISOString() })),
     emails_sent: emails.map((e) => ({ subject: e.subject, kind: e.kind, status: e.status, at: (e.sentAt ?? e.createdAt).toISOString() })),
+    back_in_stock_requests: alerts.map((a) => ({ product: a.product, option: a.option, asked_at: a.createdAt.toISOString(), emailed_at: a.notifiedAt?.toISOString() ?? null })),
     gift_cards: giftCards.map((g) => ({ ending: g.last4, currency: g.currency, initial: g.initialMinor, balance: g.balanceMinor, created_at: g.createdAt.toISOString() })),
   };
 }
@@ -192,7 +199,7 @@ export const erasedEmail = (customerId: string) => `erased-${customerId.slice(0,
 /**
  * Erases a buyer on request. Orders stay for the store's accounts and tax records, but lose the
  * email, name and street address (the country, region and postcode stay, since tax depends on
- * them). Their messages, emails, sign-in codes and campaign history are deleted, reviews show as
+ * them). Their messages, emails, sign-in codes, back-in-stock requests and campaign history are deleted, reviews show as
  * "Verified buyer", and the customer record goes. Refused while an order is still on its way or a
  * return is open, since the store still needs the details to finish it.
  */
@@ -242,6 +249,7 @@ export async function eraseCustomer(db: Db, shopId: string, customerId: string, 
       and(eq(schema.campaignSends.email, email), inArray(schema.campaignSends.campaignId, tx.select({ id: schema.campaigns.id }).from(schema.campaigns).where(eq(schema.campaigns.shopId, shopId)))),
     );
     await tx.delete(schema.buyerCodes).where(and(eq(schema.buyerCodes.shopId, shopId), eq(schema.buyerCodes.email, email)));
+    await tx.delete(schema.stockAlerts).where(and(eq(schema.stockAlerts.shopId, shopId), eq(schema.stockAlerts.email, email)));
     // Copies of the email in notification and webhook logs and AI notes.
     await tx.execute(sql`update ${schema.pushMessages} set body = replace(body, ${email}, ${replacement}) where shop_id = ${shopId} and position(${email} in body) > 0`);
     await tx.execute(sql`update ${schema.webhookDeliveries} set payload = replace(payload::text, ${email}, ${replacement})::jsonb where shop_id = ${shopId} and position(${email} in payload::text) > 0`);

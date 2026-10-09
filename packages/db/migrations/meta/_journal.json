@@ -169,6 +169,13 @@
       "when": 1791516933648,
       "tag": "0023_m22_customers",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791518200721,
+      "tag": "0024_m23_stock",
+      "breakpoints": true
     }
   ]
 }
