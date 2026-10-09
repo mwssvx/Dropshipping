@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { can, formatMoney, getOrder, listRefunds, listSupplierLinks, NotFoundError, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode } from "@sf/core";
-import { requireShop, suppliers } from "@/lib/server";
+import { requireShop, storeAddress, suppliers } from "@/lib/server";
+import { PaymentLinkActions } from "./PaymentLinkActions";
 import { CheckTrackingButton, ManualTrackingForm, RetryButton } from "./FulfillmentActions";
 import { RefundForm } from "./RefundForm";
 import { FixWithAiButton } from "./FixWithAiButton";
@@ -10,8 +11,9 @@ import { PageHeader } from "../../PageHeader";
 
 const when = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" });
 
-export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function OrderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ link?: string }> }) {
   const { id } = await params;
+  const { link } = await searchParams;
   const { shop, db, role } = await requireShop("orders");
   const seesMoney = can(role, "money");
   const order = await getOrder(db, shop.id, id).catch((e) => {
@@ -32,7 +34,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
     if (!supplierId) return "Sent by you";
     return labelFor(suppliers(), links.find((l) => l.id === supplierId));
   };
-  const EMAIL_LABEL = { order_confirmation: "Order confirmation", shipping_update: "Shipping update", delivered: "Delivery confirmation", refund: "Refund", support_reply: "Reply to a question", abandoned_cart: "Checkout reminder" };
+  const EMAIL_LABEL = { order_confirmation: "Order confirmation", shipping_update: "Shipping update", delivered: "Delivery confirmation", refund: "Refund", support_reply: "Reply to a question", abandoned_cart: "Checkout reminder", payment_link: "Payment link" };
   const timeline = [
     { at: order.createdAt, text: "Order placed" },
     ...(order.paidAt
@@ -63,9 +65,19 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   return (
     <main className="pb-12">
       <PageHeader title={`Order #${order.number}`} back={<Link href="/admin/orders" className="hint hover:text-ink">← Orders</Link>}
-        actions={<div className="flex gap-2 items-center">{order.wholesale && <span className="pill pill-info">Wholesale order</span>}<PaymentStatus value={order.paymentStatus} /><FulfilmentStatus value={order.fulfillmentStatus} /></div>} />
+        actions={<div className="flex gap-2 items-center">{order.wholesale && <span className="pill pill-info">Wholesale order</span>}{order.source === "payment_link" && <span className="pill pill-info">Payment link</span>}<PaymentStatus value={order.paymentStatus} /><FulfilmentStatus value={order.fulfillmentStatus} /></div>} />
       <div className="px-4 sm:px-8 grid gap-6 lg:grid-cols-[1fr_320px] items-start">
         <div className="flex flex-col gap-6 min-w-0">
+          {order.source === "payment_link" && (order.paymentStatus === "pending" || order.paymentStatus === "failed") && (
+            <section className="card p-5 flex flex-col gap-3" aria-labelledby="pay-link">
+              <h2 id="pay-link" className="font-semibold">Waiting for {order.shippingAddress.name.split(" ")[0]} to pay</h2>
+              {link === "sent" && <p className="banner banner-success" role="status">Payment link emailed to {order.email}.</p>}
+              {link === "unsent" && <p className="banner banner-warning" role="status">The order is ready, but the email didn&apos;t go out. Send it again or copy the link.</p>}
+              {order.note && <p className="text-sm border-l-2 border-border pl-3 whitespace-pre-line">{order.note}</p>}
+              <p className="text-sm hint">Once they pay, it goes to the supplier like any other order.</p>
+              <PaymentLinkActions orderId={order.id} url={`${await storeAddress(shop)}/pay/${order.id}`} />
+            </section>
+          )}
           {returns[0] && (returns[0].status === "requested" || returns[0].status === "approved") && (
             <p className="banner banner-warning" role="status">
               {returns[0].status === "requested" ? "The buyer asked to return items from this order." : "You approved a return on this order and haven't refunded it yet."}{" "}

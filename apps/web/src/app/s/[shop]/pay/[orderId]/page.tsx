@@ -36,6 +36,12 @@ export default async function PayPage({ params }: { params: Promise<{ shop: stri
   return (
     <main className="max-w-md mx-auto px-4 sm:px-6 py-12 flex flex-col gap-6">
       <h1 className="text-3xl font-bold tracking-tight">Payment</h1>
+      {order.source === "payment_link" && (
+        <div className="flex flex-col gap-2">
+          <p>{shop.name} put together this order for {order.shippingAddress.name.split(" ")[0]}. It ships to {order.shippingAddress.line1}, {order.shippingAddress.city}.</p>
+          {order.note && <p className="border-l-2 border-border pl-3 whitespace-pre-line text-muted">{order.note}</p>}
+        </div>
+      )}
       <dl className="card p-5 grid grid-cols-[1fr_auto] gap-y-1 num text-sm">
         {order.lines.map((l, n) => (
           <div key={l.id} className="contents">

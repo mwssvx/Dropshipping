@@ -325,6 +325,28 @@ type EmailKind = (typeof schema.emails.$inferSelect)["kind"];
 async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kind: EmailKind, ref: string) {
   const link = await ctx.orderStatusUrl(shop, order);
   const first = order.shippingAddress.name.split(" ")[0];
+  if (kind === "payment_link") {
+    const lines = await ctx.db.query.orderLines.findMany({ where: eq(schema.orderLines.orderId, order.id) });
+    const paid = buyerAmounts(order, lines);
+    const pay = ctx.payUrl ? await ctx.payUrl(shop, order) : link;
+    return {
+      subject: `Your order from ${shop.name} is ready to pay`,
+      text: [
+        `Hi ${first},`,
+        ``,
+        `${shop.name} put together this order for you:`,
+        ``,
+        ...lines.map((l, n) => `  ${l.title} × ${l.quantity}  ${formatMoney(paid.lines[n]!, paid.currency)}`),
+        ``,
+        `Total: ${formatMoney(paid.totalMinor, paid.currency)}, including shipping${order.taxMinor && !order.taxIncluded ? " and tax" : ""}`,
+        ...(order.note ? [``, `A note from ${shop.name}:`, order.note] : []),
+        ``,
+        `Pay securely here: ${pay}`,
+        ``,
+        `Once you've paid, we'll email your receipt and tracking as it ships. If you didn't ask for this, you can ignore this email.`,
+      ].join("\n"),
+    };
+  }
   if (kind === "abandoned_cart") {
     const lines = await ctx.db.query.orderLines.findMany({ where: eq(schema.orderLines.orderId, order.id) });
     const paid = buyerAmounts(order, lines);

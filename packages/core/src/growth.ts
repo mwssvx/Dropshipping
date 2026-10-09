@@ -26,6 +26,8 @@ export async function sendAbandonedCartEmails(ctx: FulfillmentContext, now = new
     .where(
       and(
         eq(schema.orders.paymentStatus, "pending"),
+        // Payment links aren't abandoned checkouts: the merchant follows those up themselves.
+        eq(schema.orders.source, "checkout"),
         lte(schema.orders.createdAt, new Date(now.getTime() - HOUR)),
         gte(schema.orders.createdAt, new Date(now.getTime() - 48 * HOUR)),
         eq(schema.shops.abandonedCartEmails, true),
