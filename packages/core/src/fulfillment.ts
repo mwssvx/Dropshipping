@@ -328,7 +328,27 @@ type EmailKind = (typeof schema.emails.$inferSelect)["kind"];
 
 async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kind: EmailKind, ref: string) {
   const link = await ctx.orderStatusUrl(shop, order);
-  const first = order.shippingAddress.name.split(" ")[0];
+  // On a gift the address is the recipient's, so the buyer is greeted by the name they gave.
+  const first = (order.gift?.from ?? order.shippingAddress.name).split(" ")[0];
+  if (kind === "gift_shipped") {
+    const gift = order.gift!;
+    const shipped = await ctx.db.query.fulfillments.findMany({
+      where: and(eq(schema.fulfillments.orderId, order.id), isNotNull(schema.fulfillments.trackingNumber)),
+    });
+    return {
+      to: gift.recipientEmail!,
+      subject: `${gift.from} sent you a gift from ${shop.name}`,
+      text: [
+        `Hi ${order.shippingAddress.name.split(" ")[0]},`,
+        ``,
+        `${gift.from} sent you a gift from ${shop.name}, and it's on its way.`,
+        ...(gift.message ? [``, `Their message:`, gift.message] : []),
+        ...(shipped.length ? [``, `Track it:`, ...shipped.map((f) => `  ${f.carrier}: ${f.trackingNumber}${f.trackingUrl ? `  ${f.trackingUrl}` : ""}`)] : []),
+        ``,
+        `${gift.from} asked us to let you know. We won't email you about anything else.`,
+      ].join("\n"),
+    };
+  }
   if (kind === "payment_link") {
     const lines = await ctx.db.query.orderLines.findMany({ where: eq(schema.orderLines.orderId, order.id) });
     const paid = buyerAmounts(order, lines);
@@ -421,6 +441,13 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
           ? [`Paid with gift card: ${formatMoney(paid.giftCardMinor, paid.currency)}`, ...(paid.chargedMinor ? [`Paid by card: ${formatMoney(paid.chargedMinor, paid.currency)}`] : [])]
           : []),
         ...(invoice ? [``, `Your invoice ${invoice.number}: ${link}/invoice`] : []),
+        ...(order.gift
+          ? [
+              ``,
+              `It's a gift for ${order.shippingAddress.name}.${order.gift.recipientEmail ? ` We'll email ${order.gift.recipientEmail} when it ships${order.gift.message ? ", with your message" : ""} and tracking, but no prices.` : ""}`,
+              ...(order.gift.message ? [`Your message: ${order.gift.message}`] : []),
+            ]
+          : []),
         ``,
         `We'll email you again when it ships. Track your order any time: ${link}`,
       ].join("\n"),
@@ -459,16 +486,21 @@ export async function sendOrderEmail(ctx: FulfillmentContext, orderId: string, k
   const order = await db.query.orders.findFirst({ where: eq(schema.orders.id, orderId) });
   if (!order) throw new NotFoundError("Order");
   const shop = (await db.query.shops.findFirst({ where: eq(schema.shops.id, order.shopId) }))!;
-  const { subject, text } = await buildEmail(ctx, order, shop, kind, ref);
+  if (kind === "gift_shipped" && !order.gift?.recipientEmail) return { status: "not_needed" as const };
+  const email = await buildEmail(ctx, order, shop, kind, ref);
+  const { subject, text } = email;
+  const to = ("to" in email && email.to) || order.email;
   const [row] = await db
     .insert(schema.emails)
-    .values({ shopId: shop.id, orderId: order.id, kind, ref, to: order.email, subject, bodyText: text })
+    .values({ shopId: shop.id, orderId: order.id, kind, ref, to, subject, bodyText: text })
     .onConflictDoNothing()
     .returning({ id: schema.emails.id });
   if (!row) return { status: "already_sent" as const };
   try {
-    const { id } = await ctx.mailer.send({ to: order.email, subject, text });
+    const { id } = await ctx.mailer.send({ to, subject, text });
     await db.update(schema.emails).set({ status: "sent", providerMessageId: id, sentAt: now(ctx) }).where(eq(schema.emails.id, row.id));
+    // The gift's recipient hears once, when the buyer does.
+    if (kind === "shipping_update" && order.gift?.recipientEmail) await sendOrderEmail(ctx, order.id, "gift_shipped");
     return { status: "sent" as const };
   } catch (e) {
     await db

@@ -273,6 +273,9 @@ export type TaxBreakdownLine = { jurisdiction: string; label: string; rateBps: n
 
 export type QuantityBreak = { minQty: number; percentOff: number };
 
+/** A gift order: who it's from, their message, and who to tell when it ships. */
+export type OrderGift = { from: string; message: string | null; recipientEmail: string | null };
+
 export type Address = {
   name: string;
   line1: string;
@@ -337,6 +340,9 @@ export const orders = pgTable(
     giftCardMinor: money("gift_card_minor").notNull().default(0),
     // The shipping option the buyer picked, as named when they bought ("Express").
     shippingMethod: text("shipping_method"),
+    // Set when the buyer marked the order as a gift. The recipient (when the buyer gave their
+    // email) hears when it ships, with the message and tracking but no prices.
+    gift: jsonb("gift").$type<OrderGift>(),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -420,7 +426,7 @@ export const emails = pgTable(
     id: id(),
     shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
     orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
-    kind: text("kind", { enum: ["order_confirmation", "shipping_update", "delivered", "refund", "support_reply", "abandoned_cart", "payment_link"] }).notNull(),
+    kind: text("kind", { enum: ["order_confirmation", "shipping_update", "delivered", "refund", "support_reply", "abandoned_cart", "payment_link", "gift_shipped"] }).notNull(),
     // Tells apart emails of a kind that can repeat (one per refund). Empty for once-only kinds.
     ref: text("ref").notNull().default(""),
     to: text("to").notNull(),

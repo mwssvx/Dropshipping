@@ -201,9 +201,22 @@ const addressSchema = z.object({
   country: z.string().trim().length(2, "Choose a country."),
 });
 
+const giftSchema = z.object({
+  from: z.string().trim().min(1, "Add who the gift is from.").max(60, "Keep the name under 60 characters."),
+  message: z.string().trim().max(300, "Keep the gift message under 300 characters.").optional().transform((m) => m || null),
+  recipientEmail: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .optional()
+    .transform((e) => e || null)
+    .refine((e) => e === null || z.string().email().safeParse(e).success, "Enter the recipient's email, or leave it empty."),
+});
+
 const checkoutSchema = z.object({
   email: z.string().trim().toLowerCase().email("Enter a valid email so we can send your receipt."),
   address: addressSchema,
+  gift: giftSchema.nullish(),
 });
 
 export async function startCheckout(
@@ -226,6 +239,8 @@ export async function startCheckout(
     giftCardCode?: string | null;
     /** The shipping rate picked at checkout; the cheapest for the address if missing. */
     shippingRateId?: string | null;
+    /** The buyer ticked "This order is a gift". */
+    gift?: z.input<typeof giftSchema> | null;
   },
   taxCalculator: TaxCalculator = new BuiltInTaxCalculator(),
 ) {
@@ -233,6 +248,7 @@ export async function startCheckout(
   const parsed = checkoutSchema.safeParse(input);
   if (!parsed.success) throw new UserError(parsed.error.issues[0]!.message);
   const { email, address } = parsed.data;
+  const gift = parsed.data.gift ?? null;
   const cart = await quoteCart(db, shop, input.lines, {
     discountCode: input.discountCode,
     email,
@@ -332,6 +348,8 @@ export async function startCheckout(
         giftCardId: cart.giftCard?.id ?? null,
         giftCardMinor,
         shippingMethod: cart.shipping?.name ?? null,
+        // Only something that ships can be a gift; gift cards are emailed to the buyer.
+        gift: gift && cart.items.some((i) => !i.giftCard) ? gift : null,
         paymentIntentId: intent.id,
         ...(dueMinor ? {} : { paymentStatus: "paid" as const, paidAt: new Date() }),
       })
