@@ -200,6 +200,7 @@ const en = {
   from: "From",
   to: "To",
   inStockOnly: "In stock only",
+  onSaleOnly: "On sale",
   productCount: (n: number) => `${n} ${plural(n, "product", "products")}`,
 
   // Saved items
@@ -405,6 +406,7 @@ const de: StoreText = {
   from: "Von",
   to: "Bis",
   inStockOnly: "Nur vorrätige",
+  onSaleOnly: "Im Angebot",
   productCount: (n) => `${n} ${plural(n, "Produkt", "Produkte")}`,
 
   nothingSaved: "Noch nichts gemerkt. Tippe bei einem Produkt auf „Merken“, um es hier zu sammeln.",
@@ -607,6 +609,7 @@ const fr: StoreText = {
   from: "De",
   to: "À",
   inStockOnly: "En stock uniquement",
+  onSaleOnly: "En promotion",
   productCount: (n) => `${n} ${plural(n, "produit", "produits")}`,
 
   nothingSaved: "Rien d'enregistré pour l'instant. Touchez « Enregistrer » sur un produit pour le garder ici.",
@@ -809,6 +812,7 @@ const es: StoreText = {
   from: "Desde",
   to: "Hasta",
   inStockOnly: "Solo con existencias",
+  onSaleOnly: "En oferta",
   productCount: (n) => `${n} ${plural(n, "producto", "productos")}`,
 
   nothingSaved: "Aún no has guardado nada. Toca «Guardar para después» en cualquier producto para tenerlo aquí.",
@@ -1011,6 +1015,7 @@ const it: StoreText = {
   from: "Da",
   to: "A",
   inStockOnly: "Solo disponibili",
+  onSaleOnly: "In offerta",
   productCount: (n) => `${n} ${plural(n, "prodotto", "prodotti")}`,
 
   nothingSaved: "Nessun articolo salvato. Tocca «Salva per dopo» su un prodotto per tenerlo qui.",
@@ -1213,6 +1218,7 @@ const nl: StoreText = {
   from: "Van",
   to: "Tot",
   inStockOnly: "Alleen op voorraad",
+  onSaleOnly: "In de aanbieding",
   productCount: (n) => `${n} ${plural(n, "product", "producten")}`,
 
   nothingSaved: "Nog niets bewaard. Tik bij een product op ‘Bewaren voor later’ om het hier te houden.",

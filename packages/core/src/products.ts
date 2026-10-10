@@ -12,6 +12,8 @@ const variantInput = z.object({
   costMinor: z.number().int().min(0).nullish(),
   sku: z.string().trim().nullish(),
   stock: z.number().int().nullish(),
+  /** Named options like { Color: "Black", Size: "XL" }, which shoppers can filter by. */
+  options: z.record(z.string().trim().min(1).max(40), z.string().trim().min(1).max(60)).optional(),
 });
 
 const productInput = z.object({
@@ -69,7 +71,10 @@ export async function updateProduct(db: Db, shopId: string, productId: string, i
     });
     for (const [i, v] of variants.entries()) {
       const row = existing[i];
-      if (row) await tx.update(schema.variants).set({ ...v, position: i }).where(eq(schema.variants.id, row.id));
+      // Renaming a one-option variant ("Small" to "S") renames the option the filters show too.
+      const own = Object.entries(row?.options ?? {});
+      const options = v.options ?? (row && own.length === 1 && own[0]![1] === row.title && v.title !== row.title ? { [own[0]![0]]: v.title } : undefined);
+      if (row) await tx.update(schema.variants).set({ ...v, options, position: i }).where(eq(schema.variants.id, row.id));
       else await tx.insert(schema.variants).values({ ...v, productId, position: i });
     }
     const extra = existing.slice(variants.length).map((v) => v.id);

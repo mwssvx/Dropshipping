@@ -26,7 +26,17 @@ export type BrowseOptions = {
   minMinor?: number | null;
   maxMinor?: number | null;
   inStock?: boolean;
+  /** Only products with a variant on sale (a compare-at price above the price). */
+  onSale?: boolean;
+  /** Chosen option values, like { Size: ["M", "L"], Color: ["Black"] }. One variant has to match them all. */
+  options?: Record<string, string[]>;
 };
+
+/** An option shoppers can filter by, with how many products have each value. */
+export type Facet = { name: string; values: { value: string; count: number }[] };
+
+const MAX_FACETS = 4;
+const MAX_VALUES = 30;
 
 const plain = (s: string) =>
   s
@@ -44,8 +54,48 @@ const words = (q: string) =>
     .slice(0, 8)
     .map((w) => (w.length > 3 && w.endsWith("s") ? w.slice(0, -1) : w));
 
+type Variant = ActiveProduct["variants"][number];
 const lowestPrice = (p: ActiveProduct) => Math.min(...p.variants.map((v) => v.priceMinor));
-const inStock = (p: ActiveProduct) => p.variants.some((v) => v.stock === null || v.stock > 0);
+const variantInStock = (v: Variant) => v.stock === null || v.stock > 0;
+const inStock = (p: ActiveProduct) => p.variants.some(variantInStock);
+const onSale = (v: Variant) => v.compareAtMinor != null && v.compareAtMinor > v.priceMinor;
+/** Option names match whatever the case ("Colour" and "colour" are one filter). */
+// "Colour" and "Color" are the same filter.
+const key = (name: string) => name.trim().toLowerCase().replace(/^colour$/, "color");
+
+/**
+ * The options found on these products, most common first, with each value's product count.
+ * Only options with at least two values are worth filtering by.
+ */
+export function optionFacets(products: ActiveProduct[]): Facet[] {
+  const names = new Map<string, { spellings: Map<string, number>; values: Map<string, Set<string>> }>();
+  for (const p of products) {
+    for (const v of p.variants) {
+      for (const [name, value] of Object.entries(v.options ?? {})) {
+        if (!name.trim() || !value.trim()) continue;
+        const entry = names.get(key(name)) ?? { spellings: new Map(), values: new Map() };
+        names.set(key(name), entry);
+        entry.spellings.set(name.trim(), (entry.spellings.get(name.trim()) ?? 0) + 1);
+        const set = entry.values.get(value.trim()) ?? new Set<string>();
+        set.add(p.id);
+        entry.values.set(value.trim(), set);
+      }
+    }
+  }
+  return [...names.values()]
+    .filter((f) => f.values.size >= 2)
+    // Shown under the spelling most variants use.
+    .map((f) => ({ name: [...f.spellings].sort((a, b) => b[1] - a[1] || Number(/^[A-Z]/.test(b[0])) - Number(/^[A-Z]/.test(a[0])))[0]![0], products: new Set([...f.values.values()].flatMap((s) => [...s])).size, values: [...f.values].map(([value, ids]) => ({ value, count: ids.size })) }))
+    .sort((a, b) => b.products - a.products)
+    .slice(0, MAX_FACETS)
+    .map(({ name, values }) => ({ name, values: values.slice(0, MAX_VALUES) }));
+}
+
+/** Whether one variant has every chosen option (any of the chosen values for each). */
+function variantMatches(v: Variant, chosen: [string, Set<string>][]) {
+  const own = new Map(Object.entries(v.options ?? {}).map(([n, val]) => [key(n), val.trim()]));
+  return chosen.every(([name, values]) => values.has(own.get(name) ?? "\u0000"));
+}
 
 /** Units sold per product, from paid orders. */
 async function unitsSold(db: Db, shopId: string, productIds: string[]) {
@@ -91,6 +141,18 @@ export async function browseProducts(db: Db, shopId: string, products: ActivePro
     })
     .filter((r): r is { p: ActiveProduct; position: number; score: number } => !!r);
 
+  // Options are offered from what the search matched, before any option is chosen, so picking
+  // "Black" doesn't hide the other colours.
+  const facets = optionFacets(scored.map((r) => r.p));
+  const chosen = Object.entries(options.options ?? {})
+    .map(([name, values]) => [key(name), new Set(values.map((v) => v.trim()).filter(Boolean))] as [string, Set<string>])
+    .filter(([, values]) => values.size);
+  if (chosen.length || options.onSale) {
+    // The same variant has to be the right size and colour, in stock when asked, and on sale when asked.
+    scored = scored.filter((r) =>
+      r.p.variants.some((v) => variantMatches(v, chosen) && (!options.inStock || variantInStock(v)) && (!options.onSale || onSale(v))),
+    );
+  }
   if (options.minMinor != null) scored = scored.filter((r) => price(r.p) >= options.minMinor!);
   if (options.maxMinor != null) scored = scored.filter((r) => price(r.p) <= options.maxMinor!);
   if (options.inStock) scored = scored.filter((r) => inStock(r.p));
@@ -105,7 +167,7 @@ export async function browseProducts(db: Db, shopId: string, products: ActivePro
     newest: (a, b) => b.p.createdAt.getTime() - a.p.createdAt.getTime() || a.position - b.position,
   };
   const sorted = scored.sort(by[sort]).map((r) => r.p);
-  return { products: sorted, sort, terms };
+  return { products: sorted, sort, terms, facets };
 }
 
 /** The search page: every active product in the store, filtered and sorted. */

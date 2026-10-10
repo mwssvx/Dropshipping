@@ -31,19 +31,19 @@ export default async function CollectionPage({ params, searchParams }: { params:
   const query = await searchParams;
   const { shop, collection, products: all } = await load(param, handle);
   const [base, fx] = await Promise.all([storeBase(param), buyerFx(shop)]);
-  const { products, sort } = await browseProducts(await db(), shop.id, all, { ...browseOptions(query), q: undefined }, fx);
+  const { products, sort, facets } = await browseProducts(await db(), shop.id, all, { ...browseOptions(query), q: undefined }, fx);
   // The grid takes the catalog's compact product shape.
   const compact = await localProducts(param, compactProducts(products));
   const t = await storeT(param);
   const data = { base, currency: shop.currency, fx, t, catalog: { products: compact, collections: [] } };
-  const filtered = !!(query.min || query.max || query.stock);
+  const filtered = !!(query.min || query.max || query.stock || query.sale || query.opt);
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 flex flex-col gap-8">
       <header className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold tracking-tight">{collection.title}</h1>
         {collection.description && <p className="text-muted max-w-2xl whitespace-pre-line">{collection.description}</p>}
       </header>
-      {all.length > 1 && <BrowseBar action={`${base}/collections/${collection.handle}`} params={{ ...query, q: undefined }} sort={sort} currency={fx.currency} count={compact.length} t={t} />}
+      {all.length > 1 && <BrowseBar action={`${base}/collections/${collection.handle}`} params={{ ...query, q: undefined }} sort={sort} currency={fx.currency} count={compact.length} facets={facets} t={t} />}
       {compact.length ? <ProductGrid products={compact} data={data} /> : <p className="hint">{filtered ? t.nothingMatchesFilters : t.nothingYet}</p>}
     </main>
   );

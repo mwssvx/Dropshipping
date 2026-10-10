@@ -5,7 +5,7 @@ import { SupplierError, type SupplierAdapter, type SupplierName } from "./types"
 
 export * from "./types";
 export { FakeSupplier, DEMO_SUPPLIER_HOST, DEMO_SUPPLIER_LINKS } from "./fake";
-export { CjSupplier } from "./cj";
+export { CjSupplier, cjOptions } from "./cj";
 export { AliExpressSupplier, signAliExpress } from "./aliexpress";
 
 export type Suppliers = {

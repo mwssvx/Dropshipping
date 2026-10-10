@@ -175,9 +175,15 @@ export class AliExpressSupplier implements SupplierAdapter {
         const title = props.map((x) => x.property_value_definition_name || x.sku_property_value).filter(Boolean).join(" / ");
         const price = Number(s.offer_sale_price || s.sku_price);
         const stock = s.sku_available_stock === undefined ? null : Number(s.sku_available_stock);
+        const options: Record<string, string> = {};
+        for (const x of props) {
+          const value = x.property_value_definition_name || x.sku_property_value;
+          if (x.sku_property_name && value) options[x.sku_property_name.trim()] = value.trim();
+        }
         return {
           ref: variantRef(id, s.sku_attr ?? ""),
           title: title || "Default",
+          options,
           costMinor: Number.isFinite(price) ? Math.round(price * 100) : 0,
           stock: stock === null || Number.isNaN(stock) ? null : stock,
           shipDaysMin: null,
