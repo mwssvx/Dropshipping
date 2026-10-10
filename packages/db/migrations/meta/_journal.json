@@ -232,6 +232,13 @@
       "when": 1791611148386,
       "tag": "0032_m33_sales",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1791612284515,
+      "tag": "0033_m34_checkout_addons",
+      "breakpoints": true
     }
   ]
 }

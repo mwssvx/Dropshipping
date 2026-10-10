@@ -272,3 +272,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 2. **The store** shows the sale price with the old price crossed out everywhere products appear (home, collections, search, saved items, product page and bundles), plus "On sale: 25% off until June 1." on the product page in every store language. The storefront data layer (`localProducts`) applies running sales with `withSales`.
 3. **The cart** charges the sale price and notes the sale on the line. Quantity, bundle and wholesale discounts come off the sale price.
 4. **Saved items**: a sale starting counts as a price drop, so buyers who saved the product get the usual email. Saving during a sale remembers the sale price. Sales that haven't ended travel in the store file.
+
+### Checkout add-ons (after launch, part 26)
+
+1. **Add-ons** (`packages/core/src/addons.ts`): up to three products the merchant offers at checkout, each with an optional discount (up to 50%) and a one-line pitch, set on the new Checkout add-ons page under Marketing. The page shows how many paid orders bought each one and what it brought in.
+2. **At checkout** the buyer sees the first live add-on that isn't already in their cart, priced in their currency, with a picker for its options. "Add for $11.99" adds it in place: the page re-renders and what the buyer typed stays.
+3. **Pricing** (`quoteCart`): the add-on price holds when it's bought with something else, comes off any sale price, replaces quantity discounts on that line, and doesn't apply to wholesale buyers. Order lines record the add-on (`order_lines.addon_id`), and add-ons travel in the store file.

@@ -1,4 +1,4 @@
-// Milestone 1 to 33 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 34 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -365,6 +365,8 @@ export const orderLines = pgTable(
     quantity: integer("quantity").notNull(),
     unitPriceMinor: money("unit_price_minor").notNull(),
     unitCostMinor: money("unit_cost_minor"),
+    /** Added from the checkout add-on offer, at its price. */
+    addonId: uuid("addon_id").references((): AnyPgColumn => checkoutAddons.id, { onDelete: "set null" }),
   },
   (t) => [index("order_lines_order_idx").on(t.orderId), check("order_lines_qty_pos", sql`${t.quantity} > 0`)],
 );
@@ -1304,5 +1306,26 @@ export const sales = pgTable(
     check("sales_percent", sql`${t.percentOff} between 1 and 90`),
     check("sales_ends_after_start", sql`${t.endsAt} is null or ${t.endsAt} > ${t.startsAt}`),
     check("sales_collection_scope", sql`(${t.scope} = 'collection') = (${t.collectionId} is not null)`),
+  ],
+);
+
+// A product offered at checkout for a little less ("Add a stand for $8.99, save 30%"). Buyers add
+// it with one tap; the price holds when it's bought with something else.
+export const checkoutAddons = pgTable(
+  "checkout_addons",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+    percentOff: integer("percent_off").notNull().default(0),
+    /** One line under the product, like "Keeps your phone charged on the go". */
+    pitch: text("pitch"),
+    active: boolean("active").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex("checkout_addons_shop_product_uq").on(t.shopId, t.productId),
+    check("checkout_addons_percent", sql`${t.percentOff} between 0 and 50`),
   ],
 );
