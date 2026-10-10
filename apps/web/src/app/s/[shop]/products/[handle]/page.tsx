@@ -8,7 +8,7 @@ import { buyerFx } from "@/lib/currency";
 import { SubmitButton } from "@/components/SubmitButton";
 import { addBundleAction, addToCartAction, stockAlertAction, toggleSavedAction } from "../../actions";
 import { savedIds } from "@/lib/saved";
-import { loadShop, localProducts, storeBase, storeT, missing } from "../../data";
+import { loadShop, localProducts, storeBase, storeLang, storeT, missing } from "../../data";
 import { Price } from "@/components/Price";
 
 async function load(shopHandle: string, handle: string, count = true) {
@@ -97,6 +97,11 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           </a>
         )}
         {v && <div className="text-xl"><Price minor={v.priceMinor} compareAt={v.compareAtMinor} currency={shop.currency} fx={fx} /></div>}
+        {product.sale && (
+          <p className="text-sm font-semibold text-success" role="status">
+            {t.saleNote(product.sale.percentOff, product.sale.endsAt ? new Intl.DateTimeFormat((await storeLang(shopHandle)) ?? "en-US", { month: "long", day: "numeric", timeZone: "UTC" }).format(product.sale.endsAt) : null)}
+          </p>
+        )}
         {v && wholesale && (
           <p className="banner banner-info" role="status">
             {t.wholesalePrice} <strong className="num"><Price minor={percentOff(v.priceMinor, wholesale.percentOff)} currency={shop.currency} fx={fx} /></strong> ({t.percentOff(wholesale.percentOff)})

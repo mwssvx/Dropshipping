@@ -6,6 +6,7 @@ import type { Mailer } from "./email";
 import { NotFoundError, UserError } from "./errors";
 import { formatMoney } from "./money";
 import { productPhotos } from "./gallery";
+import { salePrice, salesFor, type SaleInfo } from "./sales";
 
 type Shop = typeof schema.shops.$inferSelect;
 type Variant = typeof schema.variants.$inferSelect;
@@ -42,9 +43,11 @@ export function savedIdsFrom(raw: unknown): string[] {
 export async function saveItem(db: Db, shopId: string, customerId: string, productId: string, now = new Date()) {
   const [found] = await activeProducts(db, shopId, [productId]);
   if (!found || found.priceMinor === null) throw new NotFoundError("Product");
+  // Saved during a sale: the sale price is what they saw, so only a lower one counts as a drop.
+  const price = salePrice(found.priceMinor, null, (await salesFor(db, shopId, [productId], now)).get(productId)).priceMinor;
   const [{ n } = { n: 0 }] = await db.select({ n: sql<number>`count(*)`.mapWith(Number) }).from(schema.savedItems).where(eq(schema.savedItems.customerId, customerId));
   if (n >= MAX_SAVED) throw new UserError(`You can save up to ${MAX_SAVED} items. Remove one to save another.`);
-  await db.insert(schema.savedItems).values({ shopId, customerId, productId, priceMinor: found.priceMinor, alertPriceMinor: found.priceMinor, createdAt: now }).onConflictDoNothing();
+  await db.insert(schema.savedItems).values({ shopId, customerId, productId, priceMinor: price, alertPriceMinor: price, createdAt: now }).onConflictDoNothing();
 }
 
 export async function unsaveItem(db: Db, customerId: string, productId: string) {
@@ -147,10 +150,15 @@ export async function sendPriceDrops(ctx: PriceDropContext, scope: { shopId?: st
     .limit(scope.limit ?? 2000);
   if (!rows.length) return { sent: 0 };
   const variants = await db.query.variants.findMany({ where: inArray(schema.variants.productId, [...new Set(rows.map((r) => r.product.id))]) });
+  // A sale starting counts as a drop.
+  const sales = new Map<string, SaleInfo>();
+  for (const shopId of new Set(rows.map((r) => r.item.shopId))) {
+    for (const [id, sale] of await salesFor(db, shopId, rows.filter((r) => r.item.shopId === shopId).map((r) => r.product.id), now)) sales.set(id, sale);
+  }
   const priceOf = new Map<string, number | null>();
   for (const id of new Set(rows.map((r) => r.product.id))) {
     const vs = variants.filter((v) => v.productId === id && (v.stock === null || v.stock > 0));
-    priceOf.set(id, vs.length ? Math.min(...vs.map((v) => v.priceMinor)) : null); // sold out: no point telling them
+    priceOf.set(id, vs.length ? Math.min(...vs.map((v) => salePrice(v.priceMinor, null, sales.get(id)).priceMinor)) : null); // sold out: no point telling them
   }
   // Group the drops by buyer, so each gets one email.
   const byBuyer = new Map<string, { shopId: string; email: string; customerId: string; drops: { itemId: string; title: string; handle: string; was: number; now: number }[] }>();

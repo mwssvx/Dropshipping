@@ -265,3 +265,10 @@ See `.env.example` and `docs/accounts.md` for the real services.
 2. **Details**: the new Invoices page under Settings holds the registered business name, address, number prefix, next number (to continue a series from another shop; it can only go up) and a footer. Tax numbers come from the Taxes page. Each document copies the seller's details when it's issued, so later changes never rewrite it.
 3. **Buyers** get a link in the order confirmation and refund emails, and open invoices and credit notes from their order page, in the currency they paid in. Wholesale orders show the buyer's company and tax ID. "Print or save as PDF" prints only the sheet.
 4. **Merchants** open them from the order page, see the latest on the Invoices page, and download the register as CSV for a date range. The details (not the number) travel in the store file.
+
+### Scheduled sales (after launch, part 25)
+
+1. **Sales** (`packages/core/src/sales.ts`): a percentage off everything, one collection or chosen products, from a start time to an optional end, made on the new Sales page under Marketing. Sales start and end by themselves; "End now" stops a running one. Overlapping sales don't add up: a product gets the biggest. Gift cards are never on sale.
+2. **The store** shows the sale price with the old price crossed out everywhere products appear (home, collections, search, saved items, product page and bundles), plus "On sale: 25% off until June 1." on the product page in every store language. The storefront data layer (`localProducts`) applies running sales with `withSales`.
+3. **The cart** charges the sale price and notes the sale on the line. Quantity, bundle and wholesale discounts come off the sale price.
+4. **Saved items**: a sale starting counts as a price drop, so buyers who saved the product get the usual email. Saving during a sale remembers the sale price. Sales that haven't ended travel in the store file.

@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { headers } from "next/headers";
 import { notFound, permanentRedirect } from "next/navigation";
-import { findRedirect, getShopByHandle, getShopByHostname, localizeCollections, localizedTheme, localizeProducts, NotFoundError, shopLanguages, type Language } from "@sf/core";
+import { findRedirect, getShopByHandle, getShopByHostname, localizeCollections, localizedTheme, localizeProducts, NotFoundError, shopLanguages, withSales, type Language } from "@sf/core";
 import { db } from "@/lib/server";
 import { STORE_HOST_HEADER, STORE_LANG_HEADER, STORE_PATH_HEADER } from "@/lib/brand";
 import { storeText } from "@/lib/store-text";
@@ -75,10 +75,15 @@ export async function missing(param: string, path: string, count = true): Promis
   permanentRedirect(to.startsWith("https://") ? to : `${await storeBase(param)}${to}`);
 }
 
-/** Product titles (and descriptions, when given) in the buyer's language, where translated. */
-export async function localProducts<T extends { id: string; title: string; descriptionHtml?: string }>(param: string, items: T[]) {
+type Sellable = { priceMinor?: number | null; compareAtMinor?: number | null; variants?: { priceMinor: number; compareAtMinor?: number | null }[] };
+
+/**
+ * Products as the buyer sees them: titles (and descriptions, when given) in their language where
+ * translated, and prices with any running sale applied.
+ */
+export async function localProducts<T extends { id: string; title: string; descriptionHtml?: string } & Sellable>(param: string, items: T[]) {
   const shop = await loadShop(param);
-  return localizeProducts(await db(), shop.id, await storeLang(param), items);
+  return withSales(await db(), shop.id, await localizeProducts(await db(), shop.id, await storeLang(param), items));
 }
 
 export async function localCollections<T extends { id: string; title: string; description?: string }>(param: string, items: T[]) {

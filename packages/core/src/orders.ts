@@ -14,6 +14,7 @@ import { convertAmount, formatMoney, type DisplayFx } from "./money";
 import { breakFor, describeBreak, percentOff, wholesaleTermsFor } from "./wholesale";
 import { findGiftCard } from "./gift-cards";
 import { bundleSavings, bundlesInCart } from "./bundles";
+import { salePrice, salesFor } from "./sales";
 import { countryName, listShippingZones, priceRate, zoneFor } from "./shipping";
 
 type Shop = typeof schema.shops.$inferSelect;
@@ -57,6 +58,7 @@ export async function quoteCart(
       ),
     );
   const wholesale = await wholesaleTermsFor(db, shop, opts.buyerEmail);
+  const sales = await salesFor(db, shop.id, rows.map((r) => r.product.id));
   // Quantity discounts count every variant of a product together (2 small + 1 large = 3).
   const perProduct = new Map<string, number>();
   for (const l of wanted) {
@@ -74,7 +76,11 @@ export async function quoteCart(
     const giftCard = row.product.giftCard;
     const tier = wholesale || giftCard ? null : breakFor(row.product.quantityBreaks, perProduct.get(row.product.id) ?? l.quantity);
     const pct = giftCard ? 0 : (wholesale?.percentOff ?? tier?.percentOff ?? 0);
-    const unit = pct ? percentOff(row.variant.priceMinor, pct) : row.variant.priceMinor;
+    // Other discounts come off the sale price.
+    const sale = giftCard ? null : (sales.get(row.product.id) ?? null);
+    const listed = salePrice(row.variant.priceMinor, null, sale).priceMinor;
+    const unit = pct ? percentOff(listed, pct) : listed;
+    const notes = [sale ? `${sale.title}: ${sale.percentOff}% off` : null, giftCard ? null : wholesale ? `Wholesale price, ${wholesale.percentOff}% off` : tier ? describeBreak(tier) : null];
     return {
       variantId: row.variant.id,
       productId: row.product.id,
@@ -82,12 +88,12 @@ export async function quoteCart(
       title,
       imageUrl: row.product.imageUrl,
       quantity: l.quantity,
-      /** The price before quantity or wholesale discounts, shown struck through when it differs. */
+      /** The price before sales, quantity or wholesale discounts, shown struck through when it differs. */
       listUnitPriceMinor: row.variant.priceMinor,
       unitPriceMinor: unit,
       unitCostMinor: row.variant.costMinor,
       lineMinor: unit * l.quantity,
-      priceNote: giftCard ? null : wholesale ? `Wholesale price, ${wholesale.percentOff}% off` : tier ? describeBreak(tier) : null,
+      priceNote: notes.filter(Boolean).join(" · ") || null,
       giftCard,
     };
   });
