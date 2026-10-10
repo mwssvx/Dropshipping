@@ -34,7 +34,10 @@ export default async function MoneyPage({ searchParams }: { searchParams: Promis
 
   return (
     <main className="pb-12">
-      <PageHeader title="Money" actions={<a className="btn btn-secondary" href={`/admin/money/statement?from=${monthAgo}&to=${today}`}>Download statement (CSV)</a>} />
+      <PageHeader title="Money" actions={<>
+        <Link className="btn btn-secondary" href="/admin/profit">Profit report</Link>
+        <a className="btn btn-secondary" href={`/admin/money/statement?from=${monthAgo}&to=${today}`}>Download statement (CSV)</a>
+      </>} />
       <div className="px-4 sm:px-8 flex flex-col gap-6 max-w-4xl">
         {setup === "done" && shop.payoutsEnabled && <p className="banner banner-info" role="status">Payouts are set up. Money from sales goes to your bank automatically.</p>}
 
@@ -102,10 +105,14 @@ export default async function MoneyPage({ searchParams }: { searchParams: Promis
             <dt>Tax collected <Link className="hint underline" href="/admin/taxes">(you pay this to the tax office)</Link></dt><dd>−{money(summary.last30.taxMinor)}</dd>
             <dt>Shipping charged to buyers</dt><dd>−{money(summary.last30.shippingMinor)}</dd>
             <dt>Supplier costs</dt><dd>−{money(summary.last30.supplierCostsMinor)}</dd>
-            <dt className="font-semibold border-t border-border pt-2">Profit</dt>
-            <dd className={`font-semibold border-t border-border pt-2 ${summary.last30.profitMinor >= 0 ? "text-success" : "text-critical"}`}>{money(summary.last30.profitMinor)}</dd>
+            <dt>Ad spend <Link className="hint underline" href="/admin/profit">(what you entered)</Link></dt><dd>−{money(summary.last30.adsMinor)}</dd>
+            <dt className="font-semibold border-t border-border pt-2">Profit after ads</dt>
+            <dd className={`font-semibold border-t border-border pt-2 ${summary.last30.profitAfterAdsMinor >= 0 ? "text-success" : "text-critical"}`}>{money(summary.last30.profitAfterAdsMinor)}</dd>
           </dl>
-          <p className="hint">The shipping you charge is set against the supplier's shipping. Supplier costs are paid to your supplier, not taken from payouts. Ad spend isn't included yet.</p>
+          <p className="hint">
+            The shipping you charge is set against the supplier's shipping. Supplier costs are paid to your supplier, not taken from payouts.{" "}
+            <Link className="underline" href="/admin/profit">See profit by product</Link>.
+          </p>
           {advice.best && (
             <p className="banner banner-info">
               The {PLANS[advice.best.plan].name} plan would have saved you {money(advice.best.saveMinor)} this month.{" "}
