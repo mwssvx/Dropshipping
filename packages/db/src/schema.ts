@@ -954,6 +954,8 @@ export const reviews = pgTable(
     body: text("body").notNull(),
     status: text("status", { enum: ["pending", "published", "hidden"] }).notNull().default("pending"),
     reply: text("reply"),
+    // Photos the buyer added, as ids in the media table (served at /api/media/<id>).
+    photoIds: jsonb("photo_ids").$type<string[]>().notNull().default([]),
     createdAt: createdAt(),
   },
   (t) => [

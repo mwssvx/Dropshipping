@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { listReviews } from "@sf/core";
+import { listReviews, reviewPhotoUrl } from "@sf/core";
 import { requireShop } from "@/lib/server";
-import { moderateReviewAction, setReviewsAutoPublishAction } from "../../growth-actions";
+import { moderateReviewAction, removeReviewPhotoAction, setReviewsAutoPublishAction } from "../../growth-actions";
 import { PageHeader } from "../PageHeader";
 import { ReplyForm } from "./ReplyForm";
 
@@ -54,6 +54,18 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
                   <span className="hint">on {productTitle} · order #{orderNumber} · {r.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
                 </div>
                 <p className="text-sm whitespace-pre-line">{r.body}</p>
+                {r.photoIds.length > 0 && (
+                  <ul className="flex flex-wrap gap-3" aria-label="Buyer's photos">
+                    {r.photoIds.map((photo, i) => (
+                      <li key={photo} className="flex flex-col items-start gap-1">
+                        <a href={reviewPhotoUrl(photo)} target="_blank"><img src={reviewPhotoUrl(photo)} alt={`Photo ${i + 1} from ${r.name}`} className="size-24 rounded-md object-cover border border-border" /></a>
+                        <form action={removeReviewPhotoAction.bind(null, r.id, photo)}>
+                          <button className="text-xs text-critical hover:underline" aria-label={`Remove photo ${i + 1} from ${r.name}`}>Remove</button>
+                        </form>
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <ReplyForm id={r.id} reply={r.reply} />
                 <div className="flex gap-2">
                   {r.status !== "published" && (

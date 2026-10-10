@@ -344,6 +344,13 @@
       "when": 1791666307013,
       "tag": "0048_auto_collections",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1791669283901,
+      "tag": "0049_photo_reviews",
+      "breakpoints": true
     }
   ]
 }

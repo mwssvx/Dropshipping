@@ -4,6 +4,7 @@
 import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { schema, type Address, type Db } from "@sf/db";
 import { z } from "zod";
+import { removeReviewPhotos, reviewPhotoUrl } from "./reviews";
 import { NotFoundError, UserError } from "./errors";
 
 const PLACED = ["paid", "partially_refunded", "refunded"] as const;
@@ -201,7 +202,7 @@ export async function exportCustomerData(db: Db, shop: { id: string; name: strin
       items: lines.filter((l) => l.orderId === o.id).map((l) => ({ title: l.title, quantity: l.quantity, unit_price: l.unitPriceMinor })),
       refunds: refunds.filter((r) => r.orderId === o.id).map((r) => ({ amount: r.amountMinor, reason: r.reason, created_at: r.createdAt.toISOString() })),
     })),
-    reviews: reviews.map((r) => ({ order: numbers.get(r.orderId), name: r.name, rating: r.rating, body: r.body, status: r.status, created_at: r.createdAt.toISOString() })),
+    reviews: reviews.map((r) => ({ order: numbers.get(r.orderId), name: r.name, rating: r.rating, body: r.body, status: r.status, photos: r.photoIds.map(reviewPhotoUrl), created_at: r.createdAt.toISOString() })),
     returns: returns.map((r) => ({ order: numbers.get(r.orderId), status: r.status, reason: r.reason, note: r.note, items: r.items.map((i) => ({ title: i.title, quantity: i.quantity })), created_at: r.createdAt.toISOString() })),
     questions: questions.map((q) => ({ product: q.product, question: q.body, answer: q.answer, shown_on_store: q.status === "published", asked_at: q.createdAt.toISOString() })),
     messages: messages.map((m) => ({ conversation: conversations.find((c) => c.id === m.conversationId)!.subject, from: m.author === "buyer" ? "you" : "store", body: m.body, at: m.createdAt.toISOString() })),
@@ -267,6 +268,9 @@ export async function eraseCustomer(db: Db, shopId: string, customerId: string, 
     await tx.delete(schema.conversations).where(buyerConvos);
     await tx.delete(schema.emails).where(and(eq(schema.emails.shopId, shopId), ids.length ? or(eq(schema.emails.to, email), inArray(schema.emails.orderId, ids)) : eq(schema.emails.to, email)));
     if (ids.length) {
+      // Their photos could show them, so they go too.
+      const theirs = await tx.query.reviews.findMany({ where: inArray(schema.reviews.orderId, ids), columns: { id: true } });
+      await removeReviewPhotos(tx as unknown as Db, theirs.map((r) => r.id));
       await tx.update(schema.reviews).set({ name: "Verified buyer" }).where(inArray(schema.reviews.orderId, ids));
       await tx.update(schema.returnRequests).set({ note: null }).where(inArray(schema.returnRequests.orderId, ids));
     }
