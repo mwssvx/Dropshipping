@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { editProductPhotos, saveMedia, UserError, type PhotoEdit } from "@sf/core";
+import { editProductPhotos, saveMedia, setVariantPhotos, UserError, type PhotoEdit } from "@sf/core";
 import { adminUrl, requireShop } from "@/lib/server";
 
 export type PhotoState = { error?: string; message?: string; url?: string };
@@ -44,4 +44,22 @@ export async function photoAction(productId: string, _: PhotoState, form: FormDa
   revalidatePath("/admin/products");
   revalidatePath(`/s/${shop.handle}`, "layout");
   return { message };
+}
+
+/** Saves which photo each option (each colour, usually) shows. Fields are photo:<value or variant id>. */
+export async function variantPhotosAction(productId: string, option: string | null, _: PhotoState, form: FormData): Promise<PhotoState> {
+  const { shop, db } = await requireShop("products");
+  const photos: Record<string, string | null> = {};
+  for (const [name, value] of form.entries()) {
+    if (name.startsWith("photo:") && typeof value === "string") photos[name.slice(6)] = value || null;
+  }
+  try {
+    await setVariantPhotos(db, shop.id, productId, option, photos);
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath(`/admin/products/${productId}`);
+  revalidatePath(`/s/${shop.handle}`, "layout");
+  return { message: "Saved. Buyers see that photo when they pick it." };
 }

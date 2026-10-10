@@ -105,7 +105,7 @@ export class CjSupplier implements SupplierAdapter {
       description?: string;
       productImageSet?: string[];
       productImage?: string;
-      variants: { vid: string; variantNameEn?: string; variantKey?: string; variantSellPrice: number | string }[];
+      variants: { vid: string; variantNameEn?: string; variantKey?: string; variantImage?: string; variantSellPrice: number | string }[];
     }>("GET", "/product/query", { pid });
     const images = p.productImageSet?.length ? p.productImageSet : p.productImage ? parseImageList(p.productImage) : [];
     return {
@@ -118,6 +118,7 @@ export class CjSupplier implements SupplierAdapter {
         ref: v.vid,
         title: v.variantKey || v.variantNameEn || "Default",
         options: cjOptions(p.productKeyEn, v.variantKey),
+        imageUrl: v.variantImage?.startsWith("https://") ? v.variantImage : null,
         costMinor: Math.round(Number(v.variantSellPrice) * 100),
         stock: null,
         shipDaysMin: null,

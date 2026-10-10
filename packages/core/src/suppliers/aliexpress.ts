@@ -25,7 +25,7 @@ export type AliExpressOptions = {
   now?: () => number;
 };
 
-type SkuProperty = { sku_property_name?: string; sku_property_value?: string; property_value_definition_name?: string };
+type SkuProperty = { sku_property_name?: string; sku_property_value?: string; property_value_definition_name?: string; sku_image?: string };
 type Sku = {
   sku_id?: string | number;
   sku_attr?: string;
@@ -180,10 +180,13 @@ export class AliExpressSupplier implements SupplierAdapter {
           const value = x.property_value_definition_name || x.sku_property_value;
           if (x.sku_property_name && value) options[x.sku_property_name.trim()] = value.trim();
         }
+        // The property that has a picture (the colour, usually) gives the variant its photo.
+        const image = props.map((x) => x.sku_image?.trim()).find((u) => u?.startsWith("https://")) ?? null;
         return {
           ref: variantRef(id, s.sku_attr ?? ""),
           title: title || "Default",
           options,
+          imageUrl: image,
           costMinor: Number.isFinite(price) ? Math.round(price * 100) : 0,
           stock: stock === null || Number.isNaN(stock) ? null : stock,
           shipDaysMin: null,

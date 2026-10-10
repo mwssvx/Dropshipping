@@ -14,6 +14,8 @@ export type SupplierProduct = {
     title: string;
     /** Named options like { Color: "Black", Size: "XL" }, when the supplier gives them. */
     options?: Record<string, string>;
+    /** The supplier's photo of this variant (the red one, say), when it has one. */
+    imageUrl?: string | null;
     costMinor: number;
     stock: number | null;
     shipDaysMin: number | null;

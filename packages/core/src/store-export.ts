@@ -117,6 +117,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
           stock: v.stock,
           ship_days_min: v.shipDaysMin,
           ship_days_max: v.shipDaysMax,
+          image_url: v.imageUrl,
         })),
     })),
     collections: collections.map((c) => ({
@@ -275,6 +276,7 @@ const importSchema = z.object({
               stock: z.number().int().min(0).nullable().optional(),
               ship_days_min: z.number().int().min(0).max(365).nullable().optional(),
               ship_days_max: z.number().int().min(0).max(365).nullable().optional(),
+              image_url: z.string().max(2000).nullable().optional(),
             }),
           )
           .min(1, "Every product needs at least one variant.")
@@ -425,6 +427,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
     for (const x of data.products) {
       const key = keyOf(x.supplier);
       const provider = key && x.supplier?.provider !== "email" ? key : null;
+      const { images } = photoColumns(x.images?.length ? x.images : x.image_url ? [x.image_url] : []);
       const [row] = await tx
         .insert(schema.products)
         .values({
@@ -432,7 +435,8 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
           handle: x.handle,
           title: x.title,
           descriptionHtml: x.description_html,
-          ...photoColumns(x.images?.length ? x.images : x.image_url ? [x.image_url] : []),
+          images,
+          imageUrl: images[0] ?? null,
           status: x.status,
           sourceUrl: x.source_url ?? null,
           supplierId: key ? supplierIds.get(key)! : null,
@@ -456,6 +460,8 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
           shipDaysMin: v.ship_days_min ?? null,
           shipDaysMax: v.ship_days_max ?? null,
           position: i,
+          // Only one of the product's own photos.
+          imageUrl: v.image_url && images.includes(v.image_url) ? v.image_url : null,
         })),
       );
     }

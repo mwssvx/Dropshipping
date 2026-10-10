@@ -1,9 +1,30 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-/** The store's product photos: one large, with thumbnails to switch between them. */
+/**
+ * The store's product photos: one large, with thumbnails to switch between them. Picking an option
+ * that has its own photo (the red one) shows that photo: the option picker sends it as an
+ * "sf:photo" event, and a plain option list marks its choices with data-photo.
+ */
 export function ProductGallery({ title, photos }: { title: string; photos: string[] }) {
   const [current, setCurrent] = useState(0);
+  useEffect(() => {
+    const show = (url: unknown) => {
+      const i = typeof url === "string" ? photos.indexOf(url) : -1;
+      if (i >= 0) setCurrent(i);
+    };
+    const onPhoto = (e: Event) => show((e as CustomEvent).detail);
+    const onChange = (e: Event) => {
+      const el = e.target;
+      if (el instanceof HTMLInputElement && el.name === "variantId" && el.checked) show(el.dataset.photo);
+    };
+    window.addEventListener("sf:photo", onPhoto);
+    document.addEventListener("change", onChange);
+    return () => {
+      window.removeEventListener("sf:photo", onPhoto);
+      document.removeEventListener("change", onChange);
+    };
+  }, [photos]);
   const shown = photos[current] ?? photos[0];
   return (
     <div className="flex flex-col gap-3">

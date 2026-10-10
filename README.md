@@ -366,3 +366,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **On product pages** with named options (sizes and colours from the supplier or the options editor), shoppers pick each option on its own row ("Size: M", "Color: Black") instead of scrolling a list of every combination. The chosen combination and its price show under the choices (`components/OptionPicker.tsx`).
 2. **Stock-aware**: a value with nothing in stock is crossed out and can't be picked. Picking a value that isn't in stock with the other choices moves them to the closest combination that is ("Red" switches Size from S to L when red only comes in L), so Add to cart always adds something available.
 3. Products whose options don't line up (older imports without named options) keep the plain list. Option order follows the variant titles, since the database doesn't keep the order of option names.
+
+### Variant photos (after launch, part 42)
+
+1. **A photo per colour**: on a product with options, the merchant picks which of the product's photos each colour (or each option, when there's no colour) shows, under "Photo for each color" on the product page. New combinations added later (a new size) start with their colour's photo (`setVariantPhotos` and `variantPhotoRows` in `packages/core/src/gallery.ts`, `variants.image_url`).
+2. **On the store**, picking a colour switches the gallery to its photo, with the option picker and the plain option list alike. The cart shows the picked variant's photo instead of the cover.
+3. **From suppliers**: CJ's variant images and AliExpress's SKU images come in with the import. The cover stays first and variant photos are kept within the ten-photo limit. Removing a photo clears it from the options that used it, and store export and import carry each variant's photo.
