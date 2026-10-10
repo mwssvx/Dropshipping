@@ -53,12 +53,13 @@ export async function makeFixture(model: ModelClient, opts: { country?: string }
     db.query.variants.findMany({ where: eq(schema.variants.productId, productId), orderBy: schema.variants.position });
 
   let n = 0;
-  async function order(productId: string, o: { country?: string; name?: string } = {}) {
+  async function order(productId: string, o: { country?: string; name?: string; note?: string } = {}) {
     const [v] = await variants(productId);
     const { order } = await startCheckout(db, payments, await shop(), {
       email: `buyer${++n}@example.com`,
       address: { name: o.name ?? "Ada Lovelace", line1: "1 Main St", city: "Austin", region: "TX", postalCode: "78701", country: o.country ?? "US" },
       lines: [{ variantId: v!.id, quantity: 1 }],
+      note: o.note,
     });
     const { body, signature } = payments.event({ id: `evt_${order.id}`, type: "payment.succeeded", paymentIntentId: order.paymentIntentId!, amountMinor: order.totalMinor });
     await handlePaymentEvent(db, "fake", (await payments.parseWebhook(body, signature))!);

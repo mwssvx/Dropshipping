@@ -387,6 +387,11 @@ export const orders = pgTable(
     riskReviewedAt: timestamp("risk_reviewed_at", { withTimezone: true }),
     // Changes made after payment, before it shipped. The supplier order is cancelled and placed again.
     edits: jsonb("edits").$type<OrderEdit[]>().notNull().default([]),
+    // What the buyer typed in "Note for the store" at checkout ("Please leave it with the neighbour").
+    buyerNote: text("buyer_note"),
+    // The merchant's own note and labels ("follow up", "vip"). Never shown to the buyer.
+    staffNote: text("staff_note"),
+    tags: jsonb("tags").$type<string[]>().notNull().default([]),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

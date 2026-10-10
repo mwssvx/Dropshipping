@@ -13,12 +13,12 @@ const TAG_LENGTH = 30;
 const UNFINISHED = ["unfulfilled", "sent_to_supplier", "partially_shipped", "problem"] as const;
 
 /** "VIP, wholesale lead ,vip" → ["vip", "wholesale lead"]. */
-export function normalizeTags(input: string | string[]): string[] {
+export function normalizeTags(input: string | string[], owner = "A customer"): string[] {
   const raw = Array.isArray(input) ? input : input.split(",");
   const tags = [...new Set(raw.map((t) => t.trim().toLowerCase().replace(/\s+/g, " ")).filter(Boolean))];
   const long = tags.find((t) => t.length > TAG_LENGTH);
   if (long) throw new UserError(`Keep each tag to ${TAG_LENGTH} characters ("${long.slice(0, 20)}…" is longer).`);
-  if (tags.length > MAX_TAGS) throw new UserError(`A customer can have up to ${MAX_TAGS} tags.`);
+  if (tags.length > MAX_TAGS) throw new UserError(`${owner} can have up to ${MAX_TAGS} tags.`);
   return tags;
 }
 
@@ -190,6 +190,7 @@ export async function exportCustomerData(db: Db, shop: { id: string; name: strin
       email: o.email,
       shipping_address: o.shippingAddress,
       gift: o.gift,
+      note: o.buyerNote,
       currency: o.currency,
       subtotal: o.subtotalMinor,
       discount: o.discountMinor,
@@ -250,6 +251,9 @@ export async function eraseCustomer(db: Db, shopId: string, customerId: string, 
           customerId: null,
           note: null,
           gift: null,
+          // Notes are free text, so they may hold anything about the buyer. Tags stay.
+          buyerNote: null,
+          staffNote: null,
           shippingAddress: { name: "Erased", line1: "Erased", city: "Erased", postalCode: a.postalCode, country: a.country, ...(a.region ? { region: a.region } : {}) },
           updatedAt: new Date(),
         })

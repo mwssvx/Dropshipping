@@ -17,6 +17,7 @@ import { bundleSavings, bundlesInCart } from "./bundles";
 import { salePrice, salesFor } from "./sales";
 import { addonsByProduct, type CheckoutAddon } from "./addons";
 import { countryName, listShippingZones, priceRate, zoneFor } from "./shipping";
+import { normalizeTags } from "./customers";
 
 type Shop = typeof schema.shops.$inferSelect;
 type Order = typeof schema.orders.$inferSelect;
@@ -246,6 +247,7 @@ const checkoutSchema = z.object({
   email: z.string().trim().toLowerCase().email("Enter a valid email so we can send your receipt."),
   address: addressSchema,
   gift: giftSchema.nullish(),
+  note: z.string().trim().max(500, "Keep your note under 500 characters.").nullish().transform((n) => n || null),
 });
 
 export async function startCheckout(
@@ -270,6 +272,8 @@ export async function startCheckout(
     shippingRateId?: string | null;
     /** The buyer ticked "This order is a gift". */
     gift?: z.input<typeof giftSchema> | null;
+    /** "Note for the store", for the merchant. */
+    note?: string | null;
   },
   taxCalculator: TaxCalculator = new BuiltInTaxCalculator(),
 ) {
@@ -379,6 +383,7 @@ export async function startCheckout(
         shippingMethod: cart.shipping?.name ?? null,
         // Only something that ships can be a gift; gift cards are emailed to the buyer.
         gift: gift && cart.items.some((i) => !i.giftCard) ? gift : null,
+        buyerNote: parsed.data.note,
         paymentIntentId: intent.id,
         ...(dueMinor ? {} : { paymentStatus: "paid" as const, paidAt: new Date() }),
       })
@@ -461,16 +466,58 @@ export async function handlePaymentEvent(db: Db, provider: string, event: Paymen
   });
 }
 
-export async function listOrders(db: Db, shopId: string, filter: { fulfillmentStatus?: Order["fulfillmentStatus"]; held?: boolean } = {}) {
+export async function listOrders(
+  db: Db,
+  shopId: string,
+  filter: { fulfillmentStatus?: Order["fulfillmentStatus"]; held?: boolean; tag?: string; query?: string } = {},
+) {
+  const tag = filter.tag?.trim().toLowerCase();
+  // "1042", "#1042", a name or an email.
+  const q = filter.query?.trim().toLowerCase().replace(/^#(?=\d+$)/, "");
   return db.query.orders.findMany({
     where: and(
       eq(schema.orders.shopId, shopId),
       filter.fulfillmentStatus ? eq(schema.orders.fulfillmentStatus, filter.fulfillmentStatus) : undefined,
       // Held for the risk check and still worth sending (a refunded one is settled).
       filter.held ? and(isNotNull(schema.orders.heldAt), inArray(schema.orders.paymentStatus, ["paid", "partially_refunded"])) : undefined,
+      tag ? sql`${schema.orders.tags} @> ${JSON.stringify([tag])}::jsonb` : undefined,
+      q
+        ? /^\d{1,9}$/.test(q)
+          ? eq(schema.orders.number, Number(q))
+          : sql`(lower(${schema.orders.email}) like ${`%${q}%`} or lower(${schema.orders.shippingAddress}->>'name') like ${`%${q}%`})`
+        : undefined,
     ),
     orderBy: desc(schema.orders.number),
   });
+}
+
+const orderNotesInput = z.object({
+  note: z.string().max(2000, "Keep the note under 2,000 characters.").optional(),
+  tags: z.union([z.string().max(500), z.array(z.string())]).optional(),
+});
+
+/** The merchant's own note and tags on an order. The buyer never sees them. */
+export async function updateOrderNotes(db: Db, shopId: string, orderId: string, input: z.input<typeof orderNotesInput>) {
+  const parsed = orderNotesInput.safeParse(input);
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]!.message);
+  if (!z.string().uuid().safeParse(orderId).success) throw new NotFoundError("Order");
+  const order = await db.query.orders.findFirst({ where: and(eq(schema.orders.id, orderId), eq(schema.orders.shopId, shopId)) });
+  if (!order) throw new NotFoundError("Order");
+  const staffNote = parsed.data.note === undefined ? order.staffNote : parsed.data.note.trim() || null;
+  const tags = parsed.data.tags === undefined ? order.tags : normalizeTags(parsed.data.tags, "An order");
+  const [row] = await db.update(schema.orders).set({ staffNote, tags, updatedAt: new Date() }).where(eq(schema.orders.id, order.id)).returning();
+  return row!;
+}
+
+/** Every tag on the store's orders, most used first, to filter the order list. */
+export async function orderTags(db: Db, shopId: string) {
+  const rows = await db
+    .select({ tag: sql<string>`jsonb_array_elements_text(${schema.orders.tags})`.as("tag") })
+    .from(schema.orders)
+    .where(and(eq(schema.orders.shopId, shopId), sql`jsonb_array_length(${schema.orders.tags}) > 0`));
+  const counts = new Map<string, number>();
+  for (const r of rows) counts.set(r.tag, (counts.get(r.tag) ?? 0) + 1);
+  return [...counts].map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag)).slice(0, 50);
 }
 
 export async function getOrder(db: Db, shopId: string, orderId: string) {

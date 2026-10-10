@@ -71,7 +71,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
         fullName: t.fullName, address: t.address, address2: t.address2, city: t.city, region: t.region, postalCode: t.postalCode, country: t.country,
         shipping: t.shipping, noShipping: t.noShipping, placeOrder: t.placeOrder, continueToPayment: t.continueToPayment, continuing: t.continuing,
         notAvailable: t.notAvailable, tax: t.tax, giftCheckbox: t.giftCheckbox, giftFrom: t.giftFrom, giftMessage: t.giftMessage,
-        giftRecipientEmail: t.giftRecipientEmail, giftNote: t.giftNote,
+        giftRecipientEmail: t.giftRecipientEmail, giftNote: t.giftNote, orderNote: t.orderNote,
       }}
       taxLabel={quote.pricesIncludeTax ? t.taxIncluded : t.taxNextStep}
       totalLabel={quote.pricesIncludeTax ? t.total : t.totalBeforeTax}

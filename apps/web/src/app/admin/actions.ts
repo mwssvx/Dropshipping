@@ -10,6 +10,7 @@ import {
   parseMoney,
   releaseHeldOrder,
   editOrder,
+  updateOrderNotes,
   requireMember,
   retryOrder,
   sendPriceDrops,
@@ -180,6 +181,24 @@ async function orderAction(orderId: string, run: (shopId: string) => Promise<unk
 
 export async function retryOrderAction(orderId: string, _: FormState, _form: FormData): Promise<FormState> {
   return orderAction(orderId, async (shopId) => retryOrder(await fulfillment(), shopId, orderId));
+}
+
+export type OrderNotesState = { error?: string; saved?: boolean; note?: string; tags?: string };
+
+export async function orderNotesAction(orderId: string, _: OrderNotesState, form: FormData): Promise<OrderNotesState> {
+  const { shop, db } = await requireShop("orders");
+  const note = String(form.get("note") ?? "");
+  const tags = String(form.get("tags") ?? "");
+  try {
+    const saved = await updateOrderNotes(db, shop.id, orderId, { note, tags });
+    revalidatePath(`/admin/orders/${orderId}`);
+    revalidatePath("/admin/orders");
+    return { saved: true, note: saved.staffNote ?? "", tags: saved.tags.join(", ") };
+  } catch (e) {
+    // Typed values come back so a mistake doesn't wipe the note.
+    if (e instanceof UserError) return { error: e.message, note, tags };
+    throw e;
+  }
 }
 
 /** The merchant changes the address or a size before the order ships. */

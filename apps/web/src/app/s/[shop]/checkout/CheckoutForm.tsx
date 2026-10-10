@@ -24,7 +24,7 @@ function Field({ id, label, values, ...rest }: { id: string; label: string; valu
 export type CheckoutText = Record<
   | "checkout" | "orderSummary" | "contact" | "newsAndOffers" | "delivery" | "email" | "fullName" | "address" | "address2" | "city" | "region"
   | "postalCode" | "country" | "shipping" | "noShipping" | "placeOrder" | "continueToPayment" | "continuing" | "notAvailable" | "tax"
-  | "giftCheckbox" | "giftFrom" | "giftMessage" | "giftRecipientEmail" | "giftNote",
+  | "giftCheckbox" | "giftFrom" | "giftMessage" | "giftRecipientEmail" | "giftNote" | "orderNote",
   string
 >;
 
@@ -140,6 +140,10 @@ function CheckoutForm({
         </fieldset>
       )}
       {zones && <GiftFields t={t} values={v} />}
+      <div className="field">
+        <label className="label" htmlFor="note">{t.orderNote}</label>
+        <textarea className="input" id="note" name="note" rows={2} maxLength={500} defaultValue={v?.note} />
+      </div>
       <SubmitButton className="btn btn-primary btn-lg" pendingText={t.continuing}>{paidByGiftCard ? t.placeOrder : t.continueToPayment}</SubmitButton>
     </form>
   );

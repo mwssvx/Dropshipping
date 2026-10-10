@@ -503,6 +503,7 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
               ...(order.gift.message ? [`Your message: ${order.gift.message}`] : []),
             ]
           : []),
+        ...(order.buyerNote ? [``, `Your note to ${shop.name}: ${order.buyerNote}`] : []),
         ``,
         `We'll email you again when it ships. Track your order any time: ${link}`,
       ].join("\n"),

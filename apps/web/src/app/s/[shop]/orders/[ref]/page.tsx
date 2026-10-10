@@ -70,6 +70,12 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
           </p>
         </section>
       )}
+      {order.buyerNote && (
+        <section className="card p-5 flex flex-col gap-1 text-sm" aria-labelledby="note-heading">
+          <h2 id="note-heading" className="font-semibold">Your note to the store</h2>
+          <p className="whitespace-pre-line">{order.buyerNote}</p>
+        </section>
+      )}
       {order.refundedMinor > 0 && (
         <p className="banner banner-info">
           {order.paymentStatus === "refunded" ? "This order was refunded" : `${money(due.refundedMinor)} was refunded`}
