@@ -64,7 +64,9 @@ export default async function EditProductPage({ params, searchParams }: { params
             description: product.descriptionHtml,
             status: product.status,
             variants: product.variants.map((v) => ({
+              id: v.id,
               title: v.title,
+              options: v.options,
               price: toPrice(v.priceMinor),
               compareAt: toPrice(v.compareAtMinor),
               cost: toPrice(v.costMinor),
@@ -72,6 +74,8 @@ export default async function EditProductPage({ params, searchParams }: { params
               fromSupplier: !!v.supplierVariantRef,
             })),
             supplier: product.supplier ? { label: product.supplier.label, sourceUrl: product.sourceUrl } : undefined,
+            // Supplier options are tied to the supplier's listing, and gift card options are amounts.
+            optionsEditable: !product.giftCard && !product.variants.some((v) => v.supplierVariantRef),
           }} />
         <PhotosPanel productId={product.id} title={product.title} photos={productPhotos(product)} max={MAX_PHOTOS} />
         <AddressForm productId={product.id} handle={product.handle} prefix={(await storeAddress(shop)).replace(/^https?:\/\//, "")} />

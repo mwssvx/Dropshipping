@@ -5,7 +5,12 @@ import { NotFoundError, UserError } from "./errors";
 import { uniqueHandle } from "./handles";
 import { editProductPhotos, photoColumns } from "./gallery";
 
+export const MAX_VARIANTS = 100;
+export const MAX_OPTIONS = 3;
+
 const variantInput = z.object({
+  /** An existing option of this product, to edit it in place; leave out to add one. */
+  id: z.string().uuid().optional(),
   title: z.string().trim().min(1).default("Default"),
   priceMinor: z.number().int().min(0, "Price can't be negative."),
   compareAtMinor: z.number().int().min(0).nullish(),
@@ -27,7 +32,7 @@ const productInput = z.object({
     .nullish()
     .or(z.literal("").transform(() => null)),
   status: z.enum(["draft", "active", "archived"]).default("draft"),
-  variants: z.array(variantInput).min(1, "Add at least one price."),
+  variants: z.array(variantInput).min(1, "Add at least one price.").max(MAX_VARIANTS, `A product can have up to ${MAX_VARIANTS} options.`),
 });
 
 export type ProductInput = z.input<typeof productInput>;
@@ -48,7 +53,7 @@ export async function createProduct(db: Db, shopId: string, input: ProductInput)
   );
   return db.transaction(async (tx) => {
     const [product] = await tx.insert(schema.products).values({ ...data, ...photoColumns(imageUrl ? [imageUrl] : []), shopId, handle }).returning();
-    await tx.insert(schema.variants).values(variants.map((v, i) => ({ ...v, productId: product!.id, position: i })));
+    await tx.insert(schema.variants).values(variants.map(({ id: _id, ...v }, i) => ({ ...v, productId: product!.id, position: i })));
     return product!;
   });
 }
@@ -64,20 +69,26 @@ export async function updateProduct(db: Db, shopId: string, productId: string, i
       .where(and(eq(schema.products.id, productId), eq(schema.products.shopId, shopId)))
       .returning();
     if (!product) throw new NotFoundError("Product");
-    // M1 keeps one editable variant list; replace in place by position.
     const existing = await tx.query.variants.findMany({
       where: eq(schema.variants.productId, productId),
       orderBy: asc(schema.variants.position),
     });
-    for (const [i, v] of variants.entries()) {
-      const row = existing[i];
+    // Options sent with their id are edited in place, so orders, alerts and supplier links keep
+    // pointing at the same one; without ids (older forms, the API) they're matched by position.
+    const byId = variants.some((v) => v.id);
+    const kept = new Set<string>();
+    for (const [i, { id, ...v }] of variants.entries()) {
+      const row = byId ? (id ? existing.find((e) => e.id === id) : undefined) : existing[i];
+      if (byId && id && !row) throw new UserError("One of those options was removed meanwhile. Reload the page and try again.");
       // Renaming a one-option variant ("Small" to "S") renames the option the filters show too.
       const own = Object.entries(row?.options ?? {});
       const options = v.options ?? (row && own.length === 1 && own[0]![1] === row.title && v.title !== row.title ? { [own[0]![0]]: v.title } : undefined);
-      if (row) await tx.update(schema.variants).set({ ...v, options, position: i }).where(eq(schema.variants.id, row.id));
-      else await tx.insert(schema.variants).values({ ...v, productId, position: i });
+      if (row) {
+        await tx.update(schema.variants).set({ ...v, options, position: i }).where(eq(schema.variants.id, row.id));
+        kept.add(row.id);
+      } else await tx.insert(schema.variants).values({ ...v, productId, position: i });
     }
-    const extra = existing.slice(variants.length).map((v) => v.id);
+    const extra = existing.filter((e) => !kept.has(e.id)).map((e) => e.id);
     if (extra.length) await tx.delete(schema.variants).where(inArray(schema.variants.id, extra));
     return product;
   });
@@ -166,4 +177,36 @@ export async function patchProduct(db: Db, shopId: string, productId: string, in
 export async function setProductImage(db: Db, shopId: string, productId: string, imageUrl: string) {
   await editProductPhotos(db, shopId, productId, { kind: "add", url: imageUrl, cover: true });
   return (await db.query.products.findFirst({ where: eq(schema.products.id, productId) }))!;
+}
+
+export type OptionDef = { name: string; values: string[] };
+
+/**
+ * Every combination of a product's options, in order: Color (Black, White) and Size (S, M) give
+ * "Black / S", "Black / M", "White / S", "White / M".
+ */
+export function combineOptions(defs: OptionDef[]) {
+  const clean = defs
+    .map((d) => ({ name: d.name.trim(), values: [...new Set(d.values.map((v) => v.trim()).filter(Boolean))] }))
+    .filter((d) => d.name && d.values.length);
+  if (clean.length > MAX_OPTIONS) throw new UserError(`Use up to ${MAX_OPTIONS} options, like size, colour and material.`);
+  const names = clean.map((d) => d.name.toLowerCase());
+  if (new Set(names).size !== names.length) throw new UserError("Give each option a different name.");
+  let combos: Record<string, string>[] = [{}];
+  for (const d of clean) combos = combos.flatMap((c) => d.values.map((v) => ({ ...c, [d.name]: v })));
+  if (combos.length > MAX_VARIANTS) throw new UserError(`That makes ${combos.length} combinations; a product can have up to ${MAX_VARIANTS}.`);
+  return clean.length ? combos.map((options) => ({ title: Object.values(options).join(" / "), options })) : [];
+}
+
+/** A product's options and their values, in the order its variants use them. */
+export function optionDefsOf(variants: { options: Record<string, string> | null }[]): OptionDef[] {
+  const defs: OptionDef[] = [];
+  for (const v of variants) {
+    for (const [name, value] of Object.entries(v.options ?? {})) {
+      let d = defs.find((x) => x.name === name);
+      if (!d) defs.push((d = { name, values: [] }));
+      if (!d.values.includes(value)) d.values.push(value);
+    }
+  }
+  return defs;
 }

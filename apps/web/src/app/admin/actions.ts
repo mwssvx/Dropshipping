@@ -72,7 +72,15 @@ function readProduct(form: FormData): ProductInput {
     }
     const stock = readStock(form.get(`stock.${i}`));
     try {
+      const rawOptions = form.get(`options.${i}`);
+      let options: Record<string, string> | undefined;
+      if (rawOptions !== null) {
+        const parsed = JSON.parse(String(rawOptions)) as unknown;
+        options = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? Object.fromEntries(Object.entries(parsed).map(([k, v]) => [k, String(v)])) : {};
+      }
       return {
+        id: String(form.get(`variantId.${i}`) ?? "") || undefined,
+        options,
         title: String(form.get(`variantTitle.${i}`) ?? "Default") || "Default",
         priceMinor: price,
         compareAtMinor: optionalMoney(form.get(`compareAt.${i}`)),
