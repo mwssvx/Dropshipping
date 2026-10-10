@@ -253,7 +253,7 @@ export async function releaseHeldOrder(ctx: FulfillmentContext, shopId: string, 
 }
 
 /** Sends goods to suppliers and gift cards bought on the order to the buyer. Safe to repeat. */
-async function routeAndIssue(ctx: FulfillmentContext, orderId: string) {
+export async function routeAndIssue(ctx: FulfillmentContext, orderId: string) {
   const storeAddress = ctx.storeAddress ?? (async (shop: Shop) => {
     const order = await ctx.db.query.orders.findFirst({ where: eq(schema.orders.id, orderId) });
     return new URL(await ctx.orderStatusUrl(shop, order!)).origin;
@@ -552,6 +552,23 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
         ...(note ? [``, `Credit note ${note.number}: ${link}/invoice?doc=${note.id}`] : []),
         ``,
         `Order status: ${link}`,
+      ].join("\n"),
+    };
+  }
+  if (kind === "order_confirmation" && order.source === "replacement") {
+    const lines = await ctx.db.query.orderLines.findMany({ where: eq(schema.orderLines.orderId, order.id) });
+    const original = order.replacesOrderId ? await ctx.db.query.orders.findFirst({ where: eq(schema.orders.id, order.replacesOrderId), columns: { number: true } }) : null;
+    return {
+      subject: `A replacement for order #${original?.number ?? order.number} is on its way`,
+      text: [
+        `Hi ${first},`,
+        ``,
+        `${shop.name} is sending you a replacement${original ? ` for order #${original.number}` : ""}, at no charge:`,
+        ``,
+        ...lines.map((l) => `  ${l.title} × ${l.quantity}`),
+        ...(order.note ? [``, `From ${shop.name}: ${order.note}`] : []),
+        ``,
+        `It's order #${order.number}. We'll email you again when it ships. Track it any time: ${link}`,
       ].join("\n"),
     };
   }

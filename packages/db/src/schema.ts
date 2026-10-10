@@ -393,8 +393,11 @@ export const orders = pgTable(
     // "payment_link": the merchant built the order (for a buyer who asked by message or phone)
     // and emailed a link to pay. Their note to the buyer shows in the email and on the pay page.
     // "post_purchase": added from the order page right after paying, charged to the same card.
-    source: text("source", { enum: ["checkout", "payment_link", "post_purchase"] }).notNull().default("checkout"),
+    // "replacement": sent free by the merchant for one that was lost, damaged or wrong.
+    source: text("source", { enum: ["checkout", "payment_link", "post_purchase", "replacement"] }).notNull().default("checkout"),
     parentOrderId: uuid("parent_order_id").references((): AnyPgColumn => orders.id, { onDelete: "set null" }),
+    // For a replacement: the order it replaces.
+    replacesOrderId: uuid("replaces_order_id").references((): AnyPgColumn => orders.id, { onDelete: "set null" }),
     // The buyer's card was kept with the payment provider at checkout, for an after-checkout offer.
     cardSaved: boolean("card_saved").notNull().default(false),
     note: text("note"),
@@ -446,6 +449,7 @@ export const orders = pgTable(
     ),
     check("orders_discount_within_subtotal", sql`${t.discountMinor} >= 0 and ${t.discountMinor} <= ${t.subtotalMinor}`),
     index("orders_discount_idx").on(t.discountId),
+    index("orders_replaces_idx").on(t.replacesOrderId),
     check("orders_refund_within_total", sql`${t.refundedMinor} >= 0 and ${t.refundedMinor} <= ${t.totalMinor}`),
     check("orders_gift_card_within_total", sql`${t.giftCardMinor} >= 0 and ${t.giftCardMinor} <= ${t.totalMinor}`),
   ],
@@ -1225,7 +1229,7 @@ export const shippingRates = pgTable(
 
 // A buyer asking to return items from an order. The merchant approves it (with instructions),
 // refunds it, gives store credit, or declines it.
-export const RETURN_REASONS = ["damaged", "wrong_item", "not_as_described", "too_small_or_big", "changed_mind", "other"] as const;
+export const RETURN_REASONS = ["never_arrived", "damaged", "wrong_item", "not_as_described", "too_small_or_big", "changed_mind", "other"] as const;
 export type ReturnItem = { lineId: string; title: string; quantity: number };
 
 export const returnRequests = pgTable(
@@ -1234,7 +1238,7 @@ export const returnRequests = pgTable(
     id: id(),
     shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
     orderId: uuid("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
-    status: text("status", { enum: ["requested", "approved", "refunded", "credited", "declined"] }).notNull().default("requested"),
+    status: text("status", { enum: ["requested", "approved", "refunded", "credited", "replaced", "declined"] }).notNull().default("requested"),
     reason: text("reason", { enum: RETURN_REASONS }).notNull(),
     note: text("note"),
     items: jsonb("items").$type<ReturnItem[]>().notNull(),
@@ -1244,6 +1248,8 @@ export const returnRequests = pgTable(
     merchantMessage: text("merchant_message"),
     refundId: uuid("refund_id").references(() => refunds.id, { onDelete: "set null" }),
     giftCardId: uuid("gift_card_id").references(() => giftCards.id, { onDelete: "set null" }),
+    // The free order sent instead, when the merchant chose to replace the items.
+    replacementOrderId: uuid("replacement_order_id").references((): AnyPgColumn => orders.id, { onDelete: "set null" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),

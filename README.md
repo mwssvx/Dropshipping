@@ -414,3 +414,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Photos with a review**: buyers can add up to 3 photos (JPG, PNG or WebP, 3 MB each) when they review from their order page. Each file's first bytes are checked, and nothing is stored if the review is turned down (`submitReview` in `packages/core/src/reviews.ts`, `reviews.photo_ids`).
 2. **On the product page**: a "Photos from buyers" strip above the reviews links to each photo's review, and each review shows its photos. Photos on hidden or pending reviews don't show.
 3. **Admin and privacy**: the Reviews page shows each review's photos with a Remove button that deletes the file. A buyer's data export lists their photos, and erasing a buyer deletes them.
+
+### Replacements for lost or damaged orders (after launch, part 50)
+
+1. **Send it again, free**: from a shipped order's page, "Send a replacement" sends some or all of its items again as a new order at no charge (`sendReplacement` in `packages/core/src/replacements.ts`). It goes to the supplier like any order, so it gets tracking and emails. There's no invoice, and the risk check isn't run again.
+2. **From a return**: buyers can now pick "It never arrived" when they report a problem, and the merchant can answer any return with "Send a replacement", with nothing to send back (`decideReturn` action `replace`, status `replaced`).
+3. **Linked both ways**: the admin and buyer pages link the original order and its replacements, and the buyer gets an email saying what's coming. Replacements aren't counted as sales in analytics, but their supplier cost counts against profit. They can't be reviewed separately.

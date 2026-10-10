@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { can, countryName, formatMoney, getOrder, orderEditOptions, listRefunds, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode } from "@sf/core";
+import { can, countryName, formatMoney, getOrder, orderEditOptions, listRefunds, replaceableLines, replacementBlocked, replacementsOf, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode } from "@sf/core";
 import { fulfillment, requireShop, storeAddress, suppliers } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
 import { editOrderAction } from "../../../actions";
@@ -10,14 +10,15 @@ import { RefundForm } from "./RefundForm";
 import { FixWithAiButton } from "./FixWithAiButton";
 import { RiskActions } from "./RiskActions";
 import { OrderNotesForm } from "./OrderNotesForm";
+import { ReplacementForm } from "./ReplacementForm";
 import { FulfilmentStatus, PaymentStatus } from "@/components/Status";
 import { PageHeader } from "../../PageHeader";
 
 const when = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" });
 
-export default async function OrderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ link?: string }> }) {
+export default async function OrderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ link?: string; replacement?: string }> }) {
   const { id } = await params;
-  const { link } = await searchParams;
+  const { link, replacement: justSent } = await searchParams;
   const { shop, db, role } = await requireShop("orders");
   const seesMoney = can(role, "money");
   const order = await getOrder(db, shop.id, id).catch((e) => {
@@ -30,6 +31,12 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
   const a = order.shippingAddress;
   const edit = ["paid"].includes(order.paymentStatus) && can(role, "orders") ? await orderEditOptions(await fulfillment(), shop.id, order.id, "merchant") : null;
   // Linked orders: the one this was added to after checkout, or the one added to this.
+  // Replacements: the order this one replaces, those sent for it, and what could be sent again.
+  const [original, replacements, replaceable] = await Promise.all([
+    order.replacesOrderId ? db.query.orders.findFirst({ where: (o, { eq }) => eq(o.id, order.replacesOrderId!), columns: { id: true, number: true } }) : undefined,
+    replacementsOf(db, order.id),
+    !replacementBlocked(order) && can(role, "orders") ? replaceableLines(db, order.id) : Promise.resolve([]),
+  ]);
   const [parent, child] = await Promise.all([
     order.parentOrderId ? db.query.orders.findFirst({ where: (o, { eq }) => eq(o.id, order.parentOrderId!), columns: { id: true, number: true } }) : undefined,
     db.query.orders.findFirst({ where: (o, { eq }) => eq(o.parentOrderId, order.id), columns: { id: true, number: true, paymentStatus: true } }),
@@ -81,9 +88,12 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
   return (
     <main className="pb-12">
       <PageHeader title={`Order #${order.number}`} back={<Link href="/admin/orders" className="hint hover:text-ink">← Orders</Link>}
-        actions={<div className="flex gap-2 items-center">{order.wholesale && <span className="pill pill-info">Wholesale order</span>}{order.source === "payment_link" && <span className="pill pill-info">Payment link</span>}{order.source === "post_purchase" && <span className="pill pill-info">Added after checkout</span>}<PaymentStatus value={order.paymentStatus} />{held ? <span className="pill pill-warning">On hold</span> : <FulfilmentStatus value={order.fulfillmentStatus} />}</div>} />
+        actions={<div className="flex gap-2 items-center">{order.wholesale && <span className="pill pill-info">Wholesale order</span>}{order.source === "payment_link" && <span className="pill pill-info">Payment link</span>}{order.source === "post_purchase" && <span className="pill pill-info">Added after checkout</span>}{order.source === "replacement" && <span className="pill pill-info">Replacement</span>}<PaymentStatus value={order.paymentStatus} />{held ? <span className="pill pill-warning">On hold</span> : <FulfilmentStatus value={order.fulfillmentStatus} />}</div>} />
       <div className="px-4 sm:px-8 grid gap-6 lg:grid-cols-[1fr_320px] items-start">
         <div className="flex flex-col gap-6 min-w-0">
+          {justSent && order.source === "replacement" && (
+            <p className="banner banner-success" role="status">Replacement sent as order #{order.number}. {order.email} has been emailed, and it&apos;s gone to the supplier.</p>
+          )}
           {order.source === "payment_link" && (order.paymentStatus === "pending" || order.paymentStatus === "failed") && (
             <section className="card p-5 flex flex-col gap-3" aria-labelledby="pay-link">
               <h2 id="pay-link" className="font-semibold">Waiting for {order.shippingAddress.name.split(" ")[0]} to pay</h2>
@@ -247,6 +257,12 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
               <p className="hint mt-1">{order.gift.recipientEmail ? `We email ${order.gift.recipientEmail} when it ships, without prices.` : "No recipient email, so only the buyer hears from us."}</p>
             </section>
           )}
+          {original && (
+            <p>A free replacement for <Link href={`/admin/orders/${original.id}`} className="underline">order #{original.number}</Link>.{order.note ? ` You told the buyer: ${order.note}` : ""}</p>
+          )}
+          {replacements.length > 0 && (
+            <p>Replacement{replacements.length > 1 ? "s" : ""} sent: {replacements.map((r, i) => <span key={r.id}>{i ? ", " : ""}<Link href={`/admin/orders/${r.id}`} className="underline">order #{r.number}</Link></span>)}.</p>
+          )}
           {parent && (
             <p>Added after checkout to <Link href={`/admin/orders/${parent.id}`} className="underline">order #{parent.number}</Link>, on the same card.</p>
           )}
@@ -278,7 +294,12 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
             <p className="hint">The buyer can open these from their order page too.</p>
           </section>
         )}
-        {(refundable || refunds.length > 0) && can(role, "refunds") && (
+        {replaceable.length > 0 && (
+          <div className="card p-5 flex flex-col gap-3 text-sm">
+            <ReplacementForm orderId={order.id} lines={replaceable.map((l) => ({ id: l.id, title: l.title, quantity: l.quantity }))} />
+          </div>
+        )}
+        {(refundable || refunds.length > 0) && order.totalMinor > 0 && can(role, "refunds") && (
           <div className="card p-5 flex flex-col gap-3 text-sm">
             <h2 className="font-semibold">Refund</h2>
             {order.presentment && <p className="hint">The buyer paid in {order.presentment.currency}, so refunds go back in {order.presentment.currency} at the rate they paid (1 {order.currency} = {order.presentment.rate.toFixed(4)} {order.presentment.currency}). Enter the amount in {order.currency}.</p>}
