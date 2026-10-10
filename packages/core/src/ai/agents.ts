@@ -94,7 +94,32 @@ Translate the meaning naturally, the way a shop in that country would write it, 
 For items of kind "theme", each field's key is the original text: translate the value and keep the key exactly as given.
 ${RULES}`,
   },
+  answerer: {
+    agent: "answerer",
+    effort: "low",
+    maxTokens: 4096,
+    system: (shop) => `You draft answers to shoppers' questions about products for ${shop.name}, an online store. The merchant reads your draft, may change it, and sends it.
+Call read_question first, and read_store_policies if the question is about delivery, shipping prices, returns or payment. Then call save_answer_draft once.
+Write as the store, warm and short: one to four sentences that answer the question directly, without a greeting or sign-off, since the answer is also shown on the product page.
+If the data doesn't answer the question (materials, measurements, plugs, certifications and so on that the listing doesn't mention), don't guess: start the draft with "[Check: " and what the merchant needs to find out, then "]", and write the rest as an answer they can complete.
+Your final text is for the merchant: one sentence on what you drafted.
+${RULES}`,
+  },
 } satisfies Record<string, AgentSpec>;
+
+/** Ask the answerer for a suggested answer to a shopper's question. Returns the draft, or null. */
+export async function draftAnswerWithAi(ctx: AgentContext, shop: Shop, questionId: string) {
+  const q = await ctx.db.query.productQuestions.findFirst({ where: and(eq(schema.productQuestions.id, questionId), eq(schema.productQuestions.shopId, shop.id)) });
+  if (!q) throw new NotFoundError("Question");
+  if (q.status !== "waiting") throw new UserError("That question has been answered already.");
+  const run = await runAgent(ctx, AGENT_SPECS.answerer, shop, {
+    trigger: "merchant",
+    productId: q.productId,
+    messages: [{ role: "user", content: `Draft an answer to question ${q.id}. Today is ${today()}.` }],
+  });
+  const after = await ctx.db.query.productQuestions.findFirst({ where: eq(schema.productQuestions.id, q.id), columns: { draft: true } });
+  return { ...run, draft: after?.draft ?? null };
+}
 
 /** Ask the listing writer to improve one product's title and description. */
 export async function writeListing(ctx: AgentContext, shop: Shop, productId: string): Promise<RunResult> {

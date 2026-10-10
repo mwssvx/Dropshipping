@@ -284,3 +284,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Feeds** (`packages/core/src/feeds.ts`): every option of every product on sale, as a Google Merchant Center feed (`/feeds/google.xml`, RSS with `g:` tags) and a Meta catalog feed (`/feeds/meta.csv`). Each option is one item grouped by product, with its regular price, any running sale as the sale price with its dates, stock, photos, colour and size from the option names, and the description as plain text. Gift cards aren't listed.
 2. **Languages**: `?lang=de` gives the feed in a store language, with translated titles and links into that language's store.
 3. **Sales channels** (new page under Marketing): the feed links for each channel and language with a Copy button, the steps to paste them into Merchant Center and Commerce Manager, and a "To fix" list of what kept a product out (no photo, no price) or may get it rejected (no description, a title over 150 characters).
+
+### Product questions (after launch, part 28)
+
+1. **Questions** (`packages/core/src/questions.ts`): shoppers ask about a product in a "Questions" section on its page, in every store language (up to 5 a day per email). The merchant answers on the new Questions page (with a count in the menu, for anyone who can manage reviews), choosing whether the answer also shows on the product page. The shopper gets the first answer by email; later changes don't email again.
+2. **AI drafts**: "Draft with AI" asks a new agent, the question answerer, for an answer from the listing (options, prices, stock, delivery time), earlier answers and the store's policies. It only saves a draft; nothing reaches the shopper until the merchant sends it. What the listing doesn't say is marked "[Check: …]" instead of guessed.
+3. **Privacy**: shoppers' emails never show on the store. A customer's data export lists their questions; erasing them deletes unanswered ones and shows answered ones as "A shopper".

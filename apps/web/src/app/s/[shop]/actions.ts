@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { amountToCharge, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
+import { amountToCharge, askQuestion, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
 import { agents, campaigns, db, payments, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
@@ -277,6 +277,19 @@ export async function stockAlertAction(handle: string, productHandle: string, fo
     status = e.code === "in_stock" ? "back" : e.code === "too_many" ? "many" : "invalid";
   }
   redirect(`${await storeBase(handle)}/products/${productHandle}?alert=${status}#stock-alert`);
+}
+
+/** A shopper asks about a product. The merchant answers from the admin and the answer comes by email. */
+export async function askQuestionAction(handle: string, productHandle: string, productId: string, form: FormData) {
+  const shop = await loadShop(handle);
+  let status = "sent";
+  try {
+    await askQuestion(await db(), shop.id, { productId, name: String(form.get("name") ?? ""), email: String(form.get("email") ?? ""), body: String(form.get("question") ?? "") });
+  } catch (e) {
+    if (!(e instanceof UserError)) throw e;
+    status = e.code === "too_many" ? "many" : "invalid";
+  }
+  redirect(`${await storeBase(handle)}/products/${productHandle}?asked=${status}#questions`);
 }
 
 /** The heart on a product: saves it, or takes it off the list. Comes back to the page it was pressed on. */

@@ -644,7 +644,7 @@ export const appeals = pgTable(
 
 // AI agents. Every run is recorded with its token use and cost, and every tool call it makes is an
 // agent action: reads run straight away, changes may wait for the merchant's approval.
-export const AGENTS = ["listing", "assistant", "buyer_support", "fulfilment", "margin", "writer", "translator"] as const;
+export const AGENTS = ["listing", "assistant", "buyer_support", "fulfilment", "margin", "writer", "translator", "answerer"] as const;
 export type AgentName = (typeof AGENTS)[number];
 
 export const agentRuns = pgTable(
@@ -1327,5 +1327,34 @@ export const checkoutAddons = pgTable(
   (t) => [
     uniqueIndex("checkout_addons_shop_product_uq").on(t.shopId, t.productId),
     check("checkout_addons_percent", sql`${t.percentOff} between 0 and 50`),
+  ],
+);
+
+// Questions buyers ask on a product page ("Does it come with a plug for the UK?"). The merchant
+// answers in the admin, where the AI can draft the answer; answered questions show on the page
+// and the buyer gets the answer by email.
+export const productQuestions = pgTable(
+  "product_questions",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    body: text("body").notNull(),
+    /** waiting: not answered yet. published: answered and on the page. private: answered by email only. */
+    status: text("status", { enum: ["waiting", "published", "private"] }).notNull().default("waiting"),
+    answer: text("answer"),
+    /** The AI's suggested answer, until the merchant uses or changes it. */
+    draft: text("draft"),
+    answeredAt: timestamp("answered_at", { withTimezone: true }),
+    /** When the buyer was emailed the answer. */
+    notifiedAt: timestamp("notified_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("product_questions_shop_idx").on(t.shopId, t.status, t.createdAt),
+    index("product_questions_product_idx").on(t.productId, t.status),
+    check("product_questions_answered", sql`${t.status} = 'waiting' or ${t.answer} is not null`),
   ],
 );

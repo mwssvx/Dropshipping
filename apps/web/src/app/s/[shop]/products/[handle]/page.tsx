@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, getActiveProductByHandle, NotFoundError, percentOff, productPhotos, productReviews, upsellsFor, wholesaleTermsFor } from "@sf/core";
+import { bundlesForProduct, getActiveProductByHandle, NotFoundError, percentOff, productPhotos, productQuestions, productReviews, upsellsFor, wholesaleTermsFor } from "@sf/core";
 import { ProductGallery } from "@/components/ProductGallery";
 import { currentBuyer } from "@/lib/buyer";
 import { db } from "@/lib/server";
 import { buyerFx } from "@/lib/currency";
 import { SubmitButton } from "@/components/SubmitButton";
-import { addBundleAction, addToCartAction, stockAlertAction, toggleSavedAction } from "../../actions";
+import { addBundleAction, addToCartAction, askQuestionAction, stockAlertAction, toggleSavedAction } from "../../actions";
 import { savedIds } from "@/lib/saved";
 import { loadShop, localProducts, storeBase, storeLang, storeT, missing } from "../../data";
 import { Price } from "@/components/Price";
@@ -62,7 +62,13 @@ const ALERT_MESSAGES = {
   invalid: { key: "alertInvalid", ok: false },
 } as const;
 
-export default async function ProductPage({ params, searchParams }: { params: Promise<{ shop: string; handle: string }>; searchParams: Promise<{ alert?: string; saved?: string }> }) {
+const ASKED_MESSAGES = {
+  sent: { key: "askSent", ok: true },
+  many: { key: "askMany", ok: false },
+  invalid: { key: "askInvalid", ok: false },
+} as const;
+
+export default async function ProductPage({ params, searchParams }: { params: Promise<{ shop: string; handle: string }>; searchParams: Promise<{ alert?: string; saved?: string; asked?: string }> }) {
   const { shop: shopHandle, handle } = await params;
   const query = await searchParams;
   const t = await storeT(shopHandle);
@@ -72,7 +78,14 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const buyable = product.variants.filter((x) => x.stock === null || x.stock > 0);
   const v = buyable[0] ?? product.variants[0];
   const many = product.variants.length > 1;
-  const [reviews, rawUpsells, base, fx] = await Promise.all([productReviews(await db(), product.id), upsellsFor(await db(), shop.id, [product.id]), storeBase(shopHandle), buyerFx(shop)]);
+  const [reviews, questions, rawUpsells, base, fx] = await Promise.all([
+    productReviews(await db(), product.id),
+    productQuestions(await db(), product.id),
+    upsellsFor(await db(), shop.id, [product.id]),
+    storeBase(shopHandle),
+    buyerFx(shop),
+  ]);
+  const askedKind = ASKED_MESSAGES[(query.asked ?? "") as keyof typeof ASKED_MESSAGES];
   const upsells = await localProducts(shopHandle, rawUpsells);
   const buyer = await currentBuyer(shop.id);
   const wholesale = await wholesaleTermsFor(await db(), shop, buyer?.email);
@@ -262,6 +275,41 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
             ))}
           </ul>
         )}
+      </section>
+      <section id="questions" className="md:col-span-2 flex flex-col gap-4 border-t border-border pt-8" aria-labelledby="questions-heading">
+        <h2 id="questions-heading" className="text-xl font-semibold">{t.productQuestions}</h2>
+        {questions.length === 0 ? (
+          <p className="hint">{t.noQuestions}</p>
+        ) : (
+          <ul className="flex flex-col gap-4">
+            {questions.map((q) => (
+              <li key={q.id} className="flex flex-col gap-1">
+                <p className="font-medium whitespace-pre-line">{q.body} <span className="hint font-normal text-sm">· {q.name.split(/\s+/)[0]}</span></p>
+                <p className="text-sm whitespace-pre-line border-l-2 border-border pl-3"><span className="font-medium">{shop.name}: </span>{q.answer}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+        <form action={askQuestionAction.bind(null, shopHandle, product.handle, product.id)} className="card p-4 flex flex-col gap-3 max-w-2xl" aria-labelledby="ask-heading">
+          <h3 id="ask-heading" className="font-semibold">{t.askTitle}</h3>
+          {askedKind && <p role="status" className={`banner ${askedKind.ok ? "banner-success" : "banner-critical"}`}>{t[askedKind.key]}</p>}
+          <div className="field">
+            <label className="label" htmlFor="ask-question">{t.yourQuestion}</label>
+            <textarea className="input" id="ask-question" name="question" rows={3} required minLength={10} maxLength={500} />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="field">
+              <label className="label" htmlFor="ask-name">{t.yourName}</label>
+              <input className="input" id="ask-name" name="name" required maxLength={60} autoComplete="given-name" />
+            </div>
+            <div className="field">
+              <label className="label" htmlFor="ask-email">{t.email}</label>
+              <input className="input" id="ask-email" name="email" type="email" required autoComplete="email" defaultValue={buyer?.email ?? ""} placeholder="you@example.com" />
+            </div>
+          </div>
+          <p className="hint text-sm">{t.askNote}</p>
+          <SubmitButton className="btn btn-secondary self-start">{t.askButton}</SubmitButton>
+        </form>
       </section>
     </main>
   );

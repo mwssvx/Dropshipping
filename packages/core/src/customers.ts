@@ -136,6 +136,11 @@ export async function exportCustomerData(db: Db, shop: { id: string; name: strin
         db.query.returnRequests.findMany({ where: inArray(schema.returnRequests.orderId, ids) }),
       ])
     : [[], [], [], []];
+  const questions = await db
+    .select({ product: schema.products.title, body: schema.productQuestions.body, answer: schema.productQuestions.answer, status: schema.productQuestions.status, createdAt: schema.productQuestions.createdAt })
+    .from(schema.productQuestions)
+    .innerJoin(schema.products, eq(schema.products.id, schema.productQuestions.productId))
+    .where(and(eq(schema.productQuestions.shopId, shop.id), eq(schema.productQuestions.email, customer.email.toLowerCase())));
   const conversations = await db.query.conversations.findMany({
     where: and(eq(schema.conversations.shopId, shop.id), eq(schema.conversations.kind, "buyer"), ids.length ? or(eq(schema.conversations.email, customer.email), inArray(schema.conversations.orderId, ids)) : eq(schema.conversations.email, customer.email)),
   });
@@ -194,6 +199,7 @@ export async function exportCustomerData(db: Db, shop: { id: string; name: strin
     })),
     reviews: reviews.map((r) => ({ order: numbers.get(r.orderId), name: r.name, rating: r.rating, body: r.body, status: r.status, created_at: r.createdAt.toISOString() })),
     returns: returns.map((r) => ({ order: numbers.get(r.orderId), status: r.status, reason: r.reason, note: r.note, items: r.items.map((i) => ({ title: i.title, quantity: i.quantity })), created_at: r.createdAt.toISOString() })),
+    questions: questions.map((q) => ({ product: q.product, question: q.body, answer: q.answer, shown_on_store: q.status === "published", asked_at: q.createdAt.toISOString() })),
     messages: messages.map((m) => ({ conversation: conversations.find((c) => c.id === m.conversationId)!.subject, from: m.author === "buyer" ? "you" : "store", body: m.body, at: m.createdAt.toISOString() })),
     emails_sent: emails.map((e) => ({ subject: e.subject, kind: e.kind, status: e.status, at: (e.sentAt ?? e.createdAt).toISOString() })),
     back_in_stock_requests: alerts.map((a) => ({ product: a.product, option: a.option, asked_at: a.createdAt.toISOString(), emailed_at: a.notifiedAt?.toISOString() ?? null })),
@@ -208,8 +214,8 @@ export const erasedEmail = (customerId: string) => `erased-${customerId.slice(0,
 /**
  * Erases a buyer on request. Orders stay for the store's accounts and tax records, but lose the
  * email, name and street address (the country, region and postcode stay, since tax depends on
- * them). Their messages, emails, sign-in codes, back-in-stock requests and campaign history are deleted, reviews show as
- * "Verified buyer", and the customer record goes. Refused while an order is still on its way or a
+ * them). Their messages, emails, sign-in codes, back-in-stock requests, unanswered questions and campaign history are deleted, reviews show as
+ * "Verified buyer" and answered questions as "A shopper", and the customer record goes. Refused while an order is still on its way or a
  * return is open, since the store still needs the details to finish it.
  */
 export async function eraseCustomer(db: Db, shopId: string, customerId: string, input: { confirmEmail: string }) {
@@ -259,6 +265,9 @@ export async function eraseCustomer(db: Db, shopId: string, customerId: string, 
     );
     await tx.delete(schema.buyerCodes).where(and(eq(schema.buyerCodes.shopId, shopId), eq(schema.buyerCodes.email, email)));
     await tx.delete(schema.stockAlerts).where(and(eq(schema.stockAlerts.shopId, shopId), eq(schema.stockAlerts.email, email)));
+    // Answered questions can stay on the product page, without who asked.
+    await tx.delete(schema.productQuestions).where(and(eq(schema.productQuestions.shopId, shopId), eq(schema.productQuestions.email, email.toLowerCase()), eq(schema.productQuestions.status, "waiting")));
+    await tx.update(schema.productQuestions).set({ name: "A shopper", email: replacement }).where(and(eq(schema.productQuestions.shopId, shopId), eq(schema.productQuestions.email, email.toLowerCase())));
     // Copies of the email in notification and webhook logs and AI notes.
     await tx.execute(sql`update ${schema.pushMessages} set body = replace(body, ${email}, ${replacement}) where shop_id = ${shopId} and position(${email} in body) > 0`);
     await tx.execute(sql`update ${schema.webhookDeliveries} set payload = replace(payload::text, ${email}, ${replacement})::jsonb where shop_id = ${shopId} and position(${email} in payload::text) > 0`);

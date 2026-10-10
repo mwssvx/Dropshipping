@@ -12,6 +12,7 @@ export const AGENT_LABEL: Record<string, string> = {
   margin: "Margin watch",
   writer: "Blog writer",
   translator: "Translator",
+  answerer: "Question answerer",
 };
 
 export type PendingAction = { id: string; agent: string; tool: string; summary: string; reason: string | null; input: Record<string, unknown> };

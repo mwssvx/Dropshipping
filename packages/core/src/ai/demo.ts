@@ -144,6 +144,40 @@ function translator(s: State): BetaContentBlock[] {
   return [text(`I translated ${n} item${n === 1 ? "" : "s"}. Read them over on the Languages page and change anything that doesn't sound right.`)];
 }
 
+/* ───────────── Question answerer ───────────── */
+
+// Answers what the listing data can answer (delivery, options, stock, price) and marks the rest
+// for the merchant to check, like the real model is told to.
+function answerer(s: State): BetaContentBlock[] {
+  const id = s.prompt.match(/question ([0-9a-f-]{36})/)?.[1] ?? "";
+  const q = s.has("read_question");
+  if (!q) return [toolCall("read_question", { question_id: id })];
+  if (q.isError) return [text("I couldn't find that question.")];
+  const ask = strip(q.result.question).toLowerCase();
+  const policyQuestion = /\b(return|refund|ship|shipping|deliver|delivery|arrive|pay|payment)/.test(ask);
+  if (policyQuestion && !s.has("read_store_policies")) return [toolCall("read_store_policies", {})];
+  if (!s.has("save_answer_draft")) {
+    const p = q.result.product;
+    const options: { name: string; price: string; in_stock: boolean; delivery_days: string | null }[] = p.options ?? [];
+    const parts: string[] = [];
+    if (/\b(ship|shipping|deliver|delivery|arrive|how long|when)/.test(ask)) {
+      const days = options.find((o) => o.delivery_days)?.delivery_days;
+      if (days) parts.push(`It usually arrives in ${days.replace("-", " to ")} days after you order.`);
+    }
+    if (/\b(size|sizes|colou?r|option|options|version|come in)/.test(ask) && options.length) {
+      parts.push(options.length === 1 && options[0]!.name === "Default" ? "It comes in one version." : `It comes in ${options.map((o) => o.name).join(", ")}.`);
+    }
+    if (/\b(stock|available|sold out|back)/.test(ask)) {
+      const inStock = options.filter((o) => o.in_stock);
+      parts.push(inStock.length ? `${inStock.length === options.length ? "Every option is" : `${inStock.map((o) => o.name).join(", ")} ${inStock.length === 1 ? "is" : "are"}`} in stock right now.` : "It's sold out at the moment; leave your email on the product page and we'll tell you when it's back.");
+    }
+    if (/\b(price|cost|how much)/.test(ask) && options.length) parts.push(`It's ${options[0]!.price}.`);
+    const answer = parts.length ? `Thanks for asking! ${parts.join(" ")}` : `[Check: the listing doesn't say, so ask your supplier] Thanks for asking about the ${p.title}! `;
+    return [toolCall("save_answer_draft", { question_id: id, answer: answer.padEnd(10, " ") })];
+  }
+  return [text("I drafted an answer. Read it over, change anything you need, and send it.")];
+}
+
 /* ───────────── Buyer support ───────────── */
 
 function buyerSupport(s: State): BetaContentBlock[] {
@@ -337,6 +371,7 @@ const BRAINS: Record<ModelRequest["agent"], (s: State, req: ModelRequest) => Bet
   listing,
   writer,
   translator,
+  answerer,
   buyer_support: buyerSupport,
   fulfilment,
   margin,
