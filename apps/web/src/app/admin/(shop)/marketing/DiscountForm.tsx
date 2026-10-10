@@ -4,7 +4,7 @@ import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import { createDiscountAction } from "../../growth-actions";
 
-export function DiscountForm({ currency }: { currency: string }) {
+export function DiscountForm({ currency, products }: { currency: string; products: { id: string; title: string }[] }) {
   const [state, action] = useActionState(createDiscountAction, {});
   const [kind, setKind] = useState("percent");
   const symbol = new Intl.NumberFormat("en-US", { style: "currency", currency }).formatToParts(0).find((p) => p.type === "currency")?.value ?? "";
@@ -23,15 +23,48 @@ export function DiscountForm({ currency }: { currency: string }) {
             <option value="percent">Percent off</option>
             <option value="amount">Amount off</option>
             <option value="free_shipping">Free shipping</option>
+            <option value="bxgy">Buy X, get Y</option>
           </select>
         </div>
-        {kind !== "free_shipping" && (
+        {kind !== "free_shipping" && kind !== "bxgy" && (
           <div className="field">
             <label className="label" htmlFor="value">{kind === "percent" ? "Percent" : `Amount (${symbol})`}</label>
             <input className="input num" id="value" name="value" required inputMode="decimal" placeholder={kind === "percent" ? "10" : "5.00"} />
           </div>
         )}
       </div>
+      {kind === "bxgy" && (
+        <div className="flex flex-col gap-3 border-l-2 border-border pl-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="field">
+              <label className="label" htmlFor="buyQty">Buyer buys</label>
+              <input className="input num" id="buyQty" name="buyQty" required inputMode="numeric" defaultValue="2" />
+            </div>
+            <div className="field">
+              <label className="label" htmlFor="getQty">Buyer gets</label>
+              <input className="input num" id="getQty" name="getQty" required inputMode="numeric" defaultValue="1" />
+            </div>
+            <div className="field">
+              <label className="label" htmlFor="getPercent">Percent off what they get</label>
+              <input className="input num" id="getPercent" name="value" required inputMode="numeric" defaultValue="100" />
+              <span className="hint">100 makes them free. The cheapest items in the cart are the ones discounted.</span>
+            </div>
+          </div>
+          {products.length > 0 && (
+            <fieldset className="flex flex-col gap-1">
+              <legend className="label mb-1">Products it counts (none ticked means all)</legend>
+              <div className="max-h-40 overflow-y-auto flex flex-col gap-1 text-sm">
+                {products.map((p) => (
+                  <label key={p.id} className="flex items-center gap-2"><input type="checkbox" name="productIds" value={p.id} /> {p.title}</label>
+                ))}
+              </div>
+            </fieldset>
+          )}
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="automatic" defaultChecked /> Apply it automatically, no code needed. Product pages show the offer.
+          </label>
+        </div>
+      )}
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="field">
           <label className="label" htmlFor="minSubtotal">Minimum order ({symbol})</label>
@@ -55,7 +88,7 @@ export function DiscountForm({ currency }: { currency: string }) {
           <input type="checkbox" name="oncePerCustomer" /> Once per buyer
         </label>
       </div>
-      <div><SubmitButton pendingText="Creating…">Create code</SubmitButton></div>
+      <div><SubmitButton pendingText="Creating…">{kind === "bxgy" ? "Create offer" : "Create code"}</SubmitButton></div>
     </form>
   );
 }

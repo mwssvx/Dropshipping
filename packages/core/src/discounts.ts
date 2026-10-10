@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
@@ -16,8 +16,12 @@ const discountInput = z
       .trim()
       .toUpperCase()
       .regex(/^[A-Z0-9_-]{3,30}$/, "Codes are 3 to 30 letters, numbers, dashes or underscores."),
-    kind: z.enum(["percent", "amount", "free_shipping"]),
+    kind: z.enum(["percent", "amount", "free_shipping", "bxgy"]),
     value: z.number().int().min(0).default(0),
+    buyQty: z.number().int().nullish(),
+    getQty: z.number().int().nullish(),
+    productIds: z.array(z.string().uuid()).max(100, "Pick up to 100 products.").default([]),
+    automatic: z.boolean().default(false),
     minSubtotalMinor: z.number().int().min(0).default(0),
     usageLimit: z.number().int().min(1, "The limit must be at least 1.").nullish(),
     oncePerCustomer: z.boolean().default(false),
@@ -27,6 +31,12 @@ const discountInput = z
   .superRefine((d, ctx) => {
     if (d.kind === "percent" && (d.value < 1 || d.value > 100)) ctx.addIssue({ code: "custom", message: "A percentage is between 1 and 100." });
     if (d.kind === "amount" && d.value < 1) ctx.addIssue({ code: "custom", message: "Enter the amount to take off." });
+    if (d.kind === "bxgy") {
+      if (!d.buyQty || d.buyQty < 1 || d.buyQty > 20) ctx.addIssue({ code: "custom", message: "Say how many they buy, from 1 to 20." });
+      if (!d.getQty || d.getQty < 1 || d.getQty > 20) ctx.addIssue({ code: "custom", message: "Say how many they get, from 1 to 20." });
+      if (d.value < 1 || d.value > 100) ctx.addIssue({ code: "custom", message: "The items they get are 1 to 100% off (100 is free)." });
+    }
+    if (d.automatic && d.kind !== "bxgy") ctx.addIssue({ code: "custom", message: "Only buy X get Y offers can apply without a code." });
     if (d.startsAt && d.endsAt && d.endsAt <= d.startsAt) ctx.addIssue({ code: "custom", message: "The end date must be after the start date." });
   });
 
@@ -38,9 +48,26 @@ export async function createDiscount(db: Db, shopId: string, input: DiscountInpu
   const d = parsed.data;
   const existing = await db.query.discounts.findFirst({ where: and(eq(schema.discounts.shopId, shopId), eq(schema.discounts.code, d.code)) });
   if (existing) throw new UserError(`You already have a code called ${d.code}.`);
+  const bxgy = d.kind === "bxgy";
+  const productIds = bxgy ? [...new Set(d.productIds)] : [];
+  if (productIds.length) {
+    const found = await db.query.products.findMany({ where: and(eq(schema.products.shopId, shopId), inArray(schema.products.id, productIds)), columns: { id: true } });
+    if (found.length !== productIds.length) throw new NotFoundError("Product");
+  }
   const [row] = await db
     .insert(schema.discounts)
-    .values({ ...d, value: d.kind === "free_shipping" ? 0 : d.value, usageLimit: d.usageLimit ?? null, startsAt: d.startsAt ?? null, endsAt: d.endsAt ?? null, shopId })
+    .values({
+      ...d,
+      value: d.kind === "free_shipping" ? 0 : d.value,
+      buyQty: bxgy ? d.buyQty! : null,
+      getQty: bxgy ? d.getQty! : null,
+      productIds,
+      automatic: bxgy && d.automatic,
+      usageLimit: d.usageLimit ?? null,
+      startsAt: d.startsAt ?? null,
+      endsAt: d.endsAt ?? null,
+      shopId,
+    })
     .returning();
   return row!;
 }
@@ -71,9 +98,65 @@ export async function setDiscountActive(db: Db, shopId: string, id: string, acti
   return row;
 }
 
-export function describeDiscount(d: Pick<Discount, "kind" | "value" | "minSubtotalMinor">, currency: string) {
+type Describable = Pick<Discount, "kind" | "value" | "minSubtotalMinor"> & Partial<Pick<Discount, "buyQty" | "getQty" | "productIds">>;
+
+export function describeDiscount(d: Describable, currency: string) {
+  if (d.kind === "bxgy") {
+    const what = `Buy ${d.buyQty}, get ${d.getQty} ${d.value >= 100 ? "free" : `${d.value}% off`}`;
+    return [what, d.productIds?.length ? "on selected products" : null, d.minSubtotalMinor ? `on orders over ${formatMoney(d.minSubtotalMinor, currency)}` : null].filter(Boolean).join(" ");
+  }
   const what = d.kind === "percent" ? `${d.value}% off` : d.kind === "amount" ? `${formatMoney(d.value, currency)} off` : "Free shipping";
   return d.minSubtotalMinor ? `${what} orders over ${formatMoney(d.minSubtotalMinor, currency)}` : what;
+}
+
+/* Buy X get Y */
+
+export type OfferUnit = { productId: string; unitMinor: number; quantity: number };
+type Bxgy = Pick<Discount, "value" | "buyQty" | "getQty" | "productIds">;
+
+const eligible = (d: Bxgy, units: OfferUnit[]) =>
+  units.filter((u) => !d.productIds.length || d.productIds.includes(u.productId)).flatMap((u) => Array<number>(u.quantity).fill(u.unitMinor));
+
+/**
+ * What buy X get Y takes off: for every X items bought, the next Y are discounted, and the ones
+ * discounted are always the cheapest in the cart. Rounds down, like percent codes.
+ */
+export function bxgyDiscount(d: Bxgy, units: OfferUnit[]) {
+  const prices = eligible(d, units).sort((a, b) => b - a);
+  const group = d.buyQty! + d.getQty!;
+  const given = Math.floor(prices.length / group) * d.getQty!;
+  const value = prices.slice(prices.length - given).reduce((s, p) => s + p, 0);
+  return given ? Math.floor((value * d.value) / 100) : 0;
+}
+
+/** How many more items would be discounted right away, when the cart is one step from it. */
+export function bxgyMissing(d: Bxgy, units: OfferUnit[]) {
+  const n = eligible(d, units).length;
+  const group = d.buyQty! + d.getQty!;
+  const r = n % group;
+  return r >= d.buyQty! ? group - r : 0;
+}
+
+/** Buy X get Y offers that apply without a code, running now. */
+export async function automaticOffers(db: Db, shopId: string, now = new Date()) {
+  const t = schema.discounts;
+  return db.query.discounts.findMany({
+    where: and(
+      eq(t.shopId, shopId),
+      eq(t.automatic, true),
+      eq(t.active, true),
+      eq(t.source, "merchant"),
+      or(isNull(t.startsAt), lte(t.startsAt, now)),
+      or(isNull(t.endsAt), gt(t.endsAt, now)),
+    ),
+    orderBy: desc(t.createdAt),
+  });
+}
+
+/** The automatic offers a product page should mention. */
+export async function productOffers(db: Db, shop: Shop, productId: string, now = new Date()) {
+  const offers = await automaticOffers(db, shop.id, now);
+  return offers.filter((d) => !d.productIds.length || d.productIds.includes(productId)).map((d) => describeDiscount({ ...d, productIds: [] }, shop.currency));
 }
 
 /**
@@ -105,8 +188,9 @@ export async function findUsableDiscount(db: Db, shop: Shop, code: string, cart:
 }
 
 /** What a discount takes off. Percentages round down so the buyer never pays less than shown. */
-export function applyDiscount(d: Pick<Discount, "kind" | "value">, subtotalMinor: number, shippingMinor: number) {
+export function applyDiscount(d: Pick<Discount, "kind" | "value"> & Partial<Bxgy>, subtotalMinor: number, shippingMinor: number, units: OfferUnit[] = []) {
   if (d.kind === "free_shipping") return { discountMinor: 0, shippingMinor: 0 };
+  if (d.kind === "bxgy") return { discountMinor: Math.min(subtotalMinor, bxgyDiscount({ value: d.value, buyQty: d.buyQty ?? 1, getQty: d.getQty ?? 1, productIds: d.productIds ?? [] }, units)), shippingMinor };
   const off = d.kind === "percent" ? Math.floor((subtotalMinor * d.value) / 100) : Math.min(d.value, subtotalMinor);
   return { discountMinor: off, shippingMinor };
 }

@@ -842,9 +842,17 @@ export const discounts = pgTable(
     id: id(),
     shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
     code: text("code").notNull(),
-    kind: text("kind", { enum: ["percent", "amount", "free_shipping"] }).notNull(),
-    // Percent (1 to 100) or an amount in minor units. Unused for free shipping.
+    kind: text("kind", { enum: ["percent", "amount", "free_shipping", "bxgy"] }).notNull(),
+    // Percent (1 to 100) or an amount in minor units. Unused for free shipping. For buy X get Y,
+    // the percent off the items given (100 is free).
     value: integer("value").notNull().default(0),
+    // Buy X get Y: for every buyQty items bought, the next getQty (the cheapest) are discounted.
+    buyQty: integer("buy_qty"),
+    getQty: integer("get_qty"),
+    // Which products count, for buy X get Y. Empty means every product.
+    productIds: jsonb("product_ids").$type<string[]>().notNull().default([]),
+    // Applied to every cart without typing the code (buy X get Y only).
+    automatic: boolean("automatic").notNull().default(false),
     minSubtotalMinor: money("min_subtotal_minor").notNull().default(0),
     // How many paid orders may use it in total; null means no limit.
     usageLimit: integer("usage_limit"),

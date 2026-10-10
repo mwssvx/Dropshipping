@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, getActiveProductByHandle, NotFoundError, optionDefsOf, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, sizeChartForProduct, sizeChartRows, upsellsFor, wholesaleTermsFor } from "@sf/core";
+import { bundlesForProduct, getActiveProductByHandle, productOffers, NotFoundError, optionDefsOf, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, sizeChartForProduct, sizeChartRows, upsellsFor, wholesaleTermsFor } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { RecentlyViewed } from "@/components/RecentlyViewed";
 import { RememberView } from "@/components/RememberView";
@@ -107,6 +107,8 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const soldOut = product.variants.filter((x) => x.stock !== null && x.stock <= 0);
   const isSaved = (await savedIds(shop.id)).includes(product.id);
   const tiers = wholesale ? [] : product.quantityBreaks;
+  // Buy X get Y offers that apply on their own; wholesale buyers have their own prices.
+  const offers = wholesale ? [] : await productOffers(await db(), shop, product.id);
   // Wholesale buyers have their own prices, so bundles aren't offered to them.
   const bundles = wholesale ? [] : await bundlesForProduct(await db(), shop.id, product.id);
   const bundleTitles = new Map((await localProducts(shopHandle, bundles.flatMap((b) => b.products))).map((p) => [p.id, p.title]));
@@ -125,6 +127,11 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           </a>
         )}
         {v && <div className="text-xl"><Price minor={v.priceMinor} compareAt={v.compareAtMinor} currency={shop.currency} fx={fx} /></div>}
+        {offers.length > 0 && (
+          <ul className="flex flex-wrap gap-2" aria-label="Offers">
+            {offers.map((o) => <li key={o} className="pill pill-success">{o}</li>)}
+          </ul>
+        )}
         {product.sale && (
           <p className="text-sm font-semibold text-success" role="status">
             {t.saleNote(product.sale.percentOff, product.sale.endsAt ? new Intl.DateTimeFormat((await storeLang(shopHandle)) ?? "en-US", { month: "long", day: "numeric", timeZone: "UTC" }).format(product.sale.endsAt) : null)}
