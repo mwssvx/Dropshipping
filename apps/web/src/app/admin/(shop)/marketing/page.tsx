@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { abandonedCartStats, describeDiscount, formatMoney, listDiscounts, listProducts, POST_PURCHASE_MINUTES, postPurchaseStats, referralStats, welcomeOfferStats } from "@sf/core";
+import { abandonedCartStats, describeDiscount, formatMoney, listDiscounts, listProducts, POST_PURCHASE_MINUTES, postPurchaseStats, referralStats, SUBSCRIBE_WITHIN_DAYS, subscriptionStats, welcomeOfferStats } from "@sf/core";
 import { requireShop, testPayments } from "@/lib/server";
 import { sendRemindersNowAction, setDiscountActiveAction, setRemindersAction } from "../../growth-actions";
 import { PageHeader } from "../PageHeader";
@@ -7,6 +7,7 @@ import { DiscountForm } from "./DiscountForm";
 import { WelcomeOfferForm } from "./WelcomeOfferForm";
 import { ReferralForm } from "./ReferralForm";
 import { PostPurchaseForm } from "./PostPurchaseForm";
+import { SubscriptionOfferForm } from "./SubscriptionOfferForm";
 
 export const metadata = { title: "Marketing" };
 
@@ -15,13 +16,14 @@ const date = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "
 
 export default async function MarketingPage() {
   const { shop, db } = await requireShop("marketing");
-  const [discounts, stats, welcome, referrals, products, afterCheckout] = await Promise.all([
+  const [discounts, stats, welcome, referrals, products, afterCheckout, subs] = await Promise.all([
     listDiscounts(db, shop.id),
     abandonedCartStats(db, shop.id, new Date(Date.now() - 30 * DAY)),
     welcomeOfferStats(db, shop.id),
     referralStats(db, shop.id),
     listProducts(db, shop.id),
     postPurchaseStats(db, shop.id),
+    subscriptionStats(db, shop.id),
   ]);
   const money = (m: number) => formatMoney(m, shop.currency);
   const now = new Date();
@@ -107,6 +109,23 @@ export default async function MarketingPage() {
             <div><dt className="hint">Times added</dt><dd className="text-lg font-semibold num">{afterCheckout.orders}</dd></div>
             <div><dt className="hint">Extra sales</dt><dd className="text-lg font-semibold num">{money(afterCheckout.revenueMinor)}</dd></div>
           </dl>
+        </section>
+
+        <section className="card p-5 flex flex-col gap-3" aria-labelledby="subscribe-heading">
+          <h2 id="subscribe-heading" className="font-semibold">Subscribe and save</h2>
+          <p className="text-sm">
+            For {SUBSCRIBE_WITHIN_DAYS} days after paying, the buyer&apos;s order page offers to send the same items again every 2 weeks,
+            month or 2 months, for less. Each delivery is its own order, charged to the card they paid with and sent to the supplier.
+            Buyers get an email 3 days before each charge and can skip, change, pause or cancel from a link. A card that fails three
+            times pauses the subscription and tells the buyer.
+          </p>
+          <SubscriptionOfferForm offer={shop.subscriptionOffer} />
+          <dl className="grid grid-cols-3 gap-3 border-t border-border pt-3 text-sm">
+            <div><dt className="hint">Active</dt><dd className="text-lg font-semibold num">{subs.active}</dd></div>
+            <div><dt className="hint">Repeat deliveries</dt><dd className="text-lg font-semibold num">{subs.orders}</dd></div>
+            <div><dt className="hint">Repeat sales</dt><dd className="text-lg font-semibold num">{money(subs.salesMinor)}</dd></div>
+          </dl>
+          <Link href="/admin/subscriptions" className="text-sm underline self-start">See all subscriptions</Link>
         </section>
 
         <section className="card p-5 flex flex-col gap-3" aria-labelledby="refer-heading">

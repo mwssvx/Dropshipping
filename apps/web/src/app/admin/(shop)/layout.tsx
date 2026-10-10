@@ -49,6 +49,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           {show("assistant") && <NavLink href="/admin/assistant">Assistant{approvals ? <span className="ml-2 pill pill-warning">{approvals}</span> : null}</NavLink>}
           {show("orders") && <NavLink href="/admin/orders">Orders</NavLink>}
           {show("returns") && <NavLink href="/admin/returns">Returns{returns ? <span className="ml-2 pill pill-warning">{returns}</span> : null}</NavLink>}
+          {show("orders") && <NavLink href="/admin/subscriptions">Subscriptions</NavLink>}
           {show("customers") && <NavLink href="/admin/customers">Customers</NavLink>}
           {show("inbox") && <NavLink href="/admin/inbox">Inbox{inbox ? <span className="ml-2 pill pill-warning">{inbox}</span> : null}</NavLink>}
           {show("money") && <NavLink href="/admin/money">Money{holds ? <span className="ml-2 pill pill-critical">{holds}</span> : null}</NavLink>}

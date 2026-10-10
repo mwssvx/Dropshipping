@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { buyerAmounts, buyerThread, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems } from "@sf/core";
+import { buyerAmounts, buyerThread, formatDeliveryDate, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems } from "@sf/core";
 import Link from "next/link";
 import { db, fulfillment, storeAddress } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
@@ -10,14 +10,16 @@ import { ReviewForm } from "./ReviewForm";
 import { QuestionForm } from "./QuestionForm";
 import { ReturnForm } from "./ReturnForm";
 import { PostPurchaseOffer } from "./PostPurchaseOffer";
+import { SubscribeOffer } from "./SubscribeOffer";
 
 const time = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const utc = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC" });
 
 export const metadata = { title: "Order status", robots: { index: false } };
 
-export default async function OrderStatusPage({ params }: { params: Promise<{ shop: string; ref: string }> }) {
+export default async function OrderStatusPage({ params, searchParams }: { params: Promise<{ shop: string; ref: string }>; searchParams: Promise<{ subscribed?: string }> }) {
   const { shop: handle, ref } = await params;
+  const { subscribed: justSubscribed } = await searchParams;
   const shop = await loadShop(handle);
   const order = await getOrderByPaymentIntent(await db(), shop.id, ref).catch((e) => {
     if (e instanceof NotFoundError) notFound();
@@ -48,6 +50,10 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
   const replacing = order.source === "replacement";
   const replaces = order.replacesOrderId ? await (await db()).query.orders.findFirst({ where: (o, { eq }) => eq(o.id, order.replacesOrderId!), columns: { number: true, paymentIntentId: true } }) : null;
   const replacements = paid ? await replacementsOf(await db(), order.id) : [];
+  // Subscribe and save: the offer, the subscription started from this order, or the one that placed it.
+  const subOffer = paid ? await subscriptionOfferFor(await db(), shop, order) : null;
+  const subscription = paid ? await subscriptionForOrder(await db(), order.id) : null;
+  const partOf = order.subscriptionId ? await (await db()).query.subscriptions.findFirst({ where: (s, { eq }) => eq(s.id, order.subscriptionId!), columns: { token: true, status: true } }) : null;
   const steps = [
     { label: "Order confirmed", done: paid },
     { label: "Being prepared", done: order.fulfillments.some((f) => f.placedAt || f.shippedAt) },
@@ -74,6 +80,25 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
         <PostPurchaseOffer handle={handle} orderRef={ref} title={offer.product.title} imageUrl={offer.product.imageUrl} percentOff={offer.percentOff}
           until={`${utc.format(offer.expiresAt)} UTC`}
           options={offer.variants.map((v) => ({ id: v.id, title: v.title, price: formatMoney(v.priceMinor, shop.currency), offer: formatMoney(v.offerMinor, shop.currency), charge: formatMoney(v.chargeMinor, shop.currency) }))} />
+      )}
+      {subOffer && (
+        <SubscribeOffer handle={handle} orderRef={ref} percentOff={subOffer.percentOff} each={formatMoney(subOffer.eachMinor, shop.currency)}
+          intervals={subOffer.intervals.map((i) => ({ days: i.days, label: i.label }))}
+          items={subOffer.items.map((i) => ({ title: i.title, quantity: i.quantity, price: formatMoney(i.priceMinor, shop.currency), offer: formatMoney(i.offerMinor, shop.currency) }))} />
+      )}
+      {subscription && subscription.status !== "cancelled" && (
+        <p className="banner banner-success" role="status">
+          {justSubscribed ? "You're subscribed. " : ""}
+          {subscription.status === "active"
+            ? `${intervalLabel(subscription.intervalDays)} we'll send this again for ${subscription.percentOff}% less. Next delivery: ${formatDeliveryDate(subscription.nextOrderAt)}. `
+            : "Your subscription from this order is paused. "}
+          <Link href={`${base}/subscriptions/${subscription.token}`} className="underline">Manage subscription</Link>
+        </p>
+      )}
+      {partOf && (
+        <p className="banner banner-info">
+          A delivery from your subscription, charged to your saved card. <Link href={`${base}/subscriptions/${partOf.token}`} className="underline">Manage subscription</Link>
+        </p>
       )}
       {added && (
         <p className="banner banner-success" role="status">

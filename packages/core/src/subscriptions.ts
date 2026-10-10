@@ -356,6 +356,10 @@ export async function renewSubscription(ctx: SubscriptionContext, subscriptionId
   }
   await db.update(schema.subscriptions).set({ failures: 0, lastError: null }).where(eq(schema.subscriptions.id, sub.id));
   await onOrderPaid(ctx, order.id);
+  if (order.taxCalculationId && ctx.taxCalculator) {
+    // So the tax service files it; a failure here mustn't undo a paid order.
+    await ctx.taxCalculator.record(order.taxCalculationId, order.id).catch((e) => console.error(`Recording tax for order ${order!.id} failed.`, e));
+  }
   return { status: "ordered" as const, order: (await db.query.orders.findFirst({ where: eq(schema.orders.id, order.id) }))! };
 }
 
