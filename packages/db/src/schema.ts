@@ -55,6 +55,9 @@ export const sessions = pgTable(
 /** A personal one-time code emailed to each new signup. Null on the shop means it's off. */
 export type WelcomeOffer = { percentOff: number; minSubtotalMinor: number; days: number };
 
+/** One product offered on the order page right after paying, added with one click to the same card. */
+export type PostPurchaseOffer = { productId: string; percentOff: number; active: boolean };
+
 /** The risk check run when an order is paid. Reasons are written for the merchant. */
 export type OrderRisk = { level: "low" | "medium" | "high"; score: number; reasons: string[]; checkedAt: string };
 /**
@@ -145,6 +148,7 @@ export const shops = pgTable(
     invoiceFooter: text("invoice_footer"),
     welcomeOffer: jsonb("welcome_offer").$type<WelcomeOffer>(),
     holdRiskyOrders: text("hold_risky_orders", { enum: ["off", "medium", "high"] }).notNull().default("high"),
+    postPurchaseOffer: jsonb("post_purchase_offer").$type<PostPurchaseOffer>(),
     referralProgram: jsonb("referral_program").$type<ReferralProgram>(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -373,7 +377,11 @@ export const orders = pgTable(
     paymentIntentId: text("payment_intent_id").unique(),
     // "payment_link": the merchant built the order (for a buyer who asked by message or phone)
     // and emailed a link to pay. Their note to the buyer shows in the email and on the pay page.
-    source: text("source", { enum: ["checkout", "payment_link"] }).notNull().default("checkout"),
+    // "post_purchase": added from the order page right after paying, charged to the same card.
+    source: text("source", { enum: ["checkout", "payment_link", "post_purchase"] }).notNull().default("checkout"),
+    parentOrderId: uuid("parent_order_id").references((): AnyPgColumn => orders.id, { onDelete: "set null" }),
+    // The buyer's card was kept with the payment provider at checkout, for an after-checkout offer.
+    cardSaved: boolean("card_saved").notNull().default(false),
     note: text("note"),
     // Our sales fee (free plan only) and the estimated card processing fee, fixed at checkout.
     platformFeeMinor: money("platform_fee_minor").notNull().default(0),
@@ -414,6 +422,8 @@ export const orders = pgTable(
   },
   (t) => [
     uniqueIndex("orders_shop_number_uq").on(t.shopId, t.number),
+    // One after-checkout order per order, so a double click can't charge twice.
+    uniqueIndex("orders_parent_uq").on(t.parentOrderId),
     index("orders_shop_created_idx").on(t.shopId, t.createdAt),
     check(
       "orders_total_matches",

@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { abandonedCartStats, describeDiscount, formatMoney, listDiscounts, listProducts, referralStats, welcomeOfferStats } from "@sf/core";
+import { abandonedCartStats, describeDiscount, formatMoney, listDiscounts, listProducts, POST_PURCHASE_MINUTES, postPurchaseStats, referralStats, welcomeOfferStats } from "@sf/core";
 import { requireShop, testPayments } from "@/lib/server";
 import { sendRemindersNowAction, setDiscountActiveAction, setRemindersAction } from "../../growth-actions";
 import { PageHeader } from "../PageHeader";
 import { DiscountForm } from "./DiscountForm";
 import { WelcomeOfferForm } from "./WelcomeOfferForm";
 import { ReferralForm } from "./ReferralForm";
+import { PostPurchaseForm } from "./PostPurchaseForm";
 
 export const metadata = { title: "Marketing" };
 
@@ -14,12 +15,13 @@ const date = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "
 
 export default async function MarketingPage() {
   const { shop, db } = await requireShop("marketing");
-  const [discounts, stats, welcome, referrals, products] = await Promise.all([
+  const [discounts, stats, welcome, referrals, products, afterCheckout] = await Promise.all([
     listDiscounts(db, shop.id),
     abandonedCartStats(db, shop.id, new Date(Date.now() - 30 * DAY)),
     welcomeOfferStats(db, shop.id),
     referralStats(db, shop.id),
     listProducts(db, shop.id),
+    postPurchaseStats(db, shop.id),
   ]);
   const money = (m: number) => formatMoney(m, shop.currency);
   const now = new Date();
@@ -91,6 +93,19 @@ export default async function MarketingPage() {
             <div><dt className="hint">Codes sent</dt><dd className="text-lg font-semibold num">{welcome.sent}</dd></div>
             <div><dt className="hint">Used</dt><dd className="text-lg font-semibold num">{welcome.used}</dd></div>
             <div><dt className="hint">Sales</dt><dd className="text-lg font-semibold num">{money(welcome.salesMinor)}</dd></div>
+          </dl>
+        </section>
+
+        <section className="card p-5 flex flex-col gap-3" aria-labelledby="after-checkout-heading">
+          <h2 id="after-checkout-heading" className="font-semibold">After-checkout offer</h2>
+          <p className="text-sm">
+            For {POST_PURCHASE_MINUTES} minutes after paying, the buyer&apos;s order page offers one more product at a discount. One click adds
+            it to the card they just used, with no shipping charge, as its own order sent to the supplier.
+          </p>
+          <PostPurchaseForm offer={shop.postPurchaseOffer} products={products.filter((p) => p.status === "active" && !p.giftCard).map((p) => ({ id: p.id, title: p.title }))} />
+          <dl className="grid grid-cols-2 gap-3 border-t border-border pt-3 text-sm">
+            <div><dt className="hint">Times added</dt><dd className="text-lg font-semibold num">{afterCheckout.orders}</dd></div>
+            <div><dt className="hint">Extra sales</dt><dd className="text-lg font-semibold num">{money(afterCheckout.revenueMinor)}</dd></div>
           </dl>
         </section>
 

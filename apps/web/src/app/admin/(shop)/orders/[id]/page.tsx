@@ -29,6 +29,11 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
   const knownCost = order.lines.every((l) => l.unitCostMinor != null);
   const a = order.shippingAddress;
   const edit = ["paid"].includes(order.paymentStatus) && can(role, "orders") ? await orderEditOptions(await fulfillment(), shop.id, order.id, "merchant") : null;
+  // Linked orders: the one this was added to after checkout, or the one added to this.
+  const [parent, child] = await Promise.all([
+    order.parentOrderId ? db.query.orders.findFirst({ where: (o, { eq }) => eq(o.id, order.parentOrderId!), columns: { id: true, number: true } }) : undefined,
+    db.query.orders.findFirst({ where: (o, { eq }) => eq(o.parentOrderId, order.id), columns: { id: true, number: true, paymentStatus: true } }),
+  ]);
   const [links, refunds, giftCard, returns, documents] = await Promise.all([
     listSupplierLinks(db, shop.id),
     listRefunds(db, order.id),
@@ -76,7 +81,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
   return (
     <main className="pb-12">
       <PageHeader title={`Order #${order.number}`} back={<Link href="/admin/orders" className="hint hover:text-ink">← Orders</Link>}
-        actions={<div className="flex gap-2 items-center">{order.wholesale && <span className="pill pill-info">Wholesale order</span>}{order.source === "payment_link" && <span className="pill pill-info">Payment link</span>}<PaymentStatus value={order.paymentStatus} />{held ? <span className="pill pill-warning">On hold</span> : <FulfilmentStatus value={order.fulfillmentStatus} />}</div>} />
+        actions={<div className="flex gap-2 items-center">{order.wholesale && <span className="pill pill-info">Wholesale order</span>}{order.source === "payment_link" && <span className="pill pill-info">Payment link</span>}{order.source === "post_purchase" && <span className="pill pill-info">Added after checkout</span>}<PaymentStatus value={order.paymentStatus} />{held ? <span className="pill pill-warning">On hold</span> : <FulfilmentStatus value={order.fulfillmentStatus} />}</div>} />
       <div className="px-4 sm:px-8 grid gap-6 lg:grid-cols-[1fr_320px] items-start">
         <div className="flex flex-col gap-6 min-w-0">
           {order.source === "payment_link" && (order.paymentStatus === "pending" || order.paymentStatus === "failed") && (
@@ -241,6 +246,12 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
               {order.gift.message && <p className="whitespace-pre-line border-l-2 border-border pl-3 mt-1">{order.gift.message}</p>}
               <p className="hint mt-1">{order.gift.recipientEmail ? `We email ${order.gift.recipientEmail} when it ships, without prices.` : "No recipient email, so only the buyer hears from us."}</p>
             </section>
+          )}
+          {parent && (
+            <p>Added after checkout to <Link href={`/admin/orders/${parent.id}`} className="underline">order #{parent.number}</Link>, on the same card.</p>
+          )}
+          {child && child.paymentStatus !== "pending" && (
+            <p>The buyer added <Link href={`/admin/orders/${child.id}`} className="underline">order #{child.number}</Link> after checkout.</p>
           )}
           {order.buyerNote && (
             <section aria-labelledby="buyer-note-heading">

@@ -1,4 +1,5 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { UserError } from "../errors";
 import type { PaymentEvent, PaymentProvider, PayoutAccountStatus } from "./provider";
 
 /**
@@ -13,6 +14,17 @@ export class FakePaymentProvider implements PaymentProvider {
   async createPaymentIntent() {
     const id = `fake_pi_${randomUUID()}`;
     return { id, clientSecret: `${id}_secret` };
+  }
+
+  /** Tests set this to have the next saved-card charge declined. */
+  declineNextCharge = false;
+
+  async chargeSavedCard() {
+    if (this.declineNextCharge) {
+      this.declineNextCharge = false;
+      throw new UserError("Your card was declined: insufficient funds.", "card_declined");
+    }
+    return { id: `fake_pi_${randomUUID()}` };
   }
 
   async clientSecret(paymentIntentId: string) {

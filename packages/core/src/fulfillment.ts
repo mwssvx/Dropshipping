@@ -557,6 +557,7 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
   }
   if (kind === "order_confirmation") {
     const lines = await ctx.db.query.orderLines.findMany({ where: eq(schema.orderLines.orderId, order.id) });
+    const parentNumber = order.parentOrderId ? (await ctx.db.query.orders.findFirst({ where: eq(schema.orders.id, order.parentOrderId), columns: { number: true } }))?.number : null;
     const invoice = await ctx.db.query.invoices.findFirst({ where: and(eq(schema.invoices.orderId, order.id), eq(schema.invoices.kind, "invoice")) });
     const paid = buyerAmounts(order, lines);
     return {
@@ -581,6 +582,7 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
             ]
           : []),
         ...(order.buyerNote ? [``, `Your note to ${shop.name}: ${order.buyerNote}`] : []),
+        ...(order.parentOrderId ? [``, `You added this after checkout, so it's charged to the same card. It may arrive separately from order #${parentNumber}.`] : []),
         ``,
         `We'll email you again when it ships. Track your order any time: ${link}`,
       ].join("\n"),
