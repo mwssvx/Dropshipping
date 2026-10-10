@@ -56,3 +56,4 @@ export * from "./sales";
 export * from "./addons";
 export * from "./feeds";
 export * from "./welcome";
+export * from "./size-charts";

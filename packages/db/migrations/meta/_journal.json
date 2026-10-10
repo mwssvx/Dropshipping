@@ -260,6 +260,13 @@
       "when": 1791617223649,
       "tag": "0036_m39_welcome",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1791618274420,
+      "tag": "0037_m40_size_charts",
+      "breakpoints": true
     }
   ]
 }

@@ -105,7 +105,30 @@ If the data doesn't answer the question (materials, measurements, plugs, certifi
 Your final text is for the merchant: one sentence on what you drafted.
 ${RULES}`,
   },
+  sizer: {
+    agent: "sizer",
+    effort: "low",
+    maxTokens: 4096,
+    system: (shop) => `You draft size charts for products in ${shop.name}, an online store. The merchant checks your draft before buyers see it.
+Call read_product_sizes, then save_size_chart_draft once, then tell the merchant in one sentence what you drafted and what to check.
+Make one row per size the product comes in, in order from smallest to largest, with the size name in the first column. Take measurements only from the description: never invent or estimate them. Supplier descriptions often give sizes in a list or a run-on line ("S: Bust 86cm Length 62cm"); turn them into columns like Chest, Waist, Length. If the description has no measurements for a size, leave its cells empty and start the note with "[Check: ", what to ask the supplier, then "]".
+Use the unit the description uses (cm when it doesn't say). Add a short "How to measure" line to the note when it helps.
+${RULES}`,
+  },
 } satisfies Record<string, AgentSpec>;
+
+/** Ask the size chart drafter for a chart from a product's description. Returns the hidden draft's id, or null. */
+export async function draftSizeChartWithAi(ctx: AgentContext, shop: Shop, productId: string) {
+  const product = /^[0-9a-f-]{36}$/i.test(productId) ? await ctx.db.query.products.findFirst({ where: and(eq(schema.products.id, productId), eq(schema.products.shopId, shop.id)) }) : undefined;
+  if (!product) throw new NotFoundError("Product");
+  const run = await runAgent(ctx, AGENT_SPECS.sizer, shop, {
+    trigger: "merchant",
+    productId,
+    messages: [{ role: "user", content: `Draft a size chart for product ${productId}. Today is ${today()}.` }],
+  });
+  const saved = run.actions.find((a) => a.tool === "save_size_chart_draft" && a.status === "done");
+  return { ...run, chartId: ((saved?.result as { chart_id?: string } | null)?.chart_id ?? null) as string | null };
+}
 
 /** Ask the answerer for a suggested answer to a shopper's question. Returns the draft, or null. */
 export async function draftAnswerWithAi(ctx: AgentContext, shop: Shop, questionId: string) {

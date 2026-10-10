@@ -656,7 +656,7 @@ export const appeals = pgTable(
 
 // AI agents. Every run is recorded with its token use and cost, and every tool call it makes is an
 // agent action: reads run straight away, changes may wait for the merchant's approval.
-export const AGENTS = ["listing", "assistant", "buyer_support", "fulfilment", "margin", "writer", "translator", "answerer"] as const;
+export const AGENTS = ["listing", "assistant", "buyer_support", "fulfilment", "margin", "writer", "translator", "answerer", "sizer"] as const;
 export type AgentName = (typeof AGENTS)[number];
 
 export const agentRuns = pgTable(
@@ -1372,4 +1372,28 @@ export const productQuestions = pgTable(
     index("product_questions_product_idx").on(t.productId, t.status),
     check("product_questions_answered", sql`${t.status} = 'waiting' or ${t.answer} is not null`),
   ],
+);
+
+// Size charts: a table of measurements per size ("M: chest 96-101 cm"), made once and shown on the
+// product pages it's attached to, directly or through a collection. Charts the AI drafts start
+// hidden until the merchant checks them.
+export const sizeCharts = pgTable(
+  "size_charts",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    unit: text("unit", { enum: ["cm", "in"] }).notNull().default("cm"),
+    /** Column headings; the first column is the size name. */
+    columns: jsonb("columns").$type<string[]>().notNull(),
+    rows: jsonb("rows").$type<string[][]>().notNull(),
+    /** How to measure, or anything else shown under the table. */
+    note: text("note"),
+    productIds: jsonb("product_ids").$type<string[]>().notNull().default([]),
+    collectionIds: jsonb("collection_ids").$type<string[]>().notNull().default([]),
+    published: boolean("published").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("size_charts_shop_idx").on(t.shopId)],
 );

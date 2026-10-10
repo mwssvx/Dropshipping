@@ -13,6 +13,7 @@ import { parseTheme } from "./theme-doc";
 import { listShippingZones } from "./shipping";
 import { LANGUAGE_CODES, saveTranslation } from "./languages";
 import { createBundle, MAX_BUNDLES } from "./bundles";
+import { createSizeChart, MAX_SIZE_CHARTS } from "./size-charts";
 import { createSale, MAX_SALES } from "./sales";
 import { createAddon, MAX_ADDONS, setAddonActive } from "./addons";
 
@@ -28,7 +29,7 @@ function supplierOf(link: typeof schema.suppliers.$inferSelect | undefined, prod
 export async function exportStore(db: Db, shopId: string, now = new Date()) {
   const shop = await db.query.shops.findFirst({ where: eq(schema.shops.id, shopId) });
   if (!shop) throw new NotFoundError("Store");
-  const [products, collections, links, pages, theme, discounts, supplierRows, posts, redirectRows, translationRows, bundleRows, saleRows, addonRows] = await Promise.all([
+  const [products, collections, links, pages, theme, discounts, supplierRows, posts, redirectRows, translationRows, bundleRows, saleRows, addonRows, chartRows] = await Promise.all([
     db.query.products.findMany({ where: eq(schema.products.shopId, shopId), orderBy: asc(schema.products.createdAt) }),
     db.query.collections.findMany({ where: eq(schema.collections.shopId, shopId), orderBy: asc(schema.collections.createdAt) }),
     db
@@ -47,6 +48,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
     db.query.bundles.findMany({ where: eq(schema.bundles.shopId, shopId), orderBy: asc(schema.bundles.createdAt) }),
     db.query.sales.findMany({ where: eq(schema.sales.shopId, shopId), orderBy: asc(schema.sales.startsAt) }),
     db.query.checkoutAddons.findMany({ where: eq(schema.checkoutAddons.shopId, shopId), orderBy: asc(schema.checkoutAddons.createdAt) }),
+    db.query.sizeCharts.findMany({ where: eq(schema.sizeCharts.shopId, shopId), orderBy: asc(schema.sizeCharts.createdAt) }),
   ]);
   const variants = products.length
     ? await db.query.variants.findMany({ where: inArray(schema.variants.productId, products.map((p) => p.id)), orderBy: asc(schema.variants.position) })
@@ -146,6 +148,16 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       active: d.active,
     })),
     redirects: redirectRows.map((r) => ({ from: r.fromPath, to: r.toPath })),
+    size_charts: chartRows.map((c) => ({
+      name: c.name,
+      unit: c.unit,
+      columns: c.columns,
+      rows: c.rows,
+      note: c.note,
+      products: c.productIds.map((id) => handleOf.get(id)).filter((h): h is string => !!h),
+      collections: c.collectionIds.map((id) => handleByKind.collection.get(id)).filter((h): h is string => !!h),
+      published: c.published,
+    })),
     bundles: bundleRows.map((b) => ({ title: b.title, products: b.productIds.map((id) => handleOf.get(id)).filter((h): h is string => !!h), percent_off: b.percentOff, active: b.active })),
     checkout_addons: addonRows.flatMap((a) => {
       const product = handleOf.get(a.productId);
@@ -292,6 +304,21 @@ const importSchema = z.object({
   bundles: z
     .array(z.object({ title: str(80), products: z.array(handle).max(4), percent_off: z.number().int(), active: z.boolean().default(true) }))
     .max(MAX_BUNDLES)
+    .default([]),
+  size_charts: z
+    .array(
+      z.object({
+        name: str(60),
+        unit: z.enum(["cm", "in"]),
+        columns: z.array(z.string().max(30)).max(8),
+        rows: z.array(z.array(z.string().max(30)).max(8)).max(30),
+        note: z.string().max(500).nullable(),
+        products: z.array(handle).max(500),
+        collections: z.array(handle).max(100),
+        published: z.boolean().default(true),
+      }),
+    )
+    .max(MAX_SIZE_CHARTS)
     .default([]),
   checkout_addons: z
     .array(z.object({ product: handle, percent_off: z.number().int(), pitch: z.string().max(120).nullable(), active: z.boolean().default(true) }))
@@ -553,6 +580,23 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
         if (!(e instanceof UserError)) throw e;
       }
     }
+    // Size charts go through the same checks as the Size charts page; any that don't fit are left out.
+    let chartsAdded = 0;
+    if (data.size_charts.length) {
+      const collectionByHandle = new Map((await tx.query.collections.findMany({ where: eq(schema.collections.shopId, shopId), columns: { id: true, handle: true } })).map((x) => [x.handle, x.id]));
+      for (const c of data.size_charts) {
+        try {
+          await createSizeChart(tx as unknown as Db, shopId, {
+            ...c,
+            productIds: c.products.map((h) => productIds.get(h)!).filter(Boolean),
+            collectionIds: c.collections.map((h) => collectionByHandle.get(h)!).filter(Boolean),
+          });
+          chartsAdded++;
+        } catch (e) {
+          if (!(e instanceof UserError)) throw e;
+        }
+      }
+    }
     let addonsAdded = 0;
     for (const a of data.checkout_addons) {
       const productId = productIds.get(a.product);
@@ -613,6 +657,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
       bundles: bundlesAdded,
       sales: salesAdded,
       checkoutAddons: addonsAdded,
+      sizeCharts: chartsAdded,
       theme: !!theme,
       currencyDiffers: typeof data.store.currency === "string" && data.store.currency !== shop.currency,
     };
