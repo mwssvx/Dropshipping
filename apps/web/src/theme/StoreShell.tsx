@@ -95,11 +95,10 @@ export function StoreShell({
       <div className="flex-1">{children}</div>
       <footer className="border-t border-border">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col gap-6">
-          {menus.footer.length > 0 && (
-            <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-              {menus.footer.map((m, i) => <Link key={i} href={storeHref(base, m.href)} className="hover:text-accent">{m.label}</Link>)}
-            </nav>
-          )}
+          <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+            {menus.footer.map((m, i) => <Link key={i} href={storeHref(base, m.href)} className="hover:text-accent">{m.label}</Link>)}
+            <Link href={`${base}/track`} className="hover:text-accent">{t.trackOrder}</Link>
+          </nav>
           <div className="flex flex-wrap justify-between gap-4 hint">
             <span className="flex items-center gap-3 flex-wrap">
               © {new Date().getFullYear()} {shopName}

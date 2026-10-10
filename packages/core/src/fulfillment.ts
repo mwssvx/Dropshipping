@@ -349,6 +349,20 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
       ].join("\n"),
     };
   }
+  if (kind === "order_link") {
+    return {
+      subject: `Your order #${order.number} from ${shop.name}`,
+      text: [
+        `Hi ${first},`,
+        ``,
+        `Here's the link to your order #${order.number}, where you can see where it is, track it and ask us anything about it:`,
+        ``,
+        link,
+        ``,
+        `You asked for this on our "Track your order" page. If it wasn't you, you can ignore this email.`,
+      ].join("\n"),
+    };
+  }
   if (kind === "payment_link") {
     const lines = await ctx.db.query.orderLines.findMany({ where: eq(schema.orderLines.orderId, order.id) });
     const paid = buyerAmounts(order, lines);

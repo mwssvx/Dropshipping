@@ -3,9 +3,9 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { amountToCharge, askQuestion, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
+import { amountToCharge, askQuestion, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
-import { agents, campaigns, db, payments, tax } from "@/lib/server";
+import { agents, campaigns, db, fulfillment, payments, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
 import { loadShop, storeBase } from "./data";
 import { buyerFx, currencyCookie } from "@/lib/currency";
@@ -265,6 +265,19 @@ export async function newsletterAction(handle: string, form: FormData) {
     status = "invalid";
   }
   redirect(`${(await storeBase(handle)) || "/"}?signup=${status}#signup`);
+}
+
+/** "Track your order": emails the order's link to the address it was placed with, if there is one. */
+export async function trackOrderAction(handle: string, form: FormData) {
+  const shop = await loadShop(handle);
+  let sent = "1";
+  try {
+    await requestOrderLink(await fulfillment(), shop, { email: String(form.get("email") ?? ""), number: String(form.get("number") ?? "") });
+  } catch (e) {
+    if (!(e instanceof UserError)) throw e;
+    sent = "invalid";
+  }
+  redirect(`${await storeBase(handle)}/track?sent=${sent}`);
 }
 
 /** A buyer asks for an email when a sold-out option is back. */
