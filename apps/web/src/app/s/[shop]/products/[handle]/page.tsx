@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, getActiveProductByHandle, NotFoundError, percentOff, productPhotos, productQuestions, productReviews, sizeChartForProduct, sizeChartRows, upsellsFor, wholesaleTermsFor } from "@sf/core";
+import { bundlesForProduct, getActiveProductByHandle, NotFoundError, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, sizeChartForProduct, sizeChartRows, upsellsFor, wholesaleTermsFor } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
+import { RecentlyViewed } from "@/components/RecentlyViewed";
+import { RememberView } from "@/components/RememberView";
+import { readRecent, recentCookie } from "@/lib/recent";
 import { ProductGallery } from "@/components/ProductGallery";
 import { currentBuyer } from "@/lib/buyer";
 import { db } from "@/lib/server";
@@ -79,14 +82,16 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const buyable = product.variants.filter((x) => x.stock === null || x.stock > 0);
   const v = buyable[0] ?? product.variants[0];
   const many = product.variants.length > 1;
-  const [reviews, questions, rawUpsells, base, fx, chart] = await Promise.all([
+  const [reviews, questions, rawUpsells, base, fx, chart, rawRecent] = await Promise.all([
     productReviews(await db(), product.id),
     productQuestions(await db(), product.id),
     upsellsFor(await db(), shop.id, [product.id]),
     storeBase(shopHandle),
     buyerFx(shop),
     sizeChartForProduct(await db(), shop.id, product.id),
+    readRecent(shop.id).then(async (ids) => recentlyViewed(await db(), shop.id, ids, { exclude: [product.id] })),
   ]);
+  const recent = await localProducts(shopHandle, rawRecent);
   const askedKind = ASKED_MESSAGES[(query.asked ?? "") as keyof typeof ASKED_MESSAGES];
   const upsells = await localProducts(shopHandle, rawUpsells);
   const buyer = await currentBuyer(shop.id);
@@ -319,6 +324,8 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           <SubmitButton className="btn btn-secondary self-start">{t.askButton}</SubmitButton>
         </form>
       </section>
+      <RecentlyViewed items={recent} base={base} currency={shop.currency} fx={fx} title={t.recentlyViewed} soldOut={t.soldOut} className="md:col-span-2 border-t border-border pt-8" />
+      <RememberView cookie={recentCookie(shop.id)} productId={product.id} />
     </main>
   );
 }

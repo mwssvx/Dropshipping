@@ -318,3 +318,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **For buyers without an account**: every store's footer has "Track your order". The buyer enters their email and order number, and we email that address the link to the order's status page (`packages/core/src/order-lookup.ts`), where they see where it is and can track it.
 2. **Privacy**: the page gives the same answer whether or not an order matched, so it can't be used to check who bought what. Only paid orders get a link, and each order gets at most one link email per ten minutes. The email shows in the order's email list in the admin as "Order link (Track your order)". The page and email texts are in every store language (the email itself is in English, like the other order emails).
+
+### Recently viewed (after launch, part 34)
+
+1. **On product pages and in the cart**, a "Recently viewed" row shows the last products the shopper opened, newest first (up to six), with photo and price in their currency and language. A product page never lists itself, and the cart leaves out what's already in it. Sold-out products show as sold out; drafts, archived products and gift cards never show.
+2. **Privacy**: the list lives in a cookie on the shopper's device (`sf_rv_<store>`, product ids only, up to twelve, kept 60 days), set by a small script on the product page (`RememberView`). Nothing is stored on the server. `packages/core/src/recently-viewed.ts` turns the ids into products.

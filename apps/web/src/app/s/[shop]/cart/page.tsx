@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { convertAmount, convertPrice, formatMoney, pointsFor, presentQuote, quoteCart, upsellsFor, UserError } from "@sf/core";
+import { convertAmount, convertPrice, formatMoney, pointsFor, presentQuote, quoteCart, recentlyViewed, upsellsFor, UserError } from "@sf/core";
 import { buyerCountry, buyerFx } from "@/lib/currency";
 import { readCart, readDiscountCode, readGiftCardCode } from "@/lib/cart";
 import { db } from "@/lib/server";
 import { currentBuyer } from "@/lib/buyer";
+import { readRecent } from "@/lib/recent";
+import { RecentlyViewed } from "@/components/RecentlyViewed";
 import { addToCartAction, removeCodeAction, removeGiftCardAction, updateCartAction } from "../actions";
 import { CodeForm } from "./CodeForm";
 import { lineTitles, loadShop, localProducts, storeBase, storeT } from "../data";
@@ -41,6 +43,7 @@ export default async function CartPage({ params, searchParams }: { params: Promi
   }
   const variants = quote ? await (await db()).query.variants.findMany({ where: (v, { inArray }) => inArray(v.id, quote!.items.map((i) => i.variantId)) }) : [];
   const upsells = quote ? await localProducts(handle, await upsellsFor(await db(), shop.id, [...new Set(variants.map((v) => v.productId))])) : [];
+  const recent = await localProducts(handle, await recentlyViewed(await db(), shop.id, await readRecent(shop.id), { exclude: [...new Set(variants.map((v) => v.productId))] }));
   // Item titles in the buyer's language, by the product each option belongs to.
   const t = await storeT(handle);
   const titles = await lineTitles(handle, quote?.items ?? [], variants);
@@ -181,6 +184,7 @@ export default async function CartPage({ params, searchParams }: { params: Promi
           )}
         </>
       )}
+      <RecentlyViewed items={recent} base={base} currency={shop.currency} fx={fx} title={t.recentlyViewed} soldOut={t.soldOut} className="border-t border-border pt-6" />
     </main>
   );
 }
