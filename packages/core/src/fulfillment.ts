@@ -6,7 +6,7 @@ import type { Mailer } from "./email";
 import { formatMoney } from "./money";
 import { buyerAmounts } from "./currency";
 import { SupplierError, type ProblemCode, type Suppliers } from "./suppliers";
-import { sendPurchaseOrder } from "./own-suppliers";
+import { sendPurchaseOrder, supplierLabel } from "./own-suppliers";
 import { issueGiftCardsForOrder } from "./gift-cards";
 import { earnPoints } from "./rewards";
 import { issueInvoice } from "./invoices";
@@ -70,19 +70,29 @@ export async function routeOrder(ctx: FulfillmentContext, orderId: string) {
     .where(eq(schema.orderLines.orderId, order.id));
   const links = await db.query.suppliers.findMany({ where: eq(schema.suppliers.shopId, order.shopId) });
   const own = new Set(links.filter((l) => l.provider === "email").map((l) => l.id));
-  const bySupplier = new Map<string, { variantRef: string; quantity: number }[]>();
+  const bySupplier = new Map<string, RouteLine[]>();
   for (const { line, variant, product } of lines) {
     // Own suppliers are sent item names, so every variant goes to them; API suppliers need their own ids.
     const ref = product.supplierId && own.has(product.supplierId) ? variant.id : variant.supplierVariantRef;
     if (!product.supplierId || !ref) continue; // merchant ships these themselves
     const list = bySupplier.get(product.supplierId) ?? [];
-    list.push({ variantRef: ref, quantity: line.quantity });
+    list.push({ variantRef: ref, quantity: line.quantity, lineId: line.id, backup: product.backup?.gone ? undefined : product.backup?.variants[variant.id] && { supplierId: product.backup.supplierId, ...product.backup.variants[variant.id]! } });
     bySupplier.set(product.supplierId, list);
+  }
+
+  // Items a backup supplier took instead. One that went out stays there; one that never went out
+  // (cancelled to change the order, say) is tried at the main supplier again first.
+  const backups = await db.query.fulfillments.findMany({ where: and(eq(schema.fulfillments.orderId, order.id), isNotNull(schema.fulfillments.backupForSupplierId)) });
+  const covered = new Set<string>();
+  for (const f of backups) {
+    if (["pending", "failed", "cancelled"].includes(f.status)) await db.delete(schema.fulfillments).where(eq(schema.fulfillments.id, f.id));
+    else covered.add(f.backupForSupplierId!);
   }
 
   let placed = 0;
   let failed = 0;
   for (const [supplierId, supplierLines] of bySupplier) {
+    if (covered.has(supplierId)) continue;
     await db
       .insert(schema.fulfillments)
       .values({ shopId: order.shopId, orderId: order.id, supplierId })
@@ -114,15 +124,19 @@ export async function routeOrder(ctx: FulfillmentContext, orderId: string) {
               reference: claimed.id,
               email: order.email,
               address: order.shippingAddress,
-              lines: supplierLines,
+              lines: supplierLines.map((l) => ({ variantRef: l.variantRef, quantity: l.quantity })),
             });
       await db
         .update(schema.fulfillments)
-        .set({ status: "placed", supplierOrderRef, placedAt: now(ctx), problemCode: null, problemMessage: null, updatedAt: now(ctx) })
+        .set({ status: "placed", supplierOrderRef, placedAt: now(ctx), problemCode: null, problemMessage: null, backupNote: null, updatedAt: now(ctx) })
         .where(eq(schema.fulfillments.id, claimed.id));
       placed++;
     } catch (e) {
       const err = e instanceof SupplierError ? e : new SupplierError("unknown", e instanceof Error ? e.message : String(e), true);
+      if (link && BACKUP_FOR.has(err.code) && (await placeWithBackup(ctx, order, claimed, link, links, supplierLines, err))) {
+        placed++;
+        continue;
+      }
       await db
         .update(schema.fulfillments)
         .set({ status: "failed", problemCode: err.code, problemMessage: err.message, updatedAt: now(ctx) })
@@ -132,6 +146,69 @@ export async function routeOrder(ctx: FulfillmentContext, orderId: string) {
   }
   await refreshOrderFulfillment(db, order.id, now(ctx));
   return { placed, failed, skipped: null };
+}
+
+type RouteLine = {
+  variantRef: string;
+  quantity: number;
+  lineId: string;
+  /** The same option at the product's backup supplier. */
+  backup?: { supplierId: string; ref: string; costMinor: number };
+};
+type SupplierLink = typeof schema.suppliers.$inferSelect;
+
+/** Problems a backup supplier can get round. */
+const BACKUP_FOR = new Set<ProblemCode>(["out_of_stock", "product_unavailable"]);
+
+/**
+ * The main supplier couldn't take these items, so send the ones with a backup there instead. Only
+ * when everything in the supplier order can go to one place; otherwise it stays a problem for the
+ * merchant. Returns whether the backup took the order.
+ */
+async function placeWithBackup(ctx: FulfillmentContext, order: Order, claimed: Fulfillment, main: SupplierLink, links: SupplierLink[], lines: RouteLine[], err: SupplierError) {
+  const { db } = ctx;
+  if (!lines.some((l) => l.backup)) return false;
+  const targets = new Set(lines.map((l) => l.backup?.supplierId ?? main.id));
+  const target = targets.size === 1 ? links.find((l) => l.id === [...targets][0]) : undefined;
+  if (!target || target.provider === "email" || target.status === "disconnected") return false;
+  if (target.id !== main.id) {
+    // One supplier order per supplier: one already placed with the backup can't take more.
+    const other = await db.query.fulfillments.findFirst({ where: and(eq(schema.fulfillments.orderId, order.id), eq(schema.fulfillments.supplierId, target.id)) });
+    if (other && !["pending", "failed", "cancelled"].includes(other.status)) return false;
+    if (other) await db.delete(schema.fulfillments).where(eq(schema.fulfillments.id, other.id));
+  }
+  let supplierOrderRef: string;
+  try {
+    ({ supplierOrderRef } = await ctx.suppliers.get(target.provider).placeOrder({
+      reference: claimed.id,
+      email: order.email,
+      address: order.shippingAddress,
+      lines: lines.map((l) => ({ variantRef: l.backup?.ref ?? l.variantRef, quantity: l.quantity })),
+    }));
+  } catch (e) {
+    if (e instanceof SupplierError) return false;
+    throw e;
+  }
+  const why = err.code === "out_of_stock" ? "was out of stock" : "no longer lists it";
+  await db
+    .update(schema.fulfillments)
+    .set({
+      supplierId: target.id,
+      status: "placed",
+      supplierOrderRef,
+      placedAt: now(ctx),
+      problemCode: null,
+      problemMessage: null,
+      backupNote: `The main supplier ${why}, so it went to the backup supplier (${supplierLabel(ctx.suppliers, target)}).`,
+      backupForSupplierId: target.id === main.id ? null : main.id,
+      updatedAt: now(ctx),
+    })
+    .where(eq(schema.fulfillments.id, claimed.id));
+  // Profit follows what the backup charges.
+  for (const l of lines) {
+    if (l.backup) await db.update(schema.orderLines).set({ unitCostMinor: l.backup.costMinor }).where(eq(schema.orderLines.id, l.lineId));
+  }
+  return true;
 }
 
 /** The order's delivery status follows its fulfilments. */

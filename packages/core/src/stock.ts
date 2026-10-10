@@ -7,6 +7,7 @@ import { z } from "zod";
 import type { Mailer } from "./email";
 import { NotFoundError, UserError } from "./errors";
 import { SupplierError, type Suppliers } from "./suppliers";
+import { refreshBackup, sellableStock } from "./backups";
 
 type Shop = typeof schema.shops.$inferSelect;
 const DAY = 86_400_000;
@@ -52,19 +53,21 @@ export async function syncProductStock(ctx: Pick<StockContext, "db" | "suppliers
     remote = null;
   }
 
+  // With a backup supplier the store can sell what either of them has.
+  const backup = product.backup ? await refreshBackup(ctx.suppliers, product.backup, now) : null;
   const changes: StockChange[] = [];
   for (const v of variants) {
     if (!v.supplierVariantRef) continue;
     const r = remote ? remote.get(v.supplierVariantRef) : undefined;
     // An option the supplier no longer lists is sold out; its cost stays as it was.
-    const stock = r ? r.stock : 0;
+    const stock = sellableStock(r ? r.stock : 0, backup?.variants[v.id]);
     const cost = r ? r.costMinor : v.costMinor;
     if (stock === v.stock && cost === v.costMinor) continue;
     await db.update(schema.variants).set({ stock, costMinor: cost }).where(eq(schema.variants.id, v.id));
     changes.push({ productId: product.id, variantId: v.id, option: v.title, stockBefore: v.stock, stockAfter: stock, costBefore: v.costMinor, costAfter: cost });
   }
-  await db.update(schema.products).set({ stockCheckedAt: now }).where(eq(schema.products.id, product.id));
-  return { gone: remote === null, changes };
+  await db.update(schema.products).set({ stockCheckedAt: now, ...(backup ? { backup } : {}) }).where(eq(schema.products.id, product.id));
+  return { gone: remote === null, backupLive: !!backup && !backup.gone, changes };
 }
 
 /**

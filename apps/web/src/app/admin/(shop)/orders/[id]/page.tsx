@@ -47,7 +47,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
       ? [{ at: order.paidAt, text: order.giftCardMinor ? `Paid: ${money(order.giftCardMinor)} by gift card${order.totalMinor > order.giftCardMinor ? `, ${money(order.totalMinor - order.giftCardMinor)} by card` : ""}` : `Payment of ${money(order.totalMinor)} received` }]
       : []),
     ...order.fulfillments.flatMap((f) => [
-      ...(f.placedAt ? [{ at: f.placedAt, text: `Sent to ${supplierLabel(f.supplierId)} (ref ${f.supplierOrderRef ?? "n/a"})` }] : []),
+      ...(f.placedAt ? [{ at: f.placedAt, text: `Sent to ${supplierLabel(f.supplierId)} (ref ${f.supplierOrderRef ?? "n/a"})${f.backupNote ? `. ${f.backupNote}` : ""}` }] : []),
       ...(f.shippedAt ? [{ at: f.shippedAt, text: `Shipped with ${f.carrier}, tracking ${f.trackingNumber}` }] : []),
       ...(f.deliveredAt ? [{ at: f.deliveredAt, text: "Delivered" }] : []),
       ...(f.status === "failed" ? [{ at: f.updatedAt, text: f.problemCode && f.problemMessage?.includes("can't send it") ? f.problemMessage : `Supplier refused the order: ${f.problemMessage}` }] : []),
@@ -168,6 +168,8 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
                   <li key={f.id} className="text-sm flex flex-col gap-1">
                     <span className="font-medium">{supplierLabel(f.supplierId)}</span>
                     {f.supplierOrderRef && <span className="hint num">Supplier order {f.supplierOrderRef}</span>}
+                    {f.backupNote && f.status !== "cancelled" && <span className="pill pill-info self-start">Sent to backup</span>}
+                    {f.backupNote && f.status !== "cancelled" && <span className="hint">{f.backupNote}</span>}
                     {f.trackingNumber ? (
                       <span>
                         {f.carrier} ·{" "}

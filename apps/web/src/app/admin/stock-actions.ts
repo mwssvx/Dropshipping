@@ -20,7 +20,8 @@ export async function checkSupplierStockAction(productId: string, _: StockState,
   revalidatePath(`/admin/products/${productId}`);
   revalidatePath(`/s/${shop.handle}`, "layout");
   const parts: string[] = [];
-  if (result.gone) parts.push("The supplier took this listing down, so it's sold out on your store. Find another supplier or archive it.");
+  if (result.gone && result.backupLive) parts.push("The main supplier took this listing down, so orders go to the backup supplier while it has stock. Find a new main supplier when you can.");
+  else if (result.gone) parts.push("The supplier took this listing down, so it's sold out on your store. Find another supplier or archive it.");
   else if (result.changes.length === 0) parts.push("Nothing changed since the last check.");
   else
     for (const c of result.changes) {

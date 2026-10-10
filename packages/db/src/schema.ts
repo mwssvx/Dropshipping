@@ -218,6 +218,8 @@ export const products = pgTable(
     giftCard: boolean("gift_card").notNull().default(false),
     // When stock and cost were last read from the supplier; the daily sync starts with the oldest.
     stockCheckedAt: timestamp("stock_checked_at", { withTimezone: true }),
+    // A second supplier for this product. Orders go there when the main supplier is out of stock.
+    backup: jsonb("backup").$type<ProductBackup>(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -312,6 +314,20 @@ export type OrderGift = { from: string; message: string | null; recipientEmail: 
 
 /** One change to a paid order before it shipped: a new address or another size. */
 export type OrderEdit = { at: string; by: "buyer" | "merchant"; changes: string[] };
+
+/**
+ * The same product at a second supplier, used when the main one is out of stock. Variants are
+ * matched to ours by option, keyed by our variant id.
+ */
+export type ProductBackup = {
+  supplierId: string;
+  sourceUrl: string;
+  productRef: string;
+  variants: Record<string, { ref: string; costMinor: number; stock: number | null }>;
+  /** Set when the backup listing was taken down at the last check. */
+  gone?: boolean;
+  checkedAt: string;
+};
 
 export type Address = {
   name: string;
@@ -450,6 +466,10 @@ export const fulfillments = pgTable(
     supplierOrderRef: text("supplier_order_ref"),
     problemCode: text("problem_code"),
     problemMessage: text("problem_message"),
+    // Set when the main supplier couldn't take it and it went to a product's backup supplier.
+    backupNote: text("backup_note"),
+    // The main supplier a backup supplier's order stands in for, so the items aren't sent there too.
+    backupForSupplierId: uuid("backup_for_supplier_id"),
     attempts: integer("attempts").notNull().default(0),
     carrier: text("carrier"),
     trackingNumber: text("tracking_number"),

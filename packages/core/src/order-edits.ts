@@ -149,7 +149,12 @@ export async function editOrder(
           .where(inArray(schema.variants.id, swaps.map((s) => lines.find((l) => l.id === s.lineId)!.variantId!)))
       ).map((r) => r.supplierId)
     : [];
-  const affected = address ? undefined : [...new Set([...oldSuppliers, ...swaps.map((s) => s.supplierId)].filter((x): x is string => !!x))];
+  const mains = [...new Set([...oldSuppliers, ...swaps.map((s) => s.supplierId)].filter((x): x is string => !!x))];
+  // Items a backup supplier took instead of their main one are redone there.
+  const standIns = mains.length
+    ? (await db.query.fulfillments.findMany({ where: and(eq(schema.fulfillments.orderId, order.id), inArray(schema.fulfillments.backupForSupplierId, mains)) })).map((f) => f.supplierId!)
+    : [];
+  const affected = address ? undefined : [...new Set([...mains, ...standIns])];
   const cancel = affected && !affected.length ? { cancelled: 0, notCancelled: [], cancelledIds: [] as string[] } : await cancelUnshipped(ctx, order.id, affected);
   if (cancel.notCancelled.length) {
     // Leave the order as it was: put back what we stopped.
