@@ -23,7 +23,8 @@ function Field({ id, label, values, ...rest }: { id: string; label: string; valu
 /** The checkout's words in the buyer's language. */
 export type CheckoutText = Record<
   | "checkout" | "orderSummary" | "contact" | "newsAndOffers" | "delivery" | "email" | "fullName" | "address" | "address2" | "city" | "region"
-  | "postalCode" | "country" | "shipping" | "noShipping" | "placeOrder" | "continueToPayment" | "continuing" | "notAvailable" | "tax",
+  | "postalCode" | "country" | "shipping" | "noShipping" | "placeOrder" | "continueToPayment" | "continuing" | "notAvailable" | "tax"
+  | "giftCheckbox" | "giftFrom" | "giftMessage" | "giftRecipientEmail" | "giftNote",
   string
 >;
 
@@ -138,7 +139,32 @@ function CheckoutForm({
           )}
         </fieldset>
       )}
+      {zones && <GiftFields t={t} values={v} />}
       <SubmitButton className="btn btn-primary btn-lg" pendingText={t.continuing}>{paidByGiftCard ? t.placeOrder : t.continueToPayment}</SubmitButton>
     </form>
+  );
+}
+
+/** "This order is a gift": who it's from, a message, and the recipient's email for a heads-up. */
+function GiftFields({ t, values }: { t: CheckoutText; values?: Record<string, string> }) {
+  const [gift, setGift] = useState(values?.gift === "on");
+  return (
+    <fieldset className="flex flex-col gap-4">
+      <label className="flex items-center gap-2">
+        <input type="checkbox" name="gift" checked={gift} onChange={(e) => setGift(e.target.checked)} />
+        <span className="font-semibold">{t.giftCheckbox}</span>
+      </label>
+      {gift && (
+        <>
+          <Field id="giftFrom" label={t.giftFrom} autoComplete="name" required maxLength={60} values={values} />
+          <div className="field">
+            <label className="label" htmlFor="giftMessage">{t.giftMessage}</label>
+            <textarea className="input" id="giftMessage" name="giftMessage" rows={3} maxLength={300} defaultValue={values?.giftMessage} />
+          </div>
+          <Field id="giftRecipientEmail" label={t.giftRecipientEmail} type="email" values={values} />
+          <p className="hint text-sm">{t.giftNote}</p>
+        </>
+      )}
+    </fieldset>
   );
 }

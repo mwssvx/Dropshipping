@@ -35,7 +35,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
     if (!supplierId) return "Sent by you";
     return labelFor(suppliers(), links.find((l) => l.id === supplierId));
   };
-  const EMAIL_LABEL = { order_confirmation: "Order confirmation", shipping_update: "Shipping update", delivered: "Delivery confirmation", refund: "Refund", support_reply: "Reply to a question", abandoned_cart: "Checkout reminder", payment_link: "Payment link" };
+  const EMAIL_LABEL = { order_confirmation: "Order confirmation", shipping_update: "Shipping update", delivered: "Delivery confirmation", refund: "Refund", support_reply: "Reply to a question", abandoned_cart: "Checkout reminder", payment_link: "Payment link", gift_shipped: "Gift heads-up" };
   const timeline = [
     { at: order.createdAt, text: "Order placed" },
     ...(order.paidAt
@@ -182,16 +182,25 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
         <div className="card p-5 flex flex-col gap-4 text-sm">
           <div>
             <h2 className="font-semibold mb-1">Customer</h2>
-            <p>{a.name}</p>
+            <p>{order.gift?.from ?? a.name}</p>
             <p className="hint break-all">{order.email}</p>
             {order.customerId && <Link href={`/admin/customers/${order.customerId}`} className="underline">View customer</Link>}
           </div>
           <div>
             <h2 className="font-semibold mb-1">Ship to</h2>
             <address className="not-italic hint">
+              {order.gift && <>{a.name}<br /></>}
               {a.line1}{a.line2 ? <>, {a.line2}</> : null}<br />{a.city}{a.region ? `, ${a.region}` : ""} {a.postalCode}<br />{a.country}
             </address>
           </div>
+          {order.gift && (
+            <section aria-labelledby="gift-heading">
+              <h2 id="gift-heading" className="font-semibold mb-1">Gift <span className="pill pill-info ml-1">Gift</span></h2>
+              <p className="hint">From {order.gift.from} to {a.name}</p>
+              {order.gift.message && <p className="whitespace-pre-line border-l-2 border-border pl-3 mt-1">{order.gift.message}</p>}
+              <p className="hint mt-1">{order.gift.recipientEmail ? `We email ${order.gift.recipientEmail} when it ships, without prices.` : "No recipient email, so only the buyer hears from us."}</p>
+            </section>
+          )}
         </div>
         {documents.length > 0 && (
           <section className="card p-5 flex flex-col gap-2 text-sm" aria-labelledby="invoices-heading">

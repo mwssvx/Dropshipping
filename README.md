@@ -295,3 +295,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **In the cart**, a bar shows how far the buyer is from free shipping ("You're $36.01 away from free shipping.") and fills up as they add items, then says when they've got it. It's shown in the buyer's currency and every store language.
 2. **Which threshold** (`quoteCart`'s `freeShipping`): the lowest "free over" amount among the paid rates in the buyer's zone. The cart estimates shipping for the country the hosting platform says the buyer is in (`countryHint`), when the store ships there, else for the store's own country. No bar when a rate is free anyway, when a free-shipping code is applied, or for wholesale buyers.
+
+### Gift orders (after launch, part 30)
+
+1. **At checkout** the buyer ticks "This order is a gift" and adds who it's from, an optional message and the recipient's email (optional). The order keeps this in `orders.gift`; orders of gift cards only don't take it.
+2. **Emails** (`packages/core/src/fulfillment.ts`): the buyer's confirmation says it's a gift and repeats the message. When tracking comes in, the recipient gets a "gift_shipped" email ("Ada sent you a gift from …") with the message and tracking, and no prices or order link. Without a recipient email, nothing extra is sent.
+3. **Order pages**: the merchant's order page shows a Gift section (from, to, message) and the "Gift heads-up" email in the timeline; the buyer's order page shows "A gift for …". A customer's data export includes the gift details, and erasing them removes them.

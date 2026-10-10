@@ -39,7 +39,7 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
     <main className="max-w-2xl mx-auto px-4 sm:px-6 py-12 flex flex-col gap-8">
       <div className="flex flex-col gap-2">
         <p className="hint num">Order #{order.number}</p>
-        <h1 className="text-3xl font-bold tracking-tight">{paid ? `Thank you, ${order.shippingAddress.name.split(" ")[0]}!` : "We're waiting for your payment"}</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{paid ? `Thank you, ${(order.gift?.from ?? order.shippingAddress.name).split(" ")[0]}!` : "We're waiting for your payment"}</h1>
         <p className="text-muted">{paid ? `We've emailed a receipt to ${order.email}. This page updates as your order moves.` : "If you've paid, this page updates in a moment."}</p>
         {paid && (
           <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
@@ -51,6 +51,15 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
           <Link href={`${base}/pay/${order.id}`} className="btn btn-primary self-start">Finish paying</Link>
         )}
       </div>
+      {order.gift && (
+        <section className="card p-5 flex flex-col gap-1 text-sm" aria-labelledby="gift-heading">
+          <h2 id="gift-heading" className="font-semibold">A gift for {order.shippingAddress.name}</h2>
+          {order.gift.message && <p className="whitespace-pre-line border-l-2 border-border pl-3">{order.gift.message}</p>}
+          <p className="hint">
+            {order.gift.recipientEmail ? `We'll email ${order.gift.recipientEmail} when it ships, with your message and tracking but no prices.` : "We won't contact them. Share the tracking below if you like."}
+          </p>
+        </section>
+      )}
       {order.refundedMinor > 0 && (
         <p className="banner banner-info">
           {order.paymentStatus === "refunded" ? "This order was refunded" : `${money(due.refundedMinor)} was refunded`}
@@ -113,7 +122,7 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
                 {item.review.status === "pending" ? "It shows on the store once the shop has had a look." : "Thank you!"}
               </p>
             ) : (
-              <ReviewForm key={item.productId} handle={handle} orderRef={ref} productId={item.productId} title={item.title} name={order.shippingAddress.name.split(" ")[0] ?? ""} />
+              <ReviewForm key={item.productId} handle={handle} orderRef={ref} productId={item.productId} title={item.title} name={(order.gift?.from ?? order.shippingAddress.name).split(" ")[0] ?? ""} />
             ),
           )}
         </section>

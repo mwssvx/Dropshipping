@@ -158,6 +158,7 @@ export async function checkoutAction(handle: string, _: CheckoutState, form: For
       buyerEmail: (await currentBuyer(shop.id))?.email ?? null,
       giftCardCode: await readGiftCardCode(shop.id),
       shippingRateId: values.shippingRateId || null,
+      gift: values.gift === "on" ? { from: values.giftFrom ?? "", message: values.giftMessage, recipientEmail: values.giftRecipientEmail } : null,
     }, tax());
     orderId = order.id;
     await track(shop.id, "checkout_start");
