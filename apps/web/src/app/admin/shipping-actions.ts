@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseMoney, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
+import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseMoney, setDeliveryEstimates, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -71,4 +71,17 @@ export async function addRateAction(zoneId: string, _: FormState, form: FormData
 export async function deleteRateAction(id: string, _: FormState, _form: FormData): Promise<FormState> {
   const { shop, db } = await requireShop("shipping");
   return attempt(() => deleteShippingRate(db, shop.id, id));
+}
+
+export async function setDeliveryEstimatesAction(_: FormState, form: FormData): Promise<FormState> {
+  const { shop, db } = await requireShop("shipping");
+  try {
+    const days = String(form.get("processingDays") ?? "").trim();
+    await setDeliveryEstimates(db, shop.id, { enabled: form.get("on") === "on", processingDays: days === "" ? Number.NaN : Number(days) });
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath("/admin/shipping");
+  return { saved: true };
 }

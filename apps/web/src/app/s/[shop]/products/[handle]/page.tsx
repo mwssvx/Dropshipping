@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, getActiveProductByHandle, productOffers, NotFoundError, optionDefsOf, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, wholesaleTermsFor } from "@sf/core";
+import { bundlesForProduct, formatDeliveryWindow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, wholesaleTermsFor } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { RecentlyViewed } from "@/components/RecentlyViewed";
 import { RememberView } from "@/components/RememberView";
@@ -9,7 +9,7 @@ import { readRecent, recentCookie } from "@/lib/recent";
 import { ProductGallery } from "@/components/ProductGallery";
 import { currentBuyer } from "@/lib/buyer";
 import { db } from "@/lib/server";
-import { buyerFx } from "@/lib/currency";
+import { buyerCountry, buyerFx } from "@/lib/currency";
 import { SubmitButton } from "@/components/SubmitButton";
 import { addBundleAction, addToCartAction, askQuestionAction, stockAlertAction, toggleSavedAction } from "../../actions";
 import { savedIds } from "@/lib/saved";
@@ -112,6 +112,10 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   // Wholesale buyers have their own prices, so bundles aren't offered to them.
   const bundles = wholesale ? [] : await bundlesForProduct(await db(), shop.id, product.id);
   const bundleTitles = new Map((await localProducts(shopHandle, bundles.flatMap((b) => b.products))).map((p) => [p.id, p.title]));
+  // "Arrives Oct 18 – Oct 25 to United States", for the visitor's country when the store ships there.
+  const delivery = buyable.length ? await productDelivery(await db(), shop, product.id, { country: await buyerCountry() }) : null;
+  const lang = (await storeLang(shopHandle)) ?? "en-US";
+  const dayFormat = new Intl.DateTimeFormat(lang, { month: "short", day: "numeric", timeZone: "UTC" });
   const jsonLd = JSON.stringify(productJsonLd(product, shop.currency, reviews)).replace(/</g, "\\u003c");
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-10 md:grid-cols-2">
@@ -196,6 +200,12 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           </form>
         )}
         {v && buyable.length === 0 && <p className="banner banner-info">{t.soldOutForNow}</p>}
+        {delivery && (
+          <p id="delivery-estimate" className="text-sm flex flex-col gap-0.5">
+            <span className="font-medium">{t.arrives(formatDeliveryWindow(delivery, (d) => dayFormat.format(d)), new Intl.DisplayNames([lang], { type: "region" }).of(delivery.country) ?? delivery.country)}</span>
+            <span className="hint">{t.deliveryDetail(delivery.processingDays, delivery.transitMin, delivery.transitMax)}</span>
+          </p>
+        )}
         {chart && (
           <SizeChartDialog
             chart={{ name: chart.name, unit: chart.unit, columns: chart.columns, rows: { cm: sizeChartRows(chart, "cm"), in: sizeChartRows(chart, "in") }, note: chart.note }}

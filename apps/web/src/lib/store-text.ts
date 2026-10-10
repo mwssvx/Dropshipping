@@ -41,6 +41,9 @@ const en = {
   addToCart: "Add to cart",
   adding: "Adding…",
   soldOutForNow: "Sold out for now.",
+  arrives: (dates: string, country: string) => `Arrives ${dates} to ${country}`,
+  deliveryDetail: (processing: number, min: number, max: number) =>
+    `${processing ? `Ships within ${processing} ${plural(processing, "day", "days")}` : "Ships the same day"}, then ${min === max ? min : `${min}–${max}`} days in transit.`,
   saved: "Saved",
   saveForLater: "Save for later",
   savedDone: "Saved.",
@@ -255,6 +258,9 @@ const de: StoreText = {
   addToCart: "In den Warenkorb",
   adding: "Wird hinzugefügt…",
   soldOutForNow: "Zurzeit ausverkauft.",
+  arrives: (dates: string, country: string) => `Lieferung ${dates} nach ${country}`,
+  deliveryDetail: (processing: number, min: number, max: number) =>
+    `${processing ? `Versand innerhalb von ${processing} ${plural(processing, "Tag", "Tagen")}` : "Versand am selben Tag"}, dann ${min === max ? min : `${min}–${max}`} Tage unterwegs.`,
   saved: "Gemerkt",
   saveForLater: "Merken",
   savedDone: "Gemerkt.",
@@ -462,6 +468,9 @@ const fr: StoreText = {
   addToCart: "Ajouter au panier",
   adding: "Ajout…",
   soldOutForNow: "Épuisé pour le moment.",
+  arrives: (dates: string, country: string) => `Livraison ${dates} vers ${country}`,
+  deliveryDetail: (processing: number, min: number, max: number) =>
+    `${processing ? `Expédié sous ${processing} ${plural(processing, "jour", "jours")}` : "Expédié le jour même"}, puis ${min === max ? min : `${min} à ${max}`} jours de transport.`,
   saved: "Enregistré",
   saveForLater: "Enregistrer",
   savedDone: "Enregistré.",
@@ -669,6 +678,9 @@ const es: StoreText = {
   addToCart: "Añadir al carrito",
   adding: "Añadiendo…",
   soldOutForNow: "Agotado por ahora.",
+  arrives: (dates: string, country: string) => `Llega ${dates} a ${country}`,
+  deliveryDetail: (processing: number, min: number, max: number) =>
+    `${processing ? `Se envía en ${processing} ${plural(processing, "día", "días")}` : "Se envía el mismo día"}, luego ${min === max ? min : `${min} a ${max}`} días en tránsito.`,
   saved: "Guardado",
   saveForLater: "Guardar para después",
   savedDone: "Guardado.",
@@ -876,6 +888,9 @@ const it: StoreText = {
   addToCart: "Aggiungi al carrello",
   adding: "Aggiunta…",
   soldOutForNow: "Esaurito per ora.",
+  arrives: (dates: string, country: string) => `Arriva ${dates} in ${country}`,
+  deliveryDetail: (processing: number, min: number, max: number) =>
+    `${processing ? `Spedito entro ${processing} ${plural(processing, "giorno", "giorni")}` : "Spedito in giornata"}, poi ${min === max ? min : `${min}–${max}`} giorni di viaggio.`,
   saved: "Salvato",
   saveForLater: "Salva per dopo",
   savedDone: "Salvato.",
@@ -1083,6 +1098,9 @@ const nl: StoreText = {
   addToCart: "In winkelwagen",
   adding: "Toevoegen…",
   soldOutForNow: "Voorlopig uitverkocht.",
+  arrives: (dates: string, country: string) => `Bezorgd ${dates} in ${country}`,
+  deliveryDetail: (processing: number, min: number, max: number) =>
+    `${processing ? `Verzonden binnen ${processing} ${plural(processing, "dag", "dagen")}` : "Dezelfde dag verzonden"}, daarna ${min === max ? min : `${min}–${max}`} dagen onderweg.`,
   saved: "Bewaard",
   saveForLater: "Bewaren voor later",
   savedDone: "Bewaard.",

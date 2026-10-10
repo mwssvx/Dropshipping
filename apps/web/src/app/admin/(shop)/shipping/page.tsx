@@ -1,6 +1,7 @@
-import { countryName, describeRate, EVERYWHERE_ELSE, formatMoney, listShippingZones, rateDays, SHIPPING_COUNTRIES } from "@sf/core";
+import { countryName, describeRate, EVERYWHERE_ELSE, formatDeliveryWindow, formatMoney, listProducts, listShippingZones, productDelivery, rateDays, SHIPPING_COUNTRIES } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
+import { DeliveryEstimatesForm } from "./DeliveryEstimatesForm";
 import { DeleteButton, RateForm, StarterButton, ZoneForm, type Country } from "./ShippingForms";
 
 export const metadata = { title: "Shipping" };
@@ -8,6 +9,9 @@ export const metadata = { title: "Shipping" };
 export default async function ShippingPage() {
   const { shop, db } = await requireShop("shipping");
   const { zones, isDefault } = await listShippingZones(db, shop.id);
+  // An example from the store's own catalog, so the merchant sees what buyers see.
+  const example = (await listProducts(db, shop.id)).find((p) => p.status === "active" && !p.giftCard);
+  const preview = example ? await productDelivery(db, shop, example.id) : null;
   const money = (m: number) => formatMoney(m, shop.currency);
   const symbol = money(0).replace(/[\d.,\s]/g, "");
   const all = [EVERYWHERE_ELSE, ...[...SHIPPING_COUNTRIES].sort((a, b) => countryName(a).localeCompare(countryName(b)))];
@@ -75,6 +79,24 @@ export default async function ShippingPage() {
             ))}
           </ul>
         )}
+        <section className="card p-5 flex flex-col gap-3" aria-labelledby="delivery-heading">
+          <h2 id="delivery-heading" className="font-semibold">Delivery dates</h2>
+          <p className="text-sm">
+            Product pages show when an order placed today would arrive, and order pages and receipts show the expected delivery. It&apos;s your
+            processing days plus days in transit. For transit we use whichever is slower, the supplier&apos;s estimate or your rate&apos;s days, so
+            you never promise faster than the supplier ships.
+          </p>
+          <DeliveryEstimatesForm enabled={shop.deliveryEstimates} processingDays={shop.processingDays} />
+          {example && (
+            <p className="text-sm border-t border-border pt-3" role="note">
+              {preview
+                ? <>Today, {example.title} shows <strong>{formatDeliveryWindow(preview)}</strong> to {countryName(preview.country)}.</>
+                : shop.deliveryEstimates
+                  ? `${example.title} shows no date: its supplier doesn't say how long shipping takes and the rate has no days. Add days to the rate to show one.`
+                  : "Delivery dates are off."}
+            </p>
+          )}
+        </section>
         <section className="card p-5 flex flex-col gap-3" aria-labelledby="new-zone">
           <h2 id="new-zone" className="font-semibold">Add a zone</h2>
           {isDefault && <p className="text-sm hint">Your first zone replaces the standard rate: after that, only countries in a zone can check out.</p>}

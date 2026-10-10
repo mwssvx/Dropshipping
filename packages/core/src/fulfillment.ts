@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
+import { formatDeliveryWindow, orderDelivery } from "./delivery";
 import { NotFoundError, UserError } from "./errors";
 import type { Mailer } from "./email";
 import { formatMoney } from "./money";
@@ -577,6 +578,7 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
     const parentNumber = order.parentOrderId ? (await ctx.db.query.orders.findFirst({ where: eq(schema.orders.id, order.parentOrderId), columns: { number: true } }))?.number : null;
     const invoice = await ctx.db.query.invoices.findFirst({ where: and(eq(schema.invoices.orderId, order.id), eq(schema.invoices.kind, "invoice")) });
     const paid = buyerAmounts(order, lines);
+    const arrives = await orderDelivery(ctx.db, shop, order);
     return {
       subject: `Order #${order.number} confirmed`,
       text: [
@@ -591,6 +593,7 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
           ? [`Paid with gift card: ${formatMoney(paid.giftCardMinor, paid.currency)}`, ...(paid.chargedMinor ? [`Paid by card: ${formatMoney(paid.chargedMinor, paid.currency)}`] : [])]
           : []),
         ...(invoice ? [``, `Your invoice ${invoice.number}: ${link}/invoice`] : []),
+        ...(arrives ? [``, `Expected delivery: ${formatDeliveryWindow(arrives)}.`] : []),
         ...(order.gift
           ? [
               ``,
