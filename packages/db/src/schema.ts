@@ -57,6 +57,8 @@ export type WelcomeOffer = { percentOff: number; minSubtotalMinor: number; days:
 
 /** One product offered on the order page right after paying, added with one click to the same card. */
 export type PostPurchaseOffer = { productId: string; percentOff: number; active: boolean };
+/** "Subscribe and save": after paying, buyers can have the same items sent again on a schedule, for less. */
+export type SubscriptionOffer = { percentOff: number; active: boolean };
 
 /** The risk check run when an order is paid. Reasons are written for the merchant. */
 export type OrderRisk = { level: "low" | "medium" | "high"; score: number; reasons: string[]; checkedAt: string };
@@ -149,6 +151,7 @@ export const shops = pgTable(
     welcomeOffer: jsonb("welcome_offer").$type<WelcomeOffer>(),
     holdRiskyOrders: text("hold_risky_orders", { enum: ["off", "medium", "high"] }).notNull().default("high"),
     postPurchaseOffer: jsonb("post_purchase_offer").$type<PostPurchaseOffer>(),
+    subscriptionOffer: jsonb("subscription_offer").$type<SubscriptionOffer>(),
     referralProgram: jsonb("referral_program").$type<ReferralProgram>(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -394,10 +397,13 @@ export const orders = pgTable(
     // and emailed a link to pay. Their note to the buyer shows in the email and on the pay page.
     // "post_purchase": added from the order page right after paying, charged to the same card.
     // "replacement": sent free by the merchant for one that was lost, damaged or wrong.
-    source: text("source", { enum: ["checkout", "payment_link", "post_purchase", "replacement"] }).notNull().default("checkout"),
+    // "subscription": a repeat delivery the buyer subscribed to, charged to their saved card.
+    source: text("source", { enum: ["checkout", "payment_link", "post_purchase", "replacement", "subscription"] }).notNull().default("checkout"),
     parentOrderId: uuid("parent_order_id").references((): AnyPgColumn => orders.id, { onDelete: "set null" }),
     // For a replacement: the order it replaces.
     replacesOrderId: uuid("replaces_order_id").references((): AnyPgColumn => orders.id, { onDelete: "set null" }),
+    // For a repeat delivery: the subscription that placed it.
+    subscriptionId: uuid("subscription_id").references((): AnyPgColumn => subscriptions.id, { onDelete: "set null" }),
     // The buyer's card was kept with the payment provider at checkout, for an after-checkout offer.
     cardSaved: boolean("card_saved").notNull().default(false),
     note: text("note"),
@@ -450,6 +456,7 @@ export const orders = pgTable(
     check("orders_discount_within_subtotal", sql`${t.discountMinor} >= 0 and ${t.discountMinor} <= ${t.subtotalMinor}`),
     index("orders_discount_idx").on(t.discountId),
     index("orders_replaces_idx").on(t.replacesOrderId),
+    index("orders_subscription_idx").on(t.subscriptionId),
     check("orders_refund_within_total", sql`${t.refundedMinor} >= 0 and ${t.refundedMinor} <= ${t.totalMinor}`),
     check("orders_gift_card_within_total", sql`${t.giftCardMinor} >= 0 and ${t.giftCardMinor} <= ${t.totalMinor}`),
   ],
@@ -1561,4 +1568,43 @@ export const adSpend = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("ad_spend_shop_day_idx").on(t.shopId, t.day), check("ad_spend_amount_pos", sql`${t.amountMinor} > 0`)],
+);
+
+/**
+ * Subscribe and save: the items of a paid order, sent again every few weeks at a discount and
+ * charged to the card kept from that order. The buyer manages it from a private link (the token).
+ */
+export const subscriptions = pgTable(
+  "subscriptions",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    customerId: uuid("customer_id").references(() => customers.id, { onDelete: "set null" }),
+    email: text("email").notNull(),
+    token: text("token").notNull().unique(),
+    // The order the buyer subscribed from; its saved card is charged for each delivery.
+    firstOrderId: uuid("first_order_id").notNull().references((): AnyPgColumn => orders.id, { onDelete: "cascade" }),
+    lines: jsonb("lines").$type<{ variantId: string; quantity: number }[]>().notNull(),
+    shippingAddress: jsonb("shipping_address").$type<Address>().notNull(),
+    intervalDays: integer("interval_days").notNull(),
+    percentOff: integer("percent_off").notNull(),
+    status: text("status", { enum: ["active", "paused", "cancelled"] }).notNull().default("active"),
+    // Who paused it: the buyer, or us after the card failed three times in a row.
+    pausedBy: text("paused_by", { enum: ["buyer", "payment"] }),
+    nextOrderAt: timestamp("next_order_at", { withTimezone: true }).notNull(),
+    // The delivery date the "coming up" email was sent for, so it goes once per delivery.
+    remindedFor: timestamp("reminded_for", { withTimezone: true }),
+    failures: integer("failures").notNull().default(0),
+    lastError: text("last_error"),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex("subscriptions_first_order_uq").on(t.firstOrderId),
+    index("subscriptions_shop_idx").on(t.shopId, t.createdAt),
+    index("subscriptions_due_idx").on(t.status, t.nextOrderAt),
+    check("subscriptions_interval", sql`${t.intervalDays} between 7 and 120`),
+    check("subscriptions_percent", sql`${t.percentOff} between 0 and 50`),
+  ],
 );

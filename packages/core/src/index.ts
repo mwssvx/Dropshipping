@@ -49,6 +49,7 @@ export * from "./gift-cards";
 export * from "./shipping";
 export * from "./returns";
 export * from "./replacements";
+export * from "./subscriptions";
 export * from "./redirects";
 export * from "./saved";
 export * from "./languages";

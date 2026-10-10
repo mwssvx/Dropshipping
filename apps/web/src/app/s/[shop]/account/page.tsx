@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { buyerOrders, describeReferralProgram, describeRewards, formatMoney, myReferrals, referralCodeFor, REWARD_STEP, rewardsFor } from "@sf/core";
+import { buyerOrders, formatDeliveryDate, intervalLabel, subscriptionsForEmail, describeReferralProgram, describeRewards, formatMoney, myReferrals, referralCodeFor, REWARD_STEP, rewardsFor } from "@sf/core";
 import { ReferralCard } from "@/components/ReferralCard";
 import { currentBuyer } from "@/lib/buyer";
 import { db, storeAddress } from "@/lib/server";
@@ -41,6 +41,7 @@ export default async function AccountPage({ params }: { params: Promise<{ shop: 
   }
 
   const orders = await buyerOrders(await db(), shop.id, buyer.email);
+  const subs = (await subscriptionsForEmail(await db(), shop.id, buyer.email)).filter((s) => s.status !== "cancelled");
   const rewards = shop.rewardsEnabled ? await rewardsFor(await db(), shop, buyer.email) : null;
   const referCode = shop.referralProgram && orders.length ? await referralCodeFor(await db(), shop, buyer.id) : null;
   const referred = referCode ? await myReferrals(await db(), shop.id, buyer.id) : null;
@@ -115,6 +116,22 @@ export default async function AccountPage({ params }: { params: Promise<{ shop: 
           stats={referred.invited ? t.referStats(referred.invited, formatMoney(referred.creditMinor, shop.currency)) : null}
           labels={{ link: t.referLink, copy: t.referCopy, copied: t.referCopied }}
         />
+      )}
+      {subs.length > 0 && (
+        <section aria-labelledby="subs-heading" className="card p-5 flex flex-col gap-3">
+          <h2 id="subs-heading" className="font-semibold">Your subscriptions</h2>
+          <ul className="text-sm divide-y divide-border border-t border-border">
+            {subs.map((s) => (
+              <li key={s.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
+                <span>
+                  {intervalLabel(s.intervalDays)}, {s.percentOff}% off
+                  <span className="hint"> · {s.status === "active" ? `next on ${formatDeliveryDate(s.nextOrderAt)}` : "paused"}</span>
+                </span>
+                <Link href={`${base}/subscriptions/${s.token}`} className="underline">Manage</Link>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
       {orders.length === 0 ? (
         <div className="card p-6 flex flex-col gap-3 items-start">

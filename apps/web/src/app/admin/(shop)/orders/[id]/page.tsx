@@ -88,7 +88,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
   return (
     <main className="pb-12">
       <PageHeader title={`Order #${order.number}`} back={<Link href="/admin/orders" className="hint hover:text-ink">← Orders</Link>}
-        actions={<div className="flex gap-2 items-center">{order.wholesale && <span className="pill pill-info">Wholesale order</span>}{order.source === "payment_link" && <span className="pill pill-info">Payment link</span>}{order.source === "post_purchase" && <span className="pill pill-info">Added after checkout</span>}{order.source === "replacement" && <span className="pill pill-info">Replacement</span>}<PaymentStatus value={order.paymentStatus} />{held ? <span className="pill pill-warning">On hold</span> : <FulfilmentStatus value={order.fulfillmentStatus} />}</div>} />
+        actions={<div className="flex gap-2 items-center">{order.wholesale && <span className="pill pill-info">Wholesale order</span>}{order.source === "payment_link" && <span className="pill pill-info">Payment link</span>}{order.source === "post_purchase" && <span className="pill pill-info">Added after checkout</span>}{order.source === "replacement" && <span className="pill pill-info">Replacement</span>}{order.source === "subscription" && <Link href="/admin/subscriptions" className="pill pill-info">Subscription</Link>}<PaymentStatus value={order.paymentStatus} />{held ? <span className="pill pill-warning">On hold</span> : <FulfilmentStatus value={order.fulfillmentStatus} />}</div>} />
       <div className="px-4 sm:px-8 grid gap-6 lg:grid-cols-[1fr_320px] items-start">
         <div className="flex flex-col gap-6 min-w-0">
           {justSent && order.source === "replacement" && (

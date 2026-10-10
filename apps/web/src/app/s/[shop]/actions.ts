@@ -3,9 +3,9 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { acceptPostPurchaseOffer, amountToCharge, askQuestion, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
+import { acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
-import { agents, campaigns, db, fulfillment, payments, tax } from "@/lib/server";
+import { agents, campaigns, db, fulfillment, payments, subscriptions, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
 import { loadShop, storeBase } from "./data";
 import { buyerFx, currencyCookie } from "@/lib/currency";
@@ -407,4 +407,35 @@ export async function acceptPostPurchaseAction(handle: string, ref: string, _: {
   afterOrderPaid(added.id);
   revalidatePath(`/s/${handle}/orders/${ref}`);
   redirect(`${await storeBase(handle)}/orders/${ref}`);
+}
+
+/** The buyer subscribed to their order from its page. */
+export async function startSubscriptionAction(handle: string, ref: string, _: { error?: string }, form: FormData): Promise<{ error?: string }> {
+  const shop = await loadShop(handle);
+  try {
+    await startSubscription(await subscriptions(), shop, { orderRef: ref, intervalDays: Number(form.get("intervalDays") ?? 0) });
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath(`/s/${handle}/orders/${ref}`);
+  redirect(`${await storeBase(handle)}/orders/${ref}?subscribed=1`);
+}
+
+/** Skip, change how often, pause, resume or cancel, from the subscription's page. */
+export async function changeSubscriptionAction(handle: string, token: string, _: { error?: string; done?: string }, form: FormData): Promise<{ error?: string; done?: string }> {
+  const shop = await loadShop(handle);
+  const type = String(form.get("change") ?? "");
+  const change: SubscriptionChange | null =
+    type === "interval" ? { type, days: Number(form.get("intervalDays") ?? 0) } : type === "skip" || type === "pause" || type === "resume" || type === "cancel" ? { type } : null;
+  if (!change) return { error: "Something went wrong. Try again." };
+  try {
+    await changeSubscription(await db(), shop, token, change);
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath(`/s/${handle}/subscriptions/${token}`);
+  const done = { interval: "Saved. Your next delivery date has moved to match.", skip: "Skipped. Your next delivery date is below.", pause: "Paused. Nothing will be sent or charged until you resume.", resume: "Resumed. Your next delivery date is below.", cancel: "Cancelled. You won't be charged again." }[change.type];
+  return { done };
 }

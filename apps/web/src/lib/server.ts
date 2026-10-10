@@ -27,6 +27,7 @@ import {
   type DomainContext,
   type DomainHost,
   type FulfillmentContext,
+  type SubscriptionContext,
   type Mailer,
   type ModelClient,
   type PaymentProvider,
@@ -138,6 +139,11 @@ export const testPayments = () => payments().name === "fake";
 /** Supplier stock sync and back-in-stock emails. */
 export async function stock() {
   return { ...(await fulfillment()), storeAddress };
+}
+
+/** Subscribe and save: the scheduled deliveries, charged to the buyer's saved card. */
+export async function subscriptions(): Promise<SubscriptionContext> {
+  return { ...(await fulfillment()), payments: payments(), taxCalculator: tax(), manageUrl: async (shop, token) => `${await storeAddress(shop)}/subscriptions/${token}` };
 }
 
 export async function fulfillment(): Promise<FulfillmentContext> {

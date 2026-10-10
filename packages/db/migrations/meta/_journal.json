@@ -358,6 +358,13 @@
       "when": 1791670548776,
       "tag": "0050_replacements",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1791671897909,
+      "tag": "0051_subscriptions",
+      "breakpoints": true
     }
   ]
 }

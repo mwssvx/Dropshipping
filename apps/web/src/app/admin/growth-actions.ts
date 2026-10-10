@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { createDiscount, moderateReview, parseMoney, sendAbandonedCartEmails, setDiscountActive, setGrowthSettings, setPostPurchaseOffer, setReferralProgram, setUpsell, setWelcomeOffer, UserError } from "@sf/core";
+import { createDiscount, moderateReview, parseMoney, sendAbandonedCartEmails, setDiscountActive, setGrowthSettings, setPostPurchaseOffer, setReferralProgram, setSubscriptionOffer, setUpsell, setWelcomeOffer, UserError } from "@sf/core";
 import { fulfillment, requireShop, testPayments } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -75,6 +75,20 @@ export async function setPostPurchaseOfferAction(_: FormState, form: FormData): 
     throw e;
   }
   revalidatePath("/admin/marketing");
+  return { saved: true };
+}
+
+export async function setSubscriptionOfferAction(_: FormState, form: FormData): Promise<FormState> {
+  const { shop, db } = await requireShop("marketing");
+  try {
+    const percent = String(form.get("percentOff") ?? "").trim();
+    await setSubscriptionOffer(db, shop.id, { percentOff: percent ? Number(percent) : Number.NaN, active: form.get("on") === "on" });
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath("/admin/marketing");
+  revalidatePath("/admin/subscriptions");
   return { saved: true };
 }
 
