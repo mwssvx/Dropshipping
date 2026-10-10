@@ -21,6 +21,7 @@ export * from "./domains";
 export * from "./plans";
 export * from "./payouts";
 export * from "./refunds";
+export * from "./order-edits";
 export * from "./tax";
 export * from "./trust";
 export * from "./discounts";

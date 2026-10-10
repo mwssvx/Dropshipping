@@ -426,6 +426,28 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
       ].join("\n"),
     };
   }
+  if (kind === "order_updated") {
+    const edit = order.edits[Number(ref)];
+    if (!edit) throw new NotFoundError("Order change");
+    const a = order.shippingAddress;
+    return {
+      subject: `Your order #${order.number} was updated`,
+      text: [
+        `Hi ${first},`,
+        ``,
+        edit.by === "buyer" ? `Here's the change you made to your order #${order.number}:` : `${shop.name} changed your order #${order.number}:`,
+        ``,
+        ...edit.changes.map((c) => `  ${c}`),
+        ``,
+        `It ships to:`,
+        ...[a.name, a.line1, a.line2, [a.postalCode, a.city].filter(Boolean).join(" "), a.region, a.country].filter(Boolean).map((l) => `  ${l}`),
+        ``,
+        `See your order: ${link}`,
+        ``,
+        edit.by === "buyer" ? `If you didn't make this change, reply to this email right away.` : `If something looks wrong, reply to this email.`,
+      ].join("\n"),
+    };
+  }
   if (kind === "refund") {
     const refund = await ctx.db.query.refunds.findFirst({ where: eq(schema.refunds.id, ref) });
     if (!refund) throw new NotFoundError("Refund");

@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
-import { buyerAmounts, buyerThread, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, returnOptions, reviewableItems } from "@sf/core";
+import { buyerAmounts, buyerThread, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, returnOptions, reviewableItems } from "@sf/core";
 import Link from "next/link";
-import { db, storeAddress } from "@/lib/server";
+import { db, fulfillment, storeAddress } from "@/lib/server";
+import { OrderEditForm } from "@/components/OrderEditForm";
+import { editOrderByBuyerAction } from "../../actions";
 import { ReferralCard } from "@/components/ReferralCard";
 import { loadShop, storeBase, storeT } from "../../data";
 import { ReviewForm } from "./ReviewForm";
@@ -9,6 +11,7 @@ import { QuestionForm } from "./QuestionForm";
 import { ReturnForm } from "./ReturnForm";
 
 const time = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+const utc = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC" });
 
 export const metadata = { title: "Order status", robots: { index: false } };
 
@@ -34,6 +37,8 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
   const t = referCode ? await storeT(handle) : null;
   const referLink = referCode ? `${await storeAddress(shop)}/refer/${referCode}` : null;
   const shipped = order.fulfillments.filter((f) => f.trackingNumber);
+  const edit = order.paymentStatus === "paid" ? await orderEditOptions(await fulfillment(), shop.id, order.id, "buyer") : null;
+  const lastEdit = order.edits.at(-1);
   const steps = [
     { label: "Order confirmed", done: paid },
     { label: "Being prepared", done: order.fulfillments.some((f) => f.placedAt || f.shippedAt) },
@@ -97,6 +102,18 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
         <p className="hint text-sm">
           {order.lines.length === 1 ? "Your item usually ships" : "Your items usually ship"} within a few days. We&apos;ll email tracking to {order.email} as soon as it&apos;s on its way.
         </p>
+      )}
+      {lastEdit && (
+        <p className="banner banner-info" role="status">
+          {lastEdit.by === "buyer" ? "You changed this order" : `${shop.name} changed this order`} on {day.format(new Date(lastEdit.at))}: {lastEdit.changes.join("; ")}.
+        </p>
+      )}
+      {edit?.canEdit && edit.until && (
+        <section className="card p-5" aria-label="Change your order">
+          <OrderEditForm action={editOrderByBuyerAction.bind(null, handle, ref)} address={edit.address} lines={edit.lines} countryName={countryName(edit.address.country)}
+            summary="Wrong address, or need another size?"
+            note={`You can change it here until ${utc.format(edit.until)} UTC, as long as it hasn't shipped.`} />
+        </section>
       )}
       <section className="card p-5 flex flex-col gap-3 text-sm">
         {order.lines.map((l, n) => (
