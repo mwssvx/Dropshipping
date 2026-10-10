@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { schema, type Address, type Db } from "@sf/db";
 import { z } from "zod";
+import { applyDisputeEvent } from "./disputes";
 import { NotFoundError, UserError } from "./errors";
 import type { PaymentEvent, PaymentProvider } from "./payments";
 import { applyDiscount, automaticOffers, bxgyMissing, describeDiscount, findUsableDiscount, spreadDiscount, type Discount, type OfferUnit } from "./discounts";
@@ -479,6 +480,12 @@ export async function handlePaymentEvent(db: Db, provider: string, event: Paymen
       .onConflictDoNothing()
       .returning({ id: schema.webhookEvents.id });
     if (!inserted.length) return { status: "duplicate" as const };
+
+    if (event.type === "dispute.updated") {
+      const dispute = await applyDisputeEvent(tx as unknown as Db, event.dispute);
+      await tx.update(schema.webhookEvents).set({ processedAt: new Date() }).where(eq(schema.webhookEvents.id, event.id));
+      return dispute ? { status: "processed" as const, becamePaid: false as const, disputeShopId: dispute.shopId } : { status: "unknown_order" as const };
+    }
 
     if (event.type !== "payment.succeeded" && event.type !== "payment.failed") {
       const applied = await applyMoneyEvent(tx as unknown as Db, event);

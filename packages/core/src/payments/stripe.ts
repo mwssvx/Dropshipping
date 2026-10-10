@@ -1,6 +1,6 @@
 import Stripe from "stripe";
 import { UserError } from "../errors";
-import type { PaymentEvent, PaymentProvider, PayoutAccountStatus, ProviderPayout } from "./provider";
+import type { DisputeEvidence, PaymentEvent, PaymentProvider, PayoutAccountStatus, ProviderDispute, ProviderPayout } from "./provider";
 
 export type StripePrices = Partial<Record<"starter" | "growth" | "scale", string>>;
 
@@ -80,6 +80,29 @@ export class StripePaymentProvider implements PaymentProvider {
   async clientSecret(paymentIntentId: string) {
     const pi = await this.stripe.paymentIntents.retrieve(paymentIntentId);
     return pi.client_secret!;
+  }
+
+  // Destination charges are disputed on the platform account, so no Stripe-Account header.
+  async submitDisputeEvidence(input: { disputeId: string; evidence: DisputeEvidence }) {
+    const e = input.evidence;
+    await this.stripe.disputes.update(input.disputeId, {
+      evidence: {
+        customer_name: e.customerName,
+        customer_email_address: e.customerEmail,
+        shipping_address: e.shippingAddress,
+        product_description: e.productDescription,
+        ...(e.shippingCarrier ? { shipping_carrier: e.shippingCarrier } : {}),
+        ...(e.shippingTrackingNumber ? { shipping_tracking_number: e.shippingTrackingNumber } : {}),
+        ...(e.shippingDate ? { shipping_date: e.shippingDate } : {}),
+        ...(e.refundPolicy ? { refund_policy_disclosure: e.refundPolicy } : {}),
+        uncategorized_text: e.uncategorizedText,
+      },
+      submit: true,
+    });
+  }
+
+  async acceptDispute(disputeId: string) {
+    await this.stripe.disputes.close(disputeId);
   }
 
   async refund(input: { paymentIntentId: string; amountMinor: number; reason: string | null }) {
@@ -174,6 +197,16 @@ export class StripePaymentProvider implements PaymentProvider {
       case "payout.canceled":
         if (!event.account) return null;
         return { id: event.id, type: "payout.updated", accountId: event.account, payout: payoutOf(event.data.object) };
+      case "charge.dispute.created":
+      case "charge.dispute.updated":
+      case "charge.dispute.closed":
+      case "charge.dispute.funds_withdrawn":
+      case "charge.dispute.funds_reinstated": {
+        const d = event.data.object;
+        const paymentIntentId = typeof d.payment_intent === "string" ? d.payment_intent : d.payment_intent?.id;
+        if (!paymentIntentId) return null;
+        return { id: event.id, type: "dispute.updated", dispute: disputeOf(d, paymentIntentId) };
+      }
       case "customer.subscription.created":
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
@@ -196,6 +229,17 @@ export class StripePaymentProvider implements PaymentProvider {
         return null;
     }
   }
+}
+
+function disputeOf(d: Stripe.Dispute, paymentIntentId: string): ProviderDispute {
+  const inquiry = d.status.startsWith("warning_");
+  const status: ProviderDispute["status"] =
+    d.status === "won" || d.status === "lost" ? d.status
+    : d.status === "warning_closed" ? "closed"
+    : d.status === "needs_response" || d.status === "warning_needs_response" ? "needs_response"
+    : "under_review";
+  const due = d.evidence_details?.due_by;
+  return { id: d.id, paymentIntentId, amountMinor: d.amount, currency: d.currency.toUpperCase(), reason: d.reason, status, inquiry, evidenceDueBy: due ? new Date(due * 1000) : null };
 }
 
 function accountStatus(a: Stripe.Account): PayoutAccountStatus {
