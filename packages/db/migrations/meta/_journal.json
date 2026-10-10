@@ -288,6 +288,13 @@
       "when": 1791647381382,
       "tag": "0040_m46_bulk_edits",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1791648284874,
+      "tag": "0041_m47_ad_spend",
+      "breakpoints": true
     }
   ]
 }

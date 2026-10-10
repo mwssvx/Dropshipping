@@ -1466,3 +1466,24 @@ export const bulkEdits = pgTable(
   },
   (t) => [index("bulk_edits_shop_idx").on(t.shopId, t.createdAt)],
 );
+
+export const AD_CHANNELS = ["meta", "google", "tiktok", "pinterest", "snapchat", "other"] as const;
+
+// Ad spend the merchant enters (or a later ads connection fills in), per day and channel, and
+// optionally per product, so the profit report can show profit after ads.
+export const adSpend = pgTable(
+  "ad_spend",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    /** The day the money was spent, YYYY-MM-DD in UTC. */
+    day: text("day").notNull(),
+    channel: text("channel", { enum: AD_CHANNELS }).notNull(),
+    productId: uuid("product_id").references(() => products.id, { onDelete: "set null" }),
+    amountMinor: money("amount_minor").notNull(),
+    note: text("note"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("ad_spend_shop_day_idx").on(t.shopId, t.day), check("ad_spend_amount_pos", sql`${t.amountMinor} > 0`)],
+);

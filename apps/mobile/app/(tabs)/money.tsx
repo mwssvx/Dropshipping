@@ -3,8 +3,8 @@ import { useState } from "react";
 import { View } from "react-native";
 import { api, useApi } from "../../src/api";
 import { money, when } from "../../src/format";
-import { Banner, Body, Button, Card, EmptyState, Heading, List, LoadError, Loading, Pill, Row, Screen, Section, Stat } from "../../src/ui";
-import { space } from "../../src/theme";
+import { Banner, Body, Button, Card, EmptyState, Field, Heading, List, LoadError, Loading, Pill, Row, Screen, Section, Segmented, Stat } from "../../src/ui";
+import { color, space } from "../../src/theme";
 
 type Money = {
   currency: string;
@@ -13,10 +13,20 @@ type Money = {
   onTheWayMinor: number;
   paidOutMinor: number;
   payoutsEnabled: boolean;
-  last30: { orders: number; salesMinor: number; refundsMinor: number; platformFeesMinor: number; processingFeesMinor: number; supplierCostsMinor: number; shippingMinor: number; taxMinor: number; profitMinor: number };
+  last30: { orders: number; salesMinor: number; refundsMinor: number; platformFeesMinor: number; processingFeesMinor: number; supplierCostsMinor: number; shippingMinor: number; taxMinor: number; profitMinor: number; adsMinor: number; profitAfterAdsMinor: number };
+  topProducts: { title: string; units: number; profitMinor: number; adsMinor: number; roas: number | null }[];
   payouts: { id: string; amountMinor: number; status: string; arrivalDate: string | null }[];
   holds: { id: string; title: string; explanation: string; holdsPayouts: boolean; dueBy: string | null; submittedAt: string | null; upload: boolean }[];
 };
+
+type Channel = "meta" | "google" | "tiktok" | "other";
+const CHANNELS: [Channel, string][] = [["meta", "Meta"], ["google", "Google"], ["tiktok", "TikTok"], ["other", "Other"]];
+
+/** "25", "25.5" or "$25.00" to 2500; null when it isn't an amount. */
+function toMinor(raw: string) {
+  const m = raw.replace(/[^\d.,]/g, "").replace(",", ".").match(/^(\d+)(?:\.(\d{1,2}))?$/);
+  return m ? Number(m[1]) * 100 + Number((m[2] ?? "0").padEnd(2, "0")) : null;
+}
 
 const PAYOUT: Record<string, string> = { pending: "Scheduled", in_transit: "On the way", paid: "Paid", failed: "Failed", canceled: "Cancelled" };
 
@@ -24,7 +34,26 @@ export default function MoneyScreen() {
   const m = useApi<Money>("money");
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{ tone: "success" | "critical"; text: string } | null>(null);
+  const [channel, setChannel] = useState<Channel>("meta");
+  const [spent, setSpent] = useState("");
   const d = m.data;
+
+  async function addSpend() {
+    const amountMinor = toMinor(spent);
+    if (!amountMinor) return setNote({ tone: "critical", text: "Enter how much you spent today, like 25.00." });
+    setBusy("ads");
+    setNote(null);
+    try {
+      const res = await api<{ message: string }>("money/ad-spend", { method: "POST", body: { channel, amountMinor } });
+      setNote({ tone: "success", text: res.message });
+      setSpent("");
+      await m.reload();
+    } catch (e) {
+      setNote({ tone: "critical", text: (e as Error).message });
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function sendDocument(holdId: string, fromCamera: boolean) {
     const perm = fromCamera ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -99,9 +128,35 @@ export default function MoneyScreen() {
               <Row title="Supplier costs" right={<Body>−{money(d.last30.supplierCostsMinor, d.currency)}</Body>} />
               <Row title="Shipping and tax collected" subtitle="Passed on to the supplier and the tax office" right={<Body>−{money(d.last30.shippingMinor + d.last30.taxMinor, d.currency)}</Body>} />
               <Row title="Fees" subtitle="Card processing and our sales fee" right={<Body>−{money(d.last30.processingFeesMinor + d.last30.platformFeesMinor, d.currency)}</Body>} />
-              <Row title="Profit" right={<Heading>{money(d.last30.profitMinor, d.currency)}</Heading>} />
+              <Row title="Ad spend" subtitle="What you entered" right={<Body>−{money(d.last30.adsMinor, d.currency)}</Body>} />
+              <Row title="Profit after ads" right={<Heading>{money(d.last30.profitAfterAdsMinor, d.currency)}</Heading>} />
             </List>
           </Section>
+
+          <Section title="Today's ad spend">
+            <Card>
+              <View style={{ gap: space(3) }}>
+                <Segmented label="Where the ads ran" options={CHANNELS} value={channel} onChange={setChannel} />
+                <Field label="Amount spent" value={spent} onChangeText={setSpent} keyboardType="decimal-pad" placeholder="25.00" onSubmit={addSpend} />
+                <Button label="Add ad spend" onPress={addSpend} busy={busy === "ads"} />
+              </View>
+            </Card>
+          </Section>
+
+          {d.topProducts.length ? (
+            <Section title="Products by profit">
+              <List>
+                {d.topProducts.map((p) => (
+                  <Row
+                    key={p.title}
+                    title={p.title}
+                    subtitle={`${p.units} sold${p.roas != null ? ` · ROAS ${p.roas}×` : ""}`}
+                    right={<Body style={p.profitMinor < 0 ? { color: color.critical } : undefined}>{money(p.profitMinor, d.currency)}</Body>}
+                  />
+                ))}
+              </List>
+            </Section>
+          ) : null}
 
           <Section title="Payouts">
             {d.payouts.length === 0 ? (

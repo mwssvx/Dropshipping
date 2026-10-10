@@ -24,6 +24,8 @@ import {
   listRequirements,
   listShopsForUser,
   moneySummary,
+  addAdSpend,
+  profitReport,
   NotFoundError,
   patchProduct,
   productPhotos,
@@ -266,9 +268,11 @@ const routes: Record<string, Handler> = {
   },
 
   "GET money": async ({ db, shop }) => {
-    const [summary, payouts, requirements] = await Promise.all([moneySummary(db, shop), listPayouts(db, shop.id, 10), listRequirements(db, shop.id)]);
+    const [summary, payouts, requirements, profit] = await Promise.all([moneySummary(db, shop), listPayouts(db, shop.id, 10), listRequirements(db, shop.id), profitReport(db, shop, 30)]);
     return {
       ...summary,
+      // The products earning (or losing) the most in the last 30 days, after ads.
+      topProducts: profit.products.slice(0, 5).map((p) => ({ title: p.title, units: p.units, profitMinor: p.profitMinor, adsMinor: p.adsMinor, roas: p.roas })),
       payoutsEnabled: shop.payoutsEnabled,
       payouts: payouts.map((p) => ({ id: p.id, amountMinor: p.amountMinor, status: p.status, arrivalDate: p.arrivalDate })),
       holds: requirements.map((r) => ({
@@ -281,6 +285,11 @@ const routes: Record<string, Handler> = {
         upload: r.upload,
       })),
     };
+  },
+  "POST money/ad-spend": async ({ req, db, shop, user }) => {
+    const b = await body<{ day?: unknown; channel?: unknown; amountMinor?: unknown }>(req);
+    await addAdSpend(db, shop.id, { day: str(b.day) || new Date().toISOString().slice(0, 10), channel: str(b.channel) as never, amountMinor: typeof b.amountMinor === "number" ? b.amountMinor : 0 }, { userId: user.id });
+    return { ok: true, message: "Ad spend added." };
   },
   "POST money/holds/:id/document": async ({ req, params, db, shop }) => {
     const type = (req.headers.get("content-type") ?? "").split(";")[0]!.trim();

@@ -308,6 +308,11 @@ export async function moneySummary(db: Db, shop: Shop, now = new Date()) {
     .innerJoin(o, eq(o.id, schema.orderLines.orderId))
     .where(and(eq(o.shopId, shop.id), inArray(o.paymentStatus, ["paid", "partially_refunded"]), gte(o.paidAt, since)));
 
+  const [ads] = await db
+    .select({ sum: sql<number>`coalesce(sum(${schema.adSpend.amountMinor}), 0)::bigint` })
+    .from(schema.adSpend)
+    .where(and(eq(schema.adSpend.shopId, shop.id), gte(schema.adSpend.day, since.toISOString().slice(0, 10))));
+
   const n = (v: unknown) => Number(v ?? 0);
   const total = n(all?.earned) + n(feeRefunds[0]?.sum) - n(paid?.sum) - n(onTheWay?.sum);
   const pending = Math.min(Math.max(n(clearing?.earned), 0), Math.max(total, 0));
@@ -332,6 +337,9 @@ export async function moneySummary(db: Db, shop: Shop, now = new Date()) {
       // Tax collected belongs to the tax office, so it isn't profit either.
       taxMinor: n(month?.tax),
       profitMinor: n(month?.sales) - n(month?.tax) - n(month?.shipping) - platformFees - n(month?.processingFees) - n(costs?.sum),
+      // What the merchant entered under Profit → Ad spend.
+      adsMinor: n(ads?.sum),
+      profitAfterAdsMinor: n(month?.sales) - n(month?.tax) - n(month?.shipping) - platformFees - n(month?.processingFees) - n(costs?.sum) - n(ads?.sum),
     },
   };
 }

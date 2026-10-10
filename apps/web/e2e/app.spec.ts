@@ -142,6 +142,12 @@ test("money, holds, the assistant, and approvals made offline", async ({ page, b
   await expect(page.getByRole("article", { name: "Photo ID" }).getByRole("button", { name: "Take a photo of it" })).toBeVisible();
   await expect(page.getByText("Ready to pay out")).toBeVisible();
   await shot(page, "62-app-money");
+  // Today's ad spend, from the phone.
+  await page.getByRole("tab", { name: "TikTok" }).click();
+  await page.getByLabel("Amount spent").fill("12.50");
+  await page.getByRole("button", { name: "Add ad spend" }).click();
+  await expect(page.getByText("Ad spend added.")).toBeVisible();
+  await expect(page.getByText("−$12.50")).toBeVisible();
 
   await tab(page, "Assistant");
   await page.getByRole("button", { name: "How am I doing this month?" }).click();
