@@ -149,6 +149,9 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       starts_at: iso(d.startsAt),
       ends_at: iso(d.endsAt),
       active: d.active,
+      ...(d.kind === "bxgy"
+        ? { buy_qty: d.buyQty, get_qty: d.getQty, products: d.productIds.map((id) => handleOf.get(id)).filter((h): h is string => !!h), automatic: d.automatic }
+        : {}),
     })),
     redirects: redirectRows.map((r) => ({ from: r.fromPath, to: r.toPath })),
     size_charts: chartRows.map((c) => ({
@@ -359,8 +362,12 @@ const importSchema = z.object({
     .array(
       z.object({
         code: z.string().regex(/^[A-Z0-9_-]{3,30}$/),
-        kind: z.enum(["percent", "amount", "free_shipping"]),
+        kind: z.enum(["percent", "amount", "free_shipping", "bxgy"]),
         value: z.number().int().min(0),
+        buy_qty: z.number().int().min(1).max(20).nullable().optional(),
+        get_qty: z.number().int().min(1).max(20).nullable().optional(),
+        products: z.array(z.string()).max(100).default([]),
+        automatic: z.boolean().default(false),
         min_subtotal: money.default(0),
         usage_limit: z.number().int().min(1).nullable().optional(),
         once_per_customer: z.boolean().default(false),
@@ -500,6 +507,11 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
       );
     }
     for (const d of data.discount_codes) {
+      // A buy X get Y offer without its quantities can't work, so it's left out.
+      const bxgy = d.kind === "bxgy";
+      const scope = d.products.map((h) => productIds.get(h)).filter((id): id is string => !!id);
+      // Nor one whose products aren't in the file: it would widen to every product.
+      if (bxgy && (!d.buy_qty || !d.get_qty || (d.products.length && !scope.length))) continue;
       await tx
         .insert(schema.discounts)
         .values({
@@ -513,6 +525,10 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
           startsAt: d.starts_at ? new Date(d.starts_at) : null,
           endsAt: d.ends_at ? new Date(d.ends_at) : null,
           active: d.active,
+          buyQty: bxgy ? d.buy_qty! : null,
+          getQty: bxgy ? d.get_qty! : null,
+          productIds: bxgy ? scope : [],
+          automatic: bxgy && d.automatic,
         })
         .onConflictDoNothing();
     }

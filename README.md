@@ -378,3 +378,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Buyers fix it themselves**: for 12 hours after paying, and only until it ships, the buyer's order page has "Wrong address, or need another size?". They can correct the address (in the same country, since shipping and tax were worked out for it) or switch an item to another size or colour at the same price that's in stock. A new address is risk-checked again unless the merchant already reviewed the order.
 2. **Merchants too**: the admin order page has "Change the address or a size" until the order ships.
 3. **The supplier gets the new version**: the affected supplier orders are cancelled and placed again with the change. If a supplier won't cancel because it's already packing, nothing changes and the buyer is asked to message the store. Each change is emailed to the buyer and listed on the order's timeline (`editOrder` in `packages/core/src/order-edits.ts`, `orders.edits`).
+
+### Buy X, get Y (after launch, part 44)
+
+1. **A new kind of offer** on the Marketing page: "Buy 2, get 1 free", or the items they get at a percent off, for every product or only the ones ticked. For every X items bought, the next Y are discounted, always the cheapest in the cart (`bxgyDiscount` in `packages/core/src/discounts.ts`).
+2. **Automatic by default**: the offer applies without a code, product pages it covers show it, and the cart says when one more item would be free ("Add 1 more and it's free", in the store's language). It can also be a code that buyers type. A bundle that saves more wins, as with codes.
+3. Usage limits, dates, minimum order and once per buyer work as for other codes, and store export and import carry the offer.

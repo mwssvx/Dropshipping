@@ -113,7 +113,7 @@ export default async function CartPage({ params, searchParams }: { params: Promi
             <dt className="hint">{t.subtotal}</dt><dd className="text-right">{money(shown!.subtotalMinor)}</dd>
             {quote.discount && (
               <>
-                <dt className="hint">{t.discount} ({quote.discount.code})</dt>
+                <dt className="hint">{t.discount} ({quote.discount.automatic ? quote.discount.label : quote.discount.code})</dt>
                 <dd className="text-right">{shown!.discountMinor ? `−${money(shown!.discountMinor)}` : quote.discount.label}</dd>
               </>
             )}
@@ -135,7 +135,10 @@ export default async function CartPage({ params, searchParams }: { params: Promi
             <dd className="col-span-2 hint text-right font-sans">{quote.pricesIncludeTax ? t.taxIncludedNote : t.taxAddedNote}</dd>
             {points > 0 && <dd className="col-span-2 text-right font-sans text-success">{t.rewardsEarn(points.toLocaleString("en-US"))}</dd>}
           </dl>
-          {quote.discount && (
+          {quote.offerNudge && (
+            <p className="self-end banner banner-info text-sm" role="status">{quote.offerNudge.label}: {t.offerNudge(quote.offerNudge.missing, quote.offerNudge.free)}</p>
+          )}
+          {quote.discount && !quote.discount.automatic && (
             <form action={removeCodeAction.bind(null, handle)} className="self-end flex items-center gap-2 text-sm">
               <span className="pill pill-success">{quote.discount.code}: {quote.discount.label}</span>
               <button className="underline">{t.remove}</button>

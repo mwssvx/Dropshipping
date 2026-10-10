@@ -4,7 +4,7 @@ import { schema, type Address, type Db } from "@sf/db";
 import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
 import type { PaymentEvent, PaymentProvider } from "./payments";
-import { applyDiscount, describeDiscount, findUsableDiscount, spreadDiscount } from "./discounts";
+import { applyDiscount, automaticOffers, bxgyMissing, describeDiscount, findUsableDiscount, spreadDiscount, type Discount, type OfferUnit } from "./discounts";
 import { applyMoneyEvent } from "./payouts";
 import { estimateProcessingFee, platformFeeFor } from "./plans";
 import { BuiltInTaxCalculator, listTaxRegistrations, type TaxCalculator } from "./tax";
@@ -141,20 +141,47 @@ export async function quoteCart(
   let bundle = savings.length
     ? { title: savings.map((b) => b.title).join(" + "), savings, discountMinor: savings.reduce((s, b) => s + b.savingMinor, 0) }
     : null;
-  let discount: { id: string; code: string; label: string; discountMinor: number; freeShipping: boolean } | null = null;
+  type AppliedDiscount = { id: string; code: string; label: string; discountMinor: number; freeShipping: boolean; automatic: boolean };
+  // Set inside use(), which TypeScript can't follow, hence the cast.
+  let discount = null as AppliedDiscount | null;
   /** A valid code the cart didn't use because the bundle saves more. */
   let codeNotUsed: string | null = null;
+  /** An automatic buy X get Y offer the cart is one step from: "add 1 more and it's free". */
+  let offerNudge = null as { label: string; missing: number; free: boolean } | null;
+  const units: OfferUnit[] = goods.map((i) => ({ productId: i.productId, unitMinor: i.unitPriceMinor, quantity: i.quantity }));
+  const use = (d: Discount, applied: { discountMinor: number; shippingMinor: number }) => {
+    bundle = null;
+    shippingMinor = applied.shippingMinor;
+    discount = { id: d.id, code: d.code, label: describeDiscount(d, shop.currency), discountMinor: applied.discountMinor, freeShipping: d.kind === "free_shipping", automatic: d.automatic };
+  };
   if (opts.discountCode?.trim() && wholesale) throw new UserError("Discount codes don't apply to wholesale prices.", "discount_invalid");
   if (opts.discountCode?.trim()) {
     const d = await findUsableDiscount(db, shop, opts.discountCode, { subtotalMinor: goodsMinor, email: opts.email });
-    const applied = applyDiscount(d, goodsMinor, shippingMinor);
+    const applied = applyDiscount(d, goodsMinor, shippingMinor, units);
+    if (d.kind === "bxgy" && !applied.discountMinor) {
+      throw new UserError(`${d.code} is for "${describeDiscount(d, shop.currency)}". Add more to your cart to use it.`, "discount_invalid");
+    }
     if (bundle && bundle.discountMinor > applied.discountMinor + (shippingMinor - applied.shippingMinor)) {
       codeNotUsed = d.code;
     } else {
-      bundle = null;
-      shippingMinor = applied.shippingMinor;
-      discount = { id: d.id, code: d.code, label: describeDiscount(d, shop.currency), discountMinor: applied.discountMinor, freeShipping: d.kind === "free_shipping" };
+      use(d, applied);
     }
+  } else if (!wholesale && hasGoods) {
+    // Offers that need no code: the one saving the most, unless a bundle saves more.
+    let best: { d: Discount; applied: { discountMinor: number; shippingMinor: number } } | null = null;
+    for (const d of await automaticOffers(db, shop.id)) {
+      try {
+        await findUsableDiscount(db, shop, d.code, { subtotalMinor: goodsMinor, email: opts.email });
+      } catch (e) {
+        if (e instanceof UserError) continue;
+        throw e;
+      }
+      const applied = applyDiscount(d, goodsMinor, shippingMinor, units);
+      if (applied.discountMinor > (best?.applied.discountMinor ?? 0)) best = { d, applied };
+      const missing = bxgyMissing(d, units);
+      if (missing && !offerNudge) offerNudge = { label: describeDiscount(d, shop.currency), missing, free: d.value >= 100 };
+    }
+    if (best && !(bundle && bundle.discountMinor >= best.applied.discountMinor)) use(best.d, best.applied);
   }
   const discountMinor = discount?.discountMinor ?? bundle?.discountMinor ?? 0;
   const totalMinor = subtotalMinor - discountMinor + shippingMinor;
@@ -173,6 +200,7 @@ export async function quoteCart(
     /** Bundle savings, when they're used instead of a code. */
     bundle,
     codeNotUsed,
+    offerNudge,
     discountMinor,
     shippingMinor,
     totalMinor,
