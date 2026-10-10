@@ -5,6 +5,7 @@ import { refreshOrderFulfillment, sendOrderEmail, type FulfillmentContext } from
 import { cancelPurchaseOrder, supplierLabel } from "./own-suppliers";
 import type { PaymentProvider } from "./payments";
 import { takeBackPoints } from "./rewards";
+import { issueCreditNote } from "./invoices";
 
 export type RefundContext = FulfillmentContext & { payments: PaymentProvider };
 
@@ -122,6 +123,7 @@ export async function refundOrder(
   });
 
   await takeBackPoints(db, order, refund, full);
+  await issueCreditNote(db, refund.id);
   const cancelled = full ? await cancelUnshipped(ctx, order.id) : { cancelled: 0, notCancelled: [] };
   const email = await sendOrderEmail(ctx, order.id, "refund", refund.id);
   return { refund, full, ...cancelled, email: email.status };

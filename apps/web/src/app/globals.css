@@ -108,3 +108,11 @@
 .store[data-buttons="outline"] .btn-primary { background: transparent; color: var(--color-ink); border-color: var(--color-ink); }
 .store[data-buttons="outline"] .btn-primary:hover { background: var(--color-ink); color: var(--color-surface); }
 .store[data-buttons="outline"] .text-white .btn-primary { color: #fff; border-color: #fff; }
+
+/* Invoices print on their own: everything around the sheet is hidden. */
+@media print {
+  body:has(.invoice-sheet) * { visibility: hidden; }
+  .invoice-sheet, .invoice-sheet * { visibility: visible; }
+  .invoice-sheet { position: absolute; left: 0; top: 0; width: 100%; border: 0; }
+  .invoice-sheet .no-print { display: none; }
+}

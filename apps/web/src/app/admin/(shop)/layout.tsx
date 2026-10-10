@@ -24,7 +24,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const holds = show("money") ? requirements.filter((r) => r.holdsPayouts).length : 0;
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[232px_1fr]">
-      <aside className="bg-surface border-b lg:border-b-0 lg:border-r border-border lg:min-h-dvh flex flex-col">
+      <aside className="print:hidden bg-surface border-b lg:border-b-0 lg:border-r border-border lg:min-h-dvh flex flex-col">
         <div className="px-4 py-4 flex items-center justify-between gap-2">
           <span className="font-bold tracking-tight">{BRAND}</span>
           <a href={address} target="_blank" className="hint hover:text-accent" title={address.replace(/^https?:\/\//, "")}>
@@ -76,6 +76,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           {show("ai") && <NavLink href="/admin/ai">AI settings</NavLink>}
           {show("shipping") && <NavLink href="/admin/shipping">Shipping</NavLink>}
           {show("taxes") && <NavLink href="/admin/taxes">Taxes</NavLink>}
+          {show("taxes") && <NavLink href="/admin/invoices">Invoices</NavLink>}
           {show("currencies") && <NavLink href="/admin/currencies">Currencies</NavLink>}
           {show("developers") && <NavLink href="/admin/developers">Developers</NavLink>}
           {show("export") && <NavLink href="/admin/export">Export and import</NavLink>}

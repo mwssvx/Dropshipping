@@ -70,6 +70,8 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       round_converted_prices: shop.roundConvertedPrices,
       languages: shop.languages,
       rewards: { enabled: shop.rewardsEnabled, earn_rate: shop.rewardsEarnRate, value_minor: shop.rewardsValueMinor },
+      // The number series stays with the store it was used in.
+      invoices: { legal_name: shop.invoiceLegalName, address: shop.invoiceAddress, prefix: shop.invoicePrefix, footer: shop.invoiceFooter },
       wholesale: { enabled: shop.wholesaleEnabled, percent_off: shop.wholesalePercentOff, min_order_minor: shop.wholesaleMinOrderMinor },
       // Missing means the built-in default rate.
       shipping_zones: shipping.isDefault
@@ -167,6 +169,9 @@ const importSchema = z.object({
       round_converted_prices: z.boolean().optional(),
       languages: z.array(z.enum(LANGUAGE_CODES as [string, ...string[]])).max(LANGUAGE_CODES.length).optional(),
       rewards: z.object({ enabled: z.boolean(), earn_rate: z.number().int().min(1).max(100), value_minor: z.number().int().min(1).max(10_000) }).optional(),
+      invoices: z
+        .object({ legal_name: z.string().max(120).nullable(), address: z.string().max(400).nullable(), prefix: z.string().max(12).regex(/^[A-Za-z0-9\-/_.]*$/), footer: z.string().max(500).nullable() })
+        .optional(),
       wholesale: z
         .object({ enabled: z.boolean(), percent_off: z.number().int().min(1).max(80), min_order_minor: z.number().int().min(0).max(100_000_000) })
         .optional(),
@@ -461,6 +466,10 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
     if (data.store.round_converted_prices !== undefined) settings.roundConvertedPrices = data.store.round_converted_prices;
     if (data.store.rewards) {
       Object.assign(settings, { rewardsEnabled: data.store.rewards.enabled, rewardsEarnRate: data.store.rewards.earn_rate, rewardsValueMinor: data.store.rewards.value_minor });
+    }
+    if (data.store.invoices) {
+      const inv = data.store.invoices;
+      Object.assign(settings, { invoiceLegalName: inv.legal_name, invoiceAddress: inv.address, invoicePrefix: inv.prefix, invoiceFooter: inv.footer });
     }
     if (data.store.languages !== undefined) settings.languages = LANGUAGE_CODES.filter((l) => data.store.languages!.includes(l));
     if (data.store.wholesale) {

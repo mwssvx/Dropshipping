@@ -1,4 +1,4 @@
-// Milestone 1 to 31 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 32 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -111,6 +111,13 @@ export const shops = pgTable(
     rewardsEarnRate: integer("rewards_earn_rate").notNull().default(1),
     /** What 100 points are worth, in minor units. */
     rewardsValueMinor: integer("rewards_value_minor").notNull().default(100),
+    // Invoices: the seller details printed on them, and the next number in the store's one series
+    // (invoices and credit notes share it, so there are no gaps).
+    invoiceLegalName: text("invoice_legal_name"),
+    invoiceAddress: text("invoice_address"),
+    invoicePrefix: text("invoice_prefix").notNull().default("INV-"),
+    invoiceNextNumber: integer("invoice_next_number").notNull().default(1),
+    invoiceFooter: text("invoice_footer"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -1242,5 +1249,33 @@ export const rewardEntries = pgTable(
   (t) => [
     index("reward_entries_customer_idx").on(t.customerId, t.createdAt),
     uniqueIndex("reward_entries_order_uq").on(t.orderId, t.kind, t.refId),
+  ],
+);
+
+export type InvoiceSeller = { name: string; address: string | null; taxNumbers: { label: string; number: string }[]; footer: string | null };
+
+// A numbered invoice for a paid order, or a credit note for one of its refunds. The seller's
+// details are copied in when it's issued, so changing them later never rewrites an old invoice.
+export const invoices = pgTable(
+  "invoices",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    orderId: uuid("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["invoice", "credit_note"] }).notNull(),
+    /** Set on credit notes. */
+    refundId: uuid("refund_id").references(() => refunds.id, { onDelete: "cascade" }),
+    /** Like "INV-0042": the prefix when it was issued plus the number in the series. */
+    number: text("number").notNull(),
+    seq: integer("seq").notNull(),
+    seller: jsonb("seller").$type<InvoiceSeller>().notNull(),
+    issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("invoices_shop_seq_uq").on(t.shopId, t.seq),
+    uniqueIndex("invoices_order_invoice_uq").on(t.orderId).where(sql`${t.kind} = 'invoice'`),
+    uniqueIndex("invoices_refund_uq").on(t.refundId),
+    index("invoices_shop_issued_idx").on(t.shopId, t.issuedAt),
+    check("invoices_refund_when_credit", sql`(${t.kind} = 'credit_note') = (${t.refundId} is not null)`),
   ],
 );
