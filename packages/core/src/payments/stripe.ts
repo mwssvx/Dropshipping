@@ -27,8 +27,11 @@ export class StripePaymentProvider implements PaymentProvider {
     shopAccountId: string | null;
     applicationFeeMinor: number;
     metadata: Record<string, string>;
+    saveCard?: { email: string };
   }) {
     if (!input.shopAccountId) throw new UserError("This store hasn't finished payout setup yet.", "payouts_not_ready");
+    // A saved card needs a customer to hang on; it's only charged again from the order page.
+    const customer = input.saveCard ? (await this.stripe.customers.create({ email: input.saveCard.email })).id : undefined;
     const pi = await this.stripe.paymentIntents.create({
       amount: input.amountMinor,
       currency: input.currency.toLowerCase(),
@@ -36,8 +39,42 @@ export class StripePaymentProvider implements PaymentProvider {
       transfer_data: { destination: input.shopAccountId },
       application_fee_amount: input.applicationFeeMinor > 0 ? input.applicationFeeMinor : undefined,
       metadata: input.metadata,
+      ...(customer ? { customer, setup_future_usage: "off_session" as const } : {}),
     });
     return { id: pi.id, clientSecret: pi.client_secret! };
+  }
+
+  async chargeSavedCard(input: {
+    fromPaymentIntentId: string;
+    amountMinor: number;
+    currency: string;
+    shopAccountId: string | null;
+    applicationFeeMinor: number;
+    metadata: Record<string, string>;
+  }) {
+    if (!input.shopAccountId) throw new UserError("This store hasn't finished payout setup yet.", "payouts_not_ready");
+    const first = await this.stripe.paymentIntents.retrieve(input.fromPaymentIntentId);
+    const customer = typeof first.customer === "string" ? first.customer : first.customer?.id;
+    const method = typeof first.payment_method === "string" ? first.payment_method : first.payment_method?.id;
+    if (!customer || !method) throw new UserError("The card from this order wasn't kept, so it can't be charged again.", "card_not_saved");
+    try {
+      const pi = await this.stripe.paymentIntents.create({
+        amount: input.amountMinor,
+        currency: input.currency.toLowerCase(),
+        customer,
+        payment_method: method,
+        off_session: true,
+        confirm: true,
+        transfer_data: { destination: input.shopAccountId },
+        application_fee_amount: input.applicationFeeMinor > 0 ? input.applicationFeeMinor : undefined,
+        metadata: input.metadata,
+      });
+      if (pi.status !== "succeeded") throw new UserError("Your bank wants to confirm this payment, so it can't be added in one click.", "card_declined");
+      return { id: pi.id };
+    } catch (e) {
+      if (e instanceof Stripe.errors.StripeCardError) throw new UserError(`Your card was declined: ${e.message}`, "card_declined");
+      throw e;
+    }
   }
 
   async clientSecret(paymentIntentId: string) {

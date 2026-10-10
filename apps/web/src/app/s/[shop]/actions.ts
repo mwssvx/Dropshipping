@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { amountToCharge, askQuestion, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
+import { acceptPostPurchaseOffer, amountToCharge, askQuestion, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
 import { agents, campaigns, db, fulfillment, payments, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
@@ -392,4 +392,19 @@ export async function claimReferralAction(handle: string, code: string, _: Refer
     return { error: e.code === "no_link" ? "gone" : "invalid" };
   }
   return { sent: email };
+}
+
+/** The buyer took the after-checkout offer on their order page. */
+export async function acceptPostPurchaseAction(handle: string, ref: string, _: { error?: string }, form: FormData): Promise<{ error?: string }> {
+  const shop = await loadShop(handle);
+  let added;
+  try {
+    added = await acceptPostPurchaseOffer({ db: await db(), payments: payments() }, shop, { orderRef: ref, variantId: String(form.get("variantId") ?? "") }, { taxCalculator: tax() });
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  afterOrderPaid(added.id);
+  revalidatePath(`/s/${handle}/orders/${ref}`);
+  redirect(`${await storeBase(handle)}/orders/${ref}`);
 }

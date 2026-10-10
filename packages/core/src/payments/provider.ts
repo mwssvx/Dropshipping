@@ -40,7 +40,21 @@ export interface PaymentProvider {
     /** Our cut (free plan). Taken from the payment before it reaches the merchant. */
     applicationFeeMinor: number;
     metadata: Record<string, string>;
+    /** Keep the card for one more charge right after checkout (the after-checkout offer). */
+    saveCard?: { email: string };
   }): Promise<PaymentIntent>;
+  /**
+   * Charge the card used for an earlier payment again, with the buyer present but without them
+   * typing it in. Throws a UserError when the card is declined or the bank wants a check.
+   */
+  chargeSavedCard(input: {
+    fromPaymentIntentId: string;
+    amountMinor: number;
+    currency: string;
+    shopAccountId: string | null;
+    applicationFeeMinor: number;
+    metadata: Record<string, string>;
+  }): Promise<{ id: string }>;
   /** The secret the browser's card form needs to finish paying for an order. */
   clientSecret(paymentIntentId: string): Promise<string>;
   /** Verify and normalise a webhook. Throws if the signature is wrong. Returns null for events we ignore. */

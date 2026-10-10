@@ -274,6 +274,11 @@ export async function startCheckout(
     gift?: z.input<typeof giftSchema> | null;
     /** "Note for the store", for the merchant. */
     note?: string | null;
+    /**
+     * An after-checkout offer on an order just paid: its own percent off, no codes and no shipping.
+     * The order is created unpaid; the caller charges the saved card.
+     */
+    followUp?: { parentOrderId: string; percentOff: number };
   },
   taxCalculator: TaxCalculator = new BuiltInTaxCalculator(),
 ) {
@@ -282,14 +287,16 @@ export async function startCheckout(
   if (!parsed.success) throw new UserError(parsed.error.issues[0]!.message);
   const { email, address } = parsed.data;
   const gift = parsed.data.gift ?? null;
-  const cart = await quoteCart(db, shop, input.lines, {
-    discountCode: input.discountCode,
+  const followUp = input.followUp ?? null;
+  const quoted = await quoteCart(db, shop, input.lines, {
+    discountCode: followUp ? null : input.discountCode,
     email,
-    buyerEmail: input.buyerEmail,
-    giftCardCode: input.giftCardCode,
+    buyerEmail: followUp ? null : input.buyerEmail,
+    giftCardCode: followUp ? null : input.giftCardCode,
     country: address.country,
     shippingRateId: input.shippingRateId,
   });
+  const cart = followUp ? asFollowUp(quoted, followUp.percentOff) : quoted;
   if (cart.wholesale && cart.wholesale.shortByMinor > 0) {
     throw new UserError(
       `Wholesale orders start at ${formatMoney(cart.wholesale.minOrderMinor, shop.currency)}. Add ${formatMoney(cart.wholesale.shortByMinor, shop.currency)} more to check out.`,
@@ -327,16 +334,22 @@ export async function startCheckout(
   const platformFeeMinor = platformFeeFor(shop.plan, Math.max(0, quote.totalMinor - quote.taxMinor - giftCardMinor));
   const presentment = fx ? presentQuote({ ...quote, pricesIncludeTax: tax.included }, fx) : null;
 
-  // Paid in full by gift card: there's nothing to charge, so the order is paid right away.
-  const intent = dueMinor
-    ? await payments.createPaymentIntent({
-        amountMinor: presentment?.totalMinor ?? dueMinor,
-        currency: presentment?.currency ?? quote.currency,
-        shopAccountId: shop.paymentsAccountId,
-        applicationFeeMinor: fx ? convertAmount(platformFeeMinor, fx) : platformFeeMinor,
-        metadata: { shopId: shop.id },
-      })
-    : { id: `giftcard_${randomUUID()}`, clientSecret: "" };
+  // The card is kept for the after-checkout offer, in the store's currency only.
+  const saveCard = !followUp && !fx && !!dueMinor && !!shop.postPurchaseOffer?.active;
+  // Paid in full by gift card: there's nothing to charge, so the order is paid right away. An
+  // after-checkout order is charged to the saved card by the caller once it exists.
+  const intent = followUp
+    ? { id: `followup_${randomUUID()}`, clientSecret: "" }
+    : dueMinor
+      ? await payments.createPaymentIntent({
+          amountMinor: presentment?.totalMinor ?? dueMinor,
+          currency: presentment?.currency ?? quote.currency,
+          shopAccountId: shop.paymentsAccountId,
+          applicationFeeMinor: fx ? convertAmount(platformFeeMinor, fx) : platformFeeMinor,
+          metadata: { shopId: shop.id },
+          ...(saveCard ? { saveCard: { email } } : {}),
+        })
+      : { id: `giftcard_${randomUUID()}`, clientSecret: "" };
 
   const consent = input.acceptsMarketing ? { acceptsMarketing: true, marketingConsentAt: new Date(), unsubscribedAt: null } : {};
   const campaignId = await creditableCampaign(db, shop.id, input.campaignId);
@@ -384,6 +397,8 @@ export async function startCheckout(
         // Only something that ships can be a gift; gift cards are emailed to the buyer.
         gift: gift && cart.items.some((i) => !i.giftCard) ? gift : null,
         buyerNote: parsed.data.note,
+        ...(followUp ? { source: "post_purchase" as const, parentOrderId: followUp.parentOrderId } : {}),
+        cardSaved: saveCard,
         paymentIntentId: intent.id,
         ...(dueMinor ? {} : { paymentStatus: "paid" as const, paidAt: new Date() }),
       })
@@ -411,6 +426,32 @@ export async function startCheckout(
   });
 
   return { order, clientSecret: intent.clientSecret, quote, paidWithGiftCard: !dueMinor };
+}
+
+/** An after-checkout offer's prices: its percent off each item, no codes or offers, no shipping. */
+function asFollowUp(cart: Awaited<ReturnType<typeof quoteCart>>, percent: number) {
+  const items = cart.items.map((i) => {
+    const unitPriceMinor = percentOff(i.unitPriceMinor, percent);
+    return { ...i, unitPriceMinor, lineMinor: unitPriceMinor * i.quantity };
+  });
+  const subtotalMinor = items.reduce((s, i) => s + i.lineMinor, 0);
+  return {
+    ...cart,
+    items,
+    subtotalMinor,
+    goodsMinor: subtotalMinor,
+    discount: null,
+    bundle: null,
+    discountMinor: 0,
+    shippingMinor: 0,
+    shipping: null,
+    giftCard: null,
+    wholesale: null,
+    offerNudge: null,
+    freeShipping: null,
+    totalMinor: subtotalMinor,
+    dueMinor: subtotalMinor,
+  };
 }
 
 /** What the card is charged for an order: the total less any gift card, in the buyer's currency. */

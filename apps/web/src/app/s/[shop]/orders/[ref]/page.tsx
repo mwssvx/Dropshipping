@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { buyerAmounts, buyerThread, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, returnOptions, reviewableItems } from "@sf/core";
+import { buyerAmounts, buyerThread, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, returnOptions, reviewableItems } from "@sf/core";
 import Link from "next/link";
 import { db, fulfillment, storeAddress } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
@@ -9,6 +9,7 @@ import { loadShop, storeBase, storeT } from "../../data";
 import { ReviewForm } from "./ReviewForm";
 import { QuestionForm } from "./QuestionForm";
 import { ReturnForm } from "./ReturnForm";
+import { PostPurchaseOffer } from "./PostPurchaseOffer";
 
 const time = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const utc = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC" });
@@ -39,6 +40,10 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
   const shipped = order.fulfillments.filter((f) => f.trackingNumber);
   const edit = order.paymentStatus === "paid" ? await orderEditOptions(await fulfillment(), shop.id, order.id, "buyer") : null;
   const lastEdit = order.edits.at(-1);
+  // The after-checkout offer, what the buyer added with it, or the order this one was added to.
+  const offer = await postPurchaseOfferFor(await db(), shop, order);
+  const added = paid ? await postPurchaseOrder(await db(), order.id) : null;
+  const addedTo = order.parentOrderId ? await (await db()).query.orders.findFirst({ where: (o, { eq }) => eq(o.id, order.parentOrderId!), columns: { number: true, paymentIntentId: true } }) : null;
   const steps = [
     { label: "Order confirmed", done: paid },
     { label: "Being prepared", done: order.fulfillments.some((f) => f.placedAt || f.shippedAt) },
@@ -61,6 +66,21 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
           <Link href={`${base}/pay/${order.id}`} className="btn btn-primary self-start">Finish paying</Link>
         )}
       </div>
+      {offer && (
+        <PostPurchaseOffer handle={handle} orderRef={ref} title={offer.product.title} imageUrl={offer.product.imageUrl} percentOff={offer.percentOff}
+          until={`${utc.format(offer.expiresAt)} UTC`}
+          options={offer.variants.map((v) => ({ id: v.id, title: v.title, price: formatMoney(v.priceMinor, shop.currency), offer: formatMoney(v.offerMinor, shop.currency), charge: formatMoney(v.chargeMinor, shop.currency) }))} />
+      )}
+      {added && (
+        <p className="banner banner-success" role="status">
+          Added as order #{added.number} and charged {formatMoney(added.totalMinor, added.currency)} to the same card. <Link href={`${base}/orders/${added.paymentIntentId}`} className="underline">See it</Link>
+        </p>
+      )}
+      {addedTo && (
+        <p className="banner banner-info">
+          You added this after checking out, to the same card as <Link href={`${base}/orders/${addedTo.paymentIntentId}`} className="underline">order #{addedTo.number}</Link>. It may arrive separately.
+        </p>
+      )}
       {order.gift && (
         <section className="card p-5 flex flex-col gap-1 text-sm" aria-labelledby="gift-heading">
           <h2 id="gift-heading" className="font-semibold">A gift for {order.shippingAddress.name}</h2>
