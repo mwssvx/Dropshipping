@@ -198,11 +198,20 @@ export function combineOptions(defs: OptionDef[]) {
   return clean.length ? combos.map((options) => ({ title: Object.values(options).join(" / "), options })) : [];
 }
 
-/** A product's options and their values, in the order its variants use them. */
-export function optionDefsOf(variants: { options: Record<string, string> | null }[]): OptionDef[] {
+/**
+ * A product's options and their values, in the order its variants use them. The database doesn't
+ * keep the order of option names, so it's read from a title like "Red / L" when it matches.
+ */
+export function optionDefsOf(variants: { title?: string; options: Record<string, string> | null }[]): OptionDef[] {
   const defs: OptionDef[] = [];
   for (const v of variants) {
-    for (const [name, value] of Object.entries(v.options ?? {})) {
+    const entries = Object.entries(v.options ?? {});
+    const parts = v.title?.split(" / ") ?? [];
+    if (parts.length === entries.length) {
+      const at = (value: string) => parts.indexOf(value);
+      if (entries.every(([, value]) => at(value) >= 0)) entries.sort((a, b) => at(a[1]) - at(b[1]));
+    }
+    for (const [name, value] of entries) {
       let d = defs.find((x) => x.name === name);
       if (!d) defs.push((d = { name, values: [] }));
       if (!d.values.includes(value)) d.values.push(value);

@@ -360,3 +360,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Products added by hand** can have up to three options, like Size (S, M, L) and Color (Black, White). The merchant types each option's values once, and every combination ("S / Black", "S / White"…) gets its own row with price, "was" price, cost and stock, up to 100 combinations. New combinations start from the first row's price.
 2. **Editing keeps what's there**: each option is saved by its id, so removing a value or adding one leaves the other combinations, their stock, past orders and back-in-stock requests untouched. Removing every option goes back to a single price. The values are saved as named options, so collection and search filters (part 37) offer them straight away (`combineOptions` in `packages/core/src/products.ts`).
 3. Supplier products keep the supplier's options, since each one is tied to the supplier's listing, and gift cards keep their amounts.
+
+### Option picker (after launch, part 41)
+
+1. **On product pages** with named options (sizes and colours from the supplier or the options editor), shoppers pick each option on its own row ("Size: M", "Color: Black") instead of scrolling a list of every combination. The chosen combination and its price show under the choices (`components/OptionPicker.tsx`).
+2. **Stock-aware**: a value with nothing in stock is crossed out and can't be picked. Picking a value that isn't in stock with the other choices moves them to the closest combination that is ("Red" switches Size from S to L when red only comes in L), so Add to cart always adds something available.
+3. Products whose options don't line up (older imports without named options) keep the plain list. Option order follows the variant titles, since the database doesn't keep the order of option names.

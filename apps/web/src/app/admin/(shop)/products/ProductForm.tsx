@@ -33,7 +33,13 @@ function combine(drafts: OptionDraft[]) {
 function draftsFrom(variants: VariantValues[]): OptionDraft[] {
   const defs: { name: string; values: string[] }[] = [];
   for (const v of variants) {
-    for (const [name, value] of Object.entries(v.options ?? {})) {
+    // Saved options lose their order; the title ("Red / L") keeps it.
+    const entries = Object.entries(v.options ?? {});
+    const parts = v.title.split(" / ");
+    if (parts.length === entries.length && entries.every(([, value]) => parts.includes(value))) {
+      entries.sort((a, b) => parts.indexOf(a[1]) - parts.indexOf(b[1]));
+    }
+    for (const [name, value] of entries) {
       let d = defs.find((x) => x.name === name);
       if (!d) defs.push((d = { name, values: [] }));
       if (!d.values.includes(value)) d.values.push(value);

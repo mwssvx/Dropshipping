@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, getActiveProductByHandle, NotFoundError, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, sizeChartForProduct, sizeChartRows, upsellsFor, wholesaleTermsFor } from "@sf/core";
+import { bundlesForProduct, getActiveProductByHandle, NotFoundError, optionDefsOf, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, sizeChartForProduct, sizeChartRows, upsellsFor, wholesaleTermsFor } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { RecentlyViewed } from "@/components/RecentlyViewed";
 import { RememberView } from "@/components/RememberView";
@@ -82,6 +83,13 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const buyable = product.variants.filter((x) => x.stock === null || x.stock > 0);
   const v = buyable[0] ?? product.variants[0];
   const many = product.variants.length > 1;
+  // Pick each option (Size, Color) on its own when every variant names the same options.
+  const defs = optionDefsOf(product.variants);
+  const names = defs.map((d) => d.name).sort().join("|");
+  const byOption =
+    many && defs.length > 0 &&
+    product.variants.every((x) => Object.keys(x.options ?? {}).sort().join("|") === names) &&
+    new Set(product.variants.map((x) => JSON.stringify(defs.map((d) => x.options?.[d.name])))).size === product.variants.length;
   const [reviews, questions, rawUpsells, base, fx, chart, rawRecent] = await Promise.all([
     productReviews(await db(), product.id),
     productQuestions(await db(), product.id),
@@ -142,7 +150,15 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
         )}
         {v && buyable.length > 0 && (
           <form action={addToCartAction.bind(null, shopHandle)} className="flex flex-col gap-4">
-            {many ? (
+            {byOption ? (
+              <OptionPicker
+                options={defs}
+                variants={product.variants.map((x) => ({ id: x.id, title: x.title, options: x.options ?? {}, available: x.stock === null || x.stock > 0 }))}
+                initialId={v.id}
+                prices={Object.fromEntries(product.variants.map((x) => [x.id, <Price key={x.id} minor={x.priceMinor} compareAt={x.compareAtMinor} currency={shop.currency} fx={fx} />]))}
+                soldOutLabel={t.soldOut}
+              />
+            ) : many ? (
               <fieldset className="flex flex-col gap-2">
                 <legend className="label mb-2">{t.option}</legend>
                 <div className="flex flex-wrap gap-2">
