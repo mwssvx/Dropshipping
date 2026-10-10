@@ -21,6 +21,8 @@ describe("product options", () => {
       { name: "Color", values: ["Black", "White"] },
       { name: "Size", values: ["S"] },
     ]);
+    // Stored options lose their order; the title keeps it.
+    expect(optionDefsOf([{ title: "Red / L", options: { Size: "L", Color: "Red" } }]).map((d) => d.name)).toEqual(["Color", "Size"]);
   });
 
   it("edits options in place by id, adds new ones and removes the rest", async () => {
