@@ -30,6 +30,9 @@ type Detail = {
   refundableMinor: number;
   held?: boolean;
   risk?: { level: "low" | "medium" | "high"; reasons: string[] } | null;
+  buyerNote?: string | null;
+  staffNote?: string | null;
+  tags?: string[];
 };
 
 export default function OrderScreen() {
@@ -129,8 +132,22 @@ export default function OrderScreen() {
           <Body muted>
             {[o.shippingAddress.line1, o.shippingAddress.line2, o.shippingAddress.city, o.shippingAddress.region, o.shippingAddress.postalCode, o.shippingAddress.country].filter(Boolean).join(", ")}
           </Body>
+          {o.buyerNote ? <Body>Their note: {o.buyerNote}</Body> : null}
         </Card>
       </Section>
+
+      {o.staffNote || o.tags?.length ? (
+        <Section title="Your note and tags">
+          <Card>
+            {o.tags?.length ? (
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space(1) }}>
+                {o.tags.map((t) => <Pill key={t} label={t} />)}
+              </View>
+            ) : null}
+            {o.staffNote ? <Body>{o.staffNote}</Body> : null}
+          </Card>
+        </Section>
+      ) : null}
 
       {o.fulfillments.some((x) => x.trackingNumber) ? (
         <Section title="Delivery">

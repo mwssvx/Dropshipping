@@ -316,6 +316,13 @@
       "when": 1791653497766,
       "tag": "0044_m52_buy_x_get_y",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1791662530982,
+      "tag": "0045_m53_order_notes_tags",
+      "breakpoints": true
     }
   ]
 }

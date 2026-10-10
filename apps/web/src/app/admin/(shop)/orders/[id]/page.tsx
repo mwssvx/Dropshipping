@@ -9,6 +9,7 @@ import { CheckTrackingButton, ManualTrackingForm, RetryButton } from "./Fulfillm
 import { RefundForm } from "./RefundForm";
 import { FixWithAiButton } from "./FixWithAiButton";
 import { RiskActions } from "./RiskActions";
+import { OrderNotesForm } from "./OrderNotesForm";
 import { FulfilmentStatus, PaymentStatus } from "@/components/Status";
 import { PageHeader } from "../../PageHeader";
 
@@ -239,7 +240,18 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
               <p className="hint mt-1">{order.gift.recipientEmail ? `We email ${order.gift.recipientEmail} when it ships, without prices.` : "No recipient email, so only the buyer hears from us."}</p>
             </section>
           )}
+          {order.buyerNote && (
+            <section aria-labelledby="buyer-note-heading">
+              <h2 id="buyer-note-heading" className="font-semibold mb-1">Note from the customer</h2>
+              <p className="whitespace-pre-line border-l-2 border-border pl-3">{order.buyerNote}</p>
+              <p className="hint mt-1">The supplier doesn&apos;t see this. If it changes how the order ships, tell them.</p>
+            </section>
+          )}
         </div>
+        <section className="card p-5 flex flex-col gap-3 text-sm" aria-labelledby="notes-heading">
+          <h2 id="notes-heading" className="font-semibold">Your note and tags</h2>
+          <OrderNotesForm id={order.id} note={order.staffNote ?? ""} tags={order.tags.join(", ")} />
+        </section>
         {documents.length > 0 && (
           <section className="card p-5 flex flex-col gap-2 text-sm" aria-labelledby="invoices-heading">
             <h2 id="invoices-heading" className="font-semibold">Invoices</h2>

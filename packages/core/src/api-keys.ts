@@ -79,6 +79,9 @@ export function publicOrder(o: Order & { lines?: Line[]; fulfillments?: Fulfillm
     shipping_address: o.shippingAddress,
     created_at: iso(o.createdAt),
     paid_at: iso(o.paidAt),
+    buyer_note: o.buyerNote,
+    note: o.staffNote,
+    tags: o.tags,
     ...(o.lines ? { lines: o.lines.map((l) => ({ variant_id: l.variantId, title: l.title, quantity: l.quantity, unit_price: l.unitPriceMinor })) } : {}),
     ...(o.fulfillments
       ? {

@@ -384,3 +384,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **A new kind of offer** on the Marketing page: "Buy 2, get 1 free", or the items they get at a percent off, for every product or only the ones ticked. For every X items bought, the next Y are discounted, always the cheapest in the cart (`bxgyDiscount` in `packages/core/src/discounts.ts`).
 2. **Automatic by default**: the offer applies without a code, product pages it covers show it, and the cart says when one more item would be free ("Add 1 more and it's free", in the store's language). It can also be a code that buyers type. A bundle that saves more wins, as with codes.
 3. Usage limits, dates, minimum order and once per buyer work as for other codes, and store export and import carry the offer.
+
+### Order notes and tags (after launch, part 45)
+
+1. **A note from the buyer**: checkout has "Note for the store (optional)", in the store's language. The note shows on the admin order page (with a reminder that the supplier doesn't see it), as "Has a note" in the order list, on the buyer's order page, in their receipt email, in the app and in the public API (`orders.buyer_note`).
+2. **The merchant's own note and tags** on each order ("follow up", "vip"), never shown to the buyer (`updateOrderNotes` and `orderTags` in `packages/core/src/orders.ts`). The order list shows the tags, filters by them, and searches by order number, name or email.
+3. Erasing a buyer's data clears both notes, since they're free text and may be about them. The buyer's copy of their data includes their note.
