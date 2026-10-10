@@ -20,7 +20,7 @@ export type SectionData = {
   currency: string;
   fx?: DisplayFx;
   catalog: StorefrontCatalog;
-  signup?: { action: (form: FormData) => Promise<void>; status: "sent" | "invalid" | null };
+  signup?: { action: (form: FormData) => Promise<void>; status: "sent" | "invalid" | null; offerPercent?: number | null };
   /** The store's fixed words in the buyer's language; English when left out. */
   t?: StoreText;
 };
@@ -242,6 +242,7 @@ function Newsletter({ s, data }: Props<"newsletter">) {
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-12 flex flex-col gap-4 items-center text-center">
         {s.heading && <h2 className="text-2xl font-bold tracking-tight">{s.heading}</h2>}
         {s.text && <p className="text-muted">{s.text}</p>}
+        {data.signup?.offerPercent && status !== "sent" && <p className="font-medium">{t.welcomeOfferNote(data.signup.offerPercent)}</p>}
         {status && <p role="status" className={`text-sm font-medium ${status === "invalid" ? "text-critical" : ""}`}>{status === "sent" ? t.signupSent : t.signupInvalid}</p>}
         {status !== "sent" && (
           <form action={data.signup?.action} className="flex w-full max-w-md gap-2">

@@ -52,6 +52,9 @@ export const sessions = pgTable(
  * cost × multiplier, or cost + fixed amount; then rounded up to end in .99, .95 or .00 (or left
  * exact); an optional "was" price a percentage higher shows as a crossed-out price.
  */
+/** A personal one-time code emailed to each new signup. Null on the shop means it's off. */
+export type WelcomeOffer = { percentOff: number; minSubtotalMinor: number; days: number };
+
 export type PricingRule = { kind: "multiplier" | "fixed"; value: number; ending: "99" | "95" | "00" | "none"; compareAtPercent: number | null; minPriceMinor: number };
 
 export const shops = pgTable(
@@ -118,6 +121,7 @@ export const shops = pgTable(
     invoicePrefix: text("invoice_prefix").notNull().default("INV-"),
     invoiceNextNumber: integer("invoice_next_number").notNull().default(1),
     invoiceFooter: text("invoice_footer"),
+    welcomeOffer: jsonb("welcome_offer").$type<WelcomeOffer>(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -236,6 +240,8 @@ export const customers = pgTable(
     unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
     // When we last emailed a "confirm your signup" link, so a signup form can't be used to flood an inbox.
     optInSentAt: timestamp("opt_in_sent_at", { withTimezone: true }),
+    // When we emailed their welcome code. Once per address, even if they sign up again later.
+    welcomeCodeAt: timestamp("welcome_code_at", { withTimezone: true }),
     // Wholesale: a buyer applies from their store account and the merchant approves them.
     wholesaleStatus: text("wholesale_status", { enum: ["none", "pending", "approved", "declined"] }).notNull().default("none"),
     wholesaleCompany: text("wholesale_company"),
@@ -808,6 +814,9 @@ export const discounts = pgTable(
     startsAt: timestamp("starts_at", { withTimezone: true }),
     endsAt: timestamp("ends_at", { withTimezone: true }),
     active: boolean("active").notNull().default(true),
+    // Welcome codes are made one per signup, only work for that email, and stay off the codes list.
+    source: text("source", { enum: ["merchant", "welcome"] }).notNull().default("merchant"),
+    email: text("email"),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("discounts_shop_code_uq").on(t.shopId, t.code), check("discounts_value_ok", sql`${t.value} >= 0`)],

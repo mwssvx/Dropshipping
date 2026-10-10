@@ -47,7 +47,8 @@ export async function createDiscount(db: Db, shopId: string, input: DiscountInpu
 
 /** Codes with how many paid orders used them and what they took off. */
 export async function listDiscounts(db: Db, shopId: string) {
-  const rows = await db.query.discounts.findMany({ where: eq(schema.discounts.shopId, shopId), orderBy: desc(schema.discounts.createdAt) });
+  // Welcome codes (one per signup) are summed up in the welcome offer instead.
+  const rows = await db.query.discounts.findMany({ where: and(eq(schema.discounts.shopId, shopId), eq(schema.discounts.source, "merchant")), orderBy: desc(schema.discounts.createdAt) });
   if (!rows.length) return [];
   const used = await db
     .select({ id: schema.orders.discountId, n: count(), off: sql<number>`coalesce(sum(${schema.orders.discountMinor}), 0)::bigint`, sales: sql<number>`coalesce(sum(${schema.orders.totalMinor}), 0)::bigint` })
@@ -61,7 +62,11 @@ export async function listDiscounts(db: Db, shopId: string) {
 }
 
 export async function setDiscountActive(db: Db, shopId: string, id: string, active: boolean) {
-  const [row] = await db.update(schema.discounts).set({ active }).where(and(eq(schema.discounts.id, id), eq(schema.discounts.shopId, shopId))).returning();
+  const [row] = await db
+    .update(schema.discounts)
+    .set({ active })
+    .where(and(eq(schema.discounts.id, id), eq(schema.discounts.shopId, shopId), eq(schema.discounts.source, "merchant")))
+    .returning();
   if (!row) throw new NotFoundError("Discount");
   return row;
 }
@@ -73,12 +78,16 @@ export function describeDiscount(d: Pick<Discount, "kind" | "value" | "minSubtot
 
 /**
  * The discount a buyer typed, if it can be used on this cart right now. Throws a message for the
- * buyer otherwise. `email` is checked only at checkout, for once-per-customer codes.
+ * buyer otherwise. `email` is checked only at checkout, for once-per-customer codes and codes
+ * made for one buyer.
  */
 export async function findUsableDiscount(db: Db, shop: Shop, code: string, cart: { subtotalMinor: number; email?: string }, now = new Date()) {
   const clean = code.trim().toUpperCase();
   const d = await db.query.discounts.findFirst({ where: and(eq(schema.discounts.shopId, shop.id), eq(schema.discounts.code, clean)) });
   if (!d || !d.active || (d.startsAt && d.startsAt > now)) throw new UserError(`"${clean}" isn't a valid code.`, "discount_invalid");
+  if (d.email && cart.email && cart.email.trim().toLowerCase() !== d.email) {
+    throw new UserError(`${clean} was sent to a different email address. Check out with that address to use it.`, "discount_invalid");
+  }
   if (d.endsAt && d.endsAt <= now) throw new UserError(`The code ${clean} has expired.`, "discount_invalid");
   if (cart.subtotalMinor < d.minSubtotalMinor) {
     throw new UserError(`${clean} works on orders over ${formatMoney(d.minSubtotalMinor, shop.currency)}.`, "discount_invalid");

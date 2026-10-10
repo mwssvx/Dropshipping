@@ -253,6 +253,13 @@
       "when": 1791616272813,
       "tag": "0035_m38_gifts",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1791617223649,
+      "tag": "0036_m39_welcome",
+      "breakpoints": true
     }
   ]
 }

@@ -55,3 +55,4 @@ export * from "./invoices";
 export * from "./sales";
 export * from "./addons";
 export * from "./feeds";
+export * from "./welcome";

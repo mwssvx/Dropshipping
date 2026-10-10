@@ -160,6 +160,7 @@ export async function exportCustomerData(db: Db, shop: { id: string; name: strin
     .from(schema.savedItems)
     .innerJoin(schema.products, eq(schema.products.id, schema.savedItems.productId))
     .where(eq(schema.savedItems.customerId, customer.id));
+  const welcome = await db.query.discounts.findMany({ where: and(eq(schema.discounts.shopId, shop.id), eq(schema.discounts.email, customer.email.toLowerCase())) });
   const points = await db.query.rewardEntries.findMany({ where: eq(schema.rewardEntries.customerId, customer.id), orderBy: asc(schema.rewardEntries.createdAt) });
   const numbers = new Map(orders.map((o) => [o.id, o.number]));
 
@@ -206,6 +207,7 @@ export async function exportCustomerData(db: Db, shop: { id: string; name: strin
     back_in_stock_requests: alerts.map((a) => ({ product: a.product, option: a.option, asked_at: a.createdAt.toISOString(), emailed_at: a.notifiedAt?.toISOString() ?? null })),
     saved_items: saved.map((x) => ({ product: x.product, price_when_saved: x.priceMinor, saved_at: x.createdAt.toISOString() })),
     reward_points: points.map((x) => ({ points: x.points, kind: x.kind, note: x.note, at: x.createdAt.toISOString() })),
+    welcome_codes: welcome.map((d) => ({ code: d.code, percent_off: d.value, sent_at: d.createdAt.toISOString(), expires_at: d.endsAt?.toISOString() ?? null })),
     gift_cards: giftCards.map((g) => ({ ending: g.last4, currency: g.currency, initial: g.initialMinor, balance: g.balanceMinor, created_at: g.createdAt.toISOString() })),
   };
 }
@@ -261,6 +263,8 @@ export async function eraseCustomer(db: Db, shopId: string, customerId: string, 
       await tx.update(schema.reviews).set({ name: "Verified buyer" }).where(inArray(schema.reviews.orderId, ids));
       await tx.update(schema.returnRequests).set({ note: null }).where(inArray(schema.returnRequests.orderId, ids));
     }
+    // Welcome codes stop working; used ones stay for the offer's numbers.
+    await tx.update(schema.discounts).set({ email: replacement, active: false }).where(and(eq(schema.discounts.shopId, shopId), eq(schema.discounts.email, email.toLowerCase())));
     await tx.update(schema.giftCards).set({ email: replacement }).where(and(eq(schema.giftCards.shopId, shopId), eq(schema.giftCards.email, email)));
     await tx.delete(schema.campaignSends).where(
       and(eq(schema.campaignSends.email, email), inArray(schema.campaignSends.campaignId, tx.select({ id: schema.campaigns.id }).from(schema.campaigns).where(eq(schema.campaigns.shopId, shopId)))),

@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { createDiscount, moderateReview, parseMoney, sendAbandonedCartEmails, setDiscountActive, setGrowthSettings, setUpsell, UserError } from "@sf/core";
+import { createDiscount, moderateReview, parseMoney, sendAbandonedCartEmails, setDiscountActive, setGrowthSettings, setUpsell, setWelcomeOffer, UserError } from "@sf/core";
 import { fulfillment, requireShop, testPayments } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -31,6 +31,24 @@ export async function createDiscountAction(_: FormState, form: FormData): Promis
       startsAt: optionalDate(form.get("startsAt")),
       endsAt: optionalDate(form.get("endsAt"), true),
     });
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath("/admin/marketing");
+  return { saved: true };
+}
+
+export async function setWelcomeOfferAction(_: FormState, form: FormData): Promise<FormState> {
+  const { shop, db } = await requireShop("marketing");
+  try {
+    const int = (name: string) => Number.parseInt(String(form.get(name) ?? "").trim() || "NaN", 10);
+    const min = String(form.get("minSubtotal") ?? "").trim();
+    await setWelcomeOffer(
+      db,
+      shop.id,
+      form.get("on") === "on" ? { percentOff: int("percentOff"), minSubtotalMinor: min ? parseMoney(min) : 0, days: int("days") } : null,
+    );
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
     throw e;

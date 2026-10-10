@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { abandonedCartStats, describeDiscount, formatMoney, listDiscounts } from "@sf/core";
+import { abandonedCartStats, describeDiscount, formatMoney, listDiscounts, welcomeOfferStats } from "@sf/core";
 import { requireShop, testPayments } from "@/lib/server";
 import { sendRemindersNowAction, setDiscountActiveAction, setRemindersAction } from "../../growth-actions";
 import { PageHeader } from "../PageHeader";
 import { DiscountForm } from "./DiscountForm";
+import { WelcomeOfferForm } from "./WelcomeOfferForm";
 
 export const metadata = { title: "Marketing" };
 
@@ -12,7 +13,11 @@ const date = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "
 
 export default async function MarketingPage() {
   const { shop, db } = await requireShop("marketing");
-  const [discounts, stats] = await Promise.all([listDiscounts(db, shop.id), abandonedCartStats(db, shop.id, new Date(Date.now() - 30 * DAY))]);
+  const [discounts, stats, welcome] = await Promise.all([
+    listDiscounts(db, shop.id),
+    abandonedCartStats(db, shop.id, new Date(Date.now() - 30 * DAY)),
+    welcomeOfferStats(db, shop.id),
+  ]);
   const money = (m: number) => formatMoney(m, shop.currency);
   const now = new Date();
   const state = (d: (typeof discounts)[number]) =>
@@ -62,12 +67,27 @@ export default async function MarketingPage() {
               })}
             </ul>
           ) : (
-            <p className="hint">No codes yet. A first-order code like WELCOME10 is a good start.</p>
+            <p className="hint">No codes yet. A code to share on social media is a good start.</p>
           )}
           <div className="flex flex-col gap-3 border-t border-border pt-4">
             <h3 className="font-medium text-sm">New code</h3>
             <DiscountForm currency={shop.currency} />
           </div>
+        </section>
+
+        <section className="card p-5 flex flex-col gap-3" aria-labelledby="welcome-heading">
+          <h2 id="welcome-heading" className="font-semibold">Welcome offer</h2>
+          <p className="text-sm">
+            When someone confirms their email signup on your store, we email them a code of their own. It works once, only with
+            their email, until it expires. The signup form shows the offer, and people who have already bought from you don&apos;t
+            get one.
+          </p>
+          <WelcomeOfferForm offer={shop.welcomeOffer} currency={shop.currency} />
+          <dl className="grid grid-cols-3 gap-3 border-t border-border pt-3 text-sm">
+            <div><dt className="hint">Codes sent</dt><dd className="text-lg font-semibold num">{welcome.sent}</dd></div>
+            <div><dt className="hint">Used</dt><dd className="text-lg font-semibold num">{welcome.used}</dd></div>
+            <div><dt className="hint">Sales</dt><dd className="text-lg font-semibold num">{money(welcome.salesMinor)}</dd></div>
+          </dl>
         </section>
 
         <section className="card p-5 flex flex-col gap-3" aria-labelledby="reminders-heading">
