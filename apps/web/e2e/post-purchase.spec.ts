@@ -32,7 +32,7 @@ test("a buyer adds the after-checkout offer with one click", async ({ page, brow
   await offer.getByRole("button", { name: "Save after-checkout offer" }).click();
   await expect(offer.getByRole("alert")).toContainText("Pick a product to offer.");
   await offer.getByLabel("Product to offer").selectOption({ label: "Magnetic Phone Stand" });
-  await offer.getByLabel("Percent off").fill("20");
+  await offer.getByLabel("Buyer saves (%)").fill("20");
   await offer.getByRole("button", { name: "Save after-checkout offer" }).click();
   await expect(offer.getByText("Saved. Buyers see it on their order page right after paying.")).toBeVisible();
   await shot(page, "261-after-checkout-setting");

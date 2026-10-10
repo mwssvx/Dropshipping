@@ -28,7 +28,7 @@ export function PostPurchaseForm({ offer, products }: { offer: Offer; products: 
           </select>
         </div>
         <div className="field">
-          <label className="label" htmlFor="ppPercent">Percent off</label>
+          <label className="label" htmlFor="ppPercent">Buyer saves (%)</label>
           <input className="input num" id="ppPercent" name="percentOff" inputMode="numeric" value={percent} onChange={(e) => setPercent(e.target.value)} />
         </div>
       </div>
