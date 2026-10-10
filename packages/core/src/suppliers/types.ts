@@ -12,6 +12,8 @@ export type SupplierProduct = {
   variants: {
     ref: string;
     title: string;
+    /** Named options like { Color: "Black", Size: "XL" }, when the supplier gives them. */
+    options?: Record<string, string>;
     costMinor: number;
     stock: number | null;
     shipDaysMin: number | null;

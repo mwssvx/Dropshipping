@@ -79,6 +79,7 @@ export async function importProduct(db: Db, suppliers: Suppliers, shopId: string
     const price = data.prices[v.ref] ?? suggestPrice(v.costMinor, rule);
     return {
       title: v.title,
+      options: v.options ?? {},
       supplierVariantRef: v.ref,
       priceMinor: price,
       compareAtMinor: compareAtFor(price, rule),

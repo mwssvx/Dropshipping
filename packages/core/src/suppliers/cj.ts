@@ -11,6 +11,15 @@ type Fetch = typeof fetch;
 
 export type CjOptions = { apiKey: string; fetch?: Fetch; now?: () => number };
 
+/** "Color-Size" and "Black-XL" make { Color: "Black", Size: "XL" }; anything that doesn't line up makes none. */
+export function cjOptions(keys: string | undefined, values: string | undefined): Record<string, string> {
+  if (!keys || !values) return {};
+  const names = keys.split("-").map((k) => k.trim());
+  const parts = values.split("-").map((v) => v.trim());
+  if (names.length !== parts.length || names.some((n) => !n) || parts.some((v) => !v)) return {};
+  return Object.fromEntries(names.map((n, i) => [n, parts[i]!]));
+}
+
 export class CjSupplier implements SupplierAdapter {
   readonly name = "cj" as const;
   readonly label = "CJ Dropshipping";
@@ -91,6 +100,8 @@ export class CjSupplier implements SupplierAdapter {
     const p = await this.call<{
       pid: string;
       productNameEn: string;
+      /** The option names, like "Color-Size", in the order variant keys use. */
+      productKeyEn?: string;
       description?: string;
       productImageSet?: string[];
       productImage?: string;
@@ -106,6 +117,7 @@ export class CjSupplier implements SupplierAdapter {
       variants: p.variants.map((v) => ({
         ref: v.vid,
         title: v.variantKey || v.variantNameEn || "Default",
+        options: cjOptions(p.productKeyEn, v.variantKey),
         costMinor: Math.round(Number(v.variantSellPrice) * 100),
         stock: null,
         shipDaysMin: null,

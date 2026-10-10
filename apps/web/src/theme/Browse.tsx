@@ -1,7 +1,7 @@
-import type { Sort } from "@sf/core";
+import type { Facet, Sort } from "@sf/core";
 import { storeText, type StoreText } from "@/lib/store-text";
 
-export type BrowseParams = { q?: string; sort?: string; min?: string; max?: string; stock?: string };
+export type BrowseParams = { q?: string; sort?: string; min?: string; max?: string; stock?: string; sale?: string; opt?: string | string[] };
 
 /** "12" or "12.50" in the buyer's currency, as minor units; anything else means no limit. */
 export const priceParam = (raw?: string) => {
@@ -9,15 +9,30 @@ export const priceParam = (raw?: string) => {
   return raw && raw.trim() && Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null;
 };
 
+/** Chosen options from the address, sent as opt=Size:M&opt=Color:Black. */
+export function optionParams(raw: BrowseParams["opt"]) {
+  const out: Record<string, string[]> = {};
+  for (const item of (Array.isArray(raw) ? raw : raw ? [raw] : []).slice(0, 40)) {
+    const i = item.indexOf(":");
+    if (i <= 0) continue;
+    const name = item.slice(0, i).trim().slice(0, 40);
+    const value = item.slice(i + 1).trim().slice(0, 60);
+    if (name && value) (out[name] ??= []).push(value);
+  }
+  return out;
+}
+
 export function browseOptions(p: BrowseParams) {
-  return { q: p.q?.slice(0, 200), sort: p.sort, minMinor: priceParam(p.min), maxMinor: priceParam(p.max), inStock: p.stock === "1" };
+  return { q: p.q?.slice(0, 200), sort: p.sort, minMinor: priceParam(p.min), maxMinor: priceParam(p.max), inStock: p.stock === "1", onSale: p.sale === "1", options: optionParams(p.opt) };
 }
 
 /**
  * Sort and filter controls for the search and collection pages. A plain GET form, so it works
  * before any script loads and every result page has its own shareable address.
  */
-export function BrowseBar({ action, params, sort, currency, search, count, t = storeText(null) }: { action: string; params: BrowseParams; sort: Sort; currency: string; search?: boolean; count: number; t?: StoreText }) {
+export function BrowseBar({ action, params, sort, currency, search, count, facets = [], t = storeText(null) }: { action: string; params: BrowseParams; sort: Sort; currency: string; search?: boolean; count: number; facets?: Facet[]; t?: StoreText }) {
+  const chosen = optionParams(params.opt);
+  const isChosen = (name: string, value: string) => Object.entries(chosen).some(([n, vs]) => n.toLowerCase() === name.toLowerCase() && vs.includes(value));
   // The first choice is the page's natural order, sent as no sort at all, so a new search goes
   // back to best match instead of keeping the last page's order.
   const q = params.q?.trim();
@@ -33,6 +48,26 @@ export function BrowseBar({ action, params, sort, currency, search, count, t = s
         </div>
       )}
       {!search && params.q && <input type="hidden" name="q" value={params.q} />}
+      {facets.length > 0 && (
+        <div className="flex flex-wrap gap-3 text-sm">
+          {facets.map((f) => {
+            const picked = f.values.filter((v) => isChosen(f.name, v.value)).length;
+            return (
+              <details key={f.name} className="card px-3 py-2" open={picked > 0}>
+                <summary className="cursor-pointer font-medium">{f.name}{picked > 0 ? ` (${picked})` : ""}</summary>
+                <fieldset className="flex flex-wrap gap-x-4 gap-y-2 pt-2">
+                  <legend className="sr-only">{f.name}</legend>
+                  {f.values.map((v) => (
+                    <label key={v.value} className="flex items-center gap-2">
+                      <input type="checkbox" name="opt" value={`${f.name}:${v.value}`} defaultChecked={isChosen(f.name, v.value)} /> {v.value} <span className="hint">({v.count})</span>
+                    </label>
+                  ))}
+                </fieldset>
+              </details>
+            );
+          })}
+        </div>
+      )}
       <div className="flex flex-wrap items-end gap-3 text-sm">
         <div className="field">
           <label className="label" htmlFor="sort">{t.sortBy}</label>
@@ -51,6 +86,9 @@ export function BrowseBar({ action, params, sort, currency, search, count, t = s
         </fieldset>
         <label className="flex items-center gap-2 pb-2.5">
           <input type="checkbox" name="stock" value="1" defaultChecked={params.stock === "1"} /> {t.inStockOnly}
+        </label>
+        <label className="flex items-center gap-2 pb-2.5">
+          <input type="checkbox" name="sale" value="1" defaultChecked={params.sale === "1"} /> {t.onSaleOnly}
         </label>
         <button className="btn btn-secondary">{t.apply}</button>
         <span className="hint pb-2.5 ml-auto" role="status">{t.productCount(count)}</span>

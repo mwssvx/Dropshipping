@@ -66,6 +66,7 @@ export class FakeSupplier implements SupplierAdapter {
       variants: sizes.map((size, i) => ({
         ref: `demo-${slug}-${size.toLowerCase()}`,
         title: size,
+        options: (size === "Default" ? {} : { Size: size }) as Record<string, string>,
         costMinor: baseCost + i * 250,
         stock: lowStock ? 2 : 50 + (h % 400),
         shipDaysMin: 6,
