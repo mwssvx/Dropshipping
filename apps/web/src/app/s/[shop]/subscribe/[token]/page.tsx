@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { customerByToken } from "@sf/core";
+import { customerByToken, describeWelcomeOffer } from "@sf/core";
 import { db } from "@/lib/server";
 import { loadShop, storeBase } from "../../data";
 import { confirmSignupAction } from "./actions";
@@ -7,12 +7,13 @@ import { confirmSignupAction } from "./actions";
 export const metadata = { title: "Confirm your signup", robots: { index: false } };
 
 /** The link in the "confirm your signup" email. A button, so link checkers in inboxes can't sign people up. */
-export default async function ConfirmSignupPage({ params, searchParams }: { params: Promise<{ shop: string; token: string }>; searchParams: Promise<{ done?: string }> }) {
+export default async function ConfirmSignupPage({ params, searchParams }: { params: Promise<{ shop: string; token: string }>; searchParams: Promise<{ done?: string; welcome?: string }> }) {
   const { shop: handle, token } = await params;
   const shop = await loadShop(handle);
   const base = await storeBase(handle);
   const customer = /^[0-9a-f]{64}$/.test(token) ? await customerByToken(await db(), shop.id, token) : null;
-  const done = (await searchParams).done === "1";
+  const query = await searchParams;
+  const done = query.done === "1";
   return (
     <main className="max-w-lg mx-auto px-4 sm:px-6 py-16 flex flex-col gap-4">
       {!customer ? (
@@ -24,6 +25,9 @@ export default async function ConfirmSignupPage({ params, searchParams }: { para
         <>
           <h1 className="text-2xl font-bold tracking-tight">You&apos;re signed up</h1>
           <p className="text-muted" role="status">{customer.email} will get news and offers from {shop.name}. Every email has a link to stop them.</p>
+          {query.welcome === "1" && shop.welcomeOffer && (
+            <p className="font-medium">We&apos;ve emailed you a code for {describeWelcomeOffer(shop.welcomeOffer, shop.currency)}.</p>
+          )}
         </>
       ) : (
         <>

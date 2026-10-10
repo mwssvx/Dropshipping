@@ -301,3 +301,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **At checkout** the buyer ticks "This order is a gift" and adds who it's from, an optional message and the recipient's email (optional). The order keeps this in `orders.gift`; orders of gift cards only don't take it.
 2. **Emails** (`packages/core/src/fulfillment.ts`): the buyer's confirmation says it's a gift and repeats the message. When tracking comes in, the recipient gets a "gift_shipped" email ("Ada sent you a gift from …") with the message and tracking, and no prices or order link. Without a recipient email, nothing extra is sent.
 3. **Order pages**: the merchant's order page shows a Gift section (from, to, message) and the "Gift heads-up" email in the timeline; the buyer's order page shows "A gift for …". A customer's data export includes the gift details, and erasing them removes them.
+
+### Welcome offer (after launch, part 31)
+
+1. **Setting it up** (Marketing page, "Welcome offer"): the merchant turns it on and picks the percentage (5 to 50%), an optional minimum order and how many days the code lasts (7 to 90). The page shows how many codes went out, how many were used and the sales they brought. Codes already sent keep working if it's turned off.
+2. **For shoppers** (`packages/core/src/welcome.ts`): the home page email signup says "Sign up and get 15% off your first order." in the store's language. When the shopper confirms their signup (`confirmSignup`), they get an email with a code of their own (`WELCOME-` and six characters), which works once, only at checkout with that email, until it expires. Each address gets one code ever, and people who have already paid for an order get none.
+3. **Elsewhere**: personal codes stay off the discount codes list and out of the store file (the offer's settings travel in it). A customer's data export lists their codes, and erasing them turns their codes off.

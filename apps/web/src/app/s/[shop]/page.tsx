@@ -20,7 +20,7 @@ export default async function StoreHome({ params, searchParams }: { params: Prom
         fx: await buyerFx(shop),
         catalog,
         t: await storeT(param),
-        signup: { action: newsletterAction.bind(null, param), status: signup === "sent" || signup === "invalid" ? signup : null },
+        signup: { action: newsletterAction.bind(null, param), status: signup === "sent" || signup === "invalid" ? signup : null, offerPercent: shop.welcomeOffer?.percentOff ?? null },
       }} />
     </main>
   );
