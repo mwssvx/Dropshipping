@@ -93,6 +93,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
         ? { product: handleOf.get(shop.postPurchaseOffer.productId)!, percent_off: shop.postPurchaseOffer.percentOff, active: shop.postPurchaseOffer.active }
         : null,
       subscribe_and_save: shop.subscriptionOffer ? { percent_off: shop.subscriptionOffer.percentOff, active: shop.subscriptionOffer.active } : null,
+      delivery_estimates: { enabled: shop.deliveryEstimates, processing_days: shop.processingDays },
       hold_risky_orders: shop.holdRiskyOrders,
       refer_a_friend: shop.referralProgram ? { friend_percent_off: shop.referralProgram.friendPercentOff, reward: shop.referralProgram.rewardMinor, min_subtotal: shop.referralProgram.minSubtotalMinor } : null,
       // Missing means the built-in default rate.
@@ -226,6 +227,7 @@ const importSchema = z.object({
       welcome_offer: z.object({ percent_off: z.number().int().min(5).max(50), min_subtotal: z.number().int().min(0), days: z.number().int().min(7).max(90) }).nullable().optional(),
       after_checkout_offer: z.object({ product: handle, percent_off: z.number().int().min(0).max(50), active: z.boolean() }).nullable().optional(),
       subscribe_and_save: z.object({ percent_off: z.number().int().min(0).max(30), active: z.boolean() }).nullable().optional(),
+      delivery_estimates: z.object({ enabled: z.boolean(), processing_days: z.number().int().min(0).max(14) }).optional(),
       hold_risky_orders: z.enum(["off", "medium", "high"]).optional(),
       refer_a_friend: z.object({ friend_percent_off: z.number().int().min(5).max(50), reward: z.number().int().min(100).max(10_000), min_subtotal: z.number().int().min(0) }).nullable().optional(),
       rewards: z.object({ enabled: z.boolean(), earn_rate: z.number().int().min(1).max(100), value_minor: z.number().int().min(1).max(10_000) }).optional(),
@@ -613,6 +615,9 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
       const o = data.store.after_checkout_offer;
       const productId = o ? productIds.get(o.product) : undefined;
       settings.postPurchaseOffer = o && productId ? { productId, percentOff: o.percent_off, active: o.active } : null;
+    }
+    if (data.store.delivery_estimates) {
+      Object.assign(settings, { deliveryEstimates: data.store.delivery_estimates.enabled, processingDays: data.store.delivery_estimates.processing_days });
     }
     if (data.store.subscribe_and_save !== undefined) {
       const o = data.store.subscribe_and_save;

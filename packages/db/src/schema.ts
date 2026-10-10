@@ -152,6 +152,10 @@ export const shops = pgTable(
     holdRiskyOrders: text("hold_risky_orders", { enum: ["off", "medium", "high"] }).notNull().default("high"),
     postPurchaseOffer: jsonb("post_purchase_offer").$type<PostPurchaseOffer>(),
     subscriptionOffer: jsonb("subscription_offer").$type<SubscriptionOffer>(),
+    // Delivery dates on product pages, order pages and receipts: the days to get an order to the
+    // supplier and out the door, then the slower of the supplier's and the shipping rate's transit.
+    deliveryEstimates: boolean("delivery_estimates").notNull().default(true),
+    processingDays: integer("processing_days").notNull().default(2),
     referralProgram: jsonb("referral_program").$type<ReferralProgram>(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

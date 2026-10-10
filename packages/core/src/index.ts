@@ -50,6 +50,7 @@ export * from "./shipping";
 export * from "./returns";
 export * from "./replacements";
 export * from "./subscriptions";
+export * from "./delivery";
 export * from "./redirects";
 export * from "./saved";
 export * from "./languages";
