@@ -81,6 +81,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       wholesale: { enabled: shop.wholesaleEnabled, percent_off: shop.wholesalePercentOff, min_order_minor: shop.wholesaleMinOrderMinor },
       welcome_offer: shop.welcomeOffer ? { percent_off: shop.welcomeOffer.percentOff, min_subtotal: shop.welcomeOffer.minSubtotalMinor, days: shop.welcomeOffer.days } : null,
       hold_risky_orders: shop.holdRiskyOrders,
+      refer_a_friend: shop.referralProgram ? { friend_percent_off: shop.referralProgram.friendPercentOff, reward: shop.referralProgram.rewardMinor, min_subtotal: shop.referralProgram.minSubtotalMinor } : null,
       // Missing means the built-in default rate.
       shipping_zones: shipping.isDefault
         ? undefined
@@ -204,6 +205,7 @@ const importSchema = z.object({
       languages: z.array(z.enum(LANGUAGE_CODES as [string, ...string[]])).max(LANGUAGE_CODES.length).optional(),
       welcome_offer: z.object({ percent_off: z.number().int().min(5).max(50), min_subtotal: z.number().int().min(0), days: z.number().int().min(7).max(90) }).nullable().optional(),
       hold_risky_orders: z.enum(["off", "medium", "high"]).optional(),
+      refer_a_friend: z.object({ friend_percent_off: z.number().int().min(5).max(50), reward: z.number().int().min(100).max(10_000), min_subtotal: z.number().int().min(0) }).nullable().optional(),
       rewards: z.object({ enabled: z.boolean(), earn_rate: z.number().int().min(1).max(100), value_minor: z.number().int().min(1).max(10_000) }).optional(),
       invoices: z
         .object({ legal_name: z.string().max(120).nullable(), address: z.string().max(400).nullable(), prefix: z.string().max(12).regex(/^[A-Za-z0-9\-/_.]*$/), footer: z.string().max(500).nullable() })
@@ -534,6 +536,10 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
     if (data.store.presentment_currencies !== undefined) settings.presentmentCurrencies = [...new Set(data.store.presentment_currencies)];
     if (data.store.round_converted_prices !== undefined) settings.roundConvertedPrices = data.store.round_converted_prices;
     if (data.store.hold_risky_orders) settings.holdRiskyOrders = data.store.hold_risky_orders;
+    if (data.store.refer_a_friend !== undefined) {
+      const r = data.store.refer_a_friend;
+      settings.referralProgram = r ? { friendPercentOff: r.friend_percent_off, rewardMinor: r.reward, minSubtotalMinor: r.min_subtotal } : null;
+    }
     if (data.store.welcome_offer !== undefined) {
       const w = data.store.welcome_offer;
       settings.welcomeOffer = w ? { percentOff: w.percent_off, minSubtotalMinor: w.min_subtotal, days: w.days } : null;

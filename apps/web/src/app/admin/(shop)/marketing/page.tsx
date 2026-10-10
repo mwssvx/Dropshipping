@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { abandonedCartStats, describeDiscount, formatMoney, listDiscounts, welcomeOfferStats } from "@sf/core";
+import { abandonedCartStats, describeDiscount, formatMoney, listDiscounts, referralStats, welcomeOfferStats } from "@sf/core";
 import { requireShop, testPayments } from "@/lib/server";
 import { sendRemindersNowAction, setDiscountActiveAction, setRemindersAction } from "../../growth-actions";
 import { PageHeader } from "../PageHeader";
 import { DiscountForm } from "./DiscountForm";
 import { WelcomeOfferForm } from "./WelcomeOfferForm";
+import { ReferralForm } from "./ReferralForm";
 
 export const metadata = { title: "Marketing" };
 
@@ -13,10 +14,11 @@ const date = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "
 
 export default async function MarketingPage() {
   const { shop, db } = await requireShop("marketing");
-  const [discounts, stats, welcome] = await Promise.all([
+  const [discounts, stats, welcome, referrals] = await Promise.all([
     listDiscounts(db, shop.id),
     abandonedCartStats(db, shop.id, new Date(Date.now() - 30 * DAY)),
     welcomeOfferStats(db, shop.id),
+    referralStats(db, shop.id),
   ]);
   const money = (m: number) => formatMoney(m, shop.currency);
   const now = new Date();
@@ -87,6 +89,22 @@ export default async function MarketingPage() {
             <div><dt className="hint">Codes sent</dt><dd className="text-lg font-semibold num">{welcome.sent}</dd></div>
             <div><dt className="hint">Used</dt><dd className="text-lg font-semibold num">{welcome.used}</dd></div>
             <div><dt className="hint">Sales</dt><dd className="text-lg font-semibold num">{money(welcome.salesMinor)}</dd></div>
+          </dl>
+        </section>
+
+        <section className="card p-5 flex flex-col gap-3" aria-labelledby="refer-heading">
+          <h2 id="refer-heading" className="font-semibold">Refer a friend</h2>
+          <p className="text-sm">
+            Buyers get a link to share on their order page and account. A friend who opens it asks for a code by email that works
+            once, on a first order. When that order is delivered, the buyer who shared the link gets store credit as a gift card.
+            Waiting for delivery means you never pay credit on an order that&apos;s refunded or charged back.
+          </p>
+          <ReferralForm program={shop.referralProgram} currency={shop.currency} />
+          <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 border-t border-border pt-3 text-sm">
+            <div><dt className="hint">Friends sent a code</dt><dd className="text-lg font-semibold num">{referrals.friends}</dd></div>
+            <div><dt className="hint">Orders</dt><dd className="text-lg font-semibold num">{referrals.orders}</dd></div>
+            <div><dt className="hint">Sales</dt><dd className="text-lg font-semibold num">{money(referrals.salesMinor)}</dd></div>
+            <div><dt className="hint">Credit given</dt><dd className="text-lg font-semibold num">{money(referrals.creditMinor)}</dd></div>
           </dl>
         </section>
 

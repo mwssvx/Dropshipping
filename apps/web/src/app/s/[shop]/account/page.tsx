@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { buyerOrders, describeRewards, formatMoney, REWARD_STEP, rewardsFor } from "@sf/core";
+import { buyerOrders, describeReferralProgram, describeRewards, formatMoney, myReferrals, referralCodeFor, REWARD_STEP, rewardsFor } from "@sf/core";
+import { ReferralCard } from "@/components/ReferralCard";
 import { currentBuyer } from "@/lib/buyer";
-import { db } from "@/lib/server";
-import { loadShop, storeBase } from "../data";
+import { db, storeAddress } from "@/lib/server";
+import { loadShop, storeBase, storeT } from "../data";
 import { buyAgainAction, buyerSignOutAction, setBuyerMarketingAction } from "./actions";
 import { SignInForm } from "./SignInForm";
 import { WholesaleForm } from "./WholesaleForm";
@@ -41,6 +42,9 @@ export default async function AccountPage({ params }: { params: Promise<{ shop: 
 
   const orders = await buyerOrders(await db(), shop.id, buyer.email);
   const rewards = shop.rewardsEnabled ? await rewardsFor(await db(), shop, buyer.email) : null;
+  const referCode = shop.referralProgram && orders.length ? await referralCodeFor(await db(), shop, buyer.id) : null;
+  const referred = referCode ? await myReferrals(await db(), shop.id, buyer.id) : null;
+  const t = referCode ? await storeT(handle) : null;
   // The fewest points that make at least 1.00 of credit, in whole hundreds.
   const minSwap = Math.max(REWARD_STEP, Math.ceil(100 / shop.rewardsValueMinor) * REWARD_STEP);
   return (
@@ -102,6 +106,15 @@ export default async function AccountPage({ params }: { params: Promise<{ shop: 
             </ul>
           )}
         </section>
+      )}
+      {referCode && t && referred && shop.referralProgram && (
+        <ReferralCard
+          title={t.referTitle(shop.referralProgram.friendPercentOff)}
+          body={t.referBody(shop.referralProgram.friendPercentOff, describeReferralProgram(shop.referralProgram, shop.currency).reward)}
+          link={`${await storeAddress(shop)}/refer/${referCode}`}
+          stats={referred.invited ? t.referStats(referred.invited, formatMoney(referred.creditMinor, shop.currency)) : null}
+          labels={{ link: t.referLink, copy: t.referCopy, copied: t.referCopied }}
+        />
       )}
       {orders.length === 0 ? (
         <div className="card p-6 flex flex-col gap-3 items-start">

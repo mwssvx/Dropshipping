@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { amountToCharge, askQuestion, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
+import { amountToCharge, askQuestion, claimReferral, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
 import { agents, campaigns, db, fulfillment, payments, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
@@ -360,4 +360,19 @@ export async function returnAction(handle: string, ref: string, _: ReturnState, 
     throw e;
   }
   redirect(`${await storeBase(handle)}/orders/${ref}`);
+}
+
+export type ReferState = { sent?: string; error?: string };
+
+/** A friend asks for their code from a refer-a-friend link. It's only ever emailed. */
+export async function claimReferralAction(handle: string, code: string, _: ReferState, form: FormData): Promise<ReferState> {
+  const shop = await loadShop(handle);
+  const email = String(form.get("email") ?? "").trim();
+  try {
+    await claimReferral(await campaigns(), shop, code, email);
+  } catch (e) {
+    if (!(e instanceof UserError)) throw e;
+    return { error: e.code === "no_link" ? "gone" : "invalid" };
+  }
+  return { sent: email };
 }

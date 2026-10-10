@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
-import { buyerAmounts, buyerThread, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, RETURN_REASON_LABELS, returnOptions, reviewableItems } from "@sf/core";
+import { buyerAmounts, buyerThread, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, returnOptions, reviewableItems } from "@sf/core";
 import Link from "next/link";
-import { db } from "@/lib/server";
-import { loadShop, storeBase } from "../../data";
+import { db, storeAddress } from "@/lib/server";
+import { ReferralCard } from "@/components/ReferralCard";
+import { loadShop, storeBase, storeT } from "../../data";
 import { ReviewForm } from "./ReviewForm";
 import { QuestionForm } from "./QuestionForm";
 import { ReturnForm } from "./ReturnForm";
@@ -28,6 +29,10 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
   const refunds = order.presentment && order.refundedMinor ? await listRefunds(await db(), order.id) : [];
   const due = buyerAmounts(order, order.lines, order.presentment ? refunds.reduce((s, r) => s + (r.presentmentAmountMinor ?? 0), 0) : undefined);
   const money = (m: number) => formatMoney(m, due.currency);
+  // Refer a friend: a paid buyer gets their share link here.
+  const referCode = paid && order.paymentStatus !== "refunded" ? await referralCodeForEmail(await db(), shop, order.email) : null;
+  const t = referCode ? await storeT(handle) : null;
+  const referLink = referCode ? `${await storeAddress(shop)}/refer/${referCode}` : null;
   const shipped = order.fulfillments.filter((f) => f.trackingNumber);
   const steps = [
     { label: "Order confirmed", done: paid },
@@ -153,6 +158,14 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
               reasons={Object.entries(RETURN_REASON_LABELS)} closes={returns.closesAt ? day.format(returns.closesAt) : null} />
           )}
         </section>
+      )}
+      {referLink && t && shop.referralProgram && (
+        <ReferralCard
+          title={t.referTitle(shop.referralProgram.friendPercentOff)}
+          body={t.referBody(shop.referralProgram.friendPercentOff, describeReferralProgram(shop.referralProgram, shop.currency).reward)}
+          link={referLink}
+          labels={{ link: t.referLink, copy: t.referCopy, copied: t.referCopied }}
+        />
       )}
       {paid && (
         <section className="card p-5 flex flex-col gap-4" aria-labelledby="questions">
