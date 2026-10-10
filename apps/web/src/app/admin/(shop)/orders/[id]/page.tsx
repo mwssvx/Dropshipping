@@ -35,7 +35,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
     if (!supplierId) return "Sent by you";
     return labelFor(suppliers(), links.find((l) => l.id === supplierId));
   };
-  const EMAIL_LABEL = { order_confirmation: "Order confirmation", shipping_update: "Shipping update", delivered: "Delivery confirmation", refund: "Refund", support_reply: "Reply to a question", abandoned_cart: "Checkout reminder", payment_link: "Payment link", gift_shipped: "Gift heads-up" };
+  const EMAIL_LABEL = { order_confirmation: "Order confirmation", shipping_update: "Shipping update", delivered: "Delivery confirmation", refund: "Refund", support_reply: "Reply to a question", abandoned_cart: "Checkout reminder", payment_link: "Payment link", gift_shipped: "Gift heads-up", order_link: "Order link (Track your order)" };
   const timeline = [
     { at: order.createdAt, text: "Order placed" },
     ...(order.paidAt
