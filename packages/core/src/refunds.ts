@@ -129,12 +129,18 @@ export async function refundOrder(
   return { refund, full, ...cancelled, email: email.status };
 }
 
-/** Stop supplier orders that haven't shipped. Ones the supplier won't cancel are reported back. */
-async function cancelUnshipped(ctx: RefundContext, orderId: string) {
+/**
+ * Stop supplier orders that haven't shipped (only these suppliers' when given). Ones the supplier
+ * won't cancel are reported back.
+ */
+export async function cancelUnshipped(ctx: FulfillmentContext, orderId: string, supplierIds?: string[]) {
   const { db } = ctx;
-  const open = await db.query.fulfillments.findMany({
-    where: and(eq(schema.fulfillments.orderId, orderId), inArray(schema.fulfillments.status, ["pending", "failed", "placing", "placed"])),
-  });
+  const open = (
+    await db.query.fulfillments.findMany({
+      where: and(eq(schema.fulfillments.orderId, orderId), inArray(schema.fulfillments.status, ["pending", "failed", "placing", "placed"])),
+    })
+  ).filter((f) => !supplierIds || (f.supplierId && supplierIds.includes(f.supplierId)));
+  const cancelledIds: string[] = [];
   let cancelled = 0;
   const notCancelled: { supplier: string; message: string }[] = [];
   for (const f of open) {
@@ -146,6 +152,7 @@ async function cancelUnshipped(ctx: RefundContext, orderId: string) {
       // Never reached the supplier (or the attempt failed): just stop it from being sent.
       await db.update(schema.fulfillments).set({ status: "cancelled", updatedAt: new Date() }).where(eq(schema.fulfillments.id, f.id));
       cancelled++;
+      cancelledIds.push(f.id);
       continue;
     }
     const link = f.supplierId ? await db.query.suppliers.findFirst({ where: eq(schema.suppliers.id, f.supplierId) }) : undefined;
@@ -159,6 +166,7 @@ async function cancelUnshipped(ctx: RefundContext, orderId: string) {
       if (result.cancelled) {
         await db.update(schema.fulfillments).set({ status: "cancelled", updatedAt: new Date() }).where(eq(schema.fulfillments.id, f.id));
         cancelled++;
+        cancelledIds.push(f.id);
       } else {
         notCancelled.push({ supplier: label, message: result.message ?? "The supplier wouldn't cancel it." });
       }
@@ -167,7 +175,7 @@ async function cancelUnshipped(ctx: RefundContext, orderId: string) {
     }
   }
   if (open.length) await refreshOrderFulfillment(db, orderId);
-  return { cancelled, notCancelled };
+  return { cancelled, notCancelled, cancelledIds };
 }
 
 export async function listRefunds(db: FulfillmentContext["db"], orderId: string) {

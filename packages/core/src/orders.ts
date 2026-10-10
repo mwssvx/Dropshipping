@@ -192,7 +192,7 @@ export async function quoteCart(
   };
 }
 
-const addressSchema = z.object({
+export const addressSchema = z.object({
   name: z.string().trim().min(1, "Enter the name for delivery."),
   line1: z.string().trim().min(1, "Enter the street address."),
   line2: z.string().trim().optional(),

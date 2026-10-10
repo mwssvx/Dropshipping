@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { amountToCharge, askQuestion, claimReferral, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
+import { amountToCharge, askQuestion, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
 import { agents, campaigns, db, fulfillment, payments, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
@@ -11,6 +11,8 @@ import { loadShop, storeBase } from "./data";
 import { buyerFx, currencyCookie } from "@/lib/currency";
 import { campaignCookie } from "@/lib/campaigns";
 import { currentBuyer } from "@/lib/buyer";
+import { readOrderEdit } from "@/lib/order-edit";
+import type { OrderEditState } from "@/components/OrderEditForm";
 import { readGuestSaved, writeGuestSaved } from "@/lib/saved";
 
 /** The visit id the store's tracker set, for the funnel. */
@@ -360,6 +362,20 @@ export async function returnAction(handle: string, ref: string, _: ReturnState, 
     throw e;
   }
   redirect(`${await storeBase(handle)}/orders/${ref}`);
+}
+
+/** The buyer fixes their address or picks another size, from their order page, before it ships. */
+export async function editOrderByBuyerAction(handle: string, ref: string, _: OrderEditState, form: FormData): Promise<OrderEditState> {
+  const shop = await loadShop(handle);
+  try {
+    const order = await getOrderByPaymentIntent(await db(), shop.id, ref);
+    await editOrder(await fulfillment(), shop.id, order.id, readOrderEdit(form), "buyer");
+  } catch (e) {
+    if (e instanceof UserError || e instanceof NotFoundError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath(`${await storeBase(handle)}/orders/${ref}`);
+  return { message: "Saved. We've emailed you the change." };
 }
 
 export type ReferState = { sent?: string; error?: string };

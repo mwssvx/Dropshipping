@@ -372,3 +372,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **A photo per colour**: on a product with options, the merchant picks which of the product's photos each colour (or each option, when there's no colour) shows, under "Photo for each color" on the product page. New combinations added later (a new size) start with their colour's photo (`setVariantPhotos` and `variantPhotoRows` in `packages/core/src/gallery.ts`, `variants.image_url`).
 2. **On the store**, picking a colour switches the gallery to its photo, with the option picker and the plain option list alike. The cart shows the picked variant's photo instead of the cover.
 3. **From suppliers**: CJ's variant images and AliExpress's SKU images come in with the import. The cover stays first and variant photos are kept within the ten-photo limit. Removing a photo clears it from the options that used it, and store export and import carry each variant's photo.
+
+### Changing an order before it ships (after launch, part 43)
+
+1. **Buyers fix it themselves**: for 12 hours after paying, and only until it ships, the buyer's order page has "Wrong address, or need another size?". They can correct the address (in the same country, since shipping and tax were worked out for it) or switch an item to another size or colour at the same price that's in stock. A new address is risk-checked again unless the merchant already reviewed the order.
+2. **Merchants too**: the admin order page has "Change the address or a size" until the order ships.
+3. **The supplier gets the new version**: the affected supplier orders are cancelled and placed again with the change. If a supplier won't cancel because it's already packing, nothing changes and the buyer is asked to message the store. Each change is emailed to the buyer and listed on the order's timeline (`editOrder` in `packages/core/src/order-edits.ts`, `orders.edits`).

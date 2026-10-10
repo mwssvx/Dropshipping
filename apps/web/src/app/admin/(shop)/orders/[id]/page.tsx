@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { can, formatMoney, getOrder, listRefunds, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode } from "@sf/core";
-import { requireShop, storeAddress, suppliers } from "@/lib/server";
+import { can, countryName, formatMoney, getOrder, orderEditOptions, listRefunds, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode } from "@sf/core";
+import { fulfillment, requireShop, storeAddress, suppliers } from "@/lib/server";
+import { OrderEditForm } from "@/components/OrderEditForm";
+import { editOrderAction } from "../../../actions";
 import { PaymentLinkActions } from "./PaymentLinkActions";
 import { CheckTrackingButton, ManualTrackingForm, RetryButton } from "./FulfillmentActions";
 import { RefundForm } from "./RefundForm";
@@ -25,6 +27,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
   const cost = order.lines.reduce((s, l) => s + (l.unitCostMinor ?? 0) * l.quantity, 0);
   const knownCost = order.lines.every((l) => l.unitCostMinor != null);
   const a = order.shippingAddress;
+  const edit = ["paid"].includes(order.paymentStatus) && can(role, "orders") ? await orderEditOptions(await fulfillment(), shop.id, order.id, "merchant") : null;
   const [links, refunds, giftCard, returns, documents] = await Promise.all([
     listSupplierLinks(db, shop.id),
     listRefunds(db, order.id),
@@ -36,7 +39,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
     if (!supplierId) return "Sent by you";
     return labelFor(suppliers(), links.find((l) => l.id === supplierId));
   };
-  const EMAIL_LABEL = { order_confirmation: "Order confirmation", shipping_update: "Shipping update", delivered: "Delivery confirmation", refund: "Refund", support_reply: "Reply to a question", abandoned_cart: "Checkout reminder", payment_link: "Payment link", gift_shipped: "Gift heads-up", order_link: "Order link (Track your order)" };
+  const EMAIL_LABEL = { order_confirmation: "Order confirmation", shipping_update: "Shipping update", delivered: "Delivery confirmation", refund: "Refund", support_reply: "Reply to a question", abandoned_cart: "Checkout reminder", payment_link: "Payment link", gift_shipped: "Gift heads-up", order_link: "Order link (Track your order)", order_updated: "Order change" };
   const timeline = [
     { at: order.createdAt, text: "Order placed" },
     ...(order.paidAt
@@ -50,6 +53,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
     ]),
     ...(order.risk && (order.heldAt || order.riskReviewedAt) ? [{ at: new Date(order.risk.checkedAt), text: `Held for a risk check (${order.risk.level} risk)` }] : []),
     ...(order.riskReviewedAt ? [{ at: order.riskReviewedAt, text: "Checked and sent on to the supplier" }] : []),
+    ...order.edits.map((e) => ({ at: new Date(e.at), text: `Changed by ${e.by === "buyer" ? "the customer" : "you"}: ${e.changes.join("; ")}` })),
     ...returns.map((r) => ({ at: r.createdAt, text: `Buyer asked to return ${r.items.map((i) => `${i.title} × ${i.quantity}`).join(", ")}` })),
     ...refunds.map((r) => ({ at: r.createdAt, text: `Refunded ${money(r.amountMinor)}${r.reason ? `: ${r.reason}` : ""}` })),
     ...order.fulfillments.flatMap((f) => (f.status === "cancelled" ? [{ at: f.updatedAt, text: `Supplier order cancelled (${supplierLabel(f.supplierId)})` }] : [])),
@@ -182,6 +186,14 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
               {paid && order.fulfillments.length === 0 && <ManualTrackingForm orderId={order.id} />}
             </div>
           </section>
+          {edit?.canEdit && (
+            <section className="card p-5 flex flex-col gap-2" aria-labelledby="edit-heading">
+              <h2 id="edit-heading" className="font-semibold">Change the order</h2>
+              <OrderEditForm action={editOrderAction.bind(null, order.id)} address={edit.address} lines={edit.lines} countryName={countryName(edit.address.country)}
+                summary="Change the address or a size"
+                note="Until it ships. We cancel the supplier order and place it again with the change, then email the customer. Sizes listed are the ones at the same price and in stock." />
+            </section>
+          )}
           <section className="card p-5">
             <h2 className="font-semibold mb-3">Timeline</h2>
             <ol className="flex flex-col gap-3 border-l-2 border-border pl-4">

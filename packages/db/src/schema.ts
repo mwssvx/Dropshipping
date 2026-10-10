@@ -310,6 +310,9 @@ export type QuantityBreak = { minQty: number; percentOff: number };
 /** A gift order: who it's from, their message, and who to tell when it ships. */
 export type OrderGift = { from: string; message: string | null; recipientEmail: string | null };
 
+/** One change to a paid order before it shipped: a new address or another size. */
+export type OrderEdit = { at: string; by: "buyer" | "merchant"; changes: string[] };
+
 export type Address = {
   name: string;
   line1: string;
@@ -382,6 +385,8 @@ export const orders = pgTable(
     risk: jsonb("risk").$type<OrderRisk>(),
     heldAt: timestamp("held_at", { withTimezone: true }),
     riskReviewedAt: timestamp("risk_reviewed_at", { withTimezone: true }),
+    // Changes made after payment, before it shipped. The supplier order is cancelled and placed again.
+    edits: jsonb("edits").$type<OrderEdit[]>().notNull().default([]),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -465,7 +470,7 @@ export const emails = pgTable(
     id: id(),
     shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
     orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
-    kind: text("kind", { enum: ["order_confirmation", "shipping_update", "delivered", "refund", "support_reply", "abandoned_cart", "payment_link", "gift_shipped", "order_link"] }).notNull(),
+    kind: text("kind", { enum: ["order_confirmation", "shipping_update", "delivered", "refund", "support_reply", "abandoned_cart", "payment_link", "gift_shipped", "order_link", "order_updated"] }).notNull(),
     // Tells apart emails of a kind that can repeat (one per refund). Empty for once-only kinds.
     ref: text("ref").notNull().default(""),
     to: text("to").notNull(),

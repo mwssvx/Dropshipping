@@ -9,6 +9,7 @@ import {
   importProduct,
   parseMoney,
   releaseHeldOrder,
+  editOrder,
   requireMember,
   retryOrder,
   sendPriceDrops,
@@ -20,6 +21,8 @@ import {
   type ProductInput,
 } from "@sf/core";
 import { db, fulfillment, notifyLater, requireShop, requireUser, SHOP_COOKIE, stock, suppliers } from "@/lib/server";
+import { readOrderEdit } from "@/lib/order-edit";
+import type { OrderEditState } from "@/components/OrderEditForm";
 
 export type FormState = { error?: string; saved?: boolean };
 
@@ -177,6 +180,29 @@ async function orderAction(orderId: string, run: (shopId: string) => Promise<unk
 
 export async function retryOrderAction(orderId: string, _: FormState, _form: FormData): Promise<FormState> {
   return orderAction(orderId, async (shopId) => retryOrder(await fulfillment(), shopId, orderId));
+}
+
+/** The merchant changes the address or a size before the order ships. */
+export async function editOrderAction(orderId: string, _: OrderEditState, form: FormData): Promise<OrderEditState> {
+  const { shop } = await requireShop("orders");
+  let held = false;
+  let resent = false;
+  try {
+    ({ held, resent } = await editOrder(await fulfillment(), shop.id, orderId, readOrderEdit(form), "merchant"));
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  notifyLater(shop.id);
+  revalidatePath(`/admin/orders/${orderId}`);
+  revalidatePath("/admin/orders");
+  return {
+    message: held
+      ? "Saved and emailed to the customer. It's on hold, so send it on when you're ready."
+      : resent
+        ? "Saved. The supplier has the updated order, and we emailed the customer."
+        : "Saved and emailed to the customer.",
+  };
 }
 
 export async function releaseHeldOrderAction(orderId: string, _: FormState, _form: FormData): Promise<FormState> {
