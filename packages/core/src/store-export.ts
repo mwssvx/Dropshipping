@@ -4,6 +4,7 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
+import { collectionRulesSchema } from "./collection-rules";
 import { NotFoundError, UserError } from "./errors";
 import { CURRENCIES } from "./currency";
 import { csvCell } from "./payouts";
@@ -140,6 +141,8 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       description: c.description,
       image_url: c.imageUrl,
       products: links.filter(({ l }) => l.collectionId === c.id).map(({ l }) => handleOf.get(l.productId)!),
+      // An automatic collection carries its rules; its products follow from them.
+      ...(c.rules ? { rules: c.rules } : {}),
     })),
     pages: pages.map((p) => ({ handle: p.handle, title: p.title, body: p.body, seo_description: p.seoDescription, published: p.published })),
     blog_posts: posts.map((p) => ({
@@ -310,7 +313,7 @@ const importSchema = z.object({
     )
     .max(5000, "The file has more than 5,000 products."),
   collections: z
-    .array(z.object({ id: z.string().uuid().optional(), handle, title: str(200).min(1), description: str(5000).default(""), image_url: str(2000).nullable().optional(), products: z.array(handle).max(5000) }))
+    .array(z.object({ id: z.string().uuid().optional(), handle, title: str(200).min(1), description: str(5000).default(""), image_url: str(2000).nullable().optional(), products: z.array(handle).max(5000), rules: collectionRulesSchema.nullable().optional() }))
     .max(500)
     .default([]),
   pages: z.array(z.object({ handle, title: str(200).min(1), body: str(100_000).default(""), seo_description: str(320).nullable().optional(), published: z.boolean().default(true) })).max(200).default([]),
@@ -519,9 +522,10 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
     for (const x of data.collections) {
       const [row] = await tx
         .insert(schema.collections)
-        .values({ shopId, handle: x.handle, title: x.title, description: x.description, imageUrl: x.image_url ?? null })
+        .values({ shopId, handle: x.handle, title: x.title, description: x.description, imageUrl: x.image_url ?? null, rules: x.rules ?? null })
         .returning({ id: schema.collections.id });
       if (x.id) collectionIds.set(x.id, row!.id);
+      if (x.rules) continue;
       const members = x.products.map((h) => productIds.get(h)).filter((id): id is string => !!id);
       if (members.length) await tx.insert(schema.collectionProducts).values([...new Set(members)].map((productId, position) => ({ collectionId: row!.id, productId, position })));
     }

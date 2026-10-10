@@ -5,6 +5,7 @@
 import { and, asc, count, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
+import { collectionMembership } from "./collections";
 import { NotFoundError, UserError } from "./errors";
 import { percentOff } from "./wholesale";
 
@@ -127,17 +128,13 @@ export async function salesFor(db: Db, shopId: string, productIds: string[], now
     columns: { id: true },
   });
   const collectionIds = running.map((s) => s.collectionId).filter((c): c is string => !!c);
-  const links = collectionIds.length
-    ? await db.query.collectionProducts.findMany({
-        where: and(inArray(schema.collectionProducts.collectionId, collectionIds), inArray(schema.collectionProducts.productId, ids)),
-      })
-    : [];
+  const members = await collectionMembership(db, shopId, collectionIds, ids);
   for (const { id } of products) {
     for (const s of running) {
       const covers =
         s.scope === "all" ||
         (s.scope === "products" && s.productIds.includes(id)) ||
-        (s.scope === "collection" && links.some((l) => l.collectionId === s.collectionId && l.productId === id));
+        (s.scope === "collection" && !!members.get(s.collectionId!)?.has(id));
       if (covers && s.percentOff > (result.get(id)?.percentOff ?? 0)) result.set(id, { id: s.id, title: s.title, percentOff: s.percentOff, startsAt: s.startsAt, endsAt: s.endsAt });
     }
   }

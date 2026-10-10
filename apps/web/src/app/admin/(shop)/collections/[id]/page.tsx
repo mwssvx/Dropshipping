@@ -5,6 +5,7 @@ import { requireShop, storeAddress } from "@/lib/server";
 import { deleteCollectionAction, updateCollectionAction } from "../../../store-actions";
 import { PageHeader } from "../../PageHeader";
 import { CollectionForm } from "../CollectionForm";
+import { ruleProducts } from "../rule-products";
 
 export const metadata = { title: "Collection" };
 
@@ -21,9 +22,9 @@ export default async function CollectionPage({ params, searchParams }: { params:
       <PageHeader title={collection.title} back={<Link href="/admin/collections" className="hint hover:text-ink">← Collections</Link>}
         actions={<a href={`${address}/collections/${collection.handle}`} target="_blank" className="btn btn-secondary">View ↗</a>} />
       <div className="px-4 sm:px-8 flex flex-col gap-6">
-        <CollectionForm action={updateCollectionAction.bind(null, collection.id)} submitLabel="Save" products={products}
+        <CollectionForm action={updateCollectionAction.bind(null, collection.id)} submitLabel="Save" products={ruleProducts(products)} currency={shop.currency}
           saved={(await searchParams).saved === "1"}
-          initial={{ title: collection.title, description: collection.description, imageUrl: collection.imageUrl ?? "", productIds: collection.productIds }} />
+          initial={{ title: collection.title, description: collection.description, imageUrl: collection.imageUrl ?? "", productIds: collection.productIds, rules: collection.rules }} />
         <form action={deleteCollectionAction.bind(null, collection.id)}>
           <button className="text-sm text-critical hover:underline">Delete this collection</button>
           <p className="hint">Products stay in your store. Only the grouping is removed.</p>
