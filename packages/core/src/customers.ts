@@ -1,7 +1,7 @@
 // Customer profiles for the merchant: one page per buyer with their orders, spend, addresses, store
 // credit and returns, plus the merchant's own note and tags. Also answers privacy requests: a copy
 // of everything the store holds about a buyer, and erasing it on request.
-import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { schema, type Address, type Db } from "@sf/db";
 import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
@@ -155,6 +155,7 @@ export async function exportCustomerData(db: Db, shop: { id: string; name: strin
     .from(schema.savedItems)
     .innerJoin(schema.products, eq(schema.products.id, schema.savedItems.productId))
     .where(eq(schema.savedItems.customerId, customer.id));
+  const points = await db.query.rewardEntries.findMany({ where: eq(schema.rewardEntries.customerId, customer.id), orderBy: asc(schema.rewardEntries.createdAt) });
   const numbers = new Map(orders.map((o) => [o.id, o.number]));
 
   return {
@@ -197,6 +198,7 @@ export async function exportCustomerData(db: Db, shop: { id: string; name: strin
     emails_sent: emails.map((e) => ({ subject: e.subject, kind: e.kind, status: e.status, at: (e.sentAt ?? e.createdAt).toISOString() })),
     back_in_stock_requests: alerts.map((a) => ({ product: a.product, option: a.option, asked_at: a.createdAt.toISOString(), emailed_at: a.notifiedAt?.toISOString() ?? null })),
     saved_items: saved.map((x) => ({ product: x.product, price_when_saved: x.priceMinor, saved_at: x.createdAt.toISOString() })),
+    reward_points: points.map((x) => ({ points: x.points, kind: x.kind, note: x.note, at: x.createdAt.toISOString() })),
     gift_cards: giftCards.map((g) => ({ ending: g.last4, currency: g.currency, initial: g.initialMinor, balance: g.balanceMinor, created_at: g.createdAt.toISOString() })),
   };
 }

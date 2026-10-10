@@ -1,9 +1,10 @@
 "use server";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { applyForWholesale, mergeSaved, reorderLines, requestBuyerCode, signOutBuyer, subscribeBuyer, unsubscribeBuyer, UserError, verifyBuyerCode } from "@sf/core";
-import { readCart, writeCart } from "@/lib/cart";
+import { applyForWholesale, formatMoney, mergeSaved, normalizeGiftCardCode, redeemPoints, reorderLines, requestBuyerCode, signOutBuyer, subscribeBuyer, unsubscribeBuyer, UserError, verifyBuyerCode } from "@sf/core";
+import { readCart, writeCart, writeGiftCardCode } from "@/lib/cart";
 import { buyerToken, clearBuyerCookie, currentBuyer, setBuyerCookie } from "@/lib/buyer";
-import { db, mailer } from "@/lib/server";
+import { db, mailer, storeAddress } from "@/lib/server";
 import { readGuestSaved, writeGuestSaved } from "@/lib/saved";
 import { loadShop, storeBase } from "../data";
 
@@ -85,4 +86,22 @@ export async function applyWholesaleAction(handle: string, _: { error?: string }
     throw e;
   }
   redirect(`${await storeBase(handle)}/account`);
+}
+
+export type RedeemState = { error?: string; message?: string };
+
+/** Points become store credit: a gift card emailed to the buyer and put in their cart. */
+export async function redeemPointsAction(handle: string, _: RedeemState, form: FormData): Promise<RedeemState> {
+  const shop = await loadShop(handle);
+  const buyer = await currentBuyer(shop.id);
+  if (!buyer) return { error: "Sign in again to use your points." };
+  try {
+    const { code, creditMinor } = await redeemPoints({ db: await db(), mailer: mailer(), storeAddress }, shop, buyer.email, Number(form.get("points") ?? 0));
+    await writeGiftCardCode(shop.id, normalizeGiftCardCode(code));
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { message: `${formatMoney(creditMinor, shop.currency)} of store credit is in your cart. We emailed you the code too.` };
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
 }

@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { can, formatMoney, getCustomerProfile, NotFoundError, RETURN_REASON_LABELS } from "@sf/core";
+import { can, creditFor, customerPoints, formatMoney, getCustomerProfile, NotFoundError, RETURN_REASON_LABELS } from "@sf/core";
 import { FulfilmentStatus, PaymentStatus } from "@/components/Status";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../../PageHeader";
 import { EraseForm, NotesForm } from "./CustomerForms";
+import { AdjustPointsForm } from "../../rewards/RewardsForms";
 
 export const metadata = { title: "Customer" };
 
@@ -23,6 +24,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const { customer, stats, orders } = profile;
   const seesMoney = can(role, "money");
   const money = (m: number) => formatMoney(m, shop.currency);
+  const points = await customerPoints(db, customer.id);
 
   return (
     <main className="pb-12">
@@ -113,6 +115,13 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             {customer.wholesaleStatus === "approved" && <p><span className="pill pill-success">Wholesale</span> {customer.wholesaleCompany}</p>}
             {profile.storeCreditMinor > 0 && <p>Store credit: <span className="num font-medium">{money(profile.storeCreditMinor)}</span></p>}
           </section>
+          {(shop.rewardsEnabled || points !== 0) && (
+            <section className="card p-5 flex flex-col gap-3 text-sm" aria-labelledby="points-h">
+              <h2 id="points-h" className="font-semibold">Rewards</h2>
+              <p><span className="num font-medium">{points.toLocaleString("en-US")} points</span>{points >= 100 && <span className="hint"> · worth {money(creditFor(shop, points))}</span>}</p>
+              <AdjustPointsForm customerId={customer.id} />
+            </section>
+          )}
           {profile.addresses.length > 0 && (
             <section className="card p-5 flex flex-col gap-3 text-sm" aria-labelledby="addresses-h">
               <h2 id="addresses-h" className="font-semibold">{profile.addresses.length === 1 ? "Address" : "Addresses"}</h2>

@@ -211,6 +211,13 @@
       "when": 1791543186636,
       "tag": "0029_m30_bundles",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1791544553309,
+      "tag": "0030_m31_rewards",
+      "breakpoints": true
     }
   ]
 }

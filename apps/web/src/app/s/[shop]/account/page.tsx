@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { buyerOrders, formatMoney } from "@sf/core";
+import { buyerOrders, describeRewards, formatMoney, REWARD_STEP, rewardsFor } from "@sf/core";
 import { currentBuyer } from "@/lib/buyer";
 import { db } from "@/lib/server";
 import { loadShop, storeBase } from "../data";
 import { buyAgainAction, buyerSignOutAction, setBuyerMarketingAction } from "./actions";
 import { SignInForm } from "./SignInForm";
 import { WholesaleForm } from "./WholesaleForm";
+import { RedeemForm } from "./RedeemForm";
 
 export const metadata = { title: "Your account", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -39,6 +40,9 @@ export default async function AccountPage({ params }: { params: Promise<{ shop: 
   }
 
   const orders = await buyerOrders(await db(), shop.id, buyer.email);
+  const rewards = shop.rewardsEnabled ? await rewardsFor(await db(), shop, buyer.email) : null;
+  // The fewest points that make at least 1.00 of credit, in whole hundreds.
+  const minSwap = Math.max(REWARD_STEP, Math.ceil(100 / shop.rewardsValueMinor) * REWARD_STEP);
   return (
     <main className="max-w-2xl mx-auto px-4 sm:px-6 py-12 flex flex-col gap-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -71,6 +75,31 @@ export default async function AccountPage({ params }: { params: Promise<{ shop: 
               </p>
               <WholesaleForm handle={handle} company={buyer.wholesaleCompany} />
             </>
+          )}
+        </section>
+      )}
+      {rewards && (
+        <section id="rewards" aria-labelledby="rewards-heading" className="card p-5 flex flex-col gap-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 id="rewards-heading" className="font-semibold">Your points</h2>
+            <span className="num text-lg font-semibold">{rewards.points.toLocaleString("en-US")}</span>
+          </div>
+          <p className="hint text-sm">{describeRewards(shop)}</p>
+          {rewards.points >= minSwap ? (
+            <p className="text-sm">Worth {formatMoney(rewards.creditMinor, shop.currency)} in store credit.</p>
+          ) : (
+            <p className="text-sm">Collect {minSwap.toLocaleString("en-US")} points to swap them for store credit.</p>
+          )}
+          <RedeemForm handle={handle} min={minSwap} max={Math.floor(Math.max(rewards.points, 0) / REWARD_STEP) * REWARD_STEP} />
+          {rewards.entries.length > 0 && (
+            <ul className="text-sm divide-y divide-border border-t border-border">
+              {rewards.entries.map((e) => (
+                <li key={e.id} className="flex justify-between gap-3 py-2">
+                  <span>{e.label} <span className="hint">· {date.format(e.at)}</span></span>
+                  <span className={`num ${e.points > 0 ? "text-success" : ""}`}>{e.points > 0 ? "+" : "−"}{Math.abs(e.points).toLocaleString("en-US")}</span>
+                </li>
+              ))}
+            </ul>
           )}
         </section>
       )}
