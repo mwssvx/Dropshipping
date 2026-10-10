@@ -12,6 +12,7 @@ const STATUS = {
   approved: ["Approved, not refunded", "pill-info"],
   refunded: ["Refunded", "pill-success"],
   credited: ["Store credit", "pill-success"],
+  replaced: ["Replacement sent", "pill-success"],
   declined: ["Declined", "pill-neutral"],
 } as const;
 
@@ -79,6 +80,7 @@ export default async function ReturnsPage() {
                   </span>
                   <span className="flex items-center gap-2">
                     {r.resolvedMinor ? <span className="num">{formatMoney(r.resolvedMinor, r.currency)}</span> : null}
+                    {r.replacementOrderId && <Link href={`/admin/orders/${r.replacementOrderId}`} className="underline">Replacement</Link>}
                     <span className={`pill ${STATUS[r.status][1]}`}>{STATUS[r.status][0]}</span>
                     {r.resolvedAt && <span className="hint">{date.format(r.resolvedAt)}</span>}
                   </span>

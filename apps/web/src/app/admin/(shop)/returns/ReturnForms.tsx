@@ -53,6 +53,7 @@ export function DecideForm({ id, approved, amount, max }: { id: string; approved
         {!approved && <Choice value="approve" className="btn btn-secondary">Approve</Choice>}
         <Choice value="refund" className="btn btn-primary">Refund</Choice>
         <Choice value="credit" className="btn btn-secondary">Give store credit</Choice>
+        <Choice value="replace" className="btn btn-secondary">Send a replacement</Choice>
         <Choice value="decline" className="btn btn-secondary text-critical">Decline</Choice>
       </div>
     </form>

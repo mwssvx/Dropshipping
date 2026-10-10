@@ -1,5 +1,5 @@
 // Store analytics: what visitors did (storefront_events) and what they bought (orders).
-import { and, count, countDistinct, desc, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
+import { and, count, countDistinct, desc, eq, gte, inArray, isNotNull, lt, ne, sql } from "drizzle-orm";
 import { schema, STOREFRONT_EVENTS, type Db, type StorefrontEventKind } from "@sf/db";
 
 const PAID = ["paid", "partially_refunded", "refunded"] as const;
@@ -39,7 +39,8 @@ export type AnalyticsRange = { from: Date; to: Date };
 /** Sales by day, the visitor funnel, best sellers and where visitors came from. `to` is exclusive. */
 export async function analyticsReport(db: Db, shopId: string, range: AnalyticsRange) {
   const inRange = (col: typeof schema.orders.paidAt | typeof schema.storefrontEvents.createdAt) => and(gte(col, range.from), lt(col, range.to));
-  const paid = and(eq(schema.orders.shopId, shopId), inArray(schema.orders.paymentStatus, [...PAID]), inRange(schema.orders.paidAt));
+  // Free replacements aren't sales: they'd count the same goods twice.
+  const paid = and(eq(schema.orders.shopId, shopId), inArray(schema.orders.paymentStatus, [...PAID]), ne(schema.orders.source, "replacement"), inRange(schema.orders.paidAt));
   const events = and(eq(schema.storefrontEvents.shopId, shopId), inRange(schema.storefrontEvents.createdAt));
   const day = (col: unknown) => sql<string>`to_char(${col} at time zone 'UTC', 'YYYY-MM-DD')`;
 

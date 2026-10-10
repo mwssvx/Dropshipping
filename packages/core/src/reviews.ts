@@ -22,7 +22,8 @@ async function orderByRef(db: Db, shopId: string, paymentIntentId: string) {
 /** The products on an order the buyer can review (once it has shipped), with any review already left. */
 export async function reviewableItems(db: Db, shopId: string, paymentIntentId: string) {
   const order = await orderByRef(db, shopId, paymentIntentId);
-  if (!REVIEWABLE.includes(order.fulfillmentStatus as (typeof REVIEWABLE)[number])) return [];
+  // A replacement is reviewed on the order it replaces, once.
+  if (order.source === "replacement" || !REVIEWABLE.includes(order.fulfillmentStatus as (typeof REVIEWABLE)[number])) return [];
   const lines = await db
     .select({ productId: schema.products.id, title: schema.products.title })
     .from(schema.orderLines)

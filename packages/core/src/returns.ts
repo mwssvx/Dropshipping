@@ -8,6 +8,7 @@ import { NotFoundError, UserError } from "./errors";
 import { issueGiftCard, type GiftCardContext } from "./gift-cards";
 import { formatMoney } from "./money";
 import { refundOrder, type RefundContext } from "./refunds";
+import { sendReplacement } from "./replacements";
 
 type Shop = typeof schema.shops.$inferSelect;
 type Order = typeof schema.orders.$inferSelect;
@@ -15,6 +16,7 @@ type ReturnRequest = typeof schema.returnRequests.$inferSelect;
 export type ReturnContext = RefundContext & GiftCardContext;
 
 export const RETURN_REASON_LABELS: Record<(typeof RETURN_REASONS)[number], string> = {
+  never_arrived: "It never arrived",
   damaged: "It arrived damaged",
   wrong_item: "I got the wrong item",
   not_as_described: "It's not as described",
@@ -143,6 +145,7 @@ export type ReturnDecision =
   | { action: "approve"; message?: string }
   | { action: "refund"; amountMinor: number; message?: string }
   | { action: "credit"; amountMinor: number; message?: string }
+  | { action: "replace"; message?: string }
   | { action: "decline"; message: string };
 
 /** The merchant answers a return. Refund and store credit close it; approve waits for the item. */
@@ -161,6 +164,11 @@ export async function decideReturn(ctx: ReturnContext, shop: Shop, requestId: st
     if (!message) throw new UserError("Tell the buyer why, so they know what to do next.");
     update = { status: "declined", resolvedAt: new Date() };
     email = `${shop.name} can't accept this return.\n\n${message}`;
+  } else if (decision.action === "replace") {
+    // The same items again, free. Nothing needs to come back.
+    const replacement = await sendReplacement(ctx, shop, order.id, { items: request.items.map((i) => ({ lineId: i.lineId, quantity: i.quantity })), note: message ?? undefined });
+    update = { status: "replaced", replacementOrderId: replacement.id, resolvedAt: new Date() };
+    email = `${shop.name} is sending you a replacement as order #${replacement.number}. There's nothing to send back. You'll get an email with tracking when it ships.`;
   } else if (decision.action === "approve") {
     const instructions = message ?? shop.returnInstructions ?? DEFAULT_RETURN_INSTRUCTIONS;
     update = { status: "approved", merchantMessage: instructions };

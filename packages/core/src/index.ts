@@ -48,6 +48,7 @@ export * from "./wholesale";
 export * from "./gift-cards";
 export * from "./shipping";
 export * from "./returns";
+export * from "./replacements";
 export * from "./redirects";
 export * from "./saved";
 export * from "./languages";

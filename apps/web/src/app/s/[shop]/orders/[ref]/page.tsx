@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { buyerAmounts, buyerThread, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, returnOptions, reviewableItems } from "@sf/core";
+import { buyerAmounts, buyerThread, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems } from "@sf/core";
 import Link from "next/link";
 import { db, fulfillment, storeAddress } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
@@ -44,6 +44,10 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
   const offer = await postPurchaseOfferFor(await db(), shop, order);
   const added = paid ? await postPurchaseOrder(await db(), order.id) : null;
   const addedTo = order.parentOrderId ? await (await db()).query.orders.findFirst({ where: (o, { eq }) => eq(o.id, order.parentOrderId!), columns: { number: true, paymentIntentId: true } }) : null;
+  // A free replacement: the order it replaces, or the replacements sent for this one.
+  const replacing = order.source === "replacement";
+  const replaces = order.replacesOrderId ? await (await db()).query.orders.findFirst({ where: (o, { eq }) => eq(o.id, order.replacesOrderId!), columns: { number: true, paymentIntentId: true } }) : null;
+  const replacements = paid ? await replacementsOf(await db(), order.id) : [];
   const steps = [
     { label: "Order confirmed", done: paid },
     { label: "Being prepared", done: order.fulfillments.some((f) => f.placedAt || f.shippedAt) },
@@ -54,12 +58,12 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
     <main className="max-w-2xl mx-auto px-4 sm:px-6 py-12 flex flex-col gap-8">
       <div className="flex flex-col gap-2">
         <p className="hint num">Order #{order.number}</p>
-        <h1 className="text-3xl font-bold tracking-tight">{paid ? `Thank you, ${(order.gift?.from ?? order.shippingAddress.name).split(" ")[0]}!` : "We're waiting for your payment"}</h1>
-        <p className="text-muted">{paid ? `We've emailed a receipt to ${order.email}. This page updates as your order moves.` : "If you've paid, this page updates in a moment."}</p>
+        <h1 className="text-3xl font-bold tracking-tight">{replacing ? "Your replacement" : paid ? `Thank you, ${(order.gift?.from ?? order.shippingAddress.name).split(" ")[0]}!` : "We're waiting for your payment"}</h1>
+        <p className="text-muted">{replacing ? `${shop.name} is sending this at no charge. This page updates as it moves.` : paid ? `We've emailed a receipt to ${order.email}. This page updates as your order moves.` : "If you've paid, this page updates in a moment."}</p>
         {paid && (
           <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
             <Link href={`${base}/account`} className="underline">See all your orders</Link>
-            <a href={`${base}/orders/${ref}/invoice`} className="underline">Invoice{order.refundedMinor > 0 ? " and credit notes" : ""}</a>
+            {!replacing && <a href={`${base}/orders/${ref}/invoice`} className="underline">Invoice{order.refundedMinor > 0 ? " and credit notes" : ""}</a>}
           </p>
         )}
         {order.paymentStatus === "pending" && (
@@ -76,6 +80,16 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
           Added as order #{added.number} and charged {formatMoney(added.totalMinor, added.currency)} to the same card. <Link href={`${base}/orders/${added.paymentIntentId}`} className="underline">See it</Link>
         </p>
       )}
+      {replaces && (
+        <p className="banner banner-info">
+          A free replacement for <Link href={`${base}/orders/${replaces.paymentIntentId}`} className="underline">order #{replaces.number}</Link>.{order.note ? ` ${shop.name}: ${order.note}` : ""}
+        </p>
+      )}
+      {replacements.map((r) => (
+        <p key={r.id} className="banner banner-success" role="status">
+          A replacement is on its way as order #{r.number}, at no charge. <Link href={`${base}/orders/${r.paymentIntentId}`} className="underline">Track it</Link>
+        </p>
+      ))}
       {addedTo && (
         <p className="banner banner-info">
           You added this after checking out, to the same card as <Link href={`${base}/orders/${addedTo.paymentIntentId}`} className="underline">order #{addedTo.number}</Link>. It may arrive separately.
@@ -187,6 +201,7 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
                   approved: `${shop.name} approved your return.`,
                   refunded: `refunded ${returns.latest.resolvedMinor ? formatMoney(returns.latest.resolvedMinor, order.currency) : ""}.`,
                   credited: `${returns.latest.resolvedMinor ? formatMoney(returns.latest.resolvedMinor, order.currency) : ""} in store credit, sent by email.`,
+                  replaced: `${shop.name} is sending a replacement. There's nothing to send back.`,
                   declined: `${shop.name} couldn't accept this return.`,
                 }[returns.latest.status]}
               </p>

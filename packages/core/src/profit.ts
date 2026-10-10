@@ -144,7 +144,17 @@ export async function profitReport(db: Db, shop: Shop, days: ProfitRange, now = 
   for (const order of orders) {
     const own = lines.filter((l) => l.orderId === order.id);
     const gross = own.reduce((s, l) => s + l.unitPriceMinor * l.quantity, 0);
-    if (!gross) continue;
+    if (!gross) {
+      // A free replacement sells nothing, but the goods it sends again still cost money.
+      if (order.source === "replacement" && placed.has(order.id)) {
+        for (const l of own) {
+          const r = row(l.variantId ? (productOf.get(l.variantId) ?? null) : null, l.title);
+          if (l.unitCostMinor == null) r.costMissing = true;
+          else r.costMinor += l.unitCostMinor * l.quantity;
+        }
+      }
+      continue;
+    }
     // What the buyer paid for the goods: after discount, before shipping and tax.
     const goods = order.totalMinor - order.shippingMinor - order.taxMinor;
     const refundedGoods = order.totalMinor ? Math.round((order.refundedMinor * goods) / order.totalMinor) : 0;
