@@ -95,7 +95,7 @@ export async function issueGiftCard(ctx: GiftCardContext, shop: Shop, input: { e
   });
   if (!made) throw new Error("Couldn't make a unique gift card code.");
   const sent = await sendCode(ctx, shop, made.card, made.code, `${shop.name} sent you a gift card.`);
-  return { card: made.card, sent };
+  return { card: made.card, sent, code: made.code };
 }
 
 /**

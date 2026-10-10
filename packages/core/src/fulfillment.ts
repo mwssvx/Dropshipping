@@ -8,6 +8,7 @@ import { buyerAmounts } from "./currency";
 import { SupplierError, type ProblemCode, type Suppliers } from "./suppliers";
 import { sendPurchaseOrder } from "./own-suppliers";
 import { issueGiftCardsForOrder } from "./gift-cards";
+import { earnPoints } from "./rewards";
 
 type Order = typeof schema.orders.$inferSelect;
 type Fulfillment = typeof schema.fulfillments.$inferSelect;
@@ -150,6 +151,7 @@ export async function refreshOrderFulfillment(db: Db, orderId: string, at = new 
 /** Called once when a payment webhook first marks an order paid. */
 export async function onOrderPaid(ctx: FulfillmentContext, orderId: string) {
   await sendOrderEmail(ctx, orderId, "order_confirmation");
+  await earnPoints(ctx.db, orderId);
   return routeAndIssue(ctx, orderId);
 }
 

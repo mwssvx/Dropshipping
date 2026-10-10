@@ -1,4 +1,4 @@
-// Milestone 1 to 30 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 31 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -105,6 +105,12 @@ export const shops = pgTable(
     // Languages the store is also shown in, besides English, like ["de", "fr"]. Buyers pick one
     // in the footer; each has its own address (/de/...).
     languages: jsonb("languages").$type<string[]>().notNull().default([]),
+    // Rewards: buyers earn points on what they pay and swap them for store credit.
+    rewardsEnabled: boolean("rewards_enabled").notNull().default(false),
+    /** Points per 1.00 spent. */
+    rewardsEarnRate: integer("rewards_earn_rate").notNull().default(1),
+    /** What 100 points are worth, in minor units. */
+    rewardsValueMinor: integer("rewards_value_minor").notNull().default(100),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -1215,4 +1221,26 @@ export const bundles = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [index("bundles_shop_idx").on(t.shopId)],
+);
+
+// Every change to a buyer's points: earned on an order, taken back on a refund, swapped for store
+// credit, or changed by the merchant. The balance is the sum.
+export const rewardEntries = pgTable(
+  "reward_entries",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    customerId: uuid("customer_id").notNull().references(() => customers.id, { onDelete: "cascade" }),
+    points: integer("points").notNull(),
+    kind: text("kind", { enum: ["order", "refund", "redeem", "adjust"] }).notNull(),
+    orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
+    /** The refund (kind refund) or store credit (kind redeem) it came from. */
+    refId: uuid("ref_id"),
+    note: text("note"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("reward_entries_customer_idx").on(t.customerId, t.createdAt),
+    uniqueIndex("reward_entries_order_uq").on(t.orderId, t.kind, t.refId),
+  ],
 );

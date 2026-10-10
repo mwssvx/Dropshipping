@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { convertPrice, formatMoney, presentQuote, quoteCart, upsellsFor, UserError } from "@sf/core";
+import { convertPrice, formatMoney, pointsFor, presentQuote, quoteCart, upsellsFor, UserError } from "@sf/core";
 import { buyerFx } from "@/lib/currency";
 import { readCart, readDiscountCode, readGiftCardCode } from "@/lib/cart";
 import { db } from "@/lib/server";
@@ -49,6 +49,8 @@ export default async function CartPage({ params, searchParams }: { params: Promi
   const shown = quote ? presentQuote({ ...quote, taxMinor: 0 }, fx) : null;
   const money = (m: number) => formatMoney(m, fx.currency);
   const otherCurrency = fx.currency !== shop.currency;
+  // Points this order would earn: goods after discounts, less what a gift card pays.
+  const points = quote && shop.rewardsEnabled && !quote.wholesale ? pointsFor(shop, quote.goodsMinor - quote.discountMinor - (quote.giftCard?.appliedMinor ?? 0)) : 0;
   return (
     <main className="max-w-3xl mx-auto px-4 sm:px-6 py-10 flex flex-col gap-6">
       <h1 className="text-3xl font-bold tracking-tight">{t.yourCart}</h1>
@@ -119,6 +121,7 @@ export default async function CartPage({ params, searchParams }: { params: Promi
               </>
             )}
             <dd className="col-span-2 hint text-right font-sans">{quote.pricesIncludeTax ? t.taxIncludedNote : t.taxAddedNote}</dd>
+            {points > 0 && <dd className="col-span-2 text-right font-sans text-success">{t.rewardsEarn(points.toLocaleString("en-US"))}</dd>}
           </dl>
           {quote.discount && (
             <form action={removeCodeAction.bind(null, handle)} className="self-end flex items-center gap-2 text-sm">

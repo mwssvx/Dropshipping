@@ -252,3 +252,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 2. **Store**: a bundle shows on each of its products' pages with an option picker per product and one "Add all to cart" button, in every store language.
 3. **Pricing**: the cart takes the bundle's percentage off every full set. Each item counts towards one bundle at most, bigger discounts first and cheapest items first. Bundles and discount codes don't combine: the cart uses whichever saves the buyer more and says so. Wholesale buyers keep their own prices.
 4. **Orders** show the saving as "Bundle (name)" to the buyer, in admin, in the mobile app and in the public API (`bundle_title`). Bundles travel in the store file.
+
+### Rewards points (after launch, part 23)
+
+1. **Points** (`packages/core/src/rewards.ts`): turned on from the new Rewards page under Marketing. The merchant sets points per 1.00 spent and what 100 points are worth. Buyers earn points when an order is paid, on what they pay for goods (not gift cards bought, and not what a gift card paid). Refunds take points back in proportion. Wholesale orders don't earn points.
+2. **Buyers** see what an order will earn in the cart (in every store language), and their points, history and a "Swap for store credit" button on their account page. A swap makes a gift card for the credit, emails the code and puts it straight into their cart. Points come off first, so two presses can't spend them twice.
+3. **Merchants** see buyers with points, what all points are worth and the top holders on the Rewards page, and can add or take points with a note on a customer's page. Points are in the customer's data export, and the settings travel in the store file.

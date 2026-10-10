@@ -69,6 +69,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       presentment_currencies: shop.presentmentCurrencies,
       round_converted_prices: shop.roundConvertedPrices,
       languages: shop.languages,
+      rewards: { enabled: shop.rewardsEnabled, earn_rate: shop.rewardsEarnRate, value_minor: shop.rewardsValueMinor },
       wholesale: { enabled: shop.wholesaleEnabled, percent_off: shop.wholesalePercentOff, min_order_minor: shop.wholesaleMinOrderMinor },
       // Missing means the built-in default rate.
       shipping_zones: shipping.isDefault
@@ -165,6 +166,7 @@ const importSchema = z.object({
       presentment_currencies: z.array(z.enum(CURRENCIES)).max(CURRENCIES.length).optional(),
       round_converted_prices: z.boolean().optional(),
       languages: z.array(z.enum(LANGUAGE_CODES as [string, ...string[]])).max(LANGUAGE_CODES.length).optional(),
+      rewards: z.object({ enabled: z.boolean(), earn_rate: z.number().int().min(1).max(100), value_minor: z.number().int().min(1).max(10_000) }).optional(),
       wholesale: z
         .object({ enabled: z.boolean(), percent_off: z.number().int().min(1).max(80), min_order_minor: z.number().int().min(0).max(100_000_000) })
         .optional(),
@@ -457,6 +459,9 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
     if (data.store.reviews_auto_publish !== undefined) settings.reviewsAutoPublish = data.store.reviews_auto_publish;
     if (data.store.presentment_currencies !== undefined) settings.presentmentCurrencies = [...new Set(data.store.presentment_currencies)];
     if (data.store.round_converted_prices !== undefined) settings.roundConvertedPrices = data.store.round_converted_prices;
+    if (data.store.rewards) {
+      Object.assign(settings, { rewardsEnabled: data.store.rewards.enabled, rewardsEarnRate: data.store.rewards.earn_rate, rewardsValueMinor: data.store.rewards.value_minor });
+    }
     if (data.store.languages !== undefined) settings.languages = LANGUAGE_CODES.filter((l) => data.store.languages!.includes(l));
     if (data.store.wholesale) {
       Object.assign(settings, {
