@@ -218,6 +218,13 @@
       "when": 1791544553309,
       "tag": "0030_m31_rewards",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1791609812396,
+      "tag": "0031_m32_invoices",
+      "breakpoints": true
     }
   ]
 }

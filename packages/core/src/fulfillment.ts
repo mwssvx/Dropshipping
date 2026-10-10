@@ -9,6 +9,7 @@ import { SupplierError, type ProblemCode, type Suppliers } from "./suppliers";
 import { sendPurchaseOrder } from "./own-suppliers";
 import { issueGiftCardsForOrder } from "./gift-cards";
 import { earnPoints } from "./rewards";
+import { issueInvoice } from "./invoices";
 
 type Order = typeof schema.orders.$inferSelect;
 type Fulfillment = typeof schema.fulfillments.$inferSelect;
@@ -150,6 +151,7 @@ export async function refreshOrderFulfillment(db: Db, orderId: string, at = new 
 
 /** Called once when a payment webhook first marks an order paid. */
 export async function onOrderPaid(ctx: FulfillmentContext, orderId: string) {
+  await issueInvoice(ctx.db, orderId);
   await sendOrderEmail(ctx, orderId, "order_confirmation");
   await earnPoints(ctx.db, orderId);
   return routeAndIssue(ctx, orderId);
@@ -375,6 +377,7 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
     const refund = await ctx.db.query.refunds.findFirst({ where: eq(schema.refunds.id, ref) });
     if (!refund) throw new NotFoundError("Refund");
     const full = order.refundedMinor >= order.totalMinor;
+    const note = await ctx.db.query.invoices.findFirst({ where: eq(schema.invoices.refundId, refund.id) });
     const toGift = refund.giftCardMinor;
     const toCardMinor = refund.amountMinor - toGift;
     const where =
@@ -394,6 +397,7 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
         ...(refund.reason ? [``, `Reason: ${refund.reason}`] : []),
         ``,
         toCardMinor ? `Banks usually show card refunds within 5 to 10 business days.` : `You can use the gift card again right away.`,
+        ...(note ? [``, `Credit note ${note.number}: ${link}/invoice?doc=${note.id}`] : []),
         ``,
         `Order status: ${link}`,
       ].join("\n"),
@@ -401,6 +405,7 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
   }
   if (kind === "order_confirmation") {
     const lines = await ctx.db.query.orderLines.findMany({ where: eq(schema.orderLines.orderId, order.id) });
+    const invoice = await ctx.db.query.invoices.findFirst({ where: and(eq(schema.invoices.orderId, order.id), eq(schema.invoices.kind, "invoice")) });
     const paid = buyerAmounts(order, lines);
     return {
       subject: `Order #${order.number} confirmed`,
@@ -415,6 +420,7 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
         ...(paid.giftCardMinor
           ? [`Paid with gift card: ${formatMoney(paid.giftCardMinor, paid.currency)}`, ...(paid.chargedMinor ? [`Paid by card: ${formatMoney(paid.chargedMinor, paid.currency)}`] : [])]
           : []),
+        ...(invoice ? [``, `Your invoice ${invoice.number}: ${link}/invoice`] : []),
         ``,
         `We'll email you again when it ships. Track your order any time: ${link}`,
       ].join("\n"),

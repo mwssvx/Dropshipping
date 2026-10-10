@@ -41,7 +41,12 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ sh
         <p className="hint num">Order #{order.number}</p>
         <h1 className="text-3xl font-bold tracking-tight">{paid ? `Thank you, ${order.shippingAddress.name.split(" ")[0]}!` : "We're waiting for your payment"}</h1>
         <p className="text-muted">{paid ? `We've emailed a receipt to ${order.email}. This page updates as your order moves.` : "If you've paid, this page updates in a moment."}</p>
-        {paid && <Link href={`${base}/account`} className="text-sm underline self-start">See all your orders</Link>}
+        {paid && (
+          <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+            <Link href={`${base}/account`} className="underline">See all your orders</Link>
+            <a href={`${base}/orders/${ref}/invoice`} className="underline">Invoice{order.refundedMinor > 0 ? " and credit notes" : ""}</a>
+          </p>
+        )}
         {order.paymentStatus === "pending" && (
           <Link href={`${base}/pay/${order.id}`} className="btn btn-primary self-start">Finish paying</Link>
         )}

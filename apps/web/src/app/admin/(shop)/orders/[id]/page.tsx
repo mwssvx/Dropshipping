@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { can, formatMoney, getOrder, listRefunds, listSupplierLinks, NotFoundError, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode } from "@sf/core";
+import { can, formatMoney, getOrder, listRefunds, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode } from "@sf/core";
 import { requireShop, storeAddress, suppliers } from "@/lib/server";
 import { PaymentLinkActions } from "./PaymentLinkActions";
 import { CheckTrackingButton, ManualTrackingForm, RetryButton } from "./FulfillmentActions";
@@ -24,11 +24,12 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
   const cost = order.lines.reduce((s, l) => s + (l.unitCostMinor ?? 0) * l.quantity, 0);
   const knownCost = order.lines.every((l) => l.unitCostMinor != null);
   const a = order.shippingAddress;
-  const [links, refunds, giftCard, returns] = await Promise.all([
+  const [links, refunds, giftCard, returns, documents] = await Promise.all([
     listSupplierLinks(db, shop.id),
     listRefunds(db, order.id),
     order.giftCardId ? db.query.giftCards.findFirst({ where: (g, { eq }) => eq(g.id, order.giftCardId!), columns: { last4: true } }) : undefined,
     db.query.returnRequests.findMany({ where: (r, { eq }) => eq(r.orderId, order.id), orderBy: (r, { desc }) => desc(r.createdAt) }),
+    orderDocuments(db, order.id),
   ]);
   const supplierLabel = (supplierId: string | null) => {
     if (!supplierId) return "Sent by you";
@@ -192,6 +193,19 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
             </address>
           </div>
         </div>
+        {documents.length > 0 && (
+          <section className="card p-5 flex flex-col gap-2 text-sm" aria-labelledby="invoices-heading">
+            <h2 id="invoices-heading" className="font-semibold">Invoices</h2>
+            <ul className="flex flex-col gap-1">
+              {documents.map((d) => (
+                <li key={d.id}>
+                  <Link className="underline" href={`/admin/orders/${order.id}/invoice?doc=${d.id}`}>{d.kind === "invoice" ? "Invoice" : "Credit note"} {d.number}</Link>
+                </li>
+              ))}
+            </ul>
+            <p className="hint">The buyer can open these from their order page too.</p>
+          </section>
+        )}
         {(refundable || refunds.length > 0) && can(role, "refunds") && (
           <div className="card p-5 flex flex-col gap-3 text-sm">
             <h2 className="font-semibold">Refund</h2>
