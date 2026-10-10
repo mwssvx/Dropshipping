@@ -33,6 +33,7 @@ import {
   refundOrder,
   registerDevice,
   requireMember,
+  releaseHeldOrder,
   retryOrder,
   saveMedia,
   setProductImage,
@@ -90,6 +91,8 @@ const orderSummary = (o: OrderRow) => ({
   currency: o.currency,
   paymentStatus: o.paymentStatus,
   fulfillmentStatus: o.fulfillmentStatus,
+  // Held back from the supplier by the risk check until someone sends or refunds it.
+  held: isHeld(o),
   paidAt: o.paidAt,
   createdAt: o.createdAt,
 });
@@ -108,10 +111,13 @@ const productView = (p: ProductRow) => ({
   variants: p.variants.map((v) => ({ id: v.id, title: v.title, priceMinor: v.priceMinor, costMinor: v.costMinor, stock: v.stock })),
 });
 
+const isHeld = (o: OrderRow) => o.heldAt != null && ["paid", "partially_refunded"].includes(o.paymentStatus);
+
 const ORDER_FILTERS: Record<string, (o: OrderRow) => boolean> = {
   all: () => true,
-  problems: (o) => o.fulfillmentStatus === "problem",
-  to_send: (o) => ["paid", "partially_refunded"].includes(o.paymentStatus) && o.fulfillmentStatus === "unfulfilled",
+  problems: (o) => o.fulfillmentStatus === "problem" || isHeld(o),
+  held: isHeld,
+  to_send: (o) => ["paid", "partially_refunded"].includes(o.paymentStatus) && o.fulfillmentStatus === "unfulfilled" && !isHeld(o),
   open: (o) => ["paid", "partially_refunded"].includes(o.paymentStatus) && !["shipped", "delivered"].includes(o.fulfillmentStatus),
 };
 
@@ -191,7 +197,13 @@ const routes: Record<string, Handler> = {
       })),
       refunds: (await listRefunds(db, o.id)).map((r) => ({ amountMinor: r.amountMinor, reason: r.reason, createdAt: r.createdAt })),
       refundableMinor: ["paid", "partially_refunded"].includes(o.paymentStatus) ? o.totalMinor - o.refundedMinor : 0,
+      risk: o.risk ? { level: o.risk.level, reasons: o.risk.reasons } : null,
     };
+  },
+  "POST orders/:id/release": async ({ params, shop }) => {
+    await releaseHeldOrder(await fulfillment(), shop.id, params.id!);
+    notifyLater(shop.id);
+    return { ok: true, message: "Sent to the supplier." };
   },
   "POST orders/:id/retry": async ({ params, shop }) => {
     await retryOrder(await fulfillment(), shop.id, params.id!);

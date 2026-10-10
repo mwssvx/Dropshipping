@@ -8,10 +8,12 @@ import {
   createShop,
   importProduct,
   parseMoney,
+  releaseHeldOrder,
   requireMember,
   retryOrder,
   sendPriceDrops,
   sendStockAlerts,
+  setRiskHold,
   syncTracking,
   updateProduct,
   UserError,
@@ -167,6 +169,22 @@ async function orderAction(orderId: string, run: (shopId: string) => Promise<unk
 
 export async function retryOrderAction(orderId: string, _: FormState, _form: FormData): Promise<FormState> {
   return orderAction(orderId, async (shopId) => retryOrder(await fulfillment(), shopId, orderId));
+}
+
+export async function releaseHeldOrderAction(orderId: string, _: FormState, _form: FormData): Promise<FormState> {
+  return orderAction(orderId, async (shopId) => releaseHeldOrder(await fulfillment(), shopId, orderId));
+}
+
+export async function setRiskHoldAction(_: FormState, form: FormData): Promise<FormState> {
+  const { shop, db } = await requireShop("orders");
+  try {
+    await setRiskHold(db, shop.id, String(form.get("hold") ?? ""));
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath("/admin/orders");
+  return { saved: true };
 }
 
 export async function addTrackingAction(orderId: string, _: FormState, form: FormData): Promise<FormState> {

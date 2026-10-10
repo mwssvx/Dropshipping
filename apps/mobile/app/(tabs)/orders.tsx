@@ -4,18 +4,18 @@ import { useApi } from "../../src/api";
 import { FULFILMENT, money, PAYMENT, when } from "../../src/format";
 import { EmptyState, List, LoadError, Loading, Pill, Row, Screen, Segmented } from "../../src/ui";
 
-type Order = { id: string; number: number; name: string; email: string; totalMinor: number; currency: string; paymentStatus: string; fulfillmentStatus: string; paidAt: string | null; createdAt: string };
+type Order = { id: string; number: number; name: string; email: string; totalMinor: number; currency: string; paymentStatus: string; fulfillmentStatus: string; held?: boolean; paidAt: string | null; createdAt: string };
 type Show = "open" | "problems" | "all";
 
 const EMPTY: Record<Show, [string, string]> = {
   open: ["No open orders", "Paid orders that haven't shipped yet show up here."],
-  problems: ["No problems", "Orders the supplier couldn't take show up here, each with a fix."],
+  problems: ["No problems", "Orders the supplier couldn't take, and orders held for a risk check, show up here."],
   all: ["No orders yet", "Share your store link to get your first sale."],
 };
 
 export default function OrdersScreen() {
   const params = useLocalSearchParams<{ show?: string }>();
-  const [show, setShow] = useState<Show>(params.show === "problems" ? "problems" : params.show === "all" ? "all" : "open");
+  const [show, setShow] = useState<Show>(params.show === "problems" || params.show === "held" ? "problems" : params.show === "all" ? "all" : "open");
   const list = useApi<{ orders: Order[] }>(`orders?show=${show}`);
   const orders = list.data?.orders ?? [];
 
@@ -48,7 +48,7 @@ export default function OrdersScreen() {
                 a11y={`Order #${o.number}`}
                 title={`#${o.number} · ${o.name}`}
                 subtitle={`${money(o.totalMinor, o.currency)} · ${when(o.paidAt ?? o.createdAt)}${refunded ? ` · ${PAYMENT[o.paymentStatus]}` : ""}`}
-                right={<Pill label={o.paymentStatus === "pending" ? "Not paid" : f.label} tone={o.paymentStatus === "pending" ? "neutral" : f.tone} />}
+                right={o.held ? <Pill label="On hold" tone="warning" /> : <Pill label={o.paymentStatus === "pending" ? "Not paid" : f.label} tone={o.paymentStatus === "pending" ? "neutral" : f.tone} />}
               />
             );
           })}
