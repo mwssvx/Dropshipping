@@ -290,3 +290,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Questions** (`packages/core/src/questions.ts`): shoppers ask about a product in a "Questions" section on its page, in every store language (up to 5 a day per email). The merchant answers on the new Questions page (with a count in the menu, for anyone who can manage reviews), choosing whether the answer also shows on the product page. The shopper gets the first answer by email; later changes don't email again.
 2. **AI drafts**: "Draft with AI" asks a new agent, the question answerer, for an answer from the listing (options, prices, stock, delivery time), earlier answers and the store's policies. It only saves a draft; nothing reaches the shopper until the merchant sends it. What the listing doesn't say is marked "[Check: …]" instead of guessed.
 3. **Privacy**: shoppers' emails never show on the store. A customer's data export lists their questions; erasing them deletes unanswered ones and shows answered ones as "A shopper".
+
+### Free-shipping goal (after launch, part 29)
+
+1. **In the cart**, a bar shows how far the buyer is from free shipping ("You're $36.01 away from free shipping.") and fills up as they add items, then says when they've got it. It's shown in the buyer's currency and every store language.
+2. **Which threshold** (`quoteCart`'s `freeShipping`): the lowest "free over" amount among the paid rates in the buyer's zone. The cart estimates shipping for the country the hosting platform says the buyer is in (`countryHint`), when the store ships there, else for the store's own country. No bar when a rate is free anyway, when a free-shipping code is applied, or for wholesale buyers.

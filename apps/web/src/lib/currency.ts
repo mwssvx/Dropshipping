@@ -17,3 +17,8 @@ export async function buyerFx(shop: ShopFx): Promise<DisplayFx> {
   const wanted = picked && shopCurrencies(shop).includes(picked) ? picked : currencyForCountry(shop, (await headers()).get("x-vercel-ip-country"));
   return displayFx(fxRates(), shop, wanted);
 }
+
+/** The buyer's country from the hosting platform's location header, when it gives one. */
+export async function buyerCountry() {
+  return (await headers()).get("x-vercel-ip-country");
+}

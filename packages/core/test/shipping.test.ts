@@ -92,4 +92,27 @@ describe("shipping zones", () => {
     expect(await f.db.query.shippingRates.findMany({ where: eq(schema.shippingRates.zoneId, eu.id) })).toHaveLength(0);
     expect((await listShippingZones(f.db, shop.id)).isDefault).toBe(true);
   });
+
+  it("tells the cart how far it is from free shipping, for where the buyer seems to be", async () => {
+    const f = await setup();
+    const shop = await f.shop();
+    // Built-in rate: $4.99, free over $50.
+    expect((await quoteCart(f.db, shop, f.lines)).freeShipping).toEqual({ overMinor: 5000, shortByMinor: 5000 - f.lamp.priceMinor });
+    expect((await quoteCart(f.db, shop, [{ variantId: f.lamp.id, quantity: 10 }])).freeShipping).toEqual({ overMinor: 5000, shortByMinor: 0 });
+
+    const uk = await createShippingZone(f.db, shop.id, { name: "UK", countries: ["GB"] });
+    await addShippingRate(f.db, shop.id, uk.id, { name: "Royal Mail", priceMinor: 799, freeOverMinor: 8000, minDays: null, maxDays: null });
+    await addShippingRate(f.db, shop.id, uk.id, { name: "Courier", priceMinor: 1299, freeOverMinor: 12000, minDays: null, maxDays: null });
+    const us = await createShippingZone(f.db, shop.id, { name: "US", countries: ["US"] });
+    await addShippingRate(f.db, shop.id, us.id, { name: "Free", priceMinor: 0, freeOverMinor: null, minDays: null, maxDays: null });
+    // A buyer in the UK sees the lowest UK threshold; the store's own country ships free anyway.
+    const fromUk = await quoteCart(f.db, shop, f.lines, { countryHint: "GB" });
+    expect(fromUk).toMatchObject({ shippingMinor: 799, freeShipping: { overMinor: 8000 } });
+    expect((await quoteCart(f.db, shop, f.lines)).freeShipping).toBeNull();
+    // A country the store doesn't ship to falls back to the store's own country.
+    expect(await quoteCart(f.db, shop, f.lines, { countryHint: "JP" })).toMatchObject({ shippingMinor: 0, freeShipping: null });
+    // A free-shipping code makes the goal moot.
+    await createDiscount(f.db, shop.id, { code: "SHIPFREE", kind: "free_shipping", value: 0 });
+    expect((await quoteCart(f.db, shop, f.lines, { countryHint: "GB", discountCode: "SHIPFREE" })).freeShipping).toBeNull();
+  });
 });

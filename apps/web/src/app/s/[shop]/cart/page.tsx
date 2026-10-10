@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { convertPrice, formatMoney, pointsFor, presentQuote, quoteCart, upsellsFor, UserError } from "@sf/core";
-import { buyerFx } from "@/lib/currency";
+import { convertAmount, convertPrice, formatMoney, pointsFor, presentQuote, quoteCart, upsellsFor, UserError } from "@sf/core";
+import { buyerCountry, buyerFx } from "@/lib/currency";
 import { readCart, readDiscountCode, readGiftCardCode } from "@/lib/cart";
 import { db } from "@/lib/server";
 import { currentBuyer } from "@/lib/buyer";
@@ -22,7 +22,7 @@ export default async function CartPage({ params, searchParams }: { params: Promi
   let codeProblem: string | null = null;
   // Signed-in wholesale buyers get their prices here and at checkout.
   const buyerEmail = (await currentBuyer(shop.id))?.email ?? null;
-  const opts = { discountCode: code, giftCardCode: await readGiftCardCode(shop.id), buyerEmail };
+  const opts = { discountCode: code, giftCardCode: await readGiftCardCode(shop.id), buyerEmail, countryHint: await buyerCountry() };
   // A code that stopped working (cart below its minimum, expired, gift card used up) shouldn't
   // hide the cart: it's shown as a problem and the cart is priced without it.
   for (let tries = 0; lines.length && !quote && !problem && tries < 3; tries++) {
@@ -97,6 +97,15 @@ export default async function CartPage({ params, searchParams }: { params: Promi
               </li>
             ))}
           </ul>
+          {quote.freeShipping && !quote.wholesale && (
+            <div className="self-end w-full max-w-xs flex flex-col gap-1.5" role="status">
+              <p className="text-sm">{quote.freeShipping.shortByMinor > 0 ? t.freeShippingShort(money(convertAmount(quote.freeShipping.shortByMinor, fx))) : t.freeShippingReached}</p>
+              <div className="h-2 rounded-full bg-sunken overflow-hidden" role="progressbar" aria-label={t.freeShippingProgress}
+                aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(100 * Math.min(1, quote.goodsMinor / quote.freeShipping.overMinor))}>
+                <div className="h-full rounded-full bg-success" style={{ width: `${Math.min(100, (100 * quote.goodsMinor) / quote.freeShipping.overMinor)}%` }} />
+              </div>
+            </div>
+          )}
           <dl className="grid grid-cols-[1fr_auto] gap-y-1 num text-sm self-end w-full max-w-xs">
             <dt className="hint">{t.subtotal}</dt><dd className="text-right">{money(shown!.subtotalMinor)}</dd>
             {quote.discount && (
