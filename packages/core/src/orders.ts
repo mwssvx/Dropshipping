@@ -279,6 +279,11 @@ export async function startCheckout(
      * The order is created unpaid; the caller charges the saved card.
      */
     followUp?: { parentOrderId: string; percentOff: number };
+    /**
+     * A repeat delivery for a subscription: its percent off, no codes, shipping as usual. Created
+     * unpaid; the caller charges the saved card.
+     */
+    subscription?: { id: string; percentOff: number };
   },
   taxCalculator: TaxCalculator = new BuiltInTaxCalculator(),
 ) {
@@ -288,15 +293,17 @@ export async function startCheckout(
   const { email, address } = parsed.data;
   const gift = parsed.data.gift ?? null;
   const followUp = input.followUp ?? null;
+  const repeat = input.subscription ?? null;
+  const noCodes = !!followUp || !!repeat;
   const quoted = await quoteCart(db, shop, input.lines, {
-    discountCode: followUp ? null : input.discountCode,
+    discountCode: noCodes ? null : input.discountCode,
     email,
-    buyerEmail: followUp ? null : input.buyerEmail,
-    giftCardCode: followUp ? null : input.giftCardCode,
+    buyerEmail: noCodes ? null : input.buyerEmail,
+    giftCardCode: noCodes ? null : input.giftCardCode,
     country: address.country,
     shippingRateId: input.shippingRateId,
   });
-  const cart = followUp ? asFollowUp(quoted, followUp.percentOff) : quoted;
+  const cart = followUp ? asFollowUp(quoted, followUp.percentOff) : repeat ? asFollowUp(quoted, repeat.percentOff, { keepShipping: true }) : quoted;
   if (cart.wholesale && cart.wholesale.shortByMinor > 0) {
     throw new UserError(
       `Wholesale orders start at ${formatMoney(cart.wholesale.minOrderMinor, shop.currency)}. Add ${formatMoney(cart.wholesale.shortByMinor, shop.currency)} more to check out.`,
@@ -334,12 +341,12 @@ export async function startCheckout(
   const platformFeeMinor = platformFeeFor(shop.plan, Math.max(0, quote.totalMinor - quote.taxMinor - giftCardMinor));
   const presentment = fx ? presentQuote({ ...quote, pricesIncludeTax: tax.included }, fx) : null;
 
-  // The card is kept for the after-checkout offer, in the store's currency only.
-  const saveCard = !followUp && !fx && !!dueMinor && !!shop.postPurchaseOffer?.active;
+  // The card is kept for the after-checkout offer and subscriptions, in the store's currency only.
+  const saveCard = !noCodes && !fx && !!dueMinor && (!!shop.postPurchaseOffer?.active || !!shop.subscriptionOffer?.active);
   // Paid in full by gift card: there's nothing to charge, so the order is paid right away. An
-  // after-checkout order is charged to the saved card by the caller once it exists.
-  const intent = followUp
-    ? { id: `followup_${randomUUID()}`, clientSecret: "" }
+  // after-checkout order or repeat delivery is charged to the saved card by the caller once it exists.
+  const intent = noCodes
+    ? { id: `${followUp ? "followup" : "subscription"}_${randomUUID()}`, clientSecret: "" }
     : dueMinor
       ? await payments.createPaymentIntent({
           amountMinor: presentment?.totalMinor ?? dueMinor,
@@ -398,6 +405,7 @@ export async function startCheckout(
         gift: gift && cart.items.some((i) => !i.giftCard) ? gift : null,
         buyerNote: parsed.data.note,
         ...(followUp ? { source: "post_purchase" as const, parentOrderId: followUp.parentOrderId } : {}),
+        ...(repeat ? { source: "subscription" as const, subscriptionId: repeat.id } : {}),
         cardSaved: saveCard,
         paymentIntentId: intent.id,
         ...(dueMinor ? {} : { paymentStatus: "paid" as const, paidAt: new Date() }),
@@ -429,7 +437,7 @@ export async function startCheckout(
 }
 
 /** An after-checkout offer's prices: its percent off each item, no codes or offers, no shipping. */
-function asFollowUp(cart: Awaited<ReturnType<typeof quoteCart>>, percent: number) {
+function asFollowUp(cart: Awaited<ReturnType<typeof quoteCart>>, percent: number, opts: { keepShipping?: boolean } = {}) {
   const items = cart.items.map((i) => {
     const unitPriceMinor = percentOff(i.unitPriceMinor, percent);
     return { ...i, unitPriceMinor, lineMinor: unitPriceMinor * i.quantity };
@@ -443,14 +451,14 @@ function asFollowUp(cart: Awaited<ReturnType<typeof quoteCart>>, percent: number
     discount: null,
     bundle: null,
     discountMinor: 0,
-    shippingMinor: 0,
-    shipping: null,
+    shippingMinor: opts.keepShipping ? cart.shippingMinor : 0,
+    shipping: opts.keepShipping ? cart.shipping : null,
     giftCard: null,
     wholesale: null,
     offerNudge: null,
     freeShipping: null,
-    totalMinor: subtotalMinor,
-    dueMinor: subtotalMinor,
+    totalMinor: subtotalMinor + (opts.keepShipping ? cart.shippingMinor : 0),
+    dueMinor: subtotalMinor + (opts.keepShipping ? cart.shippingMinor : 0),
   };
 }
 
