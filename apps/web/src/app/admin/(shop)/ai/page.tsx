@@ -22,6 +22,7 @@ const WHAT = {
   margin: "Once a day, checks supplier costs. Only runs the model if a product on sale keeps less than 10%.",
   writer: "Drafts blog posts when you press “Write a draft” on the Blog page. Posts stay drafts until you publish them.",
   translator: "Translates your store when you press “Translate with AI” on the Languages page. You can edit any translation afterwards.",
+  answerer: "Drafts answers to shoppers' product questions when you press “Draft with AI” on the Questions page. Nothing is sent until you send it.",
 };
 
 export default async function AiSettingsPage() {

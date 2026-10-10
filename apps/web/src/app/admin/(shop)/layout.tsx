@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { can, countNeedsYou, countPendingReviews, countOpenReturns, countPendingWholesale, listPendingActions, listRequirements, openNotices, ROLES, type Area } from "@sf/core";
+import { can, countNeedsYou, countPendingReviews, countOpenReturns, countPendingWholesale, listPendingActions, waitingQuestions, listRequirements, openNotices, ROLES, type Area } from "@sf/core";
 import { requireShop, storeAddress } from "@/lib/server";
 import { BRAND } from "@/lib/brand";
 import { switchShopAction } from "../actions";
@@ -8,7 +8,7 @@ import { NavLink } from "./NavLink";
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, shop, shops, db, role } = await requireShop();
   const show = (area: Area) => can(role, area);
-  const [address, requirements, notices, pending, inbox, reviews, wholesale, returns] = await Promise.all([
+  const [address, requirements, notices, pending, inbox, reviews, wholesale, returns, questions] = await Promise.all([
     storeAddress(shop),
     listRequirements(db, shop.id),
     openNotices(db, shop.id),
@@ -17,6 +17,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     countPendingReviews(db, shop.id),
     show("wholesale") ? countPendingWholesale(db, shop.id) : 0,
     show("returns") ? countOpenReturns(db, shop.id) : 0,
+    show("reviews") ? waitingQuestions(db, shop.id) : 0,
   ]);
   const approvals = pending.filter((p) => !("message_id" in p.input)).length;
   const pause = notices.find((n) => n.kind === "paused");
@@ -64,6 +65,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           {show("gift_cards") && <NavLink href="/admin/gift-cards">Gift cards</NavLink>}
           {show("wholesale") && <NavLink href="/admin/wholesale">Wholesale{wholesale ? <span className="ml-2 pill pill-warning">{wholesale}</span> : null}</NavLink>}
           {show("reviews") && <NavLink href="/admin/reviews">Reviews{reviews ? <span className="ml-2 pill pill-info">{reviews}</span> : null}</NavLink>}
+          {show("reviews") && <NavLink href="/admin/questions">Questions{questions ? <span className="ml-2 pill pill-info">{questions}</span> : null}</NavLink>}
           {show("theme") && <span className="hidden lg:block px-3 pt-4 pb-1 text-xs font-semibold text-muted uppercase tracking-wide">Online store</span>}
           {show("theme") && <NavLink href="/admin/theme">Theme</NavLink>}
           {show("pages") && <NavLink href="/admin/pages">Pages</NavLink>}

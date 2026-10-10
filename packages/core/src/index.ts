@@ -25,6 +25,7 @@ export * from "./tax";
 export * from "./trust";
 export * from "./discounts";
 export * from "./reviews";
+export * from "./questions";
 export * from "./growth";
 export * from "./analytics";
 export * from "./api-keys";

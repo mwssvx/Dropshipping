@@ -11,6 +11,7 @@ import { openNotices } from "../trust";
 import { describeShipping } from "../shipping";
 import { setPricesIncludeTax } from "../tax";
 import { createPost } from "../blog";
+import { saveQuestionDraft } from "../questions";
 import { isLanguage, LANGUAGES, saveTranslation } from "../languages";
 import type { ProblemCode } from "../suppliers";
 import { AUTO, blocked, needsOk, untrusted, type Decision, type RunScope } from "./context";
@@ -148,6 +149,22 @@ const listingTools = [
     },
   }),
 ];
+
+const storePolicies = tool({
+    name: "read_store_policies",
+    kind: "read",
+    description: "The store's published pages (returns, shipping, FAQ) and its shipping prices.",
+    input: z.object({}),
+    summary: () => "Read the store's policies",
+    async run(_, run) {
+      const pages = await run.ctx.db.query.pages.findMany({ where: and(eq(schema.pages.shopId, run.shop.id), eq(schema.pages.published, true)) });
+      return {
+        shipping_prices: await describeShipping(run.ctx.db, run.shop),
+        pages: pages.map((p) => ({ title: p.title, text: p.body.slice(0, 3000) })),
+        note: pages.length ? null : "The store hasn't published a returns or shipping page.",
+      };
+    },
+  });
 
 /* ───────────── Blog writer: saves drafts, the merchant publishes ───────────── */
 
@@ -421,21 +438,7 @@ const buyerTools = [
       return orderFacts(run, await runOrder(run));
     },
   }),
-  tool({
-    name: "read_store_policies",
-    kind: "read",
-    description: "The store's published pages (returns, shipping, FAQ) and its shipping prices.",
-    input: z.object({}),
-    summary: () => "Read the store's policies",
-    async run(_, run) {
-      const pages = await run.ctx.db.query.pages.findMany({ where: and(eq(schema.pages.shopId, run.shop.id), eq(schema.pages.published, true)) });
-      return {
-        shipping_prices: await describeShipping(run.ctx.db, run.shop),
-        pages: pages.map((p) => ({ title: p.title, text: p.body.slice(0, 3000) })),
-        note: pages.length ? null : "The store hasn't published a returns or shipping page.",
-      };
-    },
-  }),
+  storePolicies,
   tool({
     name: "send_reply",
     kind: "change",
@@ -806,6 +809,62 @@ const translatorTools = [
   }),
 ];
 
+/* ───────────── Question answerer: drafts only, the merchant sends ───────────── */
+
+const answererTools = [
+  tool({
+    name: "read_question",
+    kind: "read",
+    description: "The shopper's question with the product it's about: its title, description, options with price and stock, delivery time, and questions already answered about it.",
+    input: z.object({ question_id: z.string() }),
+    summary: () => "Read the shopper's question",
+    async run(i, run) {
+      const { db } = run.ctx;
+      const q = /^[0-9a-f-]{36}$/i.test(i.question_id)
+        ? await db.query.productQuestions.findFirst({ where: and(eq(schema.productQuestions.id, i.question_id), eq(schema.productQuestions.shopId, run.shop.id)) })
+        : undefined;
+      if (!q) throw new UserError("There's no question with that id in this store.");
+      const product = (await db.query.products.findFirst({ where: eq(schema.products.id, q.productId) }))!;
+      const [variants, answered] = await Promise.all([
+        db.query.variants.findMany({ where: eq(schema.variants.productId, product.id), orderBy: asc(schema.variants.position) }),
+        db.query.productQuestions.findMany({ where: and(eq(schema.productQuestions.productId, product.id), eq(schema.productQuestions.status, "published")), limit: 10 }),
+      ]);
+      return {
+        store: { name: run.shop.name, country: run.shop.country },
+        question: untrusted("shopper", q.body),
+        shopper_first_name: q.name.split(/\s+/)[0],
+        product: {
+          title: product.title,
+          description: untrusted("product", product.descriptionHtml.slice(0, 3000)),
+          options: variants.map((v) => ({
+            name: v.title,
+            price: money(run, v.priceMinor),
+            in_stock: v.stock === null || v.stock > 0,
+            delivery_days: v.shipDaysMin != null && v.shipDaysMax != null ? `${v.shipDaysMin}-${v.shipDaysMax}` : null,
+          })),
+        },
+        answered_before: answered.map((a) => ({ question: untrusted("shopper", a.body), answer: a.answer })),
+      };
+    },
+  }),
+  storePolicies,
+  tool({
+    name: "save_answer_draft",
+    kind: "change",
+    description: "Save the suggested answer for the merchant to read, change and send. Nothing reaches the shopper until the merchant sends it.",
+    input: z.object({
+      question_id: z.string(),
+      answer: z.string().min(10).max(1000).describe("The answer as the store would write it, plain text, one to four sentences."),
+    }),
+    policy: () => AUTO,
+    summary: () => "Drafted an answer to a shopper's question",
+    async run(i, run) {
+      await saveQuestionDraft(run.ctx.db, run.shop.id, i.question_id, i.answer);
+      return { saved: true };
+    },
+  }),
+];
+
 export const AGENT_TOOLS: Record<AgentName, AgentTool[]> = {
   listing: listingTools,
   assistant: assistantTools,
@@ -814,6 +873,7 @@ export const AGENT_TOOLS: Record<AgentName, AgentTool[]> = {
   margin: marginTools,
   writer: writerTools,
   translator: translatorTools,
+  answerer: answererTools,
 };
 
 export function findTool(agent: AgentName, name: string) {
