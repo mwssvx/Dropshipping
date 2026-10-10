@@ -337,6 +337,13 @@
       "when": 1791664955682,
       "tag": "0047_m55_post_purchase",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1791666307013,
+      "tag": "0048_auto_collections",
+      "breakpoints": true
     }
   ]
 }

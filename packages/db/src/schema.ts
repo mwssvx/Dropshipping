@@ -323,6 +323,21 @@ export type OrderEdit = { at: string; by: "buyer" | "merchant"; changes: string[
  * The same product at a second supplier, used when the main one is out of stock. Variants are
  * matched to ours by option, keyed by our variant id.
  */
+export type CollectionCondition =
+  | { kind: "title_contains"; text: string }
+  | { kind: "price_at_least"; minor: number }
+  | { kind: "price_at_most"; minor: number }
+  | { kind: "on_sale" }
+  | { kind: "in_stock" }
+  | { kind: "added_within_days"; days: number }
+  | { kind: "option_is"; name: string; value: string };
+export type CollectionRules = {
+  /** "all": a product must meet every condition; "any": one is enough. */
+  match: "all" | "any";
+  conditions: CollectionCondition[];
+  sort: "newest" | "price_asc" | "price_desc" | "title";
+};
+
 export type ProductBackup = {
   supplierId: string;
   sourceUrl: string;
@@ -541,6 +556,8 @@ export const collections = pgTable(
     handle: text("handle").notNull(),
     description: text("description").notNull().default(""),
     imageUrl: text("image_url"),
+    // Set for an automatic collection: products join and leave by these rules instead of by hand.
+    rules: jsonb("rules").$type<CollectionRules>(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

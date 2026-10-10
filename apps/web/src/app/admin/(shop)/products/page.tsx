@@ -40,7 +40,7 @@ export default async function ProductsPage() {
         ) : (
           <BulkProducts
             rows={rows}
-            collections={collections.map((c) => ({ id: c.id, title: c.title }))}
+            collections={collections.filter((c) => !c.rules).map((c) => ({ id: c.id, title: c.title }))}
             recent={recent.map((r) => ({ id: r.id, summary: r.summary, when: when(r.createdAt), undone: !!r.undoneAt, canUndo: r.canUndo }))}
           />
         )}

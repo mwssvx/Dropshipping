@@ -27,6 +27,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./theme": "./src/theme-doc.ts",
-    "./money": "./src/money.ts"
+    "./money": "./src/money.ts",
+    "./collection-rules": "./src/collection-rules.ts"
   }
 }

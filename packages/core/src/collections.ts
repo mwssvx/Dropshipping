@@ -1,6 +1,7 @@
 import { and, asc, count, eq, inArray } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
+import { applyRules, collectionRulesSchema, type CollectionRules } from "./collection-rules";
 import { NotFoundError, UserError } from "./errors";
 import { uniqueHandle } from "./handles";
 import { listActiveProducts } from "./products";
@@ -18,6 +19,8 @@ const collectionInput = z.object({
     .default("")
     .transform((u) => u || null),
   productIds: z.array(z.string().uuid()).max(500).default([]),
+  /** Set for an automatic collection; its products then come from the rules, not productIds. */
+  rules: collectionRulesSchema.nullable().default(null),
 });
 export type CollectionInput = z.input<typeof collectionInput>;
 
@@ -43,7 +46,7 @@ async function setProducts(tx: Db, shopId: string, collectionId: string, product
 }
 
 export async function createCollection(db: Db, shopId: string, input: CollectionInput) {
-  const { productIds, ...data } = parse(input);
+  const { productIds, rules, ...data } = parse(input);
   const handle = await uniqueHandle(data.title, async (h) =>
     h === ALL_COLLECTION ||
     !!(await db.query.collections.findFirst({
@@ -52,22 +55,22 @@ export async function createCollection(db: Db, shopId: string, input: Collection
     })),
   );
   return db.transaction(async (tx) => {
-    const [row] = await tx.insert(schema.collections).values({ ...data, shopId, handle }).returning();
-    await setProducts(tx as unknown as Db, shopId, row!.id, productIds);
+    const [row] = await tx.insert(schema.collections).values({ ...data, rules, shopId, handle }).returning();
+    await setProducts(tx as unknown as Db, shopId, row!.id, rules ? [] : productIds);
     return row!;
   });
 }
 
 export async function updateCollection(db: Db, shopId: string, collectionId: string, input: CollectionInput) {
-  const { productIds, ...data } = parse(input);
+  const { productIds, rules, ...data } = parse(input);
   return db.transaction(async (tx) => {
     const [row] = await tx
       .update(schema.collections)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...data, rules, updatedAt: new Date() })
       .where(and(eq(schema.collections.id, collectionId), eq(schema.collections.shopId, shopId)))
       .returning();
     if (!row) throw new NotFoundError("Collection");
-    await setProducts(tx as unknown as Db, shopId, row.id, productIds);
+    await setProducts(tx as unknown as Db, shopId, row.id, rules ? [] : productIds);
     return row;
   });
 }
@@ -92,7 +95,13 @@ export async function listCollections(db: Db, shopId: string) {
     .from(schema.collectionProducts)
     .where(inArray(schema.collectionProducts.collectionId, rows.map((r) => r.id)))
     .groupBy(schema.collectionProducts.collectionId);
-  return rows.map((r) => ({ ...r, productCount: counts.find((c) => c.id === r.id)?.n ?? 0 }));
+  const active = rows.some((r) => r.rules) ? await listActiveProducts(db, shopId) : [];
+  const now = new Date();
+  return rows.map((r) => ({
+    ...r,
+    // An automatic collection counts what's on sale and matching right now.
+    productCount: r.rules ? applyRules(active, r.rules, now).length : (counts.find((c) => c.id === r.id)?.n ?? 0),
+  }));
 }
 
 export async function getCollection(db: Db, shopId: string, collectionId: string) {
@@ -100,6 +109,7 @@ export async function getCollection(db: Db, shopId: string, collectionId: string
     where: and(eq(schema.collections.id, collectionId), eq(schema.collections.shopId, shopId)),
   });
   if (!row) throw new NotFoundError("Collection");
+  if (row.rules) return { ...row, productIds: [] as string[] };
   const links = await db.query.collectionProducts.findMany({
     where: eq(schema.collectionProducts.collectionId, row.id),
     orderBy: asc(schema.collectionProducts.position),
@@ -109,10 +119,18 @@ export async function getCollection(db: Db, shopId: string, collectionId: string
 
 type ActiveProduct = Awaited<ReturnType<typeof listActiveProducts>>[number];
 
-/** Active products of a collection, in the merchant's order. Pass a preloaded list to avoid a query. */
-export async function collectionProducts(db: Db, shopId: string, collectionId: string | null, all?: ActiveProduct[]) {
+/**
+ * Active products of a collection, in the merchant's order (or the rules' order, for an automatic
+ * one). Pass a preloaded list to avoid a query.
+ */
+export async function collectionProducts(db: Db, shopId: string, collectionId: string | null, all?: ActiveProduct[], rules?: CollectionRules | null) {
   const products = all ?? (await listActiveProducts(db, shopId));
   if (!collectionId) return products;
+  const auto =
+    rules !== undefined
+      ? rules
+      : ((await db.query.collections.findFirst({ where: eq(schema.collections.id, collectionId), columns: { rules: true } }))?.rules ?? null);
+  if (auto) return applyRules(products, auto);
   const links = await db.query.collectionProducts.findMany({
     where: eq(schema.collectionProducts.collectionId, collectionId),
     orderBy: asc(schema.collectionProducts.position),
@@ -133,7 +151,7 @@ export async function getCollectionByHandle(db: Db, shopId: string, handle: stri
     where: and(eq(schema.collections.shopId, shopId), eq(schema.collections.handle, handle)),
   });
   if (!row) throw new NotFoundError("Collection");
-  return { collection: row, products: await collectionProducts(db, shopId, row.id) };
+  return { collection: row, products: await collectionProducts(db, shopId, row.id, undefined, row.rules) };
 }
 
 /**
@@ -141,7 +159,8 @@ export async function getCollectionByHandle(db: Db, shopId: string, handle: stri
  * product order. Plain data, so the editor preview can render the same sections in the browser.
  */
 export async function storefrontCatalog(db: Db, shopId: string) {
-  const products = (await listActiveProducts(db, shopId)).map((p) => ({
+  const active = await listActiveProducts(db, shopId);
+  const products = active.map((p) => ({
     id: p.id,
     title: p.title,
     handle: p.handle,
@@ -156,13 +175,50 @@ export async function storefrontCatalog(db: Db, shopId: string) {
         orderBy: asc(schema.collectionProducts.position),
       })
     : [];
+  const now = new Date();
   const collections = rows.map((c) => ({
     id: c.id,
     title: c.title,
     handle: c.handle,
     imageUrl: c.imageUrl,
-    productIds: links.filter((l) => l.collectionId === c.id).map((l) => l.productId),
+    productIds: c.rules ? applyRules(active, c.rules, now).map((p) => p.id) : links.filter((l) => l.collectionId === c.id).map((l) => l.productId),
   }));
   return { products, collections };
 }
 export type StorefrontCatalog = Awaited<ReturnType<typeof storefrontCatalog>>;
+
+/**
+ * Which of these collections each product is in, for manual and automatic collections alike. Only
+ * active products are checked against rules, as only they can be bought or shown.
+ */
+export async function collectionMembership(db: Db, shopId: string, collectionIds: string[], productIds?: string[]) {
+  const result = new Map<string, Set<string>>();
+  const ids = [...new Set(collectionIds)];
+  if (!ids.length) return result;
+  const rows = await db.query.collections.findMany({ where: and(eq(schema.collections.shopId, shopId), inArray(schema.collections.id, ids)), columns: { id: true, rules: true } });
+  for (const r of rows) result.set(r.id, new Set());
+  const manual = rows.filter((r) => !r.rules).map((r) => r.id);
+  if (manual.length && (!productIds || productIds.length)) {
+    const links = await db.query.collectionProducts.findMany({
+      where: productIds
+        ? and(inArray(schema.collectionProducts.collectionId, manual), inArray(schema.collectionProducts.productId, productIds))
+        : inArray(schema.collectionProducts.collectionId, manual),
+    });
+    for (const l of links) result.get(l.collectionId)!.add(l.productId);
+  }
+  const auto = rows.filter((r) => r.rules);
+  if (auto.length) {
+    const wanted = productIds ? new Set(productIds) : null;
+    const active = (await listActiveProducts(db, shopId)).filter((p) => !wanted || wanted.has(p.id));
+    const now = new Date();
+    for (const r of auto) for (const p of applyRules(active, r.rules!, now)) result.get(r.id)!.add(p.id);
+  }
+  return result;
+}
+
+/** The collections a product is in. */
+export async function collectionsOfProduct(db: Db, shopId: string, productId: string) {
+  const all = await db.query.collections.findMany({ where: eq(schema.collections.shopId, shopId), columns: { id: true } });
+  const membership = await collectionMembership(db, shopId, all.map((c) => c.id), [productId]);
+  return [...membership].filter(([, members]) => members.has(productId)).map(([id]) => id);
+}

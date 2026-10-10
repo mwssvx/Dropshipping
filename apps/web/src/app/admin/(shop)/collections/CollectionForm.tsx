@@ -2,26 +2,32 @@
 import { useActionState, useMemo, useState } from "react";
 import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
+import type { CollectionRules } from "@sf/core/collection-rules";
 import type { FormState } from "../../actions";
+import { RulesEditor, type RuleProductView } from "./RulesEditor";
 
-type Product = { id: string; title: string; imageUrl: string | null; status: string };
-
-/** Title, description, cover image and a hand-picked, ordered list of products. */
+/** Title, description, cover image, and either a hand-picked, ordered list of products or rules. */
 export function CollectionForm({
   action,
   initial,
   products,
   submitLabel,
   saved,
+  currency,
 }: {
   action: (s: FormState, f: FormData) => Promise<FormState>;
-  initial: { title: string; description: string; imageUrl: string; productIds: string[] };
-  products: Product[];
+  initial: { title: string; description: string; imageUrl: string; productIds: string[]; rules: CollectionRules | null };
+  products: RuleProductView[];
+  currency: string;
   submitLabel: string;
   saved?: boolean;
 }) {
   const [state, formAction] = useActionState(action, saved ? { saved: true } : {});
+  // Controlled, so what was typed stays after an error (React resets a form after its action runs).
+  const [fields, setFields] = useState({ title: initial.title, description: initial.description, imageUrl: initial.imageUrl });
+  const field = (name: keyof typeof fields) => ({ name, value: fields[name], onChange: (e: { target: { value: string } }) => setFields({ ...fields, [name]: e.target.value }) });
   const [picked, setPicked] = useState(initial.productIds);
+  const [mode, setMode] = useState<"manual" | "auto">(initial.rules ? "auto" : "manual");
   const [query, setQuery] = useState("");
   const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const matches = products.filter((p) => !picked.includes(p.id) && p.title.toLowerCase().includes(query.trim().toLowerCase()));
@@ -39,18 +45,34 @@ export function CollectionForm({
         <section className="card p-5 flex flex-col gap-4">
           <div className="field">
             <label className="label" htmlFor="title">Title</label>
-            <input className="input" id="title" name="title" required maxLength={120} defaultValue={initial.title} placeholder="Best sellers" />
+            <input className="input" id="title" required maxLength={120} {...field("title")} placeholder="Best sellers" />
           </div>
           <div className="field">
             <label className="label" htmlFor="description">Description</label>
-            <textarea className="input" id="description" name="description" rows={4} defaultValue={initial.description} />
+            <textarea className="input" id="description" rows={4} {...field("description")} />
           </div>
           <div className="field">
             <label className="label" htmlFor="imageUrl">Cover image address</label>
-            <input className="input" id="imageUrl" name="imageUrl" type="url" defaultValue={initial.imageUrl} placeholder="https://…" />
+            <input className="input" id="imageUrl" type="url" {...field("imageUrl")} placeholder="https://…" />
             <span className="hint">Leave empty to use the first product's picture.</span>
           </div>
         </section>
+        <fieldset className="card p-5 flex flex-col gap-2">
+          <legend className="sr-only">How products are added</legend>
+          <h2 className="font-semibold">How products are added</h2>
+          <input type="hidden" name="mode" value={mode} />
+          <label className="flex items-start gap-2 text-sm">
+            <input type="radio" name="modeChoice" checked={mode === "manual"} onChange={() => setMode("manual")} className="mt-1" />
+            <span><span className="font-medium">I pick them</span><span className="hint block">Choose products one by one and set their order.</span></span>
+          </label>
+          <label className="flex items-start gap-2 text-sm">
+            <input type="radio" name="modeChoice" checked={mode === "auto"} onChange={() => setMode("auto")} className="mt-1" />
+            <span><span className="font-medium">By rules</span><span className="hint block">Like "price at most $30" or "added in the last 30 days". New products that match join on their own.</span></span>
+          </label>
+        </fieldset>
+        {mode === "auto" ? (
+          <RulesEditor initial={initial.rules} products={products} currency={currency} />
+        ) : (
         <section className="card p-5 flex flex-col gap-4">
           <div>
             <h2 className="font-semibold">Products in this collection</h2>
@@ -74,8 +96,10 @@ export function CollectionForm({
             })}
           </ol>
         </section>
+        )}
       </div>
       <aside className="flex flex-col gap-4 lg:sticky lg:top-6">
+        {mode === "manual" && (
         <section className="card p-4 flex flex-col gap-3">
           <label className="label" htmlFor="find">Add products</label>
           <input id="find" className="input" placeholder="Search your products" value={query} onChange={(e) => setQuery(e.target.value)} />
@@ -91,6 +115,7 @@ export function CollectionForm({
             ))}
           </ul>
         </section>
+        )}
         <SubmitButton className="btn btn-primary btn-lg">{submitLabel}</SubmitButton>
       </aside>
     </form>

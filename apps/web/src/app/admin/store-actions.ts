@@ -5,6 +5,7 @@ import {
   addDomain,
   checkDomain,
   createCollection,
+  rulesFromForm,
   createPage,
   deleteCollection,
   deletePage,
@@ -62,17 +63,19 @@ export async function discardThemeAction(): Promise<{ doc: ThemeDoc }> {
 // Collections ---------------------------------------------------------------------------------
 
 function readCollection(form: FormData) {
+  const auto = form.get("mode") === "auto";
   return {
     title: String(form.get("title") ?? ""),
     description: String(form.get("description") ?? ""),
     imageUrl: String(form.get("imageUrl") ?? ""),
-    productIds: form.getAll("productIds").map(String),
+    productIds: auto ? [] : form.getAll("productIds").map(String),
+    rules: auto ? rulesFromForm(String(form.get("rules") ?? "")) : null,
   };
 }
 
 export async function createCollectionAction(_: FormState, form: FormData): Promise<FormState> {
   const { shop, db } = await requireShop("collections");
-  const r = await userErrors(() => createCollection(db, shop.id, readCollection(form)));
+  const r = await userErrors(async () => createCollection(db, shop.id, readCollection(form)));
   if ("error" in r) return r;
   refreshStore(shop.handle);
   redirect(`/admin/collections/${r.ok.id}?saved=1`);
@@ -80,7 +83,7 @@ export async function createCollectionAction(_: FormState, form: FormData): Prom
 
 export async function updateCollectionAction(id: string, _: FormState, form: FormData): Promise<FormState> {
   const { shop, db } = await requireShop("collections");
-  const r = await userErrors(() => updateCollection(db, shop.id, id, readCollection(form)));
+  const r = await userErrors(async () => updateCollection(db, shop.id, id, readCollection(form)));
   if ("error" in r) return r;
   refreshStore(shop.handle);
   revalidatePath("/admin/collections");

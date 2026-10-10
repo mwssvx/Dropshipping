@@ -5,6 +5,7 @@
 import { and, asc, count, eq, inArray } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
+import { collectionMembership } from "./collections";
 import { NotFoundError, UserError } from "./errors";
 
 export const MAX_SIZE_CHARTS = 50;
@@ -93,9 +94,9 @@ export async function sizeChartForProduct(db: Db, shopId: string, productId: str
   if (!charts.length) return null;
   const own = charts.find((c) => c.productIds.includes(productId));
   if (own) return own;
-  const memberOf = new Set(
-    (await db.query.collectionProducts.findMany({ where: eq(schema.collectionProducts.productId, productId), columns: { collectionId: true } })).map((r) => r.collectionId),
-  );
+  const wanted = [...new Set(charts.flatMap((c) => c.collectionIds))];
+  const membership = await collectionMembership(db, shopId, wanted, [productId]);
+  const memberOf = new Set([...membership].filter(([, m]) => m.has(productId)).map(([id]) => id));
   return charts.find((c) => c.collectionIds.some((id) => memberOf.has(id))) ?? null;
 }
 

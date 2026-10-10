@@ -59,6 +59,7 @@ async function plan(db: Db, shop: Shop, productIds: string[], input: BulkEditInp
   } else if (action.kind === "collection") {
     const collection = await db.query.collections.findFirst({ where: and(eq(schema.collections.id, action.collectionId), eq(schema.collections.shopId, shop.id)) });
     if (!collection) throw new NotFoundError("Collection");
+    if (collection.rules) throw new UserError(`"${collection.title}" fills itself by its rules. Change the rules, or pick a hand-picked collection.`);
     const inIt = new Set(
       (await db.query.collectionProducts.findMany({ where: and(eq(schema.collectionProducts.collectionId, collection.id), inArray(schema.collectionProducts.productId, ids)) })).map((r) => r.productId),
     );
