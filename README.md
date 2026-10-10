@@ -278,3 +278,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Add-ons** (`packages/core/src/addons.ts`): up to three products the merchant offers at checkout, each with an optional discount (up to 50%) and a one-line pitch, set on the new Checkout add-ons page under Marketing. The page shows how many paid orders bought each one and what it brought in.
 2. **At checkout** the buyer sees the first live add-on that isn't already in their cart, priced in their currency, with a picker for its options. "Add for $11.99" adds it in place: the page re-renders and what the buyer typed stays.
 3. **Pricing** (`quoteCart`): the add-on price holds when it's bought with something else, comes off any sale price, replaces quantity discounts on that line, and doesn't apply to wholesale buyers. Order lines record the add-on (`order_lines.addon_id`), and add-ons travel in the store file.
+
+### Product feeds (after launch, part 27)
+
+1. **Feeds** (`packages/core/src/feeds.ts`): every option of every product on sale, as a Google Merchant Center feed (`/feeds/google.xml`, RSS with `g:` tags) and a Meta catalog feed (`/feeds/meta.csv`). Each option is one item grouped by product, with its regular price, any running sale as the sale price with its dates, stock, photos, colour and size from the option names, and the description as plain text. Gift cards aren't listed.
+2. **Languages**: `?lang=de` gives the feed in a store language, with translated titles and links into that language's store.
+3. **Sales channels** (new page under Marketing): the feed links for each channel and language with a Copy button, the steps to paste them into Merchant Center and Commerce Manager, and a "To fix" list of what kept a product out (no photo, no price) or may get it rejected (no description, a title over 150 characters).
