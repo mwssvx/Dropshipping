@@ -1,14 +1,26 @@
 import Link from "next/link";
-import { formatMoney, listProducts } from "@sf/core";
+import { formatMoney, listCollections, listProducts, recentBulkEdits } from "@sf/core";
 import { requireShop } from "@/lib/server";
-import { ProductStatus } from "@/components/Status";
 import { PageHeader } from "../PageHeader";
+import { BulkProducts, type BulkRow } from "./BulkProducts";
 
 export const metadata = { title: "Products" };
 
 export default async function ProductsPage() {
   const { shop, db } = await requireShop("products");
-  const products = await listProducts(db, shop.id);
+  const [products, collections, recent] = await Promise.all([listProducts(db, shop.id), listCollections(db, shop.id), recentBulkEdits(db, shop.id)]);
+  const rows: BulkRow[] = products.map((p) => {
+    const v = p.variants[0];
+    return {
+      id: p.id,
+      title: p.title,
+      imageUrl: p.imageUrl,
+      status: p.status,
+      price: v ? formatMoney(v.priceMinor, shop.currency) : "—",
+      margin: v?.costMinor != null && v.priceMinor > 0 ? Math.round(((v.priceMinor - v.costMinor) / v.priceMinor) * 100) : null,
+    };
+  });
+  const when = (d: Date) => d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC" }) + " UTC";
   return (
     <main className="pb-12">
       <PageHeader title="Products" actions={<>
@@ -26,30 +38,11 @@ export default async function ProductsPage() {
             </div>
           </div>
         ) : (
-          <div className="card overflow-x-auto">
-            <table className="table min-w-[560px]">
-              <thead><tr><th>Product</th><th>Status</th><th className="text-right">Price</th><th className="text-right">Margin</th></tr></thead>
-              <tbody>
-                {products.map((p) => {
-                  const v = p.variants[0];
-                  const margin = v?.costMinor != null && v.priceMinor > 0 ? Math.round(((v.priceMinor - v.costMinor) / v.priceMinor) * 100) : null;
-                  return (
-                    <tr key={p.id} className="hover:bg-sunken">
-                      <td>
-                        <Link href={`/admin/products/${p.id}`} className="flex items-center gap-3 font-medium">
-                          {p.imageUrl ? <img src={p.imageUrl} alt="" className="size-10 rounded-md object-cover bg-sunken" /> : <span className="size-10 rounded-md bg-sunken" />}
-                          {p.title}
-                        </Link>
-                      </td>
-                      <td><ProductStatus value={p.status} /></td>
-                      <td className="text-right num">{v ? formatMoney(v.priceMinor, shop.currency) : "—"}</td>
-                      <td className="text-right num">{margin === null ? <span className="hint">—</span> : `${margin}%`}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <BulkProducts
+            rows={rows}
+            collections={collections.map((c) => ({ id: c.id, title: c.title }))}
+            recent={recent.map((r) => ({ id: r.id, summary: r.summary, when: when(r.createdAt), undone: !!r.undoneAt, canUndo: r.canUndo }))}
+          />
         )}
       </div>
     </main>

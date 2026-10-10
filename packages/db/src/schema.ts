@@ -64,6 +64,18 @@ export type OrderRisk = { level: "low" | "medium" | "high"; score: number; reaso
 export type ReferralProgram = { friendPercentOff: number; rewardMinor: number; minSubtotalMinor: number };
 /** Which risky orders wait for the merchant before going to the supplier. */
 export type RiskHold = "off" | "medium" | "high";
+/** A change made to many products at once from the Products list. */
+export type BulkEditAction =
+  | { kind: "status"; status: "draft" | "active" | "archived" }
+  | { kind: "price"; percent: number; ending: "99" | "95" | "00" | "none" }
+  | { kind: "compare_at"; percent: number | null }
+  | { kind: "collection"; collectionId: string; remove: boolean };
+/** What a bulk edit replaced, and what it set, so it can be undone without losing later edits. */
+export type BulkEditSnapshot = {
+  products: { id: string; status: "draft" | "active" | "archived" }[];
+  variants: { id: string; priceMinor: number; compareAtMinor: number | null; newPriceMinor: number; newCompareAtMinor: number | null }[];
+  collection: { collectionId: string; productId: string; wasIn: boolean }[];
+};
 
 export type PricingRule = { kind: "multiplier" | "fixed"; value: number; ending: "99" | "95" | "00" | "none"; compareAtPercent: number | null; minPriceMinor: number };
 
@@ -1436,4 +1448,21 @@ export const sizeCharts = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [index("size_charts_shop_idx").on(t.shopId)],
+);
+
+// Bulk edits from the Products list, kept with what they replaced so each can be undone for a week.
+export const bulkEdits = pgTable(
+  "bulk_edits",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    summary: text("summary").notNull(),
+    action: jsonb("action").$type<BulkEditAction>().notNull(),
+    snapshot: jsonb("snapshot").$type<BulkEditSnapshot>().notNull(),
+    products: integer("products").notNull(),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    undoneAt: timestamp("undone_at", { withTimezone: true }),
+  },
+  (t) => [index("bulk_edits_shop_idx").on(t.shopId, t.createdAt)],
 );
