@@ -427,3 +427,10 @@ See `.env.example` and `docs/accounts.md` for the real services.
 2. **Each delivery is an order**: the daily job (`runDueSubscriptions`) emails buyers 3 days before each charge, then places due deliveries as orders with `source` `subscription`. The price is today's price less the percent, plus shipping and tax. They're charged to the saved card and sent to the supplier like any order. A declined card or a sold-out item is tried again in 2 days, and after 3 failures in a row the subscription pauses and the buyer is told. Nothing is charged for a failed try.
 3. **Buyer control**: every email links to a private page (`/subscriptions/<token>`) where the buyer can skip the next delivery, change how often, pause, resume or cancel. Signed-in buyers also see their subscriptions on their account page.
 4. **Merchant view**: Admin → Subscriptions lists every subscription with its deliveries and sales, and lets the merchant cancel one for a buyer, who gets an email. In test mode, "Send next delivery now" places the next one at once. A buyer whose card stopped working can resume to try again, but can't enter a new card yet.
+
+### Delivery dates (after launch, part 52)
+
+1. **On product pages**: under "Add to cart", buyers see "Arrives Oct 18 – Oct 25 to United States" and how it breaks down ("Ships within 2 days, then 6–10 days in transit"), in the store's language. It's for the visitor's country when the store ships there, using the cheapest rate (`productDelivery` in `packages/core/src/delivery.ts`).
+2. **Honest by design**: transit is the slower of the supplier's own estimate (saved on each option at import) and the shipping rate's days, so the store never promises faster than the supplier ships (`transitDays`). With neither, no date is shown.
+3. **After paying**: the order page and the confirmation email show the expected delivery, counted from payment with the rate the buyer picked, and from the shipment once it has shipped (`orderDelivery`).
+4. **Settings**: Admin → Shipping → Delivery dates turns it on or off and sets processing days (0–14, default 2), with a preview using one of the store's products. Store files carry the setting.

@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { buyerAmounts, buyerThread, formatDeliveryDate, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems } from "@sf/core";
+import { buyerAmounts, buyerThread, formatDeliveryDate, formatDeliveryWindow, orderDelivery, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems } from "@sf/core";
 import Link from "next/link";
 import { db, fulfillment, storeAddress } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
@@ -54,6 +54,7 @@ export default async function OrderStatusPage({ params, searchParams }: { params
   const subOffer = paid ? await subscriptionOfferFor(await db(), shop, order) : null;
   const subscription = paid ? await subscriptionForOrder(await db(), order.id) : null;
   const partOf = order.subscriptionId ? await (await db()).query.subscriptions.findFirst({ where: (s, { eq }) => eq(s.id, order.subscriptionId!), columns: { token: true, status: true } }) : null;
+  const arrives = paid ? await orderDelivery(await db(), shop, order) : null;
   const steps = [
     { label: "Order confirmed", done: paid },
     { label: "Being prepared", done: order.fulfillments.some((f) => f.placedAt || f.shippedAt) },
@@ -151,6 +152,7 @@ export default async function OrderStatusPage({ params, searchParams }: { params
           </li>
         ))}
       </ol>
+      {arrives && <p className="text-sm">Expected delivery: <strong>{formatDeliveryWindow(arrives)}</strong></p>}
       {shipped.length > 0 && (
         <section className="card p-5 flex flex-col gap-2 text-sm" aria-labelledby="tracking">
           <h2 id="tracking" className="font-semibold">Tracking</h2>
