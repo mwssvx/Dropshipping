@@ -408,3 +408,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Rules instead of picking**: a collection can be "By rules" instead of hand-picked. Conditions are title contains a word, price at most or at least, on sale (has a compare-at price), in stock, added in the last N days, and an option value like "Color is Red". Products must meet every condition or any one, sorted newest, cheapest, dearest or A to Z (`packages/core/src/collection-rules.ts`, `collections.rules`).
 2. **Always up to date**: membership is worked out when it's read, from the active products, so a price change, a sell-out or a new import shows at once with nothing to sync. Sales and size charts aimed at the collection, the home page sections and the store page all use the same membership (`collectionMembership` in `packages/core/src/collections.ts`).
 3. **Admin**: the editor shows which products match while the merchant types, the collections list marks them "By rules", bulk edit can't add to them, and store files carry the rules.
+
+### Photo reviews (after launch, part 49)
+
+1. **Photos with a review**: buyers can add up to 3 photos (JPG, PNG or WebP, 3 MB each) when they review from their order page. Each file's first bytes are checked, and nothing is stored if the review is turned down (`submitReview` in `packages/core/src/reviews.ts`, `reviews.photo_ids`).
+2. **On the product page**: a "Photos from buyers" strip above the reviews links to each photo's review, and each review shows its photos. Photos on hidden or pending reviews don't show.
+3. **Admin and privacy**: the Reviews page shows each review's photos with a Remove button that deletes the file. A buyer's data export lists their photos, and erasing a buyer deletes them.

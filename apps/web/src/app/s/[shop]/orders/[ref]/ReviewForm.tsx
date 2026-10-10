@@ -1,15 +1,22 @@
 "use client";
-import { useActionState } from "react";
+import { startTransition, useActionState } from "react";
 import { FormError } from "@/components/FormError";
-import { SubmitButton } from "@/components/SubmitButton";
 import { reviewAction, type ReviewState } from "../../actions";
 
 export function ReviewForm({ handle, orderRef, productId, title, name }: { handle: string; orderRef: string; productId: string; title: string; name: string }) {
-  const [state, action] = useActionState(reviewAction.bind(null, handle, orderRef, productId), {} as ReviewState);
+  const [state, action, pending] = useActionState(reviewAction.bind(null, handle, orderRef, productId), {} as ReviewState);
   if (state.sent) return <p className="banner banner-success" role="status">Thanks for reviewing {title}!</p>;
   const id = (k: string) => `${k}-${productId}`;
   return (
-    <form action={action} className="flex flex-col gap-3 border-t border-border pt-4 first:border-0 first:pt-0" aria-label={`Review ${title}`}>
+    // Sent by hand rather than through `action`, so React doesn't clear the stars and text when a
+    // photo is refused.
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        const data = new FormData(e.currentTarget);
+        startTransition(() => action(data));
+      }}
+      className="flex flex-col gap-3 border-t border-border pt-4 first:border-0 first:pt-0" aria-label={`Review ${title}`}>
       <p className="font-medium">{title}</p>
       <FormError message={state.error} />
       <fieldset className="flex flex-col gap-1">
@@ -28,10 +35,15 @@ export function ReviewForm({ handle, orderRef, productId, title, name }: { handl
         <textarea id={id("body")} name="body" className="input" rows={3} required minLength={10} maxLength={2000} />
       </div>
       <div className="field">
+        <label className="label" htmlFor={id("photos")}>Add photos (optional)</label>
+        <input id={id("photos")} name="photos" type="file" multiple accept="image/jpeg,image/png,image/webp" className="text-sm" aria-describedby={id("photos-hint")} />
+        <span className="hint" id={id("photos-hint")}>Up to 3 photos of what you got, 3 MB each. They show with your review.</span>
+      </div>
+      <div className="field">
         <label className="label" htmlFor={id("name")}>Name to show</label>
         <input id={id("name")} name="name" className="input" defaultValue={name} required maxLength={60} />
       </div>
-      <div><SubmitButton pendingText="Sending…">Send review</SubmitButton></div>
+      <div><button type="submit" className="btn btn-primary" disabled={pending} aria-busy={pending}>{pending ? "Sending…" : "Send review"}</button></div>
     </form>
   );
 }

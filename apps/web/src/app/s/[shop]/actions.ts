@@ -233,7 +233,7 @@ export async function reviewAction(handle: string, ref: string, productId: strin
       rating: Number(form.get("rating") ?? 0),
       name: String(form.get("name") ?? ""),
       body: String(form.get("body") ?? ""),
-    });
+    }, await Promise.all(form.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0).map(async (f) => Buffer.from(await f.arrayBuffer()))));
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
     throw e;

@@ -137,6 +137,13 @@ export async function moderateReviewAction(id: string, status: "published" | "hi
   revalidatePath("/admin", "layout");
 }
 
+/** Takes down one photo a buyer added to their review. */
+export async function removeReviewPhotoAction(id: string, photoId: string) {
+  const { shop, db } = await requireShop("reviews");
+  await moderateReview(db, shop.id, id, { removePhotoId: photoId });
+  revalidatePath("/admin/reviews");
+}
+
 export async function replyToReviewAction(id: string, _: FormState, form: FormData): Promise<FormState> {
   const { shop, db } = await requireShop("reviews");
   await moderateReview(db, shop.id, id, { reply: String(form.get("reply") ?? "") });

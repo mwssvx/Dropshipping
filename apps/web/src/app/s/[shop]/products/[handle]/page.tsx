@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, getActiveProductByHandle, productOffers, NotFoundError, optionDefsOf, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, sizeChartForProduct, sizeChartRows, upsellsFor, wholesaleTermsFor } from "@sf/core";
+import { bundlesForProduct, getActiveProductByHandle, productOffers, NotFoundError, optionDefsOf, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, wholesaleTermsFor } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { RecentlyViewed } from "@/components/RecentlyViewed";
 import { RememberView } from "@/components/RememberView";
@@ -298,14 +298,33 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
       </div>
       <section id="reviews" className="md:col-span-2 flex flex-col gap-4 border-t border-border pt-8" aria-labelledby="reviews-heading">
         <h2 id="reviews-heading" className="text-xl font-semibold">{t.reviews}</h2>
+        {reviews.photos.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-semibold">{t.customerPhotos}</h3>
+            <ul className="flex gap-2 overflow-x-auto pb-1" aria-label={t.customerPhotos}>
+              {reviews.photos.map((p, i) => (
+                <li key={p.url} className="shrink-0">
+                  <a href={`#review-${p.reviewId}`}><img src={p.url} alt={t.photoFrom(p.name, i + 1)} loading="lazy" className="size-24 rounded-md object-cover border border-border" /></a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {reviews.count === 0 ? (
           <p className="hint">{t.noReviews}</p>
         ) : (
           <ul className="grid gap-4 sm:grid-cols-2">
             {reviews.reviews.map((r) => (
-              <li key={r.id} className="card p-4 flex flex-col gap-2">
+              <li key={r.id} id={`review-${r.id}`} className="card p-4 flex flex-col gap-2 scroll-mt-20">
                 <div className="flex items-center gap-2"><Stars value={r.rating} label={t.stars(r.rating)} /><span className="font-medium text-sm">{r.name}</span></div>
                 <p className="text-sm whitespace-pre-line">{r.body}</p>
+                {r.photoIds.length > 0 && (
+                  <div className="flex gap-2">
+                    {r.photoIds.map((id, i) => (
+                      <a key={id} href={reviewPhotoUrl(id)} target="_blank"><img src={reviewPhotoUrl(id)} alt={t.photoFrom(r.name, i + 1)} loading="lazy" className="size-20 rounded-md object-cover border border-border" /></a>
+                    ))}
+                  </div>
+                )}
                 {r.reply && <p className="text-sm hint border-l-2 border-border pl-3"><span className="font-medium">{shop.name}: </span>{r.reply}</p>}
               </li>
             ))}

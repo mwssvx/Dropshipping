@@ -1,7 +1,15 @@
-import { and, avg, count, desc, eq, inArray } from "drizzle-orm";
+import { and, avg, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
+import { saveMedia } from "./mobile/media";
+
+/** Buyers can add a few photos to a review. Kept small so a review with photos fits one upload. */
+export const MAX_REVIEW_PHOTOS = 3;
+export const MAX_REVIEW_PHOTO_BYTES = 3 * 1024 * 1024;
+
+/** Where a review photo is served, on any of the store's addresses. */
+export const reviewPhotoUrl = (id: string) => `/api/media/${id}`;
 
 const REVIEWABLE = ["partially_shipped", "shipped", "delivered"] as const;
 
@@ -35,20 +43,41 @@ const reviewInput = z.object({
   body: z.string().trim().min(10, "Write a little more, at least 10 characters.").max(2000, "Keep it under 2,000 characters."),
 });
 
-export async function submitReview(db: Db, shop: { id: string; reviewsAutoPublish: boolean }, paymentIntentId: string, input: z.input<typeof reviewInput>) {
+export async function submitReview(
+  db: Db,
+  shop: { id: string; reviewsAutoPublish: boolean },
+  paymentIntentId: string,
+  input: z.input<typeof reviewInput>,
+  photos: Buffer[] = [],
+) {
   const parsed = reviewInput.safeParse(input);
   if (!parsed.success) throw new UserError(parsed.error.issues[0]!.message);
+  const files = photos.filter((p) => p.length > 0);
+  if (files.length > MAX_REVIEW_PHOTOS) throw new UserError(`Add up to ${MAX_REVIEW_PHOTOS} photos.`);
+  if (files.some((p) => p.length > MAX_REVIEW_PHOTO_BYTES)) throw new UserError("Each photo can be up to 3 MB.");
   const items = await reviewableItems(db, shop.id, paymentIntentId);
   const item = items.find((i) => i.productId === parsed.data.productId);
   if (!item) throw new UserError("You can review this once your order has shipped.");
   if (item.review) throw new UserError("You've already reviewed this. Thank you!");
   const order = await orderByRef(db, shop.id, paymentIntentId);
+  // Photos are checked (real JPG, PNG or WebP) and stored before the review, and removed again if
+  // the review doesn't go in.
+  const photoIds: string[] = [];
+  try {
+    for (const file of files) photoIds.push((await saveMedia(db, shop.id, file)).id);
+  } catch (e) {
+    await deleteMedia(db, photoIds);
+    throw e;
+  }
   const [row] = await db
     .insert(schema.reviews)
-    .values({ ...parsed.data, shopId: shop.id, orderId: order.id, status: shop.reviewsAutoPublish ? "published" : "pending" })
+    .values({ ...parsed.data, photoIds, shopId: shop.id, orderId: order.id, status: shop.reviewsAutoPublish ? "published" : "pending" })
     .onConflictDoNothing()
     .returning();
-  if (!row) throw new UserError("You've already reviewed this. Thank you!");
+  if (!row) {
+    await deleteMedia(db, photoIds);
+    throw new UserError("You've already reviewed this. Thank you!");
+  }
   return row;
 }
 
@@ -63,15 +92,38 @@ export async function listReviews(db: Db, shopId: string, filter: { status?: "pe
     .limit(200);
 }
 
-export async function moderateReview(db: Db, shopId: string, reviewId: string, input: { status?: "published" | "hidden"; reply?: string | null }) {
+export async function moderateReview(
+  db: Db,
+  shopId: string,
+  reviewId: string,
+  input: { status?: "published" | "hidden"; reply?: string | null; removePhotoId?: string },
+) {
   const reply = input.reply === undefined ? undefined : input.reply?.trim().slice(0, 1000) || null;
-  const [row] = await db
-    .update(schema.reviews)
-    .set({ ...(input.status ? { status: input.status } : {}), ...(reply !== undefined ? { reply } : {}) })
-    .where(and(eq(schema.reviews.id, reviewId), eq(schema.reviews.shopId, shopId)))
-    .returning();
-  if (!row) throw new NotFoundError("Review");
+  const current = await db.query.reviews.findFirst({ where: and(eq(schema.reviews.id, reviewId), eq(schema.reviews.shopId, shopId)) });
+  if (!current) throw new NotFoundError("Review");
+  // A photo the merchant takes down is deleted, not just hidden.
+  const removed = input.removePhotoId && current.photoIds.includes(input.removePhotoId) ? input.removePhotoId : null;
+  const changes = {
+    ...(input.status ? { status: input.status } : {}),
+    ...(reply !== undefined ? { reply } : {}),
+    ...(removed ? { photoIds: current.photoIds.filter((p) => p !== removed) } : {}),
+  };
+  if (!Object.keys(changes).length) return current;
+  const [row] = await db.update(schema.reviews).set(changes).where(eq(schema.reviews.id, current.id)).returning();
+  if (removed) await deleteMedia(db, [removed]);
   return row;
+}
+
+async function deleteMedia(db: Db, ids: string[]) {
+  if (ids.length) await db.delete(schema.media).where(inArray(schema.media.id, ids));
+}
+
+/** Deletes the photos on these reviews, e.g. when a buyer's data is erased. */
+export async function removeReviewPhotos(db: Db, reviewIds: string[]) {
+  if (!reviewIds.length) return;
+  const rows = await db.query.reviews.findMany({ where: inArray(schema.reviews.id, reviewIds), columns: { photoIds: true } });
+  await db.update(schema.reviews).set({ photoIds: [] }).where(inArray(schema.reviews.id, reviewIds));
+  await deleteMedia(db, rows.flatMap((r) => r.photoIds));
 }
 
 /** Published reviews for a product page, with the average for the stars and search results. */
@@ -82,7 +134,15 @@ export async function productReviews(db: Db, productId: string, limit = 20) {
     db.query.reviews.findMany({ where, orderBy: desc(schema.reviews.createdAt), limit }),
   ]);
   const n = Number(stats?.n ?? 0);
-  return { count: n, average: n ? Math.round(Number(stats?.avg) * 10) / 10 : null, reviews };
+  // The newest buyer photos for the strip above the reviews, from any published review.
+  const withPhotos = await db.query.reviews.findMany({
+    where: and(where, sql`jsonb_array_length(${schema.reviews.photoIds}) > 0`),
+    orderBy: desc(schema.reviews.createdAt),
+    columns: { id: true, name: true, rating: true, photoIds: true },
+    limit: 12,
+  });
+  const photos = withPhotos.flatMap((r) => r.photoIds.map((id) => ({ url: reviewPhotoUrl(id), reviewId: r.id, name: r.name, rating: r.rating }))).slice(0, 12);
+  return { count: n, average: n ? Math.round(Number(stats?.avg) * 10) / 10 : null, reviews, photos };
 }
 
 export async function countPendingReviews(db: Db, shopId: string) {
