@@ -1,10 +1,11 @@
-import { pruneAuthRecords, pruneBuyerRecords, pruneStockAlerts, sendPriceDrops, sendStockAlerts, syncSupplierStock, pruneInvites, pruneEvents, refreshAllVerified, runWebhooks, routeStuckOrders, sendCampaignBatches, runFakePayouts, runHealthChecks, runScheduledAgents, sendAbandonedCartEmails, sendAllNotifications, syncTracking } from "@sf/core";
+import { pruneAuthRecords, pruneBuyerRecords, pruneStockAlerts, sendPriceDrops, sendStockAlerts, syncSupplierStock, pruneInvites, pruneEvents, refreshAllVerified, runWebhooks, routeStuckOrders, sendCampaignBatches, runFakePayouts, runHealthChecks, runScheduledAgents, sendAbandonedCartEmails, sendAllNotifications, sendReferralRewards, syncTracking } from "@sf/core";
 import { agents, campaigns, fulfillment, pushSender, stock, testPayments, webhooks } from "@/lib/server";
 
 /**
  * Scheduled job: place any paid orders that were missed, then pull tracking from suppliers, and
  * stock and costs for products (buyers waiting on something back in stock get their email, and
- * buyers whose saved items got cheaper hear about it).
+ * buyers whose saved items got cheaper hear about it). Buyers whose referred friend's order
+ * arrived get their store credit.
  * Also checks store health and the verified badge, and in test mode stands in for the payment
  * processor's daily payouts. Buyers who left a checkout get one reminder, and email campaigns go out in batches. Then the AI agents look at problem orders and thin margins, and last
  * phones get push notifications and webhooks go out for anything new. Old visitor events are pruned.
@@ -18,6 +19,8 @@ export async function GET(request: Request) {
   const ctx = await fulfillment();
   const routed = await routeStuckOrders(ctx);
   const tracking = await syncTracking(ctx, { limit: 200 });
+  // Refer a friend: credit for friends whose first order has now arrived.
+  const referrals = await sendReferralRewards(await campaigns());
   const stockSync = await syncSupplierStock(ctx);
   const restocked = await sendStockAlerts(await stock());
   const priceDrops = await sendPriceDrops(await stock());
@@ -35,5 +38,5 @@ export async function GET(request: Request) {
   await pruneInvites(ctx.db);
   await pruneBuyerRecords(ctx.db);
   await pruneStockAlerts(ctx.db);
-  return Response.json({ routed, tracking, stock: stockSync, restocked, priceDrops, payouts, health, verified, reminders, campaigns: campaignEmails, ai, push, webhooks: hooks, pruned });
+  return Response.json({ routed, tracking, referrals, stock: stockSync, restocked, priceDrops, payouts, health, verified, reminders, campaigns: campaignEmails, ai, push, webhooks: hooks, pruned });
 }

@@ -57,6 +57,11 @@ export type WelcomeOffer = { percentOff: number; minSubtotalMinor: number; days:
 
 /** The risk check run when an order is paid. Reasons are written for the merchant. */
 export type OrderRisk = { level: "low" | "medium" | "high"; score: number; reasons: string[]; checkedAt: string };
+/**
+ * Refer a friend: a buyer shares their link, the friend gets a one-time percentage off a first
+ * order, and the buyer gets store credit once that order is delivered. Null on the shop means off.
+ */
+export type ReferralProgram = { friendPercentOff: number; rewardMinor: number; minSubtotalMinor: number };
 /** Which risky orders wait for the merchant before going to the supplier. */
 export type RiskHold = "off" | "medium" | "high";
 
@@ -128,6 +133,7 @@ export const shops = pgTable(
     invoiceFooter: text("invoice_footer"),
     welcomeOffer: jsonb("welcome_offer").$type<WelcomeOffer>(),
     holdRiskyOrders: text("hold_risky_orders", { enum: ["off", "medium", "high"] }).notNull().default("high"),
+    referralProgram: jsonb("referral_program").$type<ReferralProgram>(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -248,6 +254,8 @@ export const customers = pgTable(
     optInSentAt: timestamp("opt_in_sent_at", { withTimezone: true }),
     // When we emailed their welcome code. Once per address, even if they sign up again later.
     welcomeCodeAt: timestamp("welcome_code_at", { withTimezone: true }),
+    // Their refer-a-friend link is <store>/refer/<code>. Made the first time they see it.
+    referralCode: text("referral_code"),
     // Wholesale: a buyer applies from their store account and the merchant approves them.
     wholesaleStatus: text("wholesale_status", { enum: ["none", "pending", "approved", "declined"] }).notNull().default("none"),
     wholesaleCompany: text("wholesale_company"),
@@ -261,7 +269,7 @@ export const customers = pgTable(
     emailToken: text("email_token").notNull().unique().default(sql`replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '')`),
     createdAt: createdAt(),
   },
-  (t) => [uniqueIndex("customers_shop_email_uq").on(t.shopId, t.email)],
+  (t) => [uniqueIndex("customers_shop_email_uq").on(t.shopId, t.email), uniqueIndex("customers_shop_referral_code_uq").on(t.shopId, t.referralCode)],
 );
 
 /**
@@ -825,12 +833,33 @@ export const discounts = pgTable(
     startsAt: timestamp("starts_at", { withTimezone: true }),
     endsAt: timestamp("ends_at", { withTimezone: true }),
     active: boolean("active").notNull().default(true),
-    // Welcome codes are made one per signup, only work for that email, and stay off the codes list.
-    source: text("source", { enum: ["merchant", "welcome"] }).notNull().default("merchant"),
+    // Welcome and referral codes are made one per person, only work for that email, and stay off
+    // the codes list.
+    source: text("source", { enum: ["merchant", "welcome", "referral"] }).notNull().default("merchant"),
     email: text("email"),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("discounts_shop_code_uq").on(t.shopId, t.code), check("discounts_value_ok", sql`${t.value} >= 0`)],
+);
+
+// Refer a friend: one row per friend who asked for their code from someone's link. Each email
+// can be referred once per store. The referrer's credit is a gift card, sent once the friend's
+// first order (paid with the code) is delivered.
+export const referrals = pgTable(
+  "referrals",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    referrerId: uuid("referrer_id").notNull().references(() => customers.id, { onDelete: "cascade" }),
+    friendEmail: text("friend_email").notNull(),
+    discountId: uuid("discount_id").references(() => discounts.id, { onDelete: "set null" }),
+    orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
+    giftCardId: uuid("gift_card_id").references((): AnyPgColumn => giftCards.id, { onDelete: "set null" }),
+    rewardMinor: money("reward_minor"),
+    rewardedAt: timestamp("rewarded_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("referrals_shop_friend_uq").on(t.shopId, t.friendEmail), index("referrals_referrer_idx").on(t.referrerId)],
 );
 
 // Product reviews from buyers who received their order. One per order and product.

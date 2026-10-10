@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { createDiscount, moderateReview, parseMoney, sendAbandonedCartEmails, setDiscountActive, setGrowthSettings, setUpsell, setWelcomeOffer, UserError } from "@sf/core";
+import { createDiscount, moderateReview, parseMoney, sendAbandonedCartEmails, setDiscountActive, setGrowthSettings, setReferralProgram, setUpsell, setWelcomeOffer, UserError } from "@sf/core";
 import { fulfillment, requireShop, testPayments } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -48,6 +48,32 @@ export async function setWelcomeOfferAction(_: FormState, form: FormData): Promi
       db,
       shop.id,
       form.get("on") === "on" ? { percentOff: int("percentOff"), minSubtotalMinor: min ? parseMoney(min) : 0, days: int("days") } : null,
+    );
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath("/admin/marketing");
+  return { saved: true };
+}
+
+export async function setReferralProgramAction(_: FormState, form: FormData): Promise<FormState> {
+  const { shop, db } = await requireShop("marketing");
+  try {
+    const min = String(form.get("minSubtotal") ?? "").trim();
+    const reward = String(form.get("reward") ?? "").trim();
+    let rewardMinor = Number.NaN;
+    try {
+      rewardMinor = parseMoney(reward);
+    } catch {
+      if (form.get("on") === "on") throw new UserError("Enter the credit like 10.00.");
+    }
+    await setReferralProgram(
+      db,
+      shop.id,
+      form.get("on") === "on"
+        ? { friendPercentOff: Number.parseInt(String(form.get("percentOff") ?? "").trim() || "NaN", 10), rewardMinor, minSubtotalMinor: min ? parseMoney(min) : 0 }
+        : null,
     );
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
