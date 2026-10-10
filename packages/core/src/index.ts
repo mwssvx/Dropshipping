@@ -58,3 +58,4 @@ export * from "./feeds";
 export * from "./welcome";
 export * from "./size-charts";
 export * from "./order-lookup";
+export * from "./recently-viewed";
