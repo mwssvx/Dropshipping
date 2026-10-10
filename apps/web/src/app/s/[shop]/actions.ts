@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { amountToCharge, getOrder, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
+import { amountToCharge, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
 import { agents, campaigns, db, payments, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
@@ -55,6 +55,23 @@ export async function addBundleAction(handle: string, bundleId: string, form: Fo
   await writeCart(shop.id, cart);
   await track(shop.id, "add_to_cart");
   redirect(`${base}/cart`);
+}
+
+/**
+ * Adds the checkout add-on the buyer picked. The checkout page re-renders in place, so what they
+ * already typed stays.
+ */
+export async function addAddonAction(handle: string, addonId: string, form: FormData) {
+  const shop = await loadShop(handle);
+  try {
+    const variantId = await pickAddonVariant(await db(), shop.id, addonId, String(form.get("variantId") ?? ""));
+    const cart = await readCart(shop.id);
+    if (!cart.some((l) => l.variantId === variantId)) cart.push({ variantId, quantity: 1 });
+    await writeCart(shop.id, cart);
+  } catch (e) {
+    if (!(e instanceof UserError || e instanceof NotFoundError)) throw e;
+  }
+  revalidatePath(`/s/${shop.handle}`, "layout");
 }
 
 export async function updateCartAction(handle: string, form: FormData) {

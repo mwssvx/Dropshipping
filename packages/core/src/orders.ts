@@ -15,6 +15,7 @@ import { breakFor, describeBreak, percentOff, wholesaleTermsFor } from "./wholes
 import { findGiftCard } from "./gift-cards";
 import { bundleSavings, bundlesInCart } from "./bundles";
 import { salePrice, salesFor } from "./sales";
+import { addonsByProduct, type CheckoutAddon } from "./addons";
 import { countryName, listShippingZones, priceRate, zoneFor } from "./shipping";
 
 type Shop = typeof schema.shops.$inferSelect;
@@ -59,6 +60,9 @@ export async function quoteCart(
     );
   const wholesale = await wholesaleTermsFor(db, shop, opts.buyerEmail);
   const sales = await salesFor(db, shop.id, rows.map((r) => r.product.id));
+  // An add-on keeps its price when it's bought with something else (and not at wholesale).
+  const addons = wholesale ? new Map<string, CheckoutAddon>() : await addonsByProduct(db, shop.id, rows.map((r) => r.product.id));
+  const goodsProducts = new Set(rows.filter((r) => !r.product.giftCard && wanted.some((l) => l.variantId === r.variant.id)).map((r) => r.product.id));
   // Quantity discounts count every variant of a product together (2 small + 1 large = 3).
   const perProduct = new Map<string, number>();
   for (const l of wanted) {
@@ -74,13 +78,18 @@ export async function quoteCart(
     }
     const title = row.variant.title === "Default" ? row.product.title : `${row.product.title} – ${row.variant.title}`;
     const giftCard = row.product.giftCard;
-    const tier = wholesale || giftCard ? null : breakFor(row.product.quantityBreaks, perProduct.get(row.product.id) ?? l.quantity);
-    const pct = giftCard ? 0 : (wholesale?.percentOff ?? tier?.percentOff ?? 0);
+    const addon = giftCard ? undefined : addons.get(row.product.id);
+    const withOthers = addon && [...goodsProducts].some((id) => id !== row.product.id) ? addon : undefined;
+    const tier = wholesale || giftCard || withOthers?.percentOff ? null : breakFor(row.product.quantityBreaks, perProduct.get(row.product.id) ?? l.quantity);
+    const pct = giftCard ? 0 : (wholesale?.percentOff ?? (withOthers?.percentOff || tier?.percentOff) ?? 0);
     // Other discounts come off the sale price.
     const sale = giftCard ? null : (sales.get(row.product.id) ?? null);
     const listed = salePrice(row.variant.priceMinor, null, sale).priceMinor;
     const unit = pct ? percentOff(listed, pct) : listed;
-    const notes = [sale ? `${sale.title}: ${sale.percentOff}% off` : null, giftCard ? null : wholesale ? `Wholesale price, ${wholesale.percentOff}% off` : tier ? describeBreak(tier) : null];
+    const notes = [
+      sale ? `${sale.title}: ${sale.percentOff}% off` : null,
+      giftCard ? null : wholesale ? `Wholesale price, ${wholesale.percentOff}% off` : withOthers?.percentOff ? `Add-on price, ${withOthers.percentOff}% off` : tier ? describeBreak(tier) : null,
+    ];
     return {
       variantId: row.variant.id,
       productId: row.product.id,
@@ -94,6 +103,8 @@ export async function quoteCart(
       unitCostMinor: row.variant.costMinor,
       lineMinor: unit * l.quantity,
       priceNote: notes.filter(Boolean).join(" · ") || null,
+      /** Set when the line is the checkout add-on at its price. */
+      addonId: withOthers?.id ?? null,
       giftCard,
     };
   });
@@ -327,6 +338,7 @@ export async function startCheckout(
         quantity: i.quantity,
         unitPriceMinor: i.unitPriceMinor,
         unitCostMinor: i.unitCostMinor,
+        addonId: i.addonId,
       })),
     );
     return order!;

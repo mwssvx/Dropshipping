@@ -14,6 +14,7 @@ import { listShippingZones } from "./shipping";
 import { LANGUAGE_CODES, saveTranslation } from "./languages";
 import { createBundle, MAX_BUNDLES } from "./bundles";
 import { createSale, MAX_SALES } from "./sales";
+import { createAddon, MAX_ADDONS, setAddonActive } from "./addons";
 
 export const EXPORT_FORMAT = "storefront-store";
 
@@ -27,7 +28,7 @@ function supplierOf(link: typeof schema.suppliers.$inferSelect | undefined, prod
 export async function exportStore(db: Db, shopId: string, now = new Date()) {
   const shop = await db.query.shops.findFirst({ where: eq(schema.shops.id, shopId) });
   if (!shop) throw new NotFoundError("Store");
-  const [products, collections, links, pages, theme, discounts, supplierRows, posts, redirectRows, translationRows, bundleRows, saleRows] = await Promise.all([
+  const [products, collections, links, pages, theme, discounts, supplierRows, posts, redirectRows, translationRows, bundleRows, saleRows, addonRows] = await Promise.all([
     db.query.products.findMany({ where: eq(schema.products.shopId, shopId), orderBy: asc(schema.products.createdAt) }),
     db.query.collections.findMany({ where: eq(schema.collections.shopId, shopId), orderBy: asc(schema.collections.createdAt) }),
     db
@@ -45,6 +46,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
     db.query.translations.findMany({ where: eq(schema.translations.shopId, shopId), orderBy: [asc(schema.translations.language), asc(schema.translations.kind)] }),
     db.query.bundles.findMany({ where: eq(schema.bundles.shopId, shopId), orderBy: asc(schema.bundles.createdAt) }),
     db.query.sales.findMany({ where: eq(schema.sales.shopId, shopId), orderBy: asc(schema.sales.startsAt) }),
+    db.query.checkoutAddons.findMany({ where: eq(schema.checkoutAddons.shopId, shopId), orderBy: asc(schema.checkoutAddons.createdAt) }),
   ]);
   const variants = products.length
     ? await db.query.variants.findMany({ where: inArray(schema.variants.productId, products.map((p) => p.id)), orderBy: asc(schema.variants.position) })
@@ -144,6 +146,10 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
     })),
     redirects: redirectRows.map((r) => ({ from: r.fromPath, to: r.toPath })),
     bundles: bundleRows.map((b) => ({ title: b.title, products: b.productIds.map((id) => handleOf.get(id)).filter((h): h is string => !!h), percent_off: b.percentOff, active: b.active })),
+    checkout_addons: addonRows.flatMap((a) => {
+      const product = handleOf.get(a.productId);
+      return product ? [{ product, percent_off: a.percentOff, pitch: a.pitch, active: a.active }] : [];
+    }),
     // Sales that haven't ended; collections and products by handle.
     sales: saleRows
       .filter((x) => !x.endsAt || x.endsAt > new Date())
@@ -284,6 +290,10 @@ const importSchema = z.object({
   bundles: z
     .array(z.object({ title: str(80), products: z.array(handle).max(4), percent_off: z.number().int(), active: z.boolean().default(true) }))
     .max(MAX_BUNDLES)
+    .default([]),
+  checkout_addons: z
+    .array(z.object({ product: handle, percent_off: z.number().int(), pitch: z.string().max(120).nullable(), active: z.boolean().default(true) }))
+    .max(MAX_ADDONS)
     .default([]),
   sales: z
     .array(
@@ -537,6 +547,18 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
         if (!(e instanceof UserError)) throw e;
       }
     }
+    let addonsAdded = 0;
+    for (const a of data.checkout_addons) {
+      const productId = productIds.get(a.product);
+      if (!productId) continue;
+      try {
+        const row = await createAddon(tx as unknown as Db, shopId, { productId, percentOff: a.percent_off, pitch: a.pitch ?? "" });
+        if (!a.active) await setAddonActive(tx as unknown as Db, shopId, row.id, false);
+        addonsAdded++;
+      } catch (e) {
+        if (!(e instanceof UserError)) throw e;
+      }
+    }
     // Sales too; any that don't fit (or ended since the file was made) are left out.
     let salesAdded = 0;
     if (data.sales.length) {
@@ -584,6 +606,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
       translations: translationsAdded,
       bundles: bundlesAdded,
       sales: salesAdded,
+      checkoutAddons: addonsAdded,
       theme: !!theme,
       currencyDiffers: typeof data.store.currency === "string" && data.store.currency !== shop.currency,
     };

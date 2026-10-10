@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
-import { countryName, formatMoney, lastCheckoutDetails, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, UserError } from "@sf/core";
+import { addonOffer, convertPrice, countryName, formatMoney, lastCheckoutDetails, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, UserError } from "@sf/core";
 import { buyerFx } from "@/lib/currency";
 import { currentBuyer } from "@/lib/buyer";
 import { readCart, readDiscountCode, readGiftCardCode } from "@/lib/cart";
 import { db } from "@/lib/server";
 import { countryNames } from "@/lib/store-text";
-import { lineTitles, loadShop, storeBase, storeLang, storeT } from "../data";
+import { lineTitles, loadShop, localProducts, storeBase, storeLang, storeT } from "../data";
+import { addAddonAction } from "../actions";
+import { AddonOffer } from "./AddonOffer";
 import { Checkout, type ZoneChoice } from "./CheckoutForm";
 
 export const metadata = { title: "Checkout" };
@@ -53,6 +55,9 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
   const nameOf = countryNames(lang);
   const countries = (hasGoods ? shipsTo(zones) : [...SHIPPING_COUNTRIES]).map((c) => [c, nameOf(c, countryName(c))] as [string, string]).sort((a, b) => a[1].localeCompare(b[1], lang ?? "en"));
   const withoutShipping = presentQuote({ ...quote, shippingMinor: 0, taxMinor: 0 }, fx);
+  // One more product for a little less, unless this is a wholesale or gift-card-only order.
+  const offer = !quote.wholesale && hasGoods ? await addonOffer(await db(), shop, [...new Set(variants.map((v) => v.productId))]) : null;
+  const offerTitle = offer ? (await localProducts(handle, [{ id: offer.product.id, title: offer.product.title }]))[0]!.title : "";
   return (
     <Checkout
       handle={handle}
@@ -92,6 +97,24 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
       }
       footer={
         <>
+          {offer && (
+            <AddonOffer
+              action={addAddonAction.bind(null, handle, offer.addon.id)}
+              heading={t.addonHeading}
+              title={offerTitle}
+              pitch={offer.addon.pitch}
+              imageUrl={offer.product.imageUrl}
+              save={offer.addon.percentOff ? t.addonSave(offer.addon.percentOff) : null}
+              optionLabel={t.option}
+              choices={offer.variants.map((v) => ({
+                id: v.id,
+                title: v.title,
+                priceLabel: money(convertPrice(v.priceMinor, fx)),
+                wasLabel: v.wasMinor > v.priceMinor ? money(convertPrice(v.wasMinor, fx)) : null,
+              }))}
+              addLabel={Object.fromEntries(offer.variants.map((v) => [v.id, t.addonAdd(money(convertPrice(v.priceMinor, fx)))]))}
+            />
+          )}
           {quote.giftCard && (
             <dl className="grid grid-cols-[1fr_auto] gap-y-1 num text-sm">
               <dt className="hint">{t.giftCard} ···· {quote.giftCard.last4}</dt>
