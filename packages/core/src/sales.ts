@@ -111,7 +111,7 @@ export async function listSales(db: Db, shopId: string, now = new Date()) {
     .sort((a, b) => order[a.status] - order[b.status] || (a.status === "ended" ? b.startsAt.getTime() - a.startsAt.getTime() : 0));
 }
 
-export type SaleInfo = { id: string; title: string; percentOff: number; endsAt: Date | null };
+export type SaleInfo = { id: string; title: string; percentOff: number; startsAt: Date; endsAt: Date | null };
 
 /** The sale each product is in right now (the biggest, when several overlap). */
 export async function salesFor(db: Db, shopId: string, productIds: string[], now = new Date()): Promise<Map<string, SaleInfo>> {
@@ -138,7 +138,7 @@ export async function salesFor(db: Db, shopId: string, productIds: string[], now
         s.scope === "all" ||
         (s.scope === "products" && s.productIds.includes(id)) ||
         (s.scope === "collection" && links.some((l) => l.collectionId === s.collectionId && l.productId === id));
-      if (covers && s.percentOff > (result.get(id)?.percentOff ?? 0)) result.set(id, { id: s.id, title: s.title, percentOff: s.percentOff, endsAt: s.endsAt });
+      if (covers && s.percentOff > (result.get(id)?.percentOff ?? 0)) result.set(id, { id: s.id, title: s.title, percentOff: s.percentOff, startsAt: s.startsAt, endsAt: s.endsAt });
     }
   }
   return result;
