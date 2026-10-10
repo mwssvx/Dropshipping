@@ -28,6 +28,8 @@ type Detail = {
   fulfillments: { status: string; problemMessage: string | null; carrier: string | null; trackingNumber: string | null; trackingUrl: string | null }[];
   refunds: { amountMinor: number; reason: string | null; createdAt: string }[];
   refundableMinor: number;
+  held?: boolean;
+  risk?: { level: "low" | "medium" | "high"; reasons: string[] } | null;
 };
 
 export default function OrderScreen() {
@@ -72,6 +74,20 @@ export default function OrderScreen() {
         <Pill label={f.label} tone={f.tone} />
       </View>
       {note ? <Banner tone={note.tone}>{note.text}</Banner> : null}
+
+      {o.held ? (
+        <Card>
+          <Heading>On hold: {o.risk?.level === "high" ? "high" : "medium"} risk</Heading>
+          <Body>This order looked risky, so it hasn't gone to the supplier. If it's a stolen card, refunding now means you don't pay for the goods.</Body>
+          {(o.risk?.reasons ?? []).map((r, i) => (
+            <Body key={i} muted>• {r}</Body>
+          ))}
+          <View style={{ gap: space(2) }}>
+            <Button label="It's fine, send it" onPress={() => run("release", `orders/${o.id}/release`, {})} busy={busy === "release"} disabled={!!busy} />
+            {can("refunds") ? <Button label="Refund it" kind="secondary" onPress={() => { setReason("Looked like fraud"); setPanel("refund"); }} disabled={!!busy} /> : null}
+          </View>
+        </Card>
+      ) : null}
 
       {o.fulfillmentStatus === "problem" && problem ? (
         <Card>

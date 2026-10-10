@@ -55,6 +55,11 @@ export const sessions = pgTable(
 /** A personal one-time code emailed to each new signup. Null on the shop means it's off. */
 export type WelcomeOffer = { percentOff: number; minSubtotalMinor: number; days: number };
 
+/** The risk check run when an order is paid. Reasons are written for the merchant. */
+export type OrderRisk = { level: "low" | "medium" | "high"; score: number; reasons: string[]; checkedAt: string };
+/** Which risky orders wait for the merchant before going to the supplier. */
+export type RiskHold = "off" | "medium" | "high";
+
 export type PricingRule = { kind: "multiplier" | "fixed"; value: number; ending: "99" | "95" | "00" | "none"; compareAtPercent: number | null; minPriceMinor: number };
 
 export const shops = pgTable(
@@ -122,6 +127,7 @@ export const shops = pgTable(
     invoiceNextNumber: integer("invoice_next_number").notNull().default(1),
     invoiceFooter: text("invoice_footer"),
     welcomeOffer: jsonb("welcome_offer").$type<WelcomeOffer>(),
+    holdRiskyOrders: text("hold_risky_orders", { enum: ["off", "medium", "high"] }).notNull().default("high"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -349,6 +355,11 @@ export const orders = pgTable(
     // Set when the buyer marked the order as a gift. The recipient (when the buyer gave their
     // email) hears when it ships, with the message and tracking but no prices.
     gift: jsonb("gift").$type<OrderGift>(),
+    // Set when the order is paid. A held order isn't sent to the supplier until the merchant
+    // sends it (heldAt cleared, riskReviewedAt set) or refunds it.
+    risk: jsonb("risk").$type<OrderRisk>(),
+    heldAt: timestamp("held_at", { withTimezone: true }),
+    riskReviewedAt: timestamp("risk_reviewed_at", { withTimezone: true }),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

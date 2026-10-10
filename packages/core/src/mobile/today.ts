@@ -7,7 +7,7 @@ import { openNotices } from "../trust";
 import type { Shop } from "../ai/context";
 import { can, type Role } from "../team";
 
-export type AttentionItem = { kind: "hold" | "notice" | "problems" | "to_send" | "inbox"; title: string; body: string; url: string; tone: "critical" | "warning" | "info" };
+export type AttentionItem = { kind: "hold" | "notice" | "problems" | "risk" | "to_send" | "inbox"; title: string; body: string; url: string; tone: "critical" | "warning" | "info" };
 
 const DAY = 86_400_000;
 
@@ -22,7 +22,7 @@ export async function todaySummary(db: Db, shop: Shop, now = new Date(), role: R
     }),
     db.query.orders.findMany({
       where: and(eq(schema.orders.shopId, shop.id), inArray(schema.orders.paymentStatus, ["paid", "partially_refunded"]), inArray(schema.orders.fulfillmentStatus, ["unfulfilled", "problem"])),
-      columns: { id: true, fulfillmentStatus: true },
+      columns: { id: true, fulfillmentStatus: true, heldAt: true },
     }),
     listRequirements(db, shop.id),
     openNotices(db, shop.id),
@@ -43,13 +43,15 @@ export async function todaySummary(db: Db, shop: Shop, now = new Date(), role: R
   }
   const problems = open.filter((o) => o.fulfillmentStatus === "problem").length;
   if (problems) attention.push({ kind: "problems", tone: "critical", title: `${problems} ${problems === 1 ? "order needs" : "orders need"} you`, body: problems === 1 ? "The supplier couldn't take it. Open it to see the fix." : "The supplier couldn't take them. Each one has a fix.", url: "/orders?show=problems" });
-  const toSend = open.length - problems;
+  const held = open.filter((o) => o.heldAt && o.fulfillmentStatus === "unfulfilled").length;
+  if (held) attention.push({ kind: "risk", tone: "warning", title: `${held} ${held === 1 ? "order" : "orders"} on hold`, body: held === 1 ? "It looked risky, so it waits for you before going to the supplier." : "They looked risky, so they wait for you before going to the supplier.", url: "/orders?show=held" });
+  const toSend = open.length - problems - held;
   if (toSend) attention.push({ kind: "to_send", tone: "info", title: `${toSend} ${toSend === 1 ? "order" : "orders"} on the way to the supplier`, body: "These are sent automatically.", url: "/orders?show=to_send" });
   if (inbox) attention.push({ kind: "inbox", tone: "warning", title: `${inbox} buyer ${inbox === 1 ? "question needs" : "questions need"} you`, body: "Open the inbox on the web admin to answer.", url: "/inbox" });
 
   // Staff see order counts and order problems, not sales totals, payouts or AI proposals.
   const seesMoney = can(role, "money");
-  const ATTENTION_AREA = { hold: "money", notice: "trust", problems: "orders", to_send: "orders", inbox: "inbox" } as const;
+  const ATTENTION_AREA = { hold: "money", notice: "trust", problems: "orders", risk: "orders", to_send: "orders", inbox: "inbox" } as const;
   return {
     currency: shop.currency,
     salesTodayMinor: seesMoney ? today.reduce((s, o) => s + net(o), 0) : null,

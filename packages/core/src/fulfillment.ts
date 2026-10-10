@@ -10,6 +10,7 @@ import { sendPurchaseOrder } from "./own-suppliers";
 import { issueGiftCardsForOrder } from "./gift-cards";
 import { earnPoints } from "./rewards";
 import { issueInvoice } from "./invoices";
+import { checkOrderRisk } from "./risk";
 
 type Order = typeof schema.orders.$inferSelect;
 type Fulfillment = typeof schema.fulfillments.$inferSelect;
@@ -59,6 +60,7 @@ export async function routeOrder(ctx: FulfillmentContext, orderId: string) {
   const order = await db.query.orders.findFirst({ where: eq(schema.orders.id, orderId) });
   if (!order) throw new NotFoundError("Order");
   if (order.paymentStatus !== "paid") return { placed: 0, failed: 0, skipped: "not_paid" as const };
+  if (order.heldAt) return { placed: 0, failed: 0, skipped: "held" as const };
 
   const lines = await db
     .select({ line: schema.orderLines, variant: schema.variants, product: schema.products })
@@ -154,7 +156,23 @@ export async function onOrderPaid(ctx: FulfillmentContext, orderId: string) {
   await issueInvoice(ctx.db, orderId);
   await sendOrderEmail(ctx, orderId, "order_confirmation");
   await earnPoints(ctx.db, orderId);
+  if (await checkOrderRisk(ctx.db, orderId, now(ctx))) return { placed: 0, failed: 0, skipped: "held" as const };
   return routeAndIssue(ctx, orderId);
+}
+
+/** The merchant looked at a held order and wants it sent. */
+export async function releaseHeldOrder(ctx: FulfillmentContext, shopId: string, orderId: string) {
+  const order = await ctx.db.query.orders.findFirst({ where: and(eq(schema.orders.id, orderId), eq(schema.orders.shopId, shopId)) });
+  if (!order) throw new NotFoundError("Order");
+  if (order.paymentStatus === "refunded") throw new UserError("This order was refunded, so there's nothing to send.");
+  if (!order.heldAt) throw new UserError("This order isn't on hold.");
+  const [released] = await ctx.db
+    .update(schema.orders)
+    .set({ heldAt: null, riskReviewedAt: now(ctx), updatedAt: now(ctx) })
+    .where(and(eq(schema.orders.id, order.id), isNotNull(schema.orders.heldAt)))
+    .returning();
+  if (!released) throw new UserError("This order isn't on hold.");
+  return routeAndIssue(ctx, order.id);
 }
 
 /** Sends goods to suppliers and gift cards bought on the order to the buyer. Safe to repeat. */
@@ -310,6 +328,7 @@ export async function routeStuckOrders(ctx: FulfillmentContext, olderThanMs = 2 
         eq(schema.orders.paymentStatus, "paid"),
         eq(schema.orders.fulfillmentStatus, "unfulfilled"),
         lt(schema.orders.paidAt, cutoff),
+        isNull(schema.orders.heldAt),
         isNull(schema.fulfillments.id),
       ),
     )

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { schema, type Address, type Db } from "@sf/db";
 import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
@@ -432,11 +432,13 @@ export async function handlePaymentEvent(db: Db, provider: string, event: Paymen
   });
 }
 
-export async function listOrders(db: Db, shopId: string, filter: { fulfillmentStatus?: Order["fulfillmentStatus"] } = {}) {
+export async function listOrders(db: Db, shopId: string, filter: { fulfillmentStatus?: Order["fulfillmentStatus"]; held?: boolean } = {}) {
   return db.query.orders.findMany({
     where: and(
       eq(schema.orders.shopId, shopId),
       filter.fulfillmentStatus ? eq(schema.orders.fulfillmentStatus, filter.fulfillmentStatus) : undefined,
+      // Held for the risk check and still worth sending (a refunded one is settled).
+      filter.held ? and(isNotNull(schema.orders.heldAt), inArray(schema.orders.paymentStatus, ["paid", "partially_refunded"])) : undefined,
     ),
     orderBy: desc(schema.orders.number),
   });

@@ -80,6 +80,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       invoices: { legal_name: shop.invoiceLegalName, address: shop.invoiceAddress, prefix: shop.invoicePrefix, footer: shop.invoiceFooter },
       wholesale: { enabled: shop.wholesaleEnabled, percent_off: shop.wholesalePercentOff, min_order_minor: shop.wholesaleMinOrderMinor },
       welcome_offer: shop.welcomeOffer ? { percent_off: shop.welcomeOffer.percentOff, min_subtotal: shop.welcomeOffer.minSubtotalMinor, days: shop.welcomeOffer.days } : null,
+      hold_risky_orders: shop.holdRiskyOrders,
       // Missing means the built-in default rate.
       shipping_zones: shipping.isDefault
         ? undefined
@@ -202,6 +203,7 @@ const importSchema = z.object({
       round_converted_prices: z.boolean().optional(),
       languages: z.array(z.enum(LANGUAGE_CODES as [string, ...string[]])).max(LANGUAGE_CODES.length).optional(),
       welcome_offer: z.object({ percent_off: z.number().int().min(5).max(50), min_subtotal: z.number().int().min(0), days: z.number().int().min(7).max(90) }).nullable().optional(),
+      hold_risky_orders: z.enum(["off", "medium", "high"]).optional(),
       rewards: z.object({ enabled: z.boolean(), earn_rate: z.number().int().min(1).max(100), value_minor: z.number().int().min(1).max(10_000) }).optional(),
       invoices: z
         .object({ legal_name: z.string().max(120).nullable(), address: z.string().max(400).nullable(), prefix: z.string().max(12).regex(/^[A-Za-z0-9\-/_.]*$/), footer: z.string().max(500).nullable() })
@@ -531,6 +533,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
     if (data.store.reviews_auto_publish !== undefined) settings.reviewsAutoPublish = data.store.reviews_auto_publish;
     if (data.store.presentment_currencies !== undefined) settings.presentmentCurrencies = [...new Set(data.store.presentment_currencies)];
     if (data.store.round_converted_prices !== undefined) settings.roundConvertedPrices = data.store.round_converted_prices;
+    if (data.store.hold_risky_orders) settings.holdRiskyOrders = data.store.hold_risky_orders;
     if (data.store.welcome_offer !== undefined) {
       const w = data.store.welcome_offer;
       settings.welcomeOffer = w ? { percentOff: w.percent_off, minSubtotalMinor: w.min_subtotal, days: w.days } : null;

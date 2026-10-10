@@ -6,6 +6,7 @@ import { PaymentLinkActions } from "./PaymentLinkActions";
 import { CheckTrackingButton, ManualTrackingForm, RetryButton } from "./FulfillmentActions";
 import { RefundForm } from "./RefundForm";
 import { FixWithAiButton } from "./FixWithAiButton";
+import { RiskActions } from "./RiskActions";
 import { FulfilmentStatus, PaymentStatus } from "@/components/Status";
 import { PageHeader } from "../../PageHeader";
 
@@ -47,6 +48,8 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
       ...(f.deliveredAt ? [{ at: f.deliveredAt, text: "Delivered" }] : []),
       ...(f.status === "failed" ? [{ at: f.updatedAt, text: f.problemCode && f.problemMessage?.includes("can't send it") ? f.problemMessage : `Supplier refused the order: ${f.problemMessage}` }] : []),
     ]),
+    ...(order.risk && (order.heldAt || order.riskReviewedAt) ? [{ at: new Date(order.risk.checkedAt), text: `Held for a risk check (${order.risk.level} risk)` }] : []),
+    ...(order.riskReviewedAt ? [{ at: order.riskReviewedAt, text: "Checked and sent on to the supplier" }] : []),
     ...returns.map((r) => ({ at: r.createdAt, text: `Buyer asked to return ${r.items.map((i) => `${i.title} × ${i.quantity}`).join(", ")}` })),
     ...refunds.map((r) => ({ at: r.createdAt, text: `Refunded ${money(r.amountMinor)}${r.reason ? `: ${r.reason}` : ""}` })),
     ...order.fulfillments.flatMap((f) => (f.status === "cancelled" ? [{ at: f.updatedAt, text: `Supplier order cancelled (${supplierLabel(f.supplierId)})` }] : [])),
@@ -62,11 +65,13 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
   const feeBack = order.platformFeeMinor > 0;
   const feeKept = order.platformFeeMinor - refunds.reduce((s, r) => s + r.platformFeeRefundedMinor, 0);
   const net = order.totalMinor - order.refundedMinor - feeKept - order.processingFeeMinor;
+  const held = !!order.heldAt && refundable;
+  const RISK_LABEL = { low: "Low risk", medium: "Medium risk", high: "High risk" } as const;
 
   return (
     <main className="pb-12">
       <PageHeader title={`Order #${order.number}`} back={<Link href="/admin/orders" className="hint hover:text-ink">← Orders</Link>}
-        actions={<div className="flex gap-2 items-center">{order.wholesale && <span className="pill pill-info">Wholesale order</span>}{order.source === "payment_link" && <span className="pill pill-info">Payment link</span>}<PaymentStatus value={order.paymentStatus} /><FulfilmentStatus value={order.fulfillmentStatus} /></div>} />
+        actions={<div className="flex gap-2 items-center">{order.wholesale && <span className="pill pill-info">Wholesale order</span>}{order.source === "payment_link" && <span className="pill pill-info">Payment link</span>}<PaymentStatus value={order.paymentStatus} />{held ? <span className="pill pill-warning">On hold</span> : <FulfilmentStatus value={order.fulfillmentStatus} />}</div>} />
       <div className="px-4 sm:px-8 grid gap-6 lg:grid-cols-[1fr_320px] items-start">
         <div className="flex flex-col gap-6 min-w-0">
           {order.source === "payment_link" && (order.paymentStatus === "pending" || order.paymentStatus === "failed") && (
@@ -77,6 +82,17 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
               {order.note && <p className="text-sm border-l-2 border-border pl-3 whitespace-pre-line">{order.note}</p>}
               <p className="text-sm hint">Once they pay, it goes to the supplier like any other order.</p>
               <PaymentLinkActions orderId={order.id} url={`${await storeAddress(shop)}/pay/${order.id}`} />
+            </section>
+          )}
+          {held && order.risk && (
+            <section className="card border-warning p-5 flex flex-col gap-3" aria-labelledby="held-heading">
+              <h2 id="held-heading" className="font-semibold">On hold: {RISK_LABEL[order.risk.level].toLowerCase()}</h2>
+              <p className="text-sm">This order looked risky, so it hasn&apos;t gone to the supplier. If the card was stolen, refunding now means you don&apos;t pay for goods you&apos;d lose to a chargeback.</p>
+              <ul className="text-sm list-disc pl-5 flex flex-col gap-1">
+                {order.risk.reasons.map((r) => <li key={r}>{r}</li>)}
+              </ul>
+              <p className="text-sm hint">The buyer got their usual confirmation and isn&apos;t told about the hold.</p>
+              <RiskActions orderId={order.id} canRefund={can(role, "refunds")} />
             </section>
           )}
           {returns[0] && (returns[0].status === "requested" || returns[0].status === "approved") && (
@@ -193,6 +209,16 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
               {a.line1}{a.line2 ? <>, {a.line2}</> : null}<br />{a.city}{a.region ? `, ${a.region}` : ""} {a.postalCode}<br />{a.country}
             </address>
           </div>
+          {order.risk && !held && (
+            <section aria-labelledby="risk-heading">
+              <h2 id="risk-heading" className="font-semibold mb-1">Risk check <span className={`pill ml-1 ${order.risk.level === "low" ? "pill-success" : order.risk.level === "medium" ? "pill-warning" : "pill-critical"}`}>{RISK_LABEL[order.risk.level]}</span></h2>
+              {order.risk.reasons.length ? (
+                <ul className="hint list-disc pl-5">{order.risk.reasons.map((r) => <li key={r}>{r}</li>)}</ul>
+              ) : (
+                <p className="hint">Nothing unusual.</p>
+              )}
+            </section>
+          )}
           {order.gift && (
             <section aria-labelledby="gift-heading">
               <h2 id="gift-heading" className="font-semibold mb-1">Gift <span className="pill pill-info ml-1">Gift</span></h2>

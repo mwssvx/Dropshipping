@@ -15,7 +15,8 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
   const today = paid.filter((o) => o.paidAt && o.paidAt >= startOfDay);
-  const toSend = paid.filter((o) => o.fulfillmentStatus === "unfulfilled");
+  const held = paid.filter((o) => o.fulfillmentStatus === "unfulfilled" && o.heldAt);
+  const toSend = paid.filter((o) => o.fulfillmentStatus === "unfulfilled" && !o.heldAt);
   const problems = paid.filter((o) => o.fulfillmentStatus === "problem");
   const hasActive = products.some((p) => p.status === "active");
 
@@ -52,7 +53,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
           </section>
           <section className="card">
             <h2 className="font-semibold px-4 pt-4">Needs your attention</h2>
-            {toSend.length || problems.length || holds.length ? (
+            {toSend.length || problems.length || holds.length || held.length ? (
               <ul className="p-2">
                 {holds.length > 0 && (
                   <li>
@@ -67,6 +68,14 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
                     <Link href="/admin/orders?show=problems" className="flex items-center justify-between gap-3 px-2 py-3 rounded-md hover:bg-sunken">
                       <span><span className="pill pill-critical mr-2">Problem</span>{problems.length} {problems.length === 1 ? "order needs" : "orders need"} you: the supplier refused or hasn't shipped</span>
                       <span className="hint">Fix →</span>
+                    </Link>
+                  </li>
+                )}
+                {held.length > 0 && (
+                  <li>
+                    <Link href="/admin/orders?show=held" className="flex items-center justify-between gap-3 px-2 py-3 rounded-md hover:bg-sunken">
+                      <span><span className="pill pill-warning mr-2">On hold</span>{held.length} {held.length === 1 ? "order looked" : "orders looked"} risky and {held.length === 1 ? "waits" : "wait"} for you before going to the supplier</span>
+                      <span className="hint">Check →</span>
                     </Link>
                   </li>
                 )}

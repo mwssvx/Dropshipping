@@ -181,7 +181,9 @@ export async function collectPushEvents(db: Db, shopId: string, since: Date): Pr
   if (!shop) return [];
   const events: PushEvent[] = [];
   for (const o of orders) {
-    events.push({ kind: "new_order", ref: o.id, title: `New order #${o.number}`, body: `${formatMoney(o.totalMinor, o.currency)} from ${o.email}`, url: `/orders/${o.id}`, at: o.paidAt! });
+    // A held order says so at once, since nothing happens until someone looks.
+    const held = o.heldAt && o.risk ? ` On hold: ${o.risk.reasons[0] ?? "it looked risky."}` : "";
+    events.push({ kind: "new_order", ref: o.id, title: held ? `New order #${o.number} is on hold` : `New order #${o.number}`, body: clip(`${formatMoney(o.totalMinor, o.currency)} from ${o.email}${held ? `.${held}` : ""}`), url: `/orders/${o.id}`, at: o.paidAt! });
   }
   for (const { f, number } of failed) {
     // One per order and problem, so a retry that fails the same way doesn't notify again.
