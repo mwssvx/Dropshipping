@@ -23,6 +23,9 @@ export function CollectionForm({
   saved?: boolean;
 }) {
   const [state, formAction] = useActionState(action, saved ? { saved: true } : {});
+  // Controlled, so what was typed stays after an error (React resets a form after its action runs).
+  const [fields, setFields] = useState({ title: initial.title, description: initial.description, imageUrl: initial.imageUrl });
+  const field = (name: keyof typeof fields) => ({ name, value: fields[name], onChange: (e: { target: { value: string } }) => setFields({ ...fields, [name]: e.target.value }) });
   const [picked, setPicked] = useState(initial.productIds);
   const [mode, setMode] = useState<"manual" | "auto">(initial.rules ? "auto" : "manual");
   const [query, setQuery] = useState("");
@@ -42,15 +45,15 @@ export function CollectionForm({
         <section className="card p-5 flex flex-col gap-4">
           <div className="field">
             <label className="label" htmlFor="title">Title</label>
-            <input className="input" id="title" name="title" required maxLength={120} defaultValue={initial.title} placeholder="Best sellers" />
+            <input className="input" id="title" required maxLength={120} {...field("title")} placeholder="Best sellers" />
           </div>
           <div className="field">
             <label className="label" htmlFor="description">Description</label>
-            <textarea className="input" id="description" name="description" rows={4} defaultValue={initial.description} />
+            <textarea className="input" id="description" rows={4} {...field("description")} />
           </div>
           <div className="field">
             <label className="label" htmlFor="imageUrl">Cover image address</label>
-            <input className="input" id="imageUrl" name="imageUrl" type="url" defaultValue={initial.imageUrl} placeholder="https://…" />
+            <input className="input" id="imageUrl" type="url" {...field("imageUrl")} placeholder="https://…" />
             <span className="hint">Leave empty to use the first product's picture.</span>
           </div>
         </section>

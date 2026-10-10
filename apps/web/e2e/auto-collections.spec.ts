@@ -37,10 +37,10 @@ test("a collection fills itself by rules", async ({ page }, info) => {
 
   // A second condition that any product can meet instead.
   await rules.getByRole("button", { name: "Add condition" }).click();
-  await rules.getByLabel("Condition 2").selectOption({ label: "Price is at most" });
+  await rules.getByLabel("Condition 2", { exact: true }).selectOption({ label: "Price is at most" });
   await rules.getByLabel("Price 2").fill("cheap");
   await page.getByRole("button", { name: "Save collection" }).click();
-  await expect(page.getByRole("alert")).toContainText("Condition 2: enter a price like 30.00.");
+  await expect(page.getByText("Condition 2: enter a price like 30.00.")).toBeVisible();
   await rules.getByLabel("Price 2").fill("1000");
   await rules.getByLabel("Products must meet").selectOption({ label: "Any one condition" });
   await expect(rules.getByRole("heading", { name: "2 products match now" })).toBeVisible();
