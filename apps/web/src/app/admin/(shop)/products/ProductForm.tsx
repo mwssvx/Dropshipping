@@ -1,10 +1,51 @@
 "use client";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import type { FormState } from "../../actions";
 
-export type VariantValues = { title: string; price: string; compareAt: string; cost: string; stock?: number | null; fromSupplier?: boolean };
+export type VariantValues = {
+  /** Set for options that exist already, so saving edits them in place. */
+  id?: string;
+  title: string;
+  options?: Record<string, string> | null;
+  price: string;
+  compareAt: string;
+  cost: string;
+  stock?: number | null;
+  fromSupplier?: boolean;
+};
+
+type OptionDraft = { name: string; values: string };
+const MAX_OPTIONS = 3;
+const MAX_VARIANTS = 100;
+
+const splitValues = (raw: string) => [...new Set(raw.split(",").map((v) => v.trim()).filter(Boolean))];
+
+/** Every combination of the options, like "Black / S", "Black / M", "White / S"… */
+function combine(drafts: OptionDraft[]) {
+  const defs = drafts.map((d) => ({ name: d.name.trim(), values: splitValues(d.values) })).filter((d) => d.name && d.values.length);
+  let combos: Record<string, string>[] = [{}];
+  for (const d of defs) combos = combos.flatMap((c) => d.values.map((v) => ({ ...c, [d.name]: v })));
+  return defs.length ? combos.map((options) => ({ title: Object.values(options).join(" / "), options })) : [];
+}
+
+function draftsFrom(variants: VariantValues[]): OptionDraft[] {
+  const defs: { name: string; values: string[] }[] = [];
+  for (const v of variants) {
+    for (const [name, value] of Object.entries(v.options ?? {})) {
+      let d = defs.find((x) => x.name === name);
+      if (!d) defs.push((d = { name, values: [] }));
+      if (!d.values.includes(value)) d.values.push(value);
+    }
+  }
+  return defs.map((d) => ({ name: d.name, values: d.values.join(", ") }));
+}
+
+const sameOptions = (a: Record<string, string> | null | undefined, b: Record<string, string>) => {
+  const ka = Object.keys(a ?? {});
+  return ka.length === Object.keys(b).length && ka.every((k) => a![k] === b[k]);
+};
 
 type Values = {
   title: string;
@@ -15,6 +56,8 @@ type Values = {
   variants: VariantValues[];
   /** Shown when the product came from a supplier. */
   supplier?: { label: string; sourceUrl: string | null };
+  /** Whether the merchant can set options like size and colour here (not for supplier products). */
+  optionsEditable?: boolean;
 };
 
 const toNumber = (s: string) => {
@@ -34,7 +77,26 @@ export function ProductForm({
   submitLabel: string;
 }) {
   const [state, formAction] = useActionState(action, {});
-  const many = initial.variants.length > 1;
+  const [drafts, setDrafts] = useState<OptionDraft[]>(() => draftsFrom(initial.variants));
+  const hadOptions = initial.variants.some((v) => Object.keys(v.options ?? {}).length > 0);
+  const combos = initial.optionsEditable ? combine(drafts) : [];
+  const generated = combos.length > 0;
+  const tooMany = combos.length > MAX_VARIANTS;
+  // New combinations start from the first option's prices as typed so far.
+  const [template, setTemplate] = useState({ price: initial.variants[0]!.price, cost: initial.variants[0]!.cost });
+  const first = { ...initial.variants[0]!, ...template };
+  // With options, the rows follow the combinations: an existing one keeps its id, prices and
+  // stock; a new one starts from the first option's prices.
+  const rows: { key: string; value: VariantValues; generated: boolean }[] = generated
+    ? (tooMany ? [] : combos).map((c) => {
+        const same = initial.variants.find((v) => sameOptions(v.options, c.options)) ?? initial.variants.find((v) => !Object.keys(v.options ?? {}).length && v.title === c.title);
+        return { key: c.title, generated: true, value: same ? { ...same, title: c.title, options: c.options } : { title: c.title, options: c.options, price: first.price, compareAt: first.compareAt, cost: first.cost, stock: null } };
+      })
+    : initial.optionsEditable && hadOptions
+      ? // Every option removed: one price for the whole product.
+        [{ key: "Default", generated: false, value: { ...first, title: "Default", options: {} } }]
+      : initial.variants.map((v, i) => ({ key: v.id ?? String(i), generated: false, value: v }));
+  const many = rows.length > 1;
 
   return (
     <form action={formAction} className="grid gap-6 lg:grid-cols-[1fr_300px] items-start">
@@ -69,8 +131,12 @@ export function ProductForm({
               </span>
             )}
           </div>
-          {initial.variants.map((v, i) => (
-            <VariantRow key={i} index={i} initial={v} currency={currency} showTitle={many} />
+          {initial.optionsEditable && (
+            <OptionsEditor drafts={drafts} setDrafts={setDrafts} count={combos.length} tooMany={tooMany} />
+          )}
+          {rows.map((r, i) => (
+            <VariantRow key={r.key} index={i} initial={r.value} currency={currency} showTitle={many} generated={r.generated}
+              onPrices={i === 0 ? setTemplate : undefined} />
           ))}
         </section>
       </div>
@@ -88,9 +154,43 @@ export function ProductForm({
   );
 }
 
-function VariantRow({ index, initial, currency, showTitle }: { index: number; initial: VariantValues; currency: string; showTitle: boolean }) {
+function OptionsEditor({ drafts, setDrafts, count, tooMany }: { drafts: OptionDraft[]; setDrafts: (d: OptionDraft[]) => void; count: number; tooMany: boolean }) {
+  const set = (i: number, patch: Partial<OptionDraft>) => setDrafts(drafts.map((d, n) => (n === i ? { ...d, ...patch } : d)));
+  return (
+    <div className="flex flex-col gap-3">
+      {drafts.map((d, i) => (
+        <div key={i} className="grid gap-3 sm:grid-cols-[180px_1fr_auto] items-end">
+          <div className="field">
+            <label className="label" htmlFor={`option-name-${i}`}>Option {i + 1}</label>
+            <input className="input" id={`option-name-${i}`} value={d.name} maxLength={40} placeholder={["Size", "Color", "Material"][i]} onChange={(e) => set(i, { name: e.target.value })} />
+          </div>
+          <div className="field">
+            <label className="label" htmlFor={`option-values-${i}`}>Option {i + 1} values, separated by commas</label>
+            <input className="input" id={`option-values-${i}`} value={d.values} placeholder={["S, M, L", "Black, White", "Cotton, Linen"][i]} onChange={(e) => set(i, { values: e.target.value })} />
+          </div>
+          <button type="button" className="btn btn-secondary" aria-label={`Remove option ${i + 1}`} onClick={() => setDrafts(drafts.filter((_, n) => n !== i))}>Remove</button>
+        </div>
+      ))}
+      <div className="flex flex-wrap items-center gap-3">
+        {drafts.length < MAX_OPTIONS && (
+          <button type="button" className="btn btn-secondary self-start" onClick={() => setDrafts([...drafts, { name: "", values: "" }])}>
+            {drafts.length ? "Add another option" : "Add options like size or colour"}
+          </button>
+        )}
+        {count > 0 && (
+          <span className={tooMany ? "text-critical text-sm" : "hint"} role="status">
+            {tooMany ? `${count} combinations: a product can have up to ${MAX_VARIANTS}. Remove some values.` : `${count === 1 ? "1 combination" : `${count} combinations`}, each with its own price and stock below.`}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function VariantRow({ index, initial, currency, showTitle, generated, onPrices }: { index: number; initial: VariantValues; currency: string; showTitle: boolean; generated: boolean; onPrices?: (p: { price: string; cost: string }) => void }) {
   const [price, setPrice] = useState(initial.price);
   const [cost, setCost] = useState(initial.cost);
+  useEffect(() => onPrices?.({ price, cost }), [price, cost, onPrices]);
   const p = toNumber(price);
   const c = toNumber(cost);
   const margin = p && c !== null && p > 0 ? Math.round(((p - c) / p) * 100) : null;
@@ -98,7 +198,14 @@ function VariantRow({ index, initial, currency, showTitle }: { index: number; in
   const id = (k: string) => `${k}-${index}`;
   return (
     <fieldset className={`flex flex-col gap-3 ${showTitle ? "border-t border-border pt-4 first-of-type:border-0 first-of-type:pt-0" : ""}`}>
-      {showTitle ? (
+      {initial.id && <input type="hidden" name={`variantId.${index}`} value={initial.id} />}
+      {initial.options && <input type="hidden" name={`options.${index}`} value={JSON.stringify(initial.options)} />}
+      {generated ? (
+        <>
+          <legend className="font-medium">{initial.title}</legend>
+          <input type="hidden" name={`variantTitle.${index}`} value={initial.title} />
+        </>
+      ) : showTitle ? (
         <div className="field">
           <label className="label" htmlFor={id("variantTitle")}>Option name</label>
           <input className="input" id={id("variantTitle")} name={`variantTitle.${index}`} required defaultValue={initial.title} />
