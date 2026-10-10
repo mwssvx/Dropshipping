@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, getActiveProductByHandle, NotFoundError, percentOff, productPhotos, productQuestions, productReviews, upsellsFor, wholesaleTermsFor } from "@sf/core";
+import { bundlesForProduct, getActiveProductByHandle, NotFoundError, percentOff, productPhotos, productQuestions, productReviews, sizeChartForProduct, sizeChartRows, upsellsFor, wholesaleTermsFor } from "@sf/core";
+import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { ProductGallery } from "@/components/ProductGallery";
 import { currentBuyer } from "@/lib/buyer";
 import { db } from "@/lib/server";
@@ -78,12 +79,13 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const buyable = product.variants.filter((x) => x.stock === null || x.stock > 0);
   const v = buyable[0] ?? product.variants[0];
   const many = product.variants.length > 1;
-  const [reviews, questions, rawUpsells, base, fx] = await Promise.all([
+  const [reviews, questions, rawUpsells, base, fx, chart] = await Promise.all([
     productReviews(await db(), product.id),
     productQuestions(await db(), product.id),
     upsellsFor(await db(), shop.id, [product.id]),
     storeBase(shopHandle),
     buyerFx(shop),
+    sizeChartForProduct(await db(), shop.id, product.id),
   ]);
   const askedKind = ASKED_MESSAGES[(query.asked ?? "") as keyof typeof ASKED_MESSAGES];
   const upsells = await localProducts(shopHandle, rawUpsells);
@@ -166,6 +168,12 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           </form>
         )}
         {v && buyable.length === 0 && <p className="banner banner-info">{t.soldOutForNow}</p>}
+        {chart && (
+          <SizeChartDialog
+            chart={{ name: chart.name, unit: chart.unit, columns: chart.columns, rows: { cm: sizeChartRows(chart, "cm"), in: sizeChartRows(chart, "in") }, note: chart.note }}
+            t={{ sizeChart: t.sizeChart, close: t.close, centimetres: t.centimetres, inches: t.inches }}
+          />
+        )}
         <form action={toggleSavedAction.bind(null, shopHandle, product.id, "product")} className="flex flex-wrap items-center gap-3">
           <input type="hidden" name="handle" value={product.handle} />
           <input type="hidden" name="save" value={isSaved ? "0" : "1"} />

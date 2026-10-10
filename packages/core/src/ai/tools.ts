@@ -12,6 +12,7 @@ import { describeShipping } from "../shipping";
 import { setPricesIncludeTax } from "../tax";
 import { createPost } from "../blog";
 import { saveQuestionDraft } from "../questions";
+import { createSizeChart } from "../size-charts";
 import { isLanguage, LANGUAGES, saveTranslation } from "../languages";
 import type { ProblemCode } from "../suppliers";
 import { AUTO, blocked, needsOk, untrusted, type Decision, type RunScope } from "./context";
@@ -865,6 +866,50 @@ const answererTools = [
   }),
 ];
 
+/* ───────────── Size chart drafter: saves hidden drafts only ───────────── */
+
+const sizerTools = [
+  tool({
+    name: "read_product_sizes",
+    kind: "read",
+    description: "The product's title, description (often copied from the supplier, with its measurements) and option names, so you can see which sizes it comes in.",
+    input: z.object({}),
+    summary: () => "Read the product's sizes",
+    async run(_, run) {
+      const { db } = run.ctx;
+      const product = await db.query.products.findFirst({ where: and(eq(schema.products.id, run.productId!), eq(schema.products.shopId, run.shop.id)) });
+      if (!product) throw new UserError("That product isn't in this store.");
+      const variants = await db.query.variants.findMany({ where: eq(schema.variants.productId, product.id), orderBy: asc(schema.variants.position) });
+      const axes: Record<string, string[]> = {};
+      for (const v of variants) for (const [k, val] of Object.entries(v.options)) if (!(axes[k] ??= []).includes(val)) axes[k]!.push(val);
+      return {
+        store_country: run.shop.country,
+        product: { title: product.title, description: untrusted("product", product.descriptionHtml.replace(/<br\s*\/?>|<\/p>|<\/li>/gi, "\n").replace(/<[^>]*>/g, "").slice(0, 4000)) },
+        options: axes,
+        option_names: variants.map((v) => v.title),
+      };
+    },
+  }),
+  tool({
+    name: "save_size_chart_draft",
+    kind: "change",
+    description: "Save the size chart as a hidden draft on this product. The merchant checks it and shows it on the store.",
+    input: z.object({
+      name: z.string().min(1).max(60).describe("Like \"Hoodie sizes\"."),
+      unit: z.enum(["cm", "in"]),
+      columns: z.array(z.string().min(1).max(30)).min(2).max(8).describe("Headings; the first is \"Size\"."),
+      rows: z.array(z.array(z.string().max(30))).min(1).max(30).describe("One row per size, a cell per column. Leave a cell empty when the data doesn't say."),
+      note: z.string().max(500).optional().describe("How to measure, and any [Check: …] for the merchant."),
+    }),
+    policy: () => AUTO,
+    summary: () => "Drafted a size chart",
+    async run(i, run) {
+      const chart = await createSizeChart(run.ctx.db, run.shop.id, { ...i, productIds: [run.productId!], published: false });
+      return { saved: true, chart_id: chart.id };
+    },
+  }),
+];
+
 export const AGENT_TOOLS: Record<AgentName, AgentTool[]> = {
   listing: listingTools,
   assistant: assistantTools,
@@ -874,6 +919,7 @@ export const AGENT_TOOLS: Record<AgentName, AgentTool[]> = {
   writer: writerTools,
   translator: translatorTools,
   answerer: answererTools,
+  sizer: sizerTools,
 };
 
 export function findTool(agent: AgentName, name: string) {

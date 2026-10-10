@@ -13,6 +13,7 @@ export const AGENT_LABEL: Record<string, string> = {
   writer: "Blog writer",
   translator: "Translator",
   answerer: "Question answerer",
+  sizer: "Size chart drafter",
 };
 
 export type Proposal = { id: string; agent: string; summary: string; reason: string | null; input: Record<string, unknown> };

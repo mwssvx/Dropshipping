@@ -178,6 +178,57 @@ function answerer(s: State): BetaContentBlock[] {
   return [text("I drafted an answer. Read it over, change anything you need, and send it.")];
 }
 
+/* ───────────── Size chart drafter ───────────── */
+
+const SIZE_NAME = /^\s*(?:size\s*)?(XXS|XS|S|M|L|XL|XXL|XXXL|[2-5]XL|\d{1,2})\s*[:\-–]\s*(.+)$/i;
+const MEASURE = /([A-Za-z][A-Za-z ]{1,20}?)\s*:?\s*(\d+(?:\.\d+)?(?:\s*[-–~]\s*\d+(?:\.\d+)?)?)\s*(cm|in|inch|inches|")?/g;
+
+// Reads "S: Bust 86cm Length 62cm" style lines from the description; without any, drafts the
+// sizes from the options with empty cells and asks the merchant to check, like the real model.
+function sizer(s: State): BetaContentBlock[] {
+  const read = s.has("read_product_sizes");
+  if (!read) return [toolCall("read_product_sizes", {})];
+  if (read.isError) return [text("I couldn't find that product.")];
+  if (!s.has("save_size_chart_draft")) {
+    const p = read.result;
+    const lines = strip(p.product.description).split(/\n|;/);
+    const columns = ["Size"];
+    const rows: string[][] = [];
+    let inches = false;
+    for (const line of lines) {
+      const m = line.match(SIZE_NAME);
+      if (!m) continue;
+      const cells: Record<string, string> = {};
+      for (const [, label, value, unit] of m[2]!.matchAll(MEASURE)) {
+        const name = label!.trim().replace(/^bust$/i, "Chest").replace(/^\w/, (c) => c.toUpperCase());
+        if (!columns.includes(name)) columns.push(name);
+        cells[name] = value!.replace(/\s*[-–~]\s*/, "-");
+        if (unit && /^(in|inch|inches|")$/.test(unit)) inches = true;
+      }
+      if (Object.keys(cells).length) rows.push([m[1]!.toUpperCase(), ...columns.slice(1).map((c) => cells[c] ?? "")]);
+    }
+    const title = strip(p.product.title);
+    if (rows.length) {
+      for (const r of rows) while (r.length < columns.length) r.push("");
+      return [toolCall("save_size_chart_draft", { name: `${title.slice(0, 48)} sizes`, unit: inches ? "in" : "cm", columns, rows, note: "Measured flat, garment laid out. Compare with a piece that fits you well." })];
+    }
+    const options: Record<string, string[]> = p.options ?? {};
+    const sizes = Object.entries(options).find(([k]) => /size/i.test(k))?.[1] ?? (p.option_names as string[]).filter((n) => n !== "Default");
+    return [
+      toolCall("save_size_chart_draft", {
+        name: `${title.slice(0, 48)} sizes`,
+        unit: "cm",
+        columns: ["Size", "Chest", "Length"],
+        rows: (sizes.length ? sizes : ["One size"]).slice(0, 30).map((n) => [n, "", ""]),
+        note: "[Check: the description has no measurements, so ask your supplier for each size] Measured flat, garment laid out.",
+      }),
+    ];
+  }
+  const saved = s.has("save_size_chart_draft")!;
+  if (saved.isError) return [text(`I couldn't save the chart: ${strip(saved.result)}`)];
+  return [text("I drafted a size chart from the description. Check the measurements, fill in anything empty, and show it on your store.")];
+}
+
 /* ───────────── Buyer support ───────────── */
 
 function buyerSupport(s: State): BetaContentBlock[] {
@@ -372,6 +423,7 @@ const BRAINS: Record<ModelRequest["agent"], (s: State, req: ModelRequest) => Bet
   writer,
   translator,
   answerer,
+  sizer,
   buyer_support: buyerSupport,
   fulfilment,
   margin,
