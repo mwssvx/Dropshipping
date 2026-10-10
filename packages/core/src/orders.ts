@@ -40,8 +40,10 @@ export async function quoteCart(
     email?: string;
     buyerEmail?: string | null;
     giftCardCode?: string | null;
-    /** Where it ships. Without it (the cart), shipping is estimated for the store's own country. */
+    /** Where it ships. Without it (the cart), shipping is estimated for `countryHint`, else the store's own country. */
     country?: string | null;
+    /** Where the buyer seems to be, from their connection. Used for the estimate only if the store ships there. */
+    countryHint?: string | null;
     shippingRateId?: string | null;
   } = {},
 ) {
@@ -114,9 +116,16 @@ export async function quoteCart(
   const hasGoods = items.some((i) => !i.giftCard);
   let shippingMinor = 0;
   let shipping: { rateId: string; name: string; minDays: number | null; maxDays: number | null } | null = null;
+  let freeShippingOverMinor: number | null = null;
   if (hasGoods) {
     const { zones } = await listShippingZones(db, shop.id);
-    const rates = zoneFor(zones, opts.country ?? shop.country)?.rates ?? [];
+    const hinted = opts.countryHint && zoneFor(zones, opts.countryHint)?.rates.length ? opts.countryHint : null;
+    const rates = zoneFor(zones, opts.country ?? hinted ?? shop.country)?.rates ?? [];
+    // The lowest amount that makes a paid rate free, unless a rate is free anyway.
+    if (!rates.some((r) => r.priceMinor === 0)) {
+      const over = rates.map((r) => r.freeOverMinor).filter((m): m is number => m !== null);
+      if (over.length) freeShippingOverMinor = Math.min(...over);
+    }
     if (!rates.length && opts.country) throw new UserError(`${shop.name} doesn't ship to ${countryName(opts.country)} yet.`, "no_shipping");
     // The rate the buyer picked, or the cheapest for this cart.
     const rate = rates.find((r) => r.id === opts.shippingRateId) ?? [...rates].sort((a, b) => priceRate(a, goodsMinor) - priceRate(b, goodsMinor))[0];
@@ -173,6 +182,11 @@ export async function quoteCart(
     /** What's left to pay by card after the gift card. Before tax, until checkout. */
     dueMinor: totalMinor - (giftCard?.appliedMinor ?? 0),
     pricesIncludeTax: shop.pricesIncludeTax,
+    /** How far the cart is from free shipping. Null when shipping is free anyway or never free. */
+    freeShipping:
+      freeShippingOverMinor !== null && !discount?.freeShipping
+        ? { overMinor: freeShippingOverMinor, shortByMinor: Math.max(0, freeShippingOverMinor - goodsMinor) }
+        : null,
     wholesale: wholesale ? { ...wholesale, shortByMinor: Math.max(0, wholesale.minOrderMinor - subtotalMinor) } : null,
   };
 }
