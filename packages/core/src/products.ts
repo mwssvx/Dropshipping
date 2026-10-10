@@ -3,7 +3,7 @@ import { schema, type Db } from "@sf/db";
 import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
 import { uniqueHandle } from "./handles";
-import { editProductPhotos, photoColumns } from "./gallery";
+import { editProductPhotos, inheritedPhoto, photoColumns } from "./gallery";
 
 export const MAX_VARIANTS = 100;
 export const MAX_OPTIONS = 3;
@@ -86,7 +86,7 @@ export async function updateProduct(db: Db, shopId: string, productId: string, i
       if (row) {
         await tx.update(schema.variants).set({ ...v, options, position: i }).where(eq(schema.variants.id, row.id));
         kept.add(row.id);
-      } else await tx.insert(schema.variants).values({ ...v, productId, position: i });
+      } else await tx.insert(schema.variants).values({ ...v, productId, position: i, imageUrl: inheritedPhoto(existing, v.options) });
     }
     const extra = existing.filter((e) => !kept.has(e.id)).map((e) => e.id);
     if (extra.length) await tx.delete(schema.variants).where(inArray(schema.variants.id, extra));

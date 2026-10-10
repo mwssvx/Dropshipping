@@ -114,7 +114,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-10 md:grid-cols-2">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
-      <ProductGallery title={product.title} photos={productPhotos(product)} />
+      <ProductGallery title={product.title} photos={[...new Set([...productPhotos(product), ...product.variants.flatMap((x) => (x.imageUrl ? [x.imageUrl] : []))])]} />
       <div className="flex flex-col gap-5">
         <Track shopId={shop.id} kind="product_view" productId={product.id} />
         <h1 className="text-3xl font-bold tracking-tight">{product.title}</h1>
@@ -153,7 +153,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
             {byOption ? (
               <OptionPicker
                 options={defs}
-                variants={product.variants.map((x) => ({ id: x.id, title: x.title, options: x.options ?? {}, available: x.stock === null || x.stock > 0 }))}
+                variants={product.variants.map((x) => ({ id: x.id, title: x.title, options: x.options ?? {}, available: x.stock === null || x.stock > 0, imageUrl: x.imageUrl }))}
                 initialId={v.id}
                 prices={Object.fromEntries(product.variants.map((x) => [x.id, <Price key={x.id} minor={x.priceMinor} compareAt={x.compareAtMinor} currency={shop.currency} fx={fx} />]))}
                 soldOutLabel={t.soldOut}
@@ -166,7 +166,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                     const out = x.stock !== null && x.stock <= 0;
                     return (
                       <label key={x.id} className={`chip ${out ? "opacity-50 line-through" : ""}`}>
-                        <input type="radio" name="variantId" value={x.id} defaultChecked={x.id === v.id} disabled={out} className="sr-only peer" />
+                        <input type="radio" name="variantId" value={x.id} defaultChecked={x.id === v.id} disabled={out} className="sr-only peer" data-photo={x.imageUrl ?? undefined} />
                         <span>{x.title}</span>
                         <span className="hint num"><Price minor={x.priceMinor} currency={shop.currency} fx={fx} /></span>
                       </label>

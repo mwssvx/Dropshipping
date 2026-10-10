@@ -265,14 +265,14 @@ describe("CJ Dropshipping adapter", () => {
         productNameEn: "Mini Projector",
         description: "<p>Bright &amp; small</p><script>x()</script>",
         productImageSet: ["https://cf.cjdropshipping.com/a.jpg", "http://insecure/b.jpg"],
-        variants: [{ vid: "V1", variantKey: "Black", variantSellPrice: "12.34" }],
+        variants: [{ vid: "V1", variantKey: "Black", variantImage: "https://cf.cjdropshipping.com/black.jpg", variantSellPrice: "12.34" }],
       },
     });
     const url = "https://cjdropshipping.com/product/mini-projector-p-ABC123DEF456.html";
     expect(adapter.matchesUrl(new URL(url))).toBe(true);
     const p = await adapter.getProductFromUrl(url);
     expect(p).toMatchObject({ ref: "ABC123DEF456", title: "Mini Projector", description: "Bright & small", images: ["https://cf.cjdropshipping.com/a.jpg"] });
-    expect(p.variants[0]).toMatchObject({ ref: "V1", title: "Black", costMinor: 1234 });
+    expect(p.variants[0]).toMatchObject({ ref: "V1", title: "Black", imageUrl: "https://cf.cjdropshipping.com/black.jpg", costMinor: 1234 });
     await adapter.getProductFromUrl(url);
     expect(calls.filter((c) => c.url.includes("getAccessToken"))).toHaveLength(1);
     expect(calls.at(-1)!.token).toBe("tok");

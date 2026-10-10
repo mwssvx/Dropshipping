@@ -243,6 +243,8 @@ export const variants = pgTable(
     shipDaysMin: integer("ship_days_min"),
     shipDaysMax: integer("ship_days_max"),
     position: integer("position").notNull().default(0),
+    /** One of the product's photos, shown when a buyer picks this variant (the red one, say). */
+    imageUrl: text("image_url"),
   },
   (t) => [index("variants_product_idx").on(t.productId), check("variants_price_nonneg", sql`${t.priceMinor} >= 0`)],
 );

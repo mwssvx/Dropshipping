@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { schema, type Db, type PricingRule } from "@sf/db";
 import { z } from "zod";
 import { UserError } from "./errors";
-import { photoColumns } from "./gallery";
+import { supplierPhotos } from "./gallery";
 import { uniqueHandle } from "./handles";
 import { compareAtFor, DEFAULT_PRICING_RULE, priceFromCost, pricingRuleOf } from "./pricing";
 import { SupplierError, type SupplierAdapter, type SupplierProduct, type Suppliers } from "./suppliers";
@@ -75,6 +75,7 @@ export async function importProduct(db: Db, suppliers: Suppliers, shopId: string
   if (existing) throw new UserError(`You've already imported this product as "${existing.title}".`, "duplicate");
 
   const rule = await ruleFor(db, shopId);
+  const photos = supplierPhotos(product.images, product.variants.map((v) => v.imageUrl));
   const variants = product.variants.map((v, i) => {
     const price = data.prices[v.ref] ?? suggestPrice(v.costMinor, rule);
     return {
@@ -88,6 +89,7 @@ export async function importProduct(db: Db, suppliers: Suppliers, shopId: string
       shipDaysMin: v.shipDaysMin,
       shipDaysMax: v.shipDaysMax,
       position: i,
+      imageUrl: photos.variantImage(v.imageUrl),
     };
   });
   if (data.publish && variants.some((v) => v.priceMinor <= (v.costMinor ?? 0))) {
@@ -114,7 +116,8 @@ export async function importProduct(db: Db, suppliers: Suppliers, shopId: string
         title: data.title,
         handle,
         descriptionHtml: data.description ?? product.description,
-        ...photoColumns(product.images),
+        images: photos.images,
+        imageUrl: photos.imageUrl,
         status: data.publish ? "active" : "draft",
         supplierId: link!.id,
         supplierProductRef: product.ref,

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, shopLanguages, LANGUAGES } from "@sf/core";
+import { getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES } from "@sf/core";
 import { requireShop, storeAddress, suppliers } from "@/lib/server";
 import { updateProductAction } from "../../../actions";
 import { setUpsellAction } from "../../../growth-actions";
@@ -10,6 +10,7 @@ import { ProductForm } from "../ProductForm";
 import { QuantityBreaksForm } from "./QuantityBreaksForm";
 import { AddressForm } from "./AddressForm";
 import { PhotosPanel } from "./PhotosPanel";
+import { VariantPhotosPanel } from "./VariantPhotosPanel";
 import { StockPanel } from "./StockPanel";
 import { WriteListingButton } from "./WriteListingButton";
 
@@ -78,6 +79,10 @@ export default async function EditProductPage({ params, searchParams }: { params
             optionsEditable: !product.giftCard && !product.variants.some((v) => v.supplierVariantRef),
           }} />
         <PhotosPanel productId={product.id} title={product.title} photos={productPhotos(product)} max={MAX_PHOTOS} />
+        {product.variants.length > 1 && productPhotos(product).length > 1 && !product.giftCard && (
+          <VariantPhotosPanel productId={product.id} photos={productPhotos(product)}
+            {...variantPhotoRows(product.variants.map((v) => ({ id: v.id, title: v.title, options: v.options ?? {}, imageUrl: v.imageUrl })))} />
+        )}
         <AddressForm productId={product.id} handle={product.handle} prefix={(await storeAddress(shop)).replace(/^https?:\/\//, "")} />
         {shopLanguages(shop).length > 0 && (
           <p className="text-sm max-w-3xl">

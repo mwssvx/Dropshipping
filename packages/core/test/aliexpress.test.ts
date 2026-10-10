@@ -28,7 +28,7 @@ const PRODUCT = {
         sku_price: "9.99",
         offer_sale_price: "7.45",
         sku_available_stock: 120,
-        ae_sku_property_dtos: { ae_sku_property_d_t_o: [{ sku_property_name: "Length", sku_property_value: "5m" }] },
+        ae_sku_property_dtos: { ae_sku_property_d_t_o: [{ sku_property_name: "Length", sku_property_value: "5m", sku_image: "https://ae01.alicdn.com/kf/5m.jpg" }] },
       },
       {
         sku_attr: "14:194#10m",
@@ -56,8 +56,8 @@ describe("AliExpress adapter", () => {
     expect(p).toMatchObject({ ref: "1005001234567890", title: "LED Strip Lights", description: "Bright & bendy" });
     expect(p.images).toEqual(["https://ae01.alicdn.com/a.jpg", "https://ae01.alicdn.com/b.jpg"]);
     expect(p.variants).toEqual([
-      { ref: "1005001234567890|14:193#5m", title: "5m", options: { Length: "5m" }, costMinor: 745, stock: 120, shipDaysMin: null, shipDaysMax: 12 },
-      { ref: "1005001234567890|14:194#10m", title: "10 metres", options: { Length: "10 metres" }, costMinor: 1450, stock: 0, shipDaysMin: null, shipDaysMax: 12 },
+      { ref: "1005001234567890|14:193#5m", title: "5m", options: { Length: "5m" }, imageUrl: "https://ae01.alicdn.com/kf/5m.jpg", costMinor: 745, stock: 120, shipDaysMin: null, shipDaysMax: 12 },
+      { ref: "1005001234567890|14:194#10m", title: "10 metres", options: { Length: "10 metres" }, imageUrl: null, costMinor: 1450, stock: 0, shipDaysMin: null, shipDaysMax: 12 },
     ]);
     const call = calls[0]!;
     expect(call).toMatchObject({ method: "aliexpress.ds.product.get", product_id: "1005001234567890", app_key: "key", session: "tok", sign_method: "sha256", ship_to_country: "US" });

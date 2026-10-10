@@ -97,7 +97,8 @@ export async function quoteCart(
       productId: row.product.id,
       productHandle: row.product.handle,
       title,
-      imageUrl: row.product.imageUrl,
+      // The picked colour's photo, when it has one.
+      imageUrl: row.variant.imageUrl ?? row.product.imageUrl,
       quantity: l.quantity,
       /** The price before sales, quantity or wholesale discounts, shown struck through when it differs. */
       listUnitPriceMinor: row.variant.priceMinor,

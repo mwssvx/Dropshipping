@@ -1,7 +1,12 @@
 "use client";
 import { useState, type ReactNode } from "react";
 
-export type PickerVariant = { id: string; title: string; options: Record<string, string>; available: boolean };
+export type PickerVariant = { id: string; title: string; options: Record<string, string>; available: boolean; imageUrl?: string | null };
+
+/** Tells the product gallery to show a variant's photo. */
+export function showVariantPhoto(url: string | null | undefined) {
+  if (url) window.dispatchEvent(new CustomEvent("sf:photo", { detail: url }));
+}
 
 /**
  * One row of choices per option (Size, Color) instead of a list of every combination. Picking a
@@ -26,13 +31,17 @@ export function OptionPicker({
   const chosen = variants.find((v) => v.id === chosenId) ?? variants[0]!;
 
   const find = (picks: Record<string, string>) => variants.find((v) => options.every((o) => v.options[o.name] === picks[o.name]));
+  const choose = (v: PickerVariant) => {
+    setChosenId(v.id);
+    showVariantPhoto(v.imageUrl);
+  };
   /** The best in-stock variant with this value: keep as many of the other choices as possible. */
   function pick(name: string, value: string) {
     const exact = find({ ...chosen.options, [name]: value });
-    if (exact?.available) return setChosenId(exact.id);
+    if (exact?.available) return choose(exact);
     const score = (v: PickerVariant) => options.filter((o) => o.name !== name && v.options[o.name] === chosen.options[o.name]).length;
     const best = variants.filter((v) => v.available && v.options[name] === value).sort((a, b) => score(b) - score(a))[0];
-    setChosenId((best ?? exact ?? chosen).id);
+    choose(best ?? exact ?? chosen);
   }
 
   return (
