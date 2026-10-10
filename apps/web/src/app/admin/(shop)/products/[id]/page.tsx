@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES } from "@sf/core";
+import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES } from "@sf/core";
 import { requireShop, storeAddress, suppliers } from "@/lib/server";
 import { updateProductAction } from "../../../actions";
 import { setUpsellAction } from "../../../growth-actions";
@@ -11,6 +11,7 @@ import { QuantityBreaksForm } from "./QuantityBreaksForm";
 import { AddressForm } from "./AddressForm";
 import { PhotosPanel } from "./PhotosPanel";
 import { VariantPhotosPanel } from "./VariantPhotosPanel";
+import { BackupPanel, type BackupView } from "./BackupPanel";
 import { StockPanel } from "./StockPanel";
 import { WriteListingButton } from "./WriteListingButton";
 
@@ -29,6 +30,23 @@ export default async function EditProductPage({ params, searchParams }: { params
   const label = link ? supplierLabel(suppliers(), link) : undefined;
   const product = { ...found, supplier: label ? { label } : null };
   const own = await listOwnSuppliers(db, shop.id);
+  const backupLink = found.backup ? await getSupplierLink(db, shop.id, found.backup.supplierId) : undefined;
+  const backup: BackupView | null = found.backup
+    ? {
+        label: supplierLabel(suppliers(), backupLink),
+        sourceUrl: found.backup.sourceUrl,
+        gone: !!found.backup.gone,
+        rows: found.variants.map((v) => {
+          const b = found.backup!.variants[v.id];
+          return {
+            option: v.title,
+            cost: b ? formatMoney(b.costMinor, shop.currency) : null,
+            mainCost: v.costMinor != null ? formatMoney(v.costMinor, shop.currency) : null,
+            stock: !b ? null : b.stock === null ? "in stock" : b.stock === 0 ? "sold out" : `${b.stock} in stock`,
+          };
+        }),
+      }
+    : null;
   const waitingBy = await waitingForProduct(db, shop.id, product.id);
   const saves = await savedCount(db, shop.id, product.id);
   const waiting = product.variants.filter((v) => waitingBy.has(v.id)).map((v) => ({ option: v.title, count: waitingBy.get(v.id)! }));
@@ -124,6 +142,7 @@ export default async function EditProductPage({ params, searchParams }: { params
               </form>
             )}
           </section>
+          {product.sourceUrl && link && link.provider !== "email" && <BackupPanel productId={product.id} mainLabel={label!} backup={backup} />}
           <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="breaks-heading">
             <div>
               <h2 id="breaks-heading" className="font-semibold">Quantity discounts</h2>

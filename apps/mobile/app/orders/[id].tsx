@@ -25,7 +25,7 @@ type Detail = {
   paidAt: string | null;
   shippingAddress: { name: string; line1: string; line2?: string; city: string; region?: string; postalCode: string; country: string };
   lines: { title: string; quantity: number; unitPriceMinor: number }[];
-  fulfillments: { status: string; problemMessage: string | null; carrier: string | null; trackingNumber: string | null; trackingUrl: string | null }[];
+  fulfillments: { status: string; problemMessage: string | null; backupNote?: string | null; carrier: string | null; trackingNumber: string | null; trackingUrl: string | null }[];
   refunds: { amountMinor: number; reason: string | null; createdAt: string }[];
   refundableMinor: number;
   held?: boolean;
@@ -147,6 +147,10 @@ export default function OrderScreen() {
             {o.staffNote ? <Body>{o.staffNote}</Body> : null}
           </Card>
         </Section>
+      ) : null}
+
+      {o.fulfillments.some((x) => x.backupNote && x.status !== "cancelled") ? (
+        <Banner tone="info">{o.fulfillments.find((x) => x.backupNote && x.status !== "cancelled")!.backupNote}</Banner>
       ) : null}
 
       {o.fulfillments.some((x) => x.trackingNumber) ? (

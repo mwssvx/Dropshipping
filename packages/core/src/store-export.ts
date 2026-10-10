@@ -26,6 +26,14 @@ function supplierOf(link: typeof schema.suppliers.$inferSelect | undefined, prod
     : { provider: link.provider, product_ref: productRef };
 }
 
+/** The backup supplier's listing, with its options keyed by our option titles. */
+function backupOf(p: typeof schema.products.$inferSelect, links: (typeof schema.suppliers.$inferSelect)[], variants: (typeof schema.variants.$inferSelect)[]) {
+  const link = p.backup && links.find((l) => l.id === p.backup!.supplierId);
+  if (!p.backup || !link || link.provider === "email") return null;
+  const options = variants.filter((v) => v.productId === p.id && p.backup!.variants[v.id]).map((v) => [v.title, { ref: p.backup!.variants[v.id]!.ref, cost: p.backup!.variants[v.id]!.costMinor }]);
+  return { provider: link.provider, url: p.backup.sourceUrl, product_ref: p.backup.productRef, variants: Object.fromEntries(options) };
+}
+
 export async function exportStore(db: Db, shopId: string, now = new Date()) {
   const shop = await db.query.shops.findFirst({ where: eq(schema.shops.id, shopId) });
   if (!shop) throw new NotFoundError("Store");
@@ -101,6 +109,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       status: p.status,
       source_url: p.sourceUrl,
       supplier: p.supplierId ? supplierOf(supplierRows.find((s) => s.id === p.supplierId), p.supplierProductRef) : null,
+      backup: backupOf(p, supplierRows, variants),
       goes_well_with: p.upsellProductId ? (handleOf.get(p.upsellProductId) ?? null) : null,
       quantity_breaks: p.quantityBreaks.map((t) => ({ min_qty: t.minQty, percent_off: t.percentOff })),
       gift_card: p.giftCard,
@@ -257,6 +266,15 @@ const importSchema = z.object({
             // Own suppliers only.
             name: str(100).nullable().optional(),
             email: z.string().email().max(320).nullable().optional(),
+          })
+          .nullable()
+          .optional(),
+        backup: z
+          .object({
+            provider: z.enum(["fake", "cj", "aliexpress"]),
+            url: str(2000),
+            product_ref: str(200),
+            variants: z.record(str(200), z.object({ ref: str(200), cost: money })),
           })
           .nullable()
           .optional(),
@@ -453,7 +471,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
         })
         .returning({ id: schema.products.id });
       productIds.set(x.handle, row!.id);
-      await tx.insert(schema.variants).values(
+      const inserted = await tx.insert(schema.variants).values(
         x.variants.map((v, i) => ({
           productId: row!.id,
           title: v.title,
@@ -470,7 +488,22 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
           // Only one of the product's own photos.
           imageUrl: v.image_url && images.includes(v.image_url) ? v.image_url : null,
         })),
-      );
+      ).returning({ id: schema.variants.id, title: schema.variants.title });
+      // A backup only makes sense next to a supplier listing; its stock is read at the next check.
+      if (x.backup && provider && x.source_url) {
+        const [link] = await tx
+          .insert(schema.suppliers)
+          .values({ shopId, provider: x.backup.provider })
+          .onConflictDoUpdate({ target: [schema.suppliers.shopId, schema.suppliers.provider, schema.suppliers.contactEmail], set: { status: "connected" } })
+          .returning({ id: schema.suppliers.id });
+        const matched = inserted.flatMap((v) => (x.backup!.variants[v.title] ? [[v.id, { ref: x.backup!.variants[v.title]!.ref, costMinor: x.backup!.variants[v.title]!.cost, stock: 0 }] as const] : []));
+        if (matched.length) {
+          await tx
+            .update(schema.products)
+            .set({ backup: { supplierId: link!.id, sourceUrl: x.backup.url, productRef: x.backup.product_ref, variants: Object.fromEntries(matched), checkedAt: new Date(0).toISOString() } })
+            .where(eq(schema.products.id, row!.id));
+        }
+      }
     }
     for (const x of data.products) {
       const target = x.goes_well_with ? productIds.get(x.goes_well_with) : undefined;

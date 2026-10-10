@@ -196,6 +196,7 @@ const routes: Record<string, Handler> = {
       fulfillments: o.fulfillments.map((f) => ({
         status: f.status,
         problemMessage: f.problemMessage,
+        backupNote: f.backupNote,
         carrier: f.carrier,
         trackingNumber: f.trackingNumber,
         trackingUrl: f.trackingUrl,
