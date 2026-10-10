@@ -6,6 +6,7 @@ import { and, asc, count, eq, inArray, ne } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
+import { salePrice, salesFor } from "./sales";
 
 export const MAX_BUNDLES = 50;
 export const MAX_BUNDLE_PERCENT = 50;
@@ -130,12 +131,13 @@ export async function bundlesForProduct(db: Db, shopId: string, productId: strin
   const mine = all.filter((b) => b.productIds.includes(productId));
   if (!mine.length) return [];
   const ids = [...new Set(mine.flatMap((b) => b.productIds))];
-  const [products, variants] = await Promise.all([
+  const [products, variants, sales] = await Promise.all([
     db.query.products.findMany({
       where: and(eq(schema.products.shopId, shopId), inArray(schema.products.id, ids), eq(schema.products.status, "active"), eq(schema.products.giftCard, false)),
       columns: { id: true, handle: true, title: true, imageUrl: true },
     }),
     db.query.variants.findMany({ where: inArray(schema.variants.productId, ids), orderBy: asc(schema.variants.position) }),
+    salesFor(db, shopId, ids),
   ]);
   const byId = new Map<string, BundleProduct>(
     products.map((p) => [
@@ -144,7 +146,7 @@ export async function bundlesForProduct(db: Db, shopId: string, productId: strin
         ...p,
         variants: variants
           .filter((v) => v.productId === p.id)
-          .map((v) => ({ id: v.id, title: v.title, priceMinor: v.priceMinor, available: v.stock === null || v.stock > 0 })),
+          .map((v) => ({ id: v.id, title: v.title, priceMinor: salePrice(v.priceMinor, null, sales.get(p.id)).priceMinor, available: v.stock === null || v.stock > 0 })),
       },
     ]),
   );

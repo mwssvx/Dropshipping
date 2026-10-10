@@ -225,6 +225,13 @@
       "when": 1791609812396,
       "tag": "0031_m32_invoices",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1791611148386,
+      "tag": "0032_m33_sales",
+      "breakpoints": true
     }
   ]
 }

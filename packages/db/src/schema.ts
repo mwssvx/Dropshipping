@@ -1,4 +1,4 @@
-// Milestone 1 to 32 tables. Full target schema from the plan: ../schema-target.sql.
+// Milestone 1 to 33 tables. Full target schema from the plan: ../schema-target.sql.
 // Money is integer minor units plus a currency. Times are timestamptz.
 import { sql } from "drizzle-orm";
 import {
@@ -1277,5 +1277,32 @@ export const invoices = pgTable(
     uniqueIndex("invoices_refund_uq").on(t.refundId),
     index("invoices_shop_issued_idx").on(t.shopId, t.issuedAt),
     check("invoices_refund_when_credit", sql`(${t.kind} = 'credit_note') = (${t.refundId} is not null)`),
+  ],
+);
+
+// A sale: a percentage off everything, one collection, or chosen products, between two times.
+// Prices show the old price crossed out while it runs; it ends by itself. Overlapping sales
+// don't add up: a product gets the biggest one.
+export const sales = pgTable(
+  "sales",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    percentOff: integer("percent_off").notNull(),
+    scope: text("scope", { enum: ["all", "collection", "products"] }).notNull().default("all"),
+    collectionId: uuid("collection_id").references(() => collections.id, { onDelete: "cascade" }),
+    productIds: jsonb("product_ids").$type<string[]>().notNull().default([]),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    /** Null: runs until the merchant ends it. */
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("sales_shop_idx").on(t.shopId, t.startsAt),
+    check("sales_percent", sql`${t.percentOff} between 1 and 90`),
+    check("sales_ends_after_start", sql`${t.endsAt} is null or ${t.endsAt} > ${t.startsAt}`),
+    check("sales_collection_scope", sql`(${t.scope} = 'collection') = (${t.collectionId} is not null)`),
   ],
 );

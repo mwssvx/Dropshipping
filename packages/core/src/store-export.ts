@@ -13,6 +13,7 @@ import { parseTheme } from "./theme-doc";
 import { listShippingZones } from "./shipping";
 import { LANGUAGE_CODES, saveTranslation } from "./languages";
 import { createBundle, MAX_BUNDLES } from "./bundles";
+import { createSale, MAX_SALES } from "./sales";
 
 export const EXPORT_FORMAT = "storefront-store";
 
@@ -26,7 +27,7 @@ function supplierOf(link: typeof schema.suppliers.$inferSelect | undefined, prod
 export async function exportStore(db: Db, shopId: string, now = new Date()) {
   const shop = await db.query.shops.findFirst({ where: eq(schema.shops.id, shopId) });
   if (!shop) throw new NotFoundError("Store");
-  const [products, collections, links, pages, theme, discounts, supplierRows, posts, redirectRows, translationRows, bundleRows] = await Promise.all([
+  const [products, collections, links, pages, theme, discounts, supplierRows, posts, redirectRows, translationRows, bundleRows, saleRows] = await Promise.all([
     db.query.products.findMany({ where: eq(schema.products.shopId, shopId), orderBy: asc(schema.products.createdAt) }),
     db.query.collections.findMany({ where: eq(schema.collections.shopId, shopId), orderBy: asc(schema.collections.createdAt) }),
     db
@@ -43,6 +44,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
     db.query.redirects.findMany({ where: eq(schema.redirects.shopId, shopId), orderBy: asc(schema.redirects.fromPath) }),
     db.query.translations.findMany({ where: eq(schema.translations.shopId, shopId), orderBy: [asc(schema.translations.language), asc(schema.translations.kind)] }),
     db.query.bundles.findMany({ where: eq(schema.bundles.shopId, shopId), orderBy: asc(schema.bundles.createdAt) }),
+    db.query.sales.findMany({ where: eq(schema.sales.shopId, shopId), orderBy: asc(schema.sales.startsAt) }),
   ]);
   const variants = products.length
     ? await db.query.variants.findMany({ where: inArray(schema.variants.productId, products.map((p) => p.id)), orderBy: asc(schema.variants.position) })
@@ -142,6 +144,18 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
     })),
     redirects: redirectRows.map((r) => ({ from: r.fromPath, to: r.toPath })),
     bundles: bundleRows.map((b) => ({ title: b.title, products: b.productIds.map((id) => handleOf.get(id)).filter((h): h is string => !!h), percent_off: b.percentOff, active: b.active })),
+    // Sales that haven't ended; collections and products by handle.
+    sales: saleRows
+      .filter((x) => !x.endsAt || x.endsAt > new Date())
+      .map((x) => ({
+        title: x.title,
+        percent_off: x.percentOff,
+        scope: x.scope,
+        collection: x.collectionId ? (handleByKind.collection.get(x.collectionId) ?? null) : null,
+        products: x.productIds.map((id) => handleOf.get(id)).filter((h): h is string => !!h),
+        starts_at: x.startsAt.toISOString(),
+        ends_at: iso(x.endsAt),
+      })),
     // Products, collections and pages are matched by handle; the theme has none.
     translations: translationRows.flatMap((t) => {
       const ref = t.kind === "theme" ? null : handleByKind[t.kind].get(t.refId);
@@ -270,6 +284,20 @@ const importSchema = z.object({
   bundles: z
     .array(z.object({ title: str(80), products: z.array(handle).max(4), percent_off: z.number().int(), active: z.boolean().default(true) }))
     .max(MAX_BUNDLES)
+    .default([]),
+  sales: z
+    .array(
+      z.object({
+        title: str(60),
+        percent_off: z.number().int(),
+        scope: z.enum(["all", "collection", "products"]),
+        collection: handle.nullable(),
+        products: z.array(handle).max(200),
+        starts_at: z.string().datetime({ offset: true }),
+        ends_at: z.string().datetime({ offset: true }).nullable(),
+      }),
+    )
+    .max(MAX_SALES)
     .default([]),
   translations: z
     .array(
@@ -509,6 +537,27 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
         if (!(e instanceof UserError)) throw e;
       }
     }
+    // Sales too; any that don't fit (or ended since the file was made) are left out.
+    let salesAdded = 0;
+    if (data.sales.length) {
+      const collectionByHandle = new Map((await tx.query.collections.findMany({ where: eq(schema.collections.shopId, shopId), columns: { id: true, handle: true } })).map((x) => [x.handle, x.id]));
+      for (const x of data.sales) {
+        try {
+          await createSale(tx as unknown as Db, shopId, {
+            title: x.title,
+            percentOff: x.percent_off,
+            scope: x.scope,
+            collectionId: x.collection ? (collectionByHandle.get(x.collection) ?? null) : null,
+            productIds: x.products.map((h) => productIds.get(h)!).filter(Boolean),
+            startsAt: new Date(x.starts_at),
+            endsAt: x.ends_at ? new Date(x.ends_at) : null,
+          });
+          salesAdded++;
+        } catch (e) {
+          if (!(e instanceof UserError)) throw e;
+        }
+      }
+    }
     // Translations go through the same checks as the editor; any that don't fit are left out.
     let translationsAdded = 0;
     if (data.translations.length) {
@@ -534,6 +583,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
       redirects: redirectsAdded,
       translations: translationsAdded,
       bundles: bundlesAdded,
+      sales: salesAdded,
       theme: !!theme,
       currencyDiffers: typeof data.store.currency === "string" && data.store.currency !== shop.currency,
     };
