@@ -86,6 +86,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
                 <span>
                   {titles.get(i.variantId) ?? i.title} <span className="hint">× {i.quantity}</span>
                   {i.personalization && <span className="block hint">{i.personalization.map((p) => `${p.label}: ${p.value}`).join(" · ")}</span>}
+                  {i.preorderShipsBy && <span className="block hint">{t.preorderShipsBy(new Intl.DateTimeFormat(lang ?? "en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${i.preorderShipsBy}T12:00:00Z`)))}</span>}
                   {i.priceNote && <span className="block hint">{i.priceNote}</span>}
                 </span>
                 <span className="num">{money(shown.units[i.variantId]! * i.quantity)}</span>

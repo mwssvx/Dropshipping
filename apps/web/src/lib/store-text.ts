@@ -45,6 +45,9 @@ const en = {
   optional: "optional",
   personalizeHint: (n: number) => `Up to ${n} characters`,
   personalizeMissing: (labels: string) => `Add ${labels} on the product page, then remove this one.`,
+  preorder: "Pre-order",
+  preorderShipsBy: (date: string) => `Pre-order: ships by ${date}`,
+  preorderSome: (date: string) => `Sold-out options can be pre-ordered. They ship by ${date}.`,
   deliveryDetail: (processing: number, min: number, max: number) =>
     `${processing ? `Ships within ${processing} ${plural(processing, "day", "days")}` : "Ships the same day"}, then ${min === max ? min : `${min}–${max}`} days in transit.`,
   saved: "Saved",
@@ -265,6 +268,9 @@ const de: StoreText = {
   optional: "optional",
   personalizeHint: (n: number) => `Bis zu ${n} Zeichen`,
   personalizeMissing: (labels: string) => `Gib ${labels} auf der Produktseite ein und entferne diesen Artikel.`,
+  preorder: "Vorbestellen",
+  preorderShipsBy: (date: string) => `Vorbestellung: Versand bis ${date}`,
+  preorderSome: (date: string) => `Ausverkaufte Varianten können vorbestellt werden. Versand bis ${date}.`,
   deliveryDetail: (processing: number, min: number, max: number) =>
     `${processing ? `Versand innerhalb von ${processing} ${plural(processing, "Tag", "Tagen")}` : "Versand am selben Tag"}, dann ${min === max ? min : `${min}–${max}`} Tage unterwegs.`,
   saved: "Gemerkt",
@@ -478,6 +484,9 @@ const fr: StoreText = {
   optional: "facultatif",
   personalizeHint: (n: number) => `Jusqu'à ${n} caractères`,
   personalizeMissing: (labels: string) => `Ajoutez ${labels} sur la page du produit, puis retirez celui-ci.`,
+  preorder: "Précommander",
+  preorderShipsBy: (date: string) => `Précommande : expédié avant le ${date}`,
+  preorderSome: (date: string) => `Les options épuisées peuvent être précommandées. Expédition avant le ${date}.`,
   deliveryDetail: (processing: number, min: number, max: number) =>
     `${processing ? `Expédié sous ${processing} ${plural(processing, "jour", "jours")}` : "Expédié le jour même"}, puis ${min === max ? min : `${min} à ${max}`} jours de transport.`,
   saved: "Enregistré",
@@ -691,6 +700,9 @@ const es: StoreText = {
   optional: "opcional",
   personalizeHint: (n: number) => `Hasta ${n} caracteres`,
   personalizeMissing: (labels: string) => `Añade ${labels} en la página del producto y quita este.`,
+  preorder: "Reservar",
+  preorderShipsBy: (date: string) => `Reserva: se envía antes del ${date}`,
+  preorderSome: (date: string) => `Las opciones agotadas se pueden reservar. Se envían antes del ${date}.`,
   deliveryDetail: (processing: number, min: number, max: number) =>
     `${processing ? `Se envía en ${processing} ${plural(processing, "día", "días")}` : "Se envía el mismo día"}, luego ${min === max ? min : `${min} a ${max}`} días en tránsito.`,
   saved: "Guardado",
@@ -904,6 +916,9 @@ const it: StoreText = {
   optional: "facoltativo",
   personalizeHint: (n: number) => `Fino a ${n} caratteri`,
   personalizeMissing: (labels: string) => `Aggiungi ${labels} nella pagina del prodotto, poi rimuovi questo.`,
+  preorder: "Preordina",
+  preorderShipsBy: (date: string) => `Preordine: spedito entro il ${date}`,
+  preorderSome: (date: string) => `Le opzioni esaurite si possono preordinare. Spedizione entro il ${date}.`,
   deliveryDetail: (processing: number, min: number, max: number) =>
     `${processing ? `Spedito entro ${processing} ${plural(processing, "giorno", "giorni")}` : "Spedito in giornata"}, poi ${min === max ? min : `${min}–${max}`} giorni di viaggio.`,
   saved: "Salvato",
@@ -1117,6 +1132,9 @@ const nl: StoreText = {
   optional: "optioneel",
   personalizeHint: (n: number) => `Tot ${n} tekens`,
   personalizeMissing: (labels: string) => `Vul ${labels} in op de productpagina en verwijder dit artikel.`,
+  preorder: "Pre-order",
+  preorderShipsBy: (date: string) => `Pre-order: verzonden vóór ${date}`,
+  preorderSome: (date: string) => `Uitverkochte opties kun je pre-orderen. Verzonden vóór ${date}.`,
   deliveryDetail: (processing: number, min: number, max: number) =>
     `${processing ? `Verzonden binnen ${processing} ${plural(processing, "dag", "dagen")}` : "Dezelfde dag verzonden"}, daarna ${min === max ? min : `${min}–${max}`} dagen onderweg.`,
   saved: "Bewaard",

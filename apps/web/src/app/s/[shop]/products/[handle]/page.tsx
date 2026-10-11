@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, formatDeliveryWindow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, wholesaleTermsFor } from "@sf/core";
+import { bundlesForProduct, formatDeliveryWindow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, wholesaleTermsFor, openPreorder, preordersSold } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { RecentlyViewed } from "@/components/RecentlyViewed";
 import { RememberView } from "@/components/RememberView";
@@ -82,6 +82,10 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const { shop, product } = await load(shopHandle, handle);
   const buyable = product.variants.filter((x) => x.stock === null || x.stock > 0);
   const v = buyable[0] ?? product.variants[0];
+  // Pre-orders keep sold-out options buyable until the date passes or the limit is reached.
+  const pre = openPreorder(product);
+  const preorder = pre && (pre.limit == null || (await preordersSold(await db(), product.id)) < pre.limit) ? pre : null;
+  const orderable = preorder ? product.variants : buyable;
   const many = product.variants.length > 1;
   // Pick each option (Size, Color) on its own when every variant names the same options.
   const defs = optionDefsOf(product.variants);
@@ -116,6 +120,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const delivery = buyable.length ? await productDelivery(await db(), shop, product.id, { country: await buyerCountry() }) : null;
   const lang = (await storeLang(shopHandle)) ?? "en-US";
   const dayFormat = new Intl.DateTimeFormat(lang, { month: "short", day: "numeric", timeZone: "UTC" });
+  const shipsBy = (d: string) => new Intl.DateTimeFormat(lang, { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
   const jsonLd = JSON.stringify(productJsonLd(product, shop.currency, reviews)).replace(/</g, "\\u003c");
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-10 md:grid-cols-2">
@@ -159,12 +164,12 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
             </ul>
           </section>
         )}
-        {v && buyable.length > 0 && (
+        {v && orderable.length > 0 && (
           <form action={addToCartAction.bind(null, shopHandle)} className="flex flex-col gap-4">
             {byOption ? (
               <OptionPicker
                 options={defs}
-                variants={product.variants.map((x) => ({ id: x.id, title: x.title, options: x.options ?? {}, available: x.stock === null || x.stock > 0, imageUrl: x.imageUrl }))}
+                variants={product.variants.map((x) => ({ id: x.id, title: x.title, options: x.options ?? {}, available: !!preorder || x.stock === null || x.stock > 0, imageUrl: x.imageUrl }))}
                 initialId={v.id}
                 prices={Object.fromEntries(product.variants.map((x) => [x.id, <Price key={x.id} minor={x.priceMinor} compareAt={x.compareAtMinor} currency={shop.currency} fx={fx} />]))}
                 soldOutLabel={t.soldOut}
@@ -174,7 +179,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                 <legend className="label mb-2">{t.option}</legend>
                 <div className="flex flex-wrap gap-2">
                   {product.variants.map((x) => {
-                    const out = x.stock !== null && x.stock <= 0;
+                    const out = !preorder && x.stock !== null && x.stock <= 0;
                     return (
                       <label key={x.id} className={`chip ${out ? "opacity-50 line-through" : ""}`}>
                         <input type="radio" name="variantId" value={x.id} defaultChecked={x.id === v.id} disabled={out} className="sr-only peer" data-photo={x.imageUrl ?? undefined} />
@@ -206,10 +211,15 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
             ) : (
               <input type="hidden" name="quantity" value="1" />
             )}
-            <SubmitButton className="btn btn-primary btn-lg" pendingText={t.adding}>{t.addToCart}</SubmitButton>
+            {preorder && soldOut.length > 0 && (
+              <p className="text-sm font-medium" role="note">
+                {buyable.length === 0 ? t.preorderShipsBy(shipsBy(preorder.shipsBy)) : t.preorderSome(shipsBy(preorder.shipsBy))}
+              </p>
+            )}
+            <SubmitButton className="btn btn-primary btn-lg" pendingText={t.adding}>{preorder && buyable.length === 0 ? t.preorder : t.addToCart}</SubmitButton>
           </form>
         )}
-        {v && buyable.length === 0 && <p className="banner banner-info">{t.soldOutForNow}</p>}
+        {v && orderable.length === 0 && <p className="banner banner-info">{t.soldOutForNow}</p>}
         {delivery && (
           <p id="delivery-estimate" className="text-sm flex flex-col gap-0.5">
             <span className="font-medium">{t.arrives(formatDeliveryWindow(delivery, (d) => dayFormat.format(d)), new Intl.DisplayNames([lang], { type: "region" }).of(delivery.country) ?? delivery.country)}</span>

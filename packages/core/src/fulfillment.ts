@@ -13,6 +13,7 @@ import { earnPoints } from "./rewards";
 import { issueInvoice } from "./invoices";
 import { checkOrderRisk } from "./risk";
 import { describePersonalization } from "./personalization";
+import { formatShipsBy, preorderWaitingOn } from "./preorders";
 
 /** A personalised item's text, under it in emails. */
 const personalised = (l: { personalization: PersonalizationValue[] | null }) => (l.personalization ? [`    ${describePersonalization(l.personalization)}`] : []);
@@ -66,6 +67,8 @@ export async function routeOrder(ctx: FulfillmentContext, orderId: string) {
   if (!order) throw new NotFoundError("Order");
   if (order.paymentStatus !== "paid") return { placed: 0, failed: 0, skipped: "not_paid" as const };
   if (order.heldAt) return { placed: 0, failed: 0, skipped: "held" as const };
+  // A pre-order waits until what was pre-ordered is back in stock; the daily job tries again.
+  if (order.preorderShipsBy && (await preorderWaitingOn(db, order.id)).length) return { placed: 0, failed: 0, skipped: "preorder" as const };
 
   const lines = await db
     .select({ line: schema.orderLines, variant: schema.variants, product: schema.products })
@@ -414,6 +417,8 @@ export async function routeStuckOrders(ctx: FulfillmentContext, olderThanMs = 2 
         lt(schema.orders.paidAt, cutoff),
         isNull(schema.orders.heldAt),
         isNull(schema.fulfillments.id),
+        // Pre-orders still waiting for stock aren't stuck; they go once it's back.
+        sql`not exists (select 1 from ${schema.orderLines} ol join ${schema.variants} v on v.id = ol.variant_id where ol.order_id = ${schema.orders.id} and ol.preorder and v.stock is not null and v.stock <= 0)`,
       ),
     )
     .limit(100);
@@ -599,6 +604,7 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
           ? [`Paid with gift card: ${formatMoney(paid.giftCardMinor, paid.currency)}`, ...(paid.chargedMinor ? [`Paid by card: ${formatMoney(paid.chargedMinor, paid.currency)}`] : [])]
           : []),
         ...(invoice ? [``, `Your invoice ${invoice.number}: ${link}/invoice`] : []),
+        ...(order.preorderShipsBy ? [``, `Pre-order: it ships by ${formatShipsBy(order.preorderShipsBy)}. We'll email tracking as soon as it's on its way.`] : []),
         ...(arrives ? [``, `Expected delivery: ${formatDeliveryWindow(arrives)}.`] : []),
         ...(order.gift
           ? [

@@ -102,7 +102,10 @@ export async function orderDelivery(db: Db, shop: Shop, order: Order) {
   const lastShipped = shipped.map((f) => f.shippedAt?.getTime() ?? 0).reduce((a, b) => Math.max(a, b), 0);
   // Fully shipped: only transit is left. Otherwise count from payment.
   const allShipped = order.fulfillmentStatus === "shipped" && lastShipped > 0;
-  return allShipped ? deliveryWindow(new Date(lastShipped), 0, transit.min, transit.max) : deliveryWindow(order.paidAt, shop.processingDays, transit.min, transit.max);
+  if (allShipped) return deliveryWindow(new Date(lastShipped), 0, transit.min, transit.max);
+  // A pre-order waiting for stock is counted from the date it's promised to ship by.
+  if (order.preorderShipsBy && order.fulfillmentStatus === "unfulfilled") return deliveryWindow(order.preorderShipsBy, 0, transit.min, transit.max);
+  return deliveryWindow(order.paidAt, shop.processingDays, transit.min, transit.max);
 }
 
 const short = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
