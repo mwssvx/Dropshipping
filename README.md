@@ -471,3 +471,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **How each supplier is doing**: Admin → Suppliers shows, for the last 90 days of orders, how many each supplier took, how many it couldn't, the typical days to ship and to arrive (the middle order's, from when it was placed), and how many orders had a problem it caused: never arrived, damaged, wrong or not as described, or replaced for free (`supplierScorecard` in `packages/core/src/supplier-scores.ts`). A buyer changing their mind doesn't count.
 2. **A plain grade**: Good, Watch or Poor, decided by the worst measure (more than 5% or 10% couldn't take, more than 2% or 5% problems, more than 4 or 7 days to ship), and "Too few orders" under 5 (`gradeSupplier`).
 3. **What to do**: it lists orders a supplier hasn't shipped a week after they were placed, and for a supplier graded Watch or Poor, how many of its products have no backup supplier to fall back on.
+
+### Orders as a spreadsheet (after launch, part 59)
+
+1. **Download CSV**: Admin → Orders → "Download as a spreadsheet" gives the orders shown (search, tag and "Needs attention" or "On hold" apply), optionally between two dates, oldest first (`ordersCsv` in `packages/core/src/order-export.ts`, route `/admin/orders/export.csv`).
+2. **One row per item**: each row has the order's number, dates, buyer, shipping address, statuses and money (subtotal, discount, shipping, tax, total, refunded), then the item, quantity, unit price, whether it was a pre-order and any personalisation, plus tracking, tags and both notes. Cells that a spreadsheet would run as a formula are defused.

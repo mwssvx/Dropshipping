@@ -57,6 +57,24 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             ))}
           </nav>
         )}
+        <details className="text-sm">
+          <summary className="cursor-pointer underline w-fit">Download as a spreadsheet</summary>
+          <form method="get" action="/admin/orders/export.csv" className="flex flex-wrap items-end gap-3 mt-3" aria-label="Download orders">
+            <div className="field">
+              <label className="label" htmlFor="export-from">From</label>
+              <input className="input" id="export-from" name="from" type="date" />
+            </div>
+            <div className="field">
+              <label className="label" htmlFor="export-to">To</label>
+              <input className="input" id="export-to" name="to" type="date" />
+            </div>
+            {show && <input type="hidden" name="show" value={show} />}
+            {q && <input type="hidden" name="q" value={q} />}
+            {tag && <input type="hidden" name="tag" value={tag} />}
+            <button className="btn btn-secondary">Download CSV</button>
+            <p className="hint w-full">One row per item, with the orders shown above{filtered || show ? " (your filters apply)" : ""}. Leave the dates empty for all of them.</p>
+          </form>
+        </details>
         {heldOnly && (
           <section className="card p-5 flex flex-col gap-3" aria-labelledby="risk-settings">
             <h2 id="risk-settings" className="font-semibold">Risk check</h2>

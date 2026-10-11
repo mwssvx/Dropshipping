@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { schema, type Address, type Db } from "@sf/db";
 import { z } from "zod";
 import { applyDisputeEvent } from "./disputes";
@@ -563,7 +563,7 @@ export async function handlePaymentEvent(db: Db, provider: string, event: Paymen
 export async function listOrders(
   db: Db,
   shopId: string,
-  filter: { fulfillmentStatus?: Order["fulfillmentStatus"]; held?: boolean; tag?: string; query?: string } = {},
+  filter: { fulfillmentStatus?: Order["fulfillmentStatus"]; held?: boolean; tag?: string; query?: string; from?: Date; to?: Date } = {},
 ) {
   const tag = filter.tag?.trim().toLowerCase();
   // "1042", "#1042", a name or an email.
@@ -580,6 +580,9 @@ export async function listOrders(
           ? eq(schema.orders.number, Number(q))
           : sql`(lower(${schema.orders.email}) like ${`%${q}%`} or lower(${schema.orders.shippingAddress}->>'name') like ${`%${q}%`})`
         : undefined,
+      // Placed in this range (from inclusive, to exclusive).
+      filter.from ? gte(schema.orders.createdAt, filter.from) : undefined,
+      filter.to ? lt(schema.orders.createdAt, filter.to) : undefined,
     ),
     orderBy: desc(schema.orders.number),
   });
