@@ -555,3 +555,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Last by default**: collections, search and the home page's product grids list products nobody can order right now after everything that can be bought, whatever the sort, each part keeping its order (`placeSoldOut` in `packages/core/src/badges.ts`, applied in `browseProducts` and `storefrontCatalog`). A product open for pre-order counts as available.
 2. **Or hidden, or left where they are**: Admin → Products → Sold-out products (`shops.sold_out_products`: `last`, `hide` or `show`). A hidden product's own page still works, so saved links and back-in-stock alerts keep working.
 3. Store files carry the setting.
+
+### What shoppers search for (after launch, part 74)
+
+1. **Counted by word and day**: each plain search on the store adds to a count for its words that day, with how many products it found (`recordSearch` in `packages/core/src/search-terms.ts`, table `search_terms`). Re-sorting or filtering a search isn't counted again.
+2. **Private by design**: only the words are kept, never who searched, and anything that looks like an email address or a number of six or more digits isn't kept at all. Counts older than about 13 months are deleted with old visitor events.
+3. **On the Analytics page**: the most searched words for the period, with how many results each found last, and the ones that found nothing, apart, since they point at products to add or words to use in titles (`searchReport`). Each opens that search on the store.

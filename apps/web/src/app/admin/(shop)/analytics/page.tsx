@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { analyticsReport, formatMoney } from "@sf/core";
-import { requireShop } from "@/lib/server";
+import { analyticsReport, formatMoney, searchReport } from "@sf/core";
+import { requireShop, storeAddress } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 
 export const metadata = { title: "Analytics" };
@@ -14,7 +14,9 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const days = RANGES.find((d) => String(d) === wanted) ?? 30;
   const now = new Date();
   const to = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) + DAY;
-  const r = await analyticsReport(db, shop.id, { from: new Date(to - days * DAY), to: new Date(to) });
+  const range = { from: new Date(to - days * DAY), to: new Date(to) };
+  const [r, searches, store] = await Promise.all([analyticsReport(db, shop.id, range), searchReport(db, shop.id, range), storeAddress(shop)]);
+  const searchLink = (term: string) => `${store}/search?q=${encodeURIComponent(term)}`;
   const money = (m: number) => formatMoney(m, shop.currency);
   const pct = (x: number | null) => (x === null ? "–" : `${(x * 100).toFixed(x < 0.1 ? 1 : 0)}%`);
   const top = Math.max(1, ...r.days.map((d) => d.salesMinor));
@@ -138,6 +140,54 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
             </div>
           ) : (
             <p className="hint">Your best sellers show here after your first sales.</p>
+          )}
+        </section>
+
+        <section className="card p-5 flex flex-col gap-3" aria-labelledby="searches-heading">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 id="searches-heading" className="font-semibold">What shoppers search for</h2>
+            {searches.searches > 0 && (
+              <p className="hint text-sm">
+                {searches.searches === 1 ? "1 search" : `${searches.searches.toLocaleString("en-US")} searches`}, {pct(searches.nothingShare)} found nothing
+              </p>
+            )}
+          </div>
+          {searches.searches === 0 ? (
+            <p className="hint">Words shoppers type into your store&apos;s search box show here. Only the words are kept, never who searched.</p>
+          ) : (
+            <div className="grid gap-6 sm:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <h3 className="text-sm font-medium">Most searched</h3>
+                <ol className="text-sm flex flex-col gap-1" aria-label="Most searched">
+                  {searches.top.map((s) => (
+                    <li key={s.term} className="flex justify-between gap-3">
+                      <a href={searchLink(s.term)} target="_blank" rel="noreferrer" className="hover:underline truncate">{s.term}</a>
+                      <span className="num hint shrink-0">{s.searches} · {s.results === 1 ? "1 result" : `${s.results} results`}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+              <div className="flex flex-col gap-2">
+                <h3 className="text-sm font-medium">Found nothing</h3>
+                {searches.nothing.length ? (
+                  <>
+                    <ol className="text-sm flex flex-col gap-1" aria-label="Found nothing">
+                      {searches.nothing.map((s) => (
+                        <li key={s.term} className="flex justify-between gap-3">
+                          <a href={searchLink(s.term)} target="_blank" rel="noreferrer" className="hover:underline truncate">{s.term}</a>
+                          <span className="num hint shrink-0">{s.searches === 1 ? "1 search" : `${s.searches} searches`}</span>
+                        </li>
+                      ))}
+                    </ol>
+                    <p className="hint text-xs">
+                      Shoppers wanted these and left empty-handed. Add a product they&apos;d buy, or use their words in a product&apos;s title or description.
+                    </p>
+                  </>
+                ) : (
+                  <p className="hint text-sm">Every search found something.</p>
+                )}
+              </div>
+            </div>
           )}
         </section>
       </div>

@@ -1069,6 +1069,21 @@ export const storefrontEvents = pgTable(
   (t) => [index("storefront_events_shop_idx").on(t.shopId, t.createdAt), index("storefront_events_product_idx").on(t.productId)],
 );
 
+// What shoppers typed in the store's search box: one row per store, word and day, with how many
+// results the last search found. No visitor is recorded, only the words.
+export const searchTerms = pgTable(
+  "search_terms",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    term: text("term").notNull(),
+    day: date("day", { mode: "string" }).notNull(),
+    searches: integer("searches").notNull().default(1),
+    results: integer("results").notNull().default(0),
+  },
+  (t) => [uniqueIndex("search_terms_shop_term_day_uq").on(t.shopId, t.term, t.day), index("search_terms_shop_day_idx").on(t.shopId, t.day)],
+);
+
 // Keys for the public REST API. Only a hash is stored; the key is shown once when created.
 export const apiKeys = pgTable(
   "api_keys",
