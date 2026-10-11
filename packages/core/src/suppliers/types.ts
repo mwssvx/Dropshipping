@@ -28,7 +28,8 @@ export type PlaceOrderInput = {
   reference: string;
   email: string;
   address: Address;
-  lines: { variantRef: string; quantity: number }[];
+  /** `note` is the buyer's personalisation for that item, like "Name to engrave: Ada". */
+  lines: { variantRef: string; quantity: number; note?: string }[];
 };
 
 export type Tracking = {

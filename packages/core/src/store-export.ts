@@ -118,6 +118,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       backup: backupOf(p, supplierRows, variants),
       goes_well_with: p.upsellProductId ? (handleOf.get(p.upsellProductId) ?? null) : null,
       quantity_breaks: p.quantityBreaks.map((t) => ({ min_qty: t.minQty, percent_off: t.percentOff })),
+      personalization: p.personalization.map((f) => ({ label: f.label, required: f.required, max_length: f.maxLength })),
       gift_card: p.giftCard,
       variants: variants
         .filter((v) => v.productId === p.id)
@@ -293,6 +294,10 @@ const importSchema = z.object({
         gift_card: z.boolean().optional(),
         quantity_breaks: z
           .array(z.object({ min_qty: z.number().int().min(2).max(99), percent_off: z.number().int().min(1).max(80) }))
+          .max(3)
+          .optional(),
+        personalization: z
+          .array(z.object({ label: str(40), required: z.boolean(), max_length: z.number().int().min(1).max(200) }))
           .max(3)
           .optional(),
         variants: z
@@ -479,6 +484,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
           supplierProductRef: provider ? (x.supplier?.product_ref ?? null) : null,
           quantityBreaks: (x.quantity_breaks ?? []).map((t) => ({ minQty: t.min_qty, percentOff: t.percent_off })).sort((a, b) => a.minQty - b.minQty),
           giftCard: x.gift_card ?? false,
+          personalization: (x.personalization ?? []).map((f, i) => ({ id: `f${i + 1}`, label: f.label, required: f.required, maxLength: f.max_length })),
         })
         .returning({ id: schema.products.id });
       productIds.set(x.handle, row!.id);

@@ -144,7 +144,7 @@ export async function setProductSupplier(db: Db, shopId: string, productId: stri
 /** The order's items that this supplier sends. */
 async function itemsFor(db: Db, orderId: string, supplierId: string) {
   return db
-    .select({ title: schema.orderLines.title, quantity: schema.orderLines.quantity, sku: schema.variants.sku })
+    .select({ title: schema.orderLines.title, quantity: schema.orderLines.quantity, sku: schema.variants.sku, personalization: schema.orderLines.personalization })
     .from(schema.orderLines)
     .innerJoin(schema.variants, eq(schema.variants.id, schema.orderLines.variantId))
     .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
@@ -169,7 +169,10 @@ export async function sendPurchaseOrder(ctx: FulfillmentContext, link: SupplierL
     `${shop.name} has a new order for you to send.`,
     ``,
     `Order ${ref}`,
-    ...items.map((i) => `  ${i.quantity} × ${i.title}${i.sku ? `  (SKU ${i.sku})` : ""}`),
+    ...items.flatMap((i) => [
+      `  ${i.quantity} × ${i.title}${i.sku ? `  (SKU ${i.sku})` : ""}`,
+      ...(i.personalization ?? []).map((p) => `      ${p.label}: "${p.value}"`),
+    ]),
     ``,
     `Ship to:`,
     ...addressLines(order.shippingAddress).map((l) => `  ${l}`),

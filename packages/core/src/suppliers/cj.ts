@@ -152,6 +152,8 @@ export class CjSupplier implements SupplierAdapter {
       logisticName: cheapest.logisticName,
       fromCountryCode: "CN",
       products,
+      // CJ takes one note per order; personalised items are listed by their variant id.
+      ...(input.lines.some((l) => l.note) ? { remark: input.lines.filter((l) => l.note).map((l) => `${l.variantRef}: ${l.note}`).join("\n").slice(0, 500) } : {}),
     });
     return { supplierOrderRef: order.orderId };
   }

@@ -71,3 +71,4 @@ export * from "./bulk-edit";
 export * from "./profit";
 export * from "./backups";
 export * from "./post-purchase";
+export * from "./personalization";
