@@ -536,3 +536,10 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Automatic badges**: product cards show how much is off ("-20%", rounded down) when a product is on sale, "Sold out" when nothing can be ordered (an open pre-order counts as orderable), and "New" for a number of days after a product was added (`cardBadges` in `packages/core/src/badge-rules.ts`, `shops.product_badges`). Admin → Products → Badges turns each on or off; sale and sold out are on, "New" is off until the merchant picks a number of days.
 2. **The merchant's own**: any product can have a short label of up to 20 characters, like "Bestseller" (`setProductBadge`, `products.badge`). It comes first on the card and also shows above the title on the product page, with "New".
 3. Cards show two badges at most, in the buyer's language, and the theme editor's preview shows them too. Store files carry both settings.
+
+### Photo descriptions (after launch, part 71)
+
+1. **Describe each photo**: under a product's photos, the merchant writes what each one shows, up to 125 characters (`setPhotoTexts` in `packages/core/src/gallery.ts`, `products.image_alts`, kept by photo address). The store's gallery uses it as the photo's alt text, which screen readers read out and image search indexes; a photo without one is described by the product's name and its place ("photo 2 of 3"), as before.
+2. **Moves with the photo**: the description follows its photo when it's reordered or becomes the main one, and goes when the photo is removed.
+3. **Search listings**: the page lists products on sale that have photos with no description, apart from the listing problems, since most supplier products start without them.
+4. **Moving in**: Shopify's "Image Alt Text" comes across with the products file, and store files carry descriptions both ways.

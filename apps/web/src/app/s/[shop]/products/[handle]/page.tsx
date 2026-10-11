@@ -147,7 +147,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-10 md:grid-cols-2">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
-      <ProductGallery title={product.title} photos={[...new Set([...productPhotos(product), ...product.variants.flatMap((x) => (x.imageUrl ? [x.imageUrl] : []))])]} video={parseVideo(product.videoUrl)} text={{ video: t.productVideo, play: t.playVideo }} />
+      <ProductGallery title={product.title} alts={product.imageAlts} photos={[...new Set([...productPhotos(product), ...product.variants.flatMap((x) => (x.imageUrl ? [x.imageUrl] : []))])]} video={parseVideo(product.videoUrl)} text={{ video: t.productVideo, play: t.playVideo }} />
       <div className="flex flex-col gap-5">
         <Track shopId={shop.id} kind="product_view" productId={product.id} />
         {tracking && v && <PixelEvent name="view_item" data={{ ids: [v.id], value: pixelPrices[v.id]!, currency: shop.currency }} />}

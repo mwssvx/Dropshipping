@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { editProductPhotos, saveMedia, setVariantPhotos, UserError, type PhotoEdit } from "@sf/core";
+import { editProductPhotos, saveMedia, setPhotoTexts, setVariantPhotos, UserError, type PhotoEdit } from "@sf/core";
 import { adminUrl, requireShop } from "@/lib/server";
 
 export type PhotoState = { error?: string; message?: string; url?: string };
@@ -62,4 +62,22 @@ export async function variantPhotosAction(productId: string, option: string | nu
   revalidatePath(`/admin/products/${productId}`);
   revalidatePath(`/s/${shop.handle}`, "layout");
   return { message: "Saved. Buyers see that photo when they pick it." };
+}
+
+export type PhotoTextState = { error?: string; described?: number };
+
+/** Saves what each photo shows. Fields are text:<photo number>, one per photo in order. */
+export async function photoTextAction(productId: string, count: number, _: PhotoTextState, form: FormData): Promise<PhotoTextState> {
+  const { shop, db } = await requireShop("products");
+  let described: number;
+  try {
+    described = await setPhotoTexts(db, shop.id, productId, Array.from({ length: count }, (_, i) => String(form.get(`text:${i}`) ?? "")));
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath(`/admin/products/${productId}`);
+  revalidatePath("/admin/seo");
+  revalidatePath(`/s/${shop.handle}`, "layout");
+  return { described };
 }

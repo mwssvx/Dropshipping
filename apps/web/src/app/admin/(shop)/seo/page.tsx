@@ -41,6 +41,24 @@ export default async function SeoPage() {
             </ul>
           </>
         )}
+        {report.undescribed.length > 0 && (
+          <section className="card p-4 flex flex-col gap-2" aria-labelledby="photo-text-heading">
+            <h2 id="photo-text-heading" className="font-semibold">Photos with no description</h2>
+            <p className="text-sm hint">
+              A sentence about what each photo shows helps your products turn up in image search, and buyers who use a screen reader hear it instead of
+              just the product&apos;s name.
+            </p>
+            <ul className="text-sm flex flex-col gap-1">
+              {report.undescribed.slice(0, 25).map((p) => (
+                <li key={p.id}>
+                  <Link href={`/admin/products/${p.id}#photos-heading`} className="underline">{p.title}</Link>{" "}
+                  <span className="hint">({p.photos === 1 ? "1 photo" : `${p.photos} photos`})</span>
+                </li>
+              ))}
+            </ul>
+            {report.undescribed.length > 25 && <p className="text-sm hint">And {report.undescribed.length - 25} more.</p>}
+          </section>
+        )}
       </div>
     </main>
   );

@@ -3,9 +3,10 @@ import { useActionState } from "react";
 import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import { photoAction } from "../../../photo-actions";
+import { PhotoTextForm } from "./PhotoTextForm";
 
 /** The product's photos in order, with buttons to reorder, remove and add. The first is the main photo. */
-export function PhotosPanel({ productId, title, photos, max }: { productId: string; title: string; photos: string[]; max: number }) {
+export function PhotosPanel({ productId, title, photos, texts, max, textMax }: { productId: string; title: string; photos: string[]; texts: Record<string, string>; max: number; textMax: number }) {
   const [state, action] = useActionState(photoAction.bind(null, productId), {});
   const full = photos.length >= max;
   return (
@@ -22,7 +23,7 @@ export function PhotosPanel({ productId, title, photos, max }: { productId: stri
           {photos.map((src, i) => (
             <li key={src} className="flex flex-col gap-2">
               <div className="relative aspect-square rounded-lg bg-sunken overflow-hidden border border-border">
-                <img src={src} alt={`${title}, photo ${i + 1}`} className="size-full object-cover" />
+                <img src={src} alt={texts[src] || `${title}, photo ${i + 1}`} className="size-full object-cover" />
                 {i === 0 && <span className="pill pill-info absolute top-2 left-2">Main</span>}
               </div>
               <div className="flex flex-wrap gap-1 text-xs">
@@ -38,6 +39,7 @@ export function PhotosPanel({ productId, title, photos, max }: { productId: stri
       ) : (
         <p className="hint">No photos yet. Products with photos sell much better.</p>
       )}
+      {photos.length > 0 && <PhotoTextForm productId={productId} title={title} photos={photos} texts={texts} max={textMax} />}
       {full ? (
         <p className="hint">That&apos;s the most photos a product can have. Remove one to add another.</p>
       ) : (

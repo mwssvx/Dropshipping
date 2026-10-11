@@ -6,6 +6,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
+import { productPhotos } from "./gallery";
 
 type Product = typeof schema.products.$inferSelect;
 
@@ -83,5 +84,10 @@ export async function seoReport(db: Db, shopId: string) {
   }
   const rows = products.map((p) => ({ id: p.id, title: p.title, listing: productSearchListing(p), issues: seoIssuesOf(p, titles) }));
   const needsWork = rows.filter((r) => r.issues.length).sort((a, b) => b.issues.length - a.issues.length);
-  return { checked: rows.length, fine: rows.length - needsWork.length, products: needsWork };
+  // Photos with no description are listed apart: most supplier products start that way, and it
+  // shouldn't hide the listings that look bad in results.
+  const undescribed = products
+    .map((p) => ({ id: p.id, title: p.title, photos: productPhotos(p).filter((url) => !p.imageAlts?.[url]).length }))
+    .filter((p) => p.photos > 0);
+  return { checked: rows.length, fine: rows.length - needsWork.length, products: needsWork, undescribed };
 }
