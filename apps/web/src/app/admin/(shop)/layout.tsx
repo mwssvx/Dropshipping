@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { can, countCostAlerts, countNeedsYou, countOpenDisputes, countPendingReviews, countOpenReturns, countPendingWholesale, listPendingActions, waitingQuestions, listRequirements, openNotices, ROLES, type Area } from "@sf/core";
+import { activeClosure, can, countCostAlerts, countNeedsYou, countOpenDisputes, countPendingReviews, countOpenReturns, countPendingWholesale, listPendingActions, waitingQuestions, listRequirements, openNotices, ROLES, type Area } from "@sf/core";
 import { requireShop, storeAddress } from "@/lib/server";
 import { BRAND } from "@/lib/brand";
 import { switchShopAction } from "../actions";
@@ -24,6 +24,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const approvals = pending.filter((p) => !("message_id" in p.input)).length;
   const pause = notices.find((n) => n.kind === "paused");
   const warning = notices.find((n) => n.kind === "warning");
+  const closure = activeClosure(shop);
   const holds = show("money") ? requirements.filter((r) => r.holdsPayouts).length : 0;
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[232px_1fr]">
@@ -76,6 +77,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           {show("reviews") && <NavLink href="/admin/questions">Questions{questions ? <span className="ml-2 pill pill-info">{questions}</span> : null}</NavLink>}
           {show("theme") && <span className="hidden lg:block px-3 pt-4 pb-1 text-xs font-semibold text-muted uppercase tracking-wide">Online store</span>}
           {show("theme") && <NavLink href="/admin/theme">Theme</NavLink>}
+          {show("theme") && <NavLink href="/admin/store-status">Store status{closure ? <span className="ml-2 pill pill-warning">{closure.mode === "password" ? "Password" : "Break"}</span> : null}</NavLink>}
           {show("pages") && <NavLink href="/admin/pages">Pages</NavLink>}
           {show("pages") && <NavLink href="/admin/blog">Blog</NavLink>}
           {show("domains") && <NavLink href="/admin/domains">Domains</NavLink>}
@@ -108,6 +110,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         ) : warning ? (
           <Link href="/admin/trust" className="block banner banner-warning rounded-none px-4 sm:px-8">
             <span className="font-semibold">{warning.title}.</span> Fix it{warning.dueBy ? ` by ${warning.dueBy.toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""} to keep selling as normal →
+          </Link>
+        ) : closure ? (
+          <Link href="/admin/store-status" className="block banner banner-info rounded-none px-4 sm:px-8">
+            <span className="font-semibold">{closure.mode === "password" ? "Your store is behind a password." : "Your store is on a break, so buyers can't check out."}</span>
+            {closure.until ? ` It opens again on ${new Date(`${closure.until}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}.` : ""} Change →
           </Link>
         ) : null}
         {children}

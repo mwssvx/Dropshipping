@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
+import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
 import { agents, campaigns, db, fulfillment, payments, subscriptions, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
@@ -276,6 +276,29 @@ export async function newsletterAction(handle: string, form: FormData) {
     status = "invalid";
   }
   redirect(`${(await storeBase(handle)) || "/"}?signup=${status}#signup`);
+}
+
+/** The password page: lets a visitor in for 30 days when the password is right. */
+export async function storePasswordAction(handle: string, form: FormData) {
+  const shop = await loadShop(handle);
+  const base = await storeBase(handle);
+  const key = await enterStorePassword(shop, String(form.get("password") ?? ""));
+  if (!key) redirect(`${base}/password?wrong=1`);
+  (await cookies()).set(storeAccessCookie(shop.id), key, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 30 * 86_400 });
+  redirect(base || "/");
+}
+
+/** The password page's "email me when you open" list: the store's own newsletter. */
+export async function passwordSignupAction(handle: string, form: FormData) {
+  const shop = await loadShop(handle);
+  let status = "sent";
+  try {
+    await requestNewsletterSignup(await campaigns(), shop, String(form.get("email") ?? ""));
+  } catch (e) {
+    if (!(e instanceof UserError)) throw e;
+    status = "invalid";
+  }
+  redirect(`${await storeBase(handle)}/password?signup=${status}`);
 }
 
 /** "Track your order": emails the order's link to the address it was placed with, if there is one. */

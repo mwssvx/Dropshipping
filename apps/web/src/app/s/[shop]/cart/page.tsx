@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { convertAmount, convertPrice, formatMoney, pointsFor, presentQuote, quoteCart, recentlyViewed, upsellsFor, boughtTogether, UserError } from "@sf/core";
+import { convertAmount, convertPrice, formatMoney, pointsFor, presentQuote, quoteCart, recentlyViewed, upsellsFor, boughtTogether, onHoliday, UserError } from "@sf/core";
 import { buyerCountry, buyerFx } from "@/lib/currency";
 import { readCart, readDiscountCode, readGiftCardCode } from "@/lib/cart";
 import { db } from "@/lib/server";
@@ -182,7 +182,9 @@ export default async function CartPage({ params, searchParams }: { params: Promi
             </form>
           )}
           {(!(quote.discount || quote.codeNotUsed) || !quote.giftCard) && <CodeForm handle={handle} text={{ label: t.codeLabel, apply: t.apply, checking: t.checking }} />}
-          {quote.wholesale && quote.wholesale.shortByMinor > 0 ? (
+          {onHoliday(shop) ? (
+            <p className="self-end banner banner-info" role="status">{t.holidayNoCheckout}</p>
+          ) : quote.wholesale && quote.wholesale.shortByMinor > 0 ? (
             <Link href={base || "/"} className="btn btn-secondary btn-lg self-end">{t.keepShopping}</Link>
           ) : (
             <Link href={`${base}/checkout`} className="btn btn-primary btn-lg self-end">{t.checkOut}</Link>

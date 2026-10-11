@@ -1,6 +1,6 @@
 import { PixelEvent } from "@/components/PixelEvent";
 import { redirect } from "next/navigation";
-import { addonOffer, convertPrice, countryName, formatMoney, lastCheckoutDetails, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, storePixels, UserError } from "@sf/core";
+import { addonOffer, convertPrice, countryName, formatMoney, lastCheckoutDetails, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, onHoliday, storePixels, UserError } from "@sf/core";
 import { buyerFx } from "@/lib/currency";
 import { currentBuyer } from "@/lib/buyer";
 import { readCart, readDiscountCode, readGiftCardCode } from "@/lib/cart";
@@ -18,7 +18,8 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
   const shop = await loadShop(handle);
   const base = await storeBase(handle);
   const lines = await readCart(shop.id);
-  if (!lines.length) redirect(`${base}/cart`);
+  // Empty, or the store is on a break: the cart says what's going on.
+  if (!lines.length || onHoliday(shop)) redirect(`${base}/cart`);
   const buyer = await currentBuyer(shop.id);
   let quote;
   try {

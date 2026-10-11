@@ -170,6 +170,8 @@ export const shops = pgTable(
     // Ad tracking: Meta, TikTok and Google tags, and which visitors are asked before they load.
     adPixels: jsonb("ad_pixels").$type<AdPixels>(),
     cookieConsent: text("cookie_consent", { enum: ["everyone", "eu_uk"] }).notNull().default("everyone"),
+    // A password page before launch, or a holiday break. Null when the store is open.
+    closure: jsonb("closure").$type<StoreClosure>(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -349,6 +351,14 @@ export type Preorder = { shipsBy: string; limit: number | null };
 
 /** Ad platform tags the store loads (after the buyer agrees, where the law asks for it). */
 export type AdPixels = { meta: string | null; tiktok: string | null; google: string | null };
+
+/**
+ * The store closed to buyers for a while. "password": only visitors with the password get in
+ * (before launch); "holiday": buyers can look around but not order. Either ends by itself on
+ * `until` (YYYY-MM-DD) when set. `accessKey` is what a visitor's cookie holds once they gave the
+ * password; it changes with the password.
+ */
+export type StoreClosure = { mode: "password" | "holiday"; message: string | null; until: string | null; passwordHash: string | null; accessKey: string | null };
 
 /** How many a buyer can take: per order (`min`, `max`) and in all, across their paid orders (`perCustomer`). */
 export type PurchaseLimit = { min: number | null; max: number | null; perCustomer: number | null };
