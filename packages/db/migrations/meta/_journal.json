@@ -442,6 +442,13 @@
       "when": 1791698653298,
       "tag": "0062_store_closure",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1791700051783,
+      "tag": "0063_product_video",
+      "breakpoints": true
     }
   ]
 }
