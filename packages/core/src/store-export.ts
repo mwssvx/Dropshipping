@@ -80,6 +80,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       country: shop.country,
       prices_include_tax: shop.pricesIncludeTax,
       abandoned_cart_emails: shop.abandonedCartEmails,
+      price_watch: { min_margin_percent: shop.minMarginPercent, auto_reprice: shop.autoReprice },
       reviews_auto_publish: shop.reviewsAutoPublish,
       presentment_currencies: shop.presentmentCurrencies,
       round_converted_prices: shop.roundConvertedPrices,
@@ -222,6 +223,7 @@ const importSchema = z.object({
     .object({
       prices_include_tax: z.boolean().optional(),
       abandoned_cart_emails: z.boolean().optional(),
+      price_watch: z.object({ min_margin_percent: z.number().int().min(0).max(90), auto_reprice: z.boolean() }).optional(),
       reviews_auto_publish: z.boolean().optional(),
       presentment_currencies: z.array(z.enum(CURRENCIES)).max(CURRENCIES.length).optional(),
       round_converted_prices: z.boolean().optional(),
@@ -607,6 +609,10 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
     const settings: Partial<typeof schema.shops.$inferInsert> = {};
     if (data.store.prices_include_tax !== undefined) settings.pricesIncludeTax = data.store.prices_include_tax;
     if (data.store.abandoned_cart_emails !== undefined) settings.abandonedCartEmails = data.store.abandoned_cart_emails;
+    if (data.store.price_watch) {
+      settings.minMarginPercent = data.store.price_watch.min_margin_percent;
+      settings.autoReprice = data.store.price_watch.auto_reprice;
+    }
     if (data.store.reviews_auto_publish !== undefined) settings.reviewsAutoPublish = data.store.reviews_auto_publish;
     if (data.store.presentment_currencies !== undefined) settings.presentmentCurrencies = [...new Set(data.store.presentment_currencies)];
     if (data.store.round_converted_prices !== undefined) settings.roundConvertedPrices = data.store.round_converted_prices;

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { can, countNeedsYou, countOpenDisputes, countPendingReviews, countOpenReturns, countPendingWholesale, listPendingActions, waitingQuestions, listRequirements, openNotices, ROLES, type Area } from "@sf/core";
+import { can, countCostAlerts, countNeedsYou, countOpenDisputes, countPendingReviews, countOpenReturns, countPendingWholesale, listPendingActions, waitingQuestions, listRequirements, openNotices, ROLES, type Area } from "@sf/core";
 import { requireShop, storeAddress } from "@/lib/server";
 import { BRAND } from "@/lib/brand";
 import { switchShopAction } from "../actions";
@@ -8,7 +8,7 @@ import { NavLink } from "./NavLink";
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, shop, shops, db, role } = await requireShop();
   const show = (area: Area) => can(role, area);
-  const [address, requirements, notices, pending, inbox, reviews, wholesale, returns, questions, disputes] = await Promise.all([
+  const [address, requirements, notices, pending, inbox, reviews, wholesale, returns, questions, disputes, costAlerts] = await Promise.all([
     storeAddress(shop),
     listRequirements(db, shop.id),
     openNotices(db, shop.id),
@@ -19,6 +19,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     show("returns") ? countOpenReturns(db, shop.id) : 0,
     show("reviews") ? waitingQuestions(db, shop.id) : 0,
     show("money") ? countOpenDisputes(db, shop.id) : 0,
+    show("products") ? countCostAlerts(db, shop) : 0,
   ]);
   const approvals = pending.filter((p) => !("message_id" in p.input)).length;
   const pause = notices.find((n) => n.kind === "paused");
@@ -57,6 +58,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           {show("money") && <NavLink href="/admin/disputes">Disputes{disputes ? <span className="ml-2 pill pill-critical">{disputes}</span> : null}</NavLink>}
           {show("money") && <NavLink href="/admin/profit">Profit</NavLink>}
           {show("products") && <NavLink href="/admin/products">Products</NavLink>}
+          {show("products") && <NavLink href="/admin/price-changes">Price changes{costAlerts ? <span className="ml-2 pill pill-critical">{costAlerts}</span> : null}</NavLink>}
           {show("products") && <NavLink href="/admin/pricing">Pricing</NavLink>}
           {show("products") && <NavLink href="/admin/size-charts">Size charts</NavLink>}
           {show("collections") && <NavLink href="/admin/collections">Collections</NavLink>}

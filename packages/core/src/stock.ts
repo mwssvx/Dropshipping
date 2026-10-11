@@ -8,6 +8,7 @@ import type { Mailer } from "./email";
 import { NotFoundError, UserError } from "./errors";
 import { SupplierError, type Suppliers } from "./suppliers";
 import { refreshBackup, sellableStock } from "./backups";
+import { recordCostChange } from "./price-watch";
 
 type Shop = typeof schema.shops.$inferSelect;
 const DAY = 86_400_000;
@@ -56,6 +57,7 @@ export async function syncProductStock(ctx: Pick<StockContext, "db" | "suppliers
   // With a backup supplier the store can sell what either of them has.
   const backup = product.backup ? await refreshBackup(ctx.suppliers, product.backup, now) : null;
   const changes: StockChange[] = [];
+  let shop: typeof schema.shops.$inferSelect | undefined;
   for (const v of variants) {
     if (!v.supplierVariantRef) continue;
     const r = remote ? remote.get(v.supplierVariantRef) : undefined;
@@ -64,6 +66,10 @@ export async function syncProductStock(ctx: Pick<StockContext, "db" | "suppliers
     const cost = r ? r.costMinor : v.costMinor;
     if (stock === v.stock && cost === v.costMinor) continue;
     await db.update(schema.variants).set({ stock, costMinor: cost }).where(eq(schema.variants.id, v.id));
+    if (v.costMinor !== null && cost !== null && cost > v.costMinor) {
+      shop ??= (await db.query.shops.findFirst({ where: eq(schema.shops.id, shopId) }))!;
+      await recordCostChange(db, shop, v, v.costMinor, cost, now);
+    }
     changes.push({ productId: product.id, variantId: v.id, option: v.title, stockBefore: v.stock, stockAfter: stock, costBefore: v.costMinor, costAfter: cost });
   }
   await db.update(schema.products).set({ stockCheckedAt: now, ...(backup ? { backup } : {}) }).where(eq(schema.products.id, product.id));
