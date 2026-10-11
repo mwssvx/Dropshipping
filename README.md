@@ -434,3 +434,10 @@ See `.env.example` and `docs/accounts.md` for the real services.
 2. **Honest by design**: transit is the slower of the supplier's own estimate (saved on each option at import) and the shipping rate's days, so the store never promises faster than the supplier ships (`transitDays`). With neither, no date is shown.
 3. **After paying**: the order page and the confirmation email show the expected delivery, counted from payment with the rate the buyer picked, and from the shipment once it has shipped (`orderDelivery`).
 4. **Settings**: Admin → Shipping → Delivery dates turns it on or off and sets processing days (0–14, default 2), with a preview using one of the store's products. Store files carry the setting.
+
+### Disputes (after launch, part 53)
+
+1. **Every chargeback in one place**: when a buyer's bank pulls a payment back (or first asks a question), the payment provider tells us and the dispute appears on the order with its reason, amount and answer-by date (`applyDisputeEvent` in `packages/core/src/disputes.ts`, from `charge.dispute.*` webhooks). Everyone who handles money gets an email and a phone alert once.
+2. **Evidence gathered for you**: the order page shows what we'll send (tracking number, delivery, returns policy, messages with the buyer), with what's missing marked, plus a summary of the order. The merchant adds an optional note and presses "Send evidence", or accepts the dispute if it's fair (`disputeEvidence`, `submitDispute`, `acceptDispute`).
+3. **Disputes page**: Admin → Disputes lists them, open ones first, with money held, wins and losses, and the 90-day dispute rate. Above 0.75% it warns, since processors can hold payouts at that level. The nav shows how many need an answer.
+4. **Counted in profit**: a lost dispute counts like a refund on the profit report, with a $15 dispute fee. In test mode, an order page can simulate a dispute and the bank's decision through the real webhook path.
