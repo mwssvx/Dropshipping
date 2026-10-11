@@ -37,6 +37,7 @@ export default async function ProductsPage() {
               <Link href="/admin/products/import" className="btn btn-primary">Import from supplier</Link>
               <Link href="/admin/products/new" className="btn btn-secondary">Add by hand</Link>
             </div>
+            <Link href="/admin/products/move" className="text-sm underline">Moving from Shopify? Bring your products over</Link>
           </div>
         ) : (
           <BulkProducts
@@ -44,6 +45,9 @@ export default async function ProductsPage() {
             collections={collections.filter((c) => !c.rules).map((c) => ({ id: c.id, title: c.title }))}
             recent={recent.map((r) => ({ id: r.id, summary: r.summary, when: when(r.createdAt), undone: !!r.undoneAt, canUndo: r.canUndo }))}
           />
+        )}
+        {products.length > 0 && (
+          <p className="mt-4 text-sm"><Link href="/admin/products/move" className="underline">Move products from Shopify</Link></p>
         )}
         <section className="card p-5 mt-6 flex flex-col gap-3 max-w-3xl" aria-labelledby="low-stock-heading">
           <div>

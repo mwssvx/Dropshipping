@@ -504,3 +504,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Meta, TikTok and Google tags**: Admin → Sales channels → Ad tracking takes the Meta pixel ID, TikTok pixel ID and Google tag ID (`setAdPixels` in `packages/core/src/pixels.ts`, `shops.ad_pixels`). Each is checked against the platform's format when saved and again before it reaches a page, since it ends up in a script.
 2. **What they hear**: page views, product views, add to cart, checkout started and purchases, with the price, the store's currency and the same option IDs as the product feeds (`components/AdPixels.tsx`, `PixelEvent`). A purchase is reported once, however often the order page is opened; free replacements aren't.
 3. **Asked first**: a cookie banner in the buyer's language asks before any tag loads, for every visitor or only those in the EU, EEA, UK and Switzerland (`needsConsent`; a visitor whose country isn't known is asked). Saying no doesn't stop anyone from shopping, and "Cookie settings" at the foot of each page changes the answer. Store files carry the settings.
+
+### Move from Shopify (after launch, part 65)
+
+1. **Bring the products**: Admin → Products → Move from Shopify takes the products file Shopify exports (Products → Export → CSV) and adds every product with its options, prices, compare-at prices, costs, stock, SKUs, photos (and photo per option) and search listing (`importShopifyProducts` in `packages/core/src/shopify-import.ts`).
+2. **Same addresses**: each product keeps its Shopify handle, so /products/… links and search results keep working once the domain points here. A handle longer than ours (60 characters) is shortened and the old address redirects to it.
+3. **Safe to repeat**: products already in the store are left alone. Everything comes in as a draft unless the merchant ticks the box to keep Shopify's status. Gift cards and rows without a price are listed as not imported, with the reason.
