@@ -573,3 +573,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **The EU rule, worked out**: a product page showing a reduced price (crossed-out price above it) also says "Lowest price in the 30 days before this discount", in the buyer's language (`lowestPricesBefore` in `packages/core/src/lowest-price.ts`). The 30 days end when the running sale started, or else when the option's current price was set.
 2. **From the real history**: a database trigger records every price an option has had (`variant_prices`), and earlier sales count at what they charged. When the history doesn't reach back 30 days for an older product, nothing is shown rather than a guess.
 3. **Who sees it**: Admin → Sales → Lowest earlier price (`shops.lowest_price_note`): visitors in Europe (the EU, the rest of the EEA, the UK and Switzerland; the default), everyone, or nobody. Store files carry the setting.
+
+### Two-step sign-in (after launch, part 77)
+
+1. **A code after the password**: Admin → Your account → Two-step sign-in. The merchant scans a QR code with any authenticator app (Google Authenticator, 1Password, Authy) and confirms a code; from then on, signing in on the web or in the merchant app asks for the 6-digit code after the password (`packages/core/src/two-step.ts`, standard TOTP with no outside service). Turning it on signs out every other device, and a new password from a reset link doesn't skip the code.
+2. **Recovery codes**: ten one-time codes, shown once and kept only as hashes, sign in when the phone is lost. Using one sends an email and takes the merchant to set up again; a fresh set can be made at any time.
+3. **Hard to guess, hard to switch off**: each code works once, five wrong codes in 15 minutes stop further tries for that person however many sign-ins are started, and turning it off takes the password and a code. Turning it on or off, and using a recovery code, is emailed. The owner's setup list on Home suggests it.

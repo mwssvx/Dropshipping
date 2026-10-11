@@ -1,14 +1,14 @@
 import Link from "next/link";
-import { can, formatMoney, listOrders, listProducts, listRequirements } from "@sf/core";
+import { can, formatMoney, listOrders, listProducts, listRequirements, twoStepStatus } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "./PageHeader";
 
 export const metadata = { title: "Home" };
 
 export default async function AdminHome({ searchParams }: { searchParams: Promise<{ denied?: string }> }) {
-  const { shop, db, role } = await requireShop("home");
+  const { shop, db, role, user } = await requireShop("home");
   const { denied } = await searchParams;
-  const [orders, products, requirements] = await Promise.all([listOrders(db, shop.id), listProducts(db, shop.id), listRequirements(db, shop.id)]);
+  const [orders, products, requirements, twoStep] = await Promise.all([listOrders(db, shop.id), listProducts(db, shop.id), listRequirements(db, shop.id), twoStepStatus(db, user.id)]);
   const seesMoney = can(role, "money");
   const holds = seesMoney ? requirements.filter((r) => r.holdsPayouts) : [];
   const paid = orders.filter((o) => o.paymentStatus === "paid");
@@ -26,6 +26,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
     { done: hasActive, title: "Make a product active so buyers can see it", href: "/admin/products" },
     { done: paid.length > 0, title: "Place a test order on your store", href: `/s/${shop.handle}` },
     { done: shop.payoutsEnabled || requirements.length > 0, title: "Set up payouts so you get paid", href: "/admin/money" },
+    { done: twoStep.on, title: "Turn on two-step sign-in to keep your money safe", href: "/admin/account" },
   ];
   const left = steps.filter((s) => !s.done).length;
 

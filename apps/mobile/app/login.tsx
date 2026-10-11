@@ -7,9 +7,12 @@ import { Banner, Body, Button, Card, Field } from "../src/ui";
 import { color, space } from "../src/theme";
 
 export default function Login() {
-  const { signIn } = useSession();
+  const { signIn, finishTwoStep } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // Set when the account has two-step sign-in on: the next step asks for the code.
+  const [twoStep, setTwoStep] = useState<string | null>(null);
+  const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,8 +20,14 @@ export default function Login() {
     setBusy(true);
     setError(null);
     try {
-      await signIn(email.trim(), password);
+      if (twoStep) await finishTwoStep(twoStep, code.trim());
+      else setTwoStep(await signIn(email.trim(), password));
     } catch (e) {
+      // A step that ran out of time starts over from the password.
+      if (twoStep && /sign in again/i.test((e as Error).message)) {
+        setTwoStep(null);
+        setCode("");
+      }
       setError((e as Error).message);
     } finally {
       setBusy(false);
@@ -35,9 +44,19 @@ export default function Login() {
           <Body muted>Use the same email and password as on the web.</Body>
           <Card>
             {error ? <Banner tone="critical">{error}</Banner> : null}
-            <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
-            <Field label="Password" value={password} onChangeText={setPassword} secure autoCapitalize="none" onSubmit={submit} />
-            <Button label="Sign in" onPress={submit} busy={busy} disabled={!email || !password} />
+            {twoStep ? (
+              <>
+                <Body>Open your authenticator app and type the 6-digit code it shows. Lost your phone? Type a recovery code instead.</Body>
+                <Field label="Code" value={code} onChangeText={setCode} autoCapitalize="none" oneTimeCode onSubmit={submit} />
+                <Button label="Sign in" onPress={submit} busy={busy} disabled={!code.trim()} />
+              </>
+            ) : (
+              <>
+                <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+                <Field label="Password" value={password} onChangeText={setPassword} secure autoCapitalize="none" onSubmit={submit} />
+                <Button label="Sign in" onPress={submit} busy={busy} disabled={!email || !password} />
+              </>
+            )}
           </Card>
           <Body muted>New here? Create your store on the web first, then sign in.</Body>
         </View>

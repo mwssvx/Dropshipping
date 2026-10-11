@@ -20,7 +20,9 @@ type SessionValue = {
   signedIn: boolean;
   me: Me | null;
   refreshMe: () => Promise<void>;
-  signIn: (email: string, password: string) => Promise<void>;
+  /** Signs in, or returns a two-step token when the account needs a code from an authenticator app. */
+  signIn: (email: string, password: string) => Promise<string | null>;
+  finishTwoStep: (twoStep: string, code: string) => Promise<void>;
   signOut: () => Promise<void>;
   switchShop: (id: string) => Promise<void>;
 };
@@ -60,7 +62,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     me: token ? me : null,
     refreshMe,
     signIn: async (email, password) => {
-      const r = await api<{ token: string; shops: ShopLink[] }>("auth/login", { body: { email, password } });
+      const r = await api<{ token: string; shops: ShopLink[] } | { twoStep: string }>("auth/login", { body: { email, password } });
+      if ("twoStep" in r) return r.twoStep;
+      await setSession({ token: r.token, shopId: r.shops[0]?.id ?? null });
+      await refreshMe();
+      void registerForPush();
+      return null;
+    },
+    finishTwoStep: async (twoStep, code) => {
+      const r = await api<{ token: string; shops: ShopLink[] }>("auth/two-step", { body: { twoStep, code } });
       await setSession({ token: r.token, shopId: r.shops[0]?.id ?? null });
       await refreshMe();
       void registerForPush();

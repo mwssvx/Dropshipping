@@ -17,6 +17,8 @@ import {
   getProduct,
   getSessionUser,
   importProduct,
+  finishTwoStep,
+  twoStepChallenge,
   listOrders,
   listPayouts,
   listProducts,
@@ -54,7 +56,8 @@ import {
   describePersonalization,
 } from "@sf/core";
 import type { Db } from "@sf/db";
-import { agents, db, fulfillment, notifyLater, payments, refunds, stock, storeAddress, suppliers, testPayments } from "./server";
+import { BRAND } from "./brand";
+import { agents, db, fulfillment, mailer, notifyLater, payments, refunds, stock, storeAddress, suppliers, testPayments } from "./server";
 
 type User = { id: string; email: string };
 type ShopLink = { id: string; name: string; handle: string; role: string };
@@ -130,6 +133,16 @@ const publicRoutes: Record<string, PublicHandler> = {
   "POST auth/login": async ({ req, db }) => {
     const b = await body(req);
     const user = await signIn(db, { email: str(b.email), password: str(b.password) });
+    // With two-step sign-in on, the app asks for the code and sends it to auth/two-step.
+    const twoStep = await twoStepChallenge(db, user.id);
+    if (twoStep) return { twoStep };
+    const { token, expiresAt } = await createSession(db, user.id);
+    return { token, expiresAt, user, shops: await listShopsForUser(db, user.id) };
+  },
+  "POST auth/two-step": async ({ req, db }) => {
+    const b = await body(req);
+    const done = await finishTwoStep({ db, mailer: mailer(), brand: BRAND }, str(b.twoStep), str(b.code));
+    const user = { id: done.id, email: done.email };
     const { token, expiresAt } = await createSession(db, user.id);
     return { token, expiresAt, user, shops: await listShopsForUser(db, user.id) };
   },
