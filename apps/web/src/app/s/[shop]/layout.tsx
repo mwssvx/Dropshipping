@@ -1,9 +1,10 @@
 import { readCart } from "@/lib/cart";
 import { Track } from "@/components/Track";
 import { StoreShell } from "@/theme/StoreShell";
-import { LANGUAGES, shopCurrencies, shopLanguages } from "@sf/core";
+import { LANGUAGES, needsConsent, shopCurrencies, shopLanguages, storePixels } from "@sf/core";
+import { AdPixels } from "@/components/AdPixels";
 import { storeAddress } from "@/lib/server";
-import { buyerFx } from "@/lib/currency";
+import { buyerCountry, buyerFx } from "@/lib/currency";
 import { setCurrencyAction } from "./actions";
 import { loadShop, loadTheme, storeBase, storeLang, storePath, storeRoot, storeT } from "./data";
 
@@ -37,11 +38,15 @@ export default async function StoreLayout({ children, params }: { children: Reac
   const langs = shopLanguages(shop);
   const count = (await readCart(shop.id)).reduce((s, l) => s + l.quantity, 0);
   const currencies = shopCurrencies(shop);
+  // Ad tags, once the buyer agrees where the law asks for it.
+  const pixels = storePixels(shop);
+  const ask = pixels ? needsConsent(shop, await buyerCountry()) : false;
   const picker = currencies.length > 1 ? { currencies, current: (await buyerFx(shop)).currency, action: setCurrencyAction.bind(null, param) } : undefined;
   return (
     <StoreShell doc={theme} shopName={shop.name} currency={shop.currency} base={base} cartCount={count} closed={shop.status !== "active"} verified={!!shop.verifiedAt && shop.status === "active"} picker={picker} t={t} languages={langs.length ? { root, current: lang ?? "en", options: [{ code: "en", name: "English" }, ...langs.map((l) => ({ code: l, name: LANGUAGES[l].name }))] } : undefined}>
       <Track shopId={shop.id} kind="page_view" />
       {children}
+      {pixels && <AdPixels ids={pixels} ask={ask} text={{ message: t.cookieMessage, accept: t.cookieAccept, decline: t.cookieDecline, settings: t.cookieSettings }} />}
     </StoreShell>
   );
 }

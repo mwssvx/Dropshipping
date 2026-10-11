@@ -18,6 +18,7 @@ import { createSizeChart, MAX_SIZE_CHARTS } from "./size-charts";
 import { createSale, MAX_SALES } from "./sales";
 import { createAddon, MAX_ADDONS, setAddonActive } from "./addons";
 import { openPreorder } from "./preorders";
+import { storePixels } from "./pixels";
 
 export const EXPORT_FORMAT = "storefront-store";
 
@@ -98,6 +99,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       subscribe_and_save: shop.subscriptionOffer ? { percent_off: shop.subscriptionOffer.percentOff, active: shop.subscriptionOffer.active } : null,
       delivery_estimates: { enabled: shop.deliveryEstimates, processing_days: shop.processingDays },
       low_stock_note: shop.lowStockNote,
+      ad_tracking: { meta_pixel: shop.adPixels?.meta ?? null, tiktok_pixel: shop.adPixels?.tiktok ?? null, google_tag: shop.adPixels?.google ?? null, ask_consent: shop.cookieConsent },
       hold_risky_orders: shop.holdRiskyOrders,
       refer_a_friend: shop.referralProgram ? { friend_percent_off: shop.referralProgram.friendPercentOff, reward: shop.referralProgram.rewardMinor, min_subtotal: shop.referralProgram.minSubtotalMinor } : null,
       // Missing means the built-in default rate.
@@ -239,6 +241,9 @@ const importSchema = z.object({
       subscribe_and_save: z.object({ percent_off: z.number().int().min(0).max(30), active: z.boolean() }).nullable().optional(),
       delivery_estimates: z.object({ enabled: z.boolean(), processing_days: z.number().int().min(0).max(14) }).optional(),
       low_stock_note: z.number().int().min(0).max(50).optional(),
+      ad_tracking: z
+        .object({ meta_pixel: str(40).nullable(), tiktok_pixel: str(40).nullable(), google_tag: str(40).nullable(), ask_consent: z.enum(["everyone", "eu_uk"]) })
+        .optional(),
       hold_risky_orders: z.enum(["off", "medium", "high"]).optional(),
       refer_a_friend: z.object({ friend_percent_off: z.number().int().min(5).max(50), reward: z.number().int().min(100).max(10_000), min_subtotal: z.number().int().min(0) }).nullable().optional(),
       rewards: z.object({ enabled: z.boolean(), earn_rate: z.number().int().min(1).max(100), value_minor: z.number().int().min(1).max(10_000) }).optional(),
@@ -658,6 +663,12 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
       Object.assign(settings, { deliveryEstimates: data.store.delivery_estimates.enabled, processingDays: data.store.delivery_estimates.processing_days });
     }
     if (data.store.low_stock_note !== undefined) settings.lowStockNote = data.store.low_stock_note;
+    if (data.store.ad_tracking) {
+      // Only IDs in the platforms' formats come in; anything else is left off.
+      const a = data.store.ad_tracking;
+      settings.adPixels = storePixels({ adPixels: { meta: a.meta_pixel, tiktok: a.tiktok_pixel, google: a.google_tag } });
+      settings.cookieConsent = a.ask_consent;
+    }
     if (data.store.subscribe_and_save !== undefined) {
       const o = data.store.subscribe_and_save;
       settings.subscriptionOffer = o ? { percentOff: o.percent_off, active: o.active } : null;

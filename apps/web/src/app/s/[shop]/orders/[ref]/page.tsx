@@ -1,5 +1,6 @@
+import { PixelEvent } from "@/components/PixelEvent";
 import { notFound } from "next/navigation";
-import { buyerAmounts, buyerThread, formatDeliveryDate, formatDeliveryWindow, orderDelivery, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems, formatShipsBy } from "@sf/core";
+import { buyerAmounts, buyerThread, formatDeliveryDate, formatDeliveryWindow, orderDelivery, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems, formatShipsBy, storePixels } from "@sf/core";
 import Link from "next/link";
 import { db, fulfillment, storeAddress } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
@@ -63,6 +64,10 @@ export default async function OrderStatusPage({ params, searchParams }: { params
   ];
   return (
     <main className="max-w-2xl mx-auto px-4 sm:px-6 py-12 flex flex-col gap-8">
+      {/* Reported once per order (the tags remember), and never for free replacements. */}
+      {paid && !replacing && storePixels(shop) && (
+        <PixelEvent name="purchase" data={{ ids: order.lines.map((l) => l.variantId).filter((id): id is string => !!id), value: order.totalMinor / 100, currency: order.currency, orderId: order.id }} />
+      )}
       <div className="flex flex-col gap-2">
         <p className="hint num">Order #{order.number}</p>
         <h1 className="text-3xl font-bold tracking-tight">{replacing ? "Your replacement" : paid ? `Thank you, ${(order.gift?.from ?? order.shippingAddress.name).split(" ")[0]}!` : "We're waiting for your payment"}</h1>

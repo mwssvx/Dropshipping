@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, formatDeliveryWindow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft } from "@sf/core";
+import { bundlesForProduct, formatDeliveryWindow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, storePixels } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { RecentlyViewed } from "@/components/RecentlyViewed";
 import { RememberView } from "@/components/RememberView";
@@ -15,6 +15,7 @@ import { addBundleAction, addToCartAction, askQuestionAction, stockAlertAction, 
 import { savedIds } from "@/lib/saved";
 import { loadShop, localProducts, storeBase, storeLang, storeT, missing } from "../../data";
 import { Price } from "@/components/Price";
+import { PixelEvent } from "@/components/PixelEvent";
 
 async function load(shopHandle: string, handle: string, count = true) {
   const shop = await loadShop(shopHandle);
@@ -116,6 +117,9 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const soldOut = product.variants.filter((x) => x.stock !== null && x.stock <= 0);
   const isSaved = (await savedIds(shop.id)).includes(product.id);
   const tiers = wholesale ? [] : product.quantityBreaks;
+  // What ad tags hear about: each option's price as shown (sales included), in the store's currency.
+  const tracking = !!storePixels(shop);
+  const pixelPrices = Object.fromEntries(product.variants.map((x) => [x.id, x.priceMinor / 100]));
   // "Only 3 left" for options with few left, from the real stock count.
   const lowStock = Object.fromEntries(product.variants.flatMap((x) => {
     const left = lowStockLeft(shop, x.stock);
@@ -143,6 +147,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
       <ProductGallery title={product.title} photos={[...new Set([...productPhotos(product), ...product.variants.flatMap((x) => (x.imageUrl ? [x.imageUrl] : []))])]} />
       <div className="flex flex-col gap-5">
         <Track shopId={shop.id} kind="product_view" productId={product.id} />
+        {tracking && v && <PixelEvent name="view_item" data={{ ids: [v.id], value: pixelPrices[v.id]!, currency: shop.currency }} />}
         <h1 className="text-3xl font-bold tracking-tight">{product.title}</h1>
         {reviews.count > 0 && (
           <a href="#reviews" className="text-sm flex items-center gap-2">
@@ -180,7 +185,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           </section>
         )}
         {v && orderable.length > 0 && (
-          <form action={addToCartAction.bind(null, shopHandle)} className="flex flex-col gap-4">
+          <form action={addToCartAction.bind(null, shopHandle)} className="flex flex-col gap-4" data-pixel-prices={tracking ? JSON.stringify(pixelPrices) : undefined} data-pixel-currency={tracking ? shop.currency : undefined}>
             {byOption ? (
               <OptionPicker
                 options={defs}

@@ -167,6 +167,9 @@ export const shops = pgTable(
     referralProgram: jsonb("referral_program").$type<ReferralProgram>(),
     // Product pages say "Only 3 left" when an option's real stock is at or below this; 0 turns it off.
     lowStockNote: integer("low_stock_note").notNull().default(5),
+    // Ad tracking: Meta, TikTok and Google tags, and which visitors are asked before they load.
+    adPixels: jsonb("ad_pixels").$type<AdPixels>(),
+    cookieConsent: text("cookie_consent", { enum: ["everyone", "eu_uk"] }).notNull().default("everyone"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -343,6 +346,9 @@ export type QuantityBreak = { minQty: number; percentOff: number };
 
 /** `shipsBy` is a YYYY-MM-DD date; `limit` caps how many can be pre-ordered in all. */
 export type Preorder = { shipsBy: string; limit: number | null };
+
+/** Ad platform tags the store loads (after the buyer agrees, where the law asks for it). */
+export type AdPixels = { meta: string | null; tiktok: string | null; google: string | null };
 
 /** How many a buyer can take: per order (`min`, `max`) and in all, across their paid orders (`perCustomer`). */
 export type PurchaseLimit = { min: number | null; max: number | null; perCustomer: number | null };
