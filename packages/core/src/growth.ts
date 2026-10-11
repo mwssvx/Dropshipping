@@ -1,5 +1,7 @@
-// Small growth tools: abandoned checkout reminders, "goes well with" suggestions, and their settings.
-import { and, eq, gte, inArray, lte, ne, sql } from "drizzle-orm";
+// Small growth tools: abandoned checkout reminders, "goes well with" and "often bought together"
+// suggestions, and their settings.
+import { and, desc, eq, gt, gte, inArray, lte, ne, notInArray, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { schema, type Db } from "@sf/db";
 import { NotFoundError, UserError } from "./errors";
 import { sendOrderEmail, type FulfillmentContext } from "./fulfillment";
@@ -95,4 +97,57 @@ export async function upsellsFor(db: Db, shopId: string, productIds: string[]) {
       return v ? { id: p.id, handle: p.handle, title: p.title, imageUrl: p.imageUrl, variantId: v.id, priceMinor: v.priceMinor } : null;
     })
     .filter((x) => x !== null);
+}
+
+/** Paid orders needed before two products count as bought together. */
+export const BOUGHT_TOGETHER_MIN_ORDERS = 2;
+
+/**
+ * Products that buyers of these products also bought in the same order, most often first, from
+ * the last 180 days of paid orders. Only active products with something in stock, never the
+ * products asked about, and only pairs seen in at least two orders.
+ */
+export async function boughtTogether(db: Db, shopId: string, productIds: string[], opts: { limit?: number; days?: number; now?: Date } = {}) {
+  if (!productIds.length) return [];
+  const since = new Date((opts.now ?? new Date()).getTime() - (opts.days ?? 180) * 86_400_000);
+  const mine = alias(schema.orderLines, "mine");
+  const mineV = alias(schema.variants, "mine_v");
+  const other = alias(schema.orderLines, "other");
+  const otherV = alias(schema.variants, "other_v");
+  const orders = sql<number>`count(distinct ${mine.orderId})::int`;
+  const pairs = await db
+    .select({ productId: otherV.productId, orders })
+    .from(mine)
+    .innerJoin(mineV, eq(mineV.id, mine.variantId))
+    .innerJoin(schema.orders, eq(schema.orders.id, mine.orderId))
+    .innerJoin(other, and(eq(other.orderId, mine.orderId), ne(other.id, mine.id)))
+    .innerJoin(otherV, eq(otherV.id, other.variantId))
+    .where(
+      and(
+        eq(schema.orders.shopId, shopId),
+        inArray(schema.orders.paymentStatus, ["paid", "partially_refunded"]),
+        gt(schema.orders.paidAt, since),
+        // Free replacements and repeat deliveries aren't a buyer choosing two things.
+        notInArray(schema.orders.source, ["replacement", "subscription"]),
+        inArray(mineV.productId, productIds),
+        notInArray(otherV.productId, productIds),
+      ),
+    )
+    .groupBy(otherV.productId)
+    .having(sql`${orders} >= ${BOUGHT_TOGETHER_MIN_ORDERS}`)
+    .orderBy(desc(orders))
+    .limit(20);
+  if (!pairs.length) return [];
+  const products = await db.query.products.findMany({
+    where: and(eq(schema.products.shopId, shopId), inArray(schema.products.id, pairs.map((p) => p.productId)), eq(schema.products.status, "active"), eq(schema.products.giftCard, false)),
+  });
+  const variants = await db.query.variants.findMany({ where: inArray(schema.variants.productId, products.map((p) => p.id)), orderBy: schema.variants.position });
+  return pairs
+    .map((pair) => {
+      const p = products.find((x) => x.id === pair.productId);
+      const v = p && variants.find((x) => x.productId === p.id && (x.stock === null || x.stock > 0));
+      return p && v ? { id: p.id, handle: p.handle, title: p.title, imageUrl: p.imageUrl, variantId: v.id, priceMinor: v.priceMinor, orders: pair.orders } : null;
+    })
+    .filter((x) => x !== null)
+    .slice(0, opts.limit ?? 3);
 }
