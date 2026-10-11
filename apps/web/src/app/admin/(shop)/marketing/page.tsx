@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { abandonedCartStats, describeDiscount, formatMoney, listDiscounts, listProducts, POST_PURCHASE_MINUTES, postPurchaseStats, referralStats, SUBSCRIBE_WITHIN_DAYS, subscriptionStats, welcomeOfferStats } from "@sf/core";
+import { abandonedCartStats, describeDiscount, formatMoney, listDiscounts, listProducts, POST_PURCHASE_MINUTES, postPurchaseStats, referralStats, SUBSCRIBE_WITHIN_DAYS, subscriptionStats, welcomeOfferStats, winbackDueCount, winbackStats } from "@sf/core";
 import { requireShop, testPayments } from "@/lib/server";
 import { sendRemindersNowAction, setDiscountActiveAction, setRemindersAction } from "../../growth-actions";
 import { PageHeader } from "../PageHeader";
 import { DiscountForm } from "./DiscountForm";
 import { WelcomeOfferForm } from "./WelcomeOfferForm";
+import { WinbackForm } from "./WinbackForm";
 import { ReferralForm } from "./ReferralForm";
 import { PostPurchaseForm } from "./PostPurchaseForm";
 import { SubscriptionOfferForm } from "./SubscriptionOfferForm";
@@ -16,7 +17,7 @@ const date = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "
 
 export default async function MarketingPage() {
   const { shop, db } = await requireShop("marketing");
-  const [discounts, stats, welcome, referrals, products, afterCheckout, subs] = await Promise.all([
+  const [discounts, stats, welcome, referrals, products, afterCheckout, subs, winback, winbackDue] = await Promise.all([
     listDiscounts(db, shop.id),
     abandonedCartStats(db, shop.id, new Date(Date.now() - 30 * DAY)),
     welcomeOfferStats(db, shop.id),
@@ -24,6 +25,8 @@ export default async function MarketingPage() {
     listProducts(db, shop.id),
     postPurchaseStats(db, shop.id),
     subscriptionStats(db, shop.id),
+    winbackStats(db, shop.id),
+    shop.winbackOffer ? winbackDueCount(db, shop, shop.winbackOffer) : null,
   ]);
   const money = (m: number) => formatMoney(m, shop.currency);
   const now = new Date();
@@ -95,6 +98,26 @@ export default async function MarketingPage() {
             <div><dt className="hint">Codes sent</dt><dd className="text-lg font-semibold num">{welcome.sent}</dd></div>
             <div><dt className="hint">Used</dt><dd className="text-lg font-semibold num">{welcome.used}</dd></div>
             <div><dt className="hint">Sales</dt><dd className="text-lg font-semibold num">{money(welcome.salesMinor)}</dd></div>
+          </dl>
+        </section>
+
+        <section className="card p-5 flex flex-col gap-3" aria-labelledby="winback-heading">
+          <h2 id="winback-heading" className="font-semibold">Win-back emails</h2>
+          <p className="text-sm">
+            When someone who said yes to your emails hasn&apos;t ordered for a while, we email them a code of their own to come back. It
+            works once, only with their email. Each person gets one per quiet spell: another only after they order again. Nobody who
+            last ordered more than six months before that is emailed.
+          </p>
+          <WinbackForm offer={shop.winbackOffer} />
+          {winbackDue !== null && (
+            <p className="text-sm hint" role="note">
+              {winbackDue === 0 ? "Nobody is due one right now." : `${winbackDue} ${winbackDue === 1 ? "person is" : "people are"} due one. It goes out with the next daily emails.`}
+            </p>
+          )}
+          <dl className="grid grid-cols-3 gap-3 border-t border-border pt-3 text-sm" aria-label="Win-back results">
+            <div><dt className="hint">Codes sent</dt><dd className="text-lg font-semibold num">{winback.sent}</dd></div>
+            <div><dt className="hint">Came back</dt><dd className="text-lg font-semibold num">{winback.used}</dd></div>
+            <div><dt className="hint">Sales</dt><dd className="text-lg font-semibold num">{money(winback.salesMinor)}</dd></div>
           </dl>
         </section>
 
