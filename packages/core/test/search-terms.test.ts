@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { DemoModel, pruneEvents, recordSearch, searchReport, searchTerm } from "../src";
+import { eq } from "drizzle-orm";
+import { schema } from "@sf/db";
+import { DemoModel, exportStore, importStore, pruneEvents, recordSearch, removeSearchFix, searchProducts, searchReport, searchTerm, setSearchFix } from "../src";
 import { makeFixture } from "../evals/fixture";
 
 const DAY = 86_400_000;
@@ -46,5 +48,37 @@ describe("what shoppers search for", () => {
     expect(await pruneEvents(f.db, now)).toBeGreaterThanOrEqual(1);
     const all = await searchReport(f.db, shop.id, { from: daysAgo(1000), to: now });
     expect(all.top.find((t) => t.term === "candle")?.searches).toBe(1);
+  });
+
+  it("points a search that finds nothing at words that do", async () => {
+    const f = await makeFixture(new DemoModel());
+    const shop = await f.shop();
+    const find = (q: string) => searchProducts(f.db, shop.id, { q });
+    expect((await find("nightlight")).products).toHaveLength(0);
+
+    await expect(setSearchFix(f.db, shop.id, { from: "x", to: "lamp" })).rejects.toThrow("Type what shoppers searched for");
+    await expect(setSearchFix(f.db, shop.id, { from: "Lamp", to: " lamp " })).rejects.toThrow("Pick different words");
+    await expect(setSearchFix(f.db, shop.id, { from: "lamp", to: "" })).rejects.toThrow("Type the words to show results for");
+    expect(await setSearchFix(f.db, shop.id, { from: " NightLight ", to: "Projection  Lamp" })).toEqual([{ from: "nightlight", to: "projection lamp" }]);
+
+    const fixed = await find("Nightlight");
+    expect(fixed.showingFor).toBe("projection lamp");
+    expect(fixed.products.map((p) => p.id)).toContain(f.products.lamp.id);
+    // Other searches are untouched.
+    expect((await find("lamp")).showingFor).toBeNull();
+
+    // Saving the same search again replaces its fix.
+    expect(await setSearchFix(f.db, shop.id, { from: "nightlight", to: "sunset" })).toEqual([{ from: "nightlight", to: "sunset" }]);
+
+    const data = await exportStore(f.db, shop.id);
+    expect(data.store.search_fixes).toEqual([{ from: "nightlight", to: "sunset" }]);
+    const g = await makeFixture(new DemoModel());
+    const target = await g.shop();
+    await g.db.delete(schema.products).where(eq(schema.products.shopId, target.id));
+    await importStore(g.db, target.id, data);
+    expect((await g.shop()).searchFixes).toEqual([{ from: "nightlight", to: "sunset" }]);
+
+    expect(await removeSearchFix(f.db, shop.id, "nightlight")).toEqual([]);
+    expect((await find("nightlight")).showingFor).toBeNull();
   });
 });

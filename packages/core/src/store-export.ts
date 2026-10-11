@@ -102,6 +102,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       low_stock_note: shop.lowStockNote,
       badges: { sale: shop.productBadges.sale, sold_out: shop.productBadges.soldOut, new_days: shop.productBadges.newDays },
       sold_out_products: shop.soldOutProducts,
+      search_fixes: shop.searchFixes,
       ad_tracking: { meta_pixel: shop.adPixels?.meta ?? null, tiktok_pixel: shop.adPixels?.tiktok ?? null, google_tag: shop.adPixels?.google ?? null, ask_consent: shop.cookieConsent },
       hold_risky_orders: shop.holdRiskyOrders,
       refer_a_friend: shop.referralProgram ? { friend_percent_off: shop.referralProgram.friendPercentOff, reward: shop.referralProgram.rewardMinor, min_subtotal: shop.referralProgram.minSubtotalMinor } : null,
@@ -249,6 +250,7 @@ const importSchema = z.object({
       low_stock_note: z.number().int().min(0).max(50).optional(),
       badges: z.object({ sale: z.boolean(), sold_out: z.boolean(), new_days: z.number().int().min(0).max(90) }).optional(),
       sold_out_products: z.enum(SOLD_OUT_DISPLAY).optional(),
+      search_fixes: z.array(z.object({ from: str(80).min(2), to: str(80).min(1) })).max(100).optional(),
       ad_tracking: z
         .object({ meta_pixel: str(40).nullable(), tiktok_pixel: str(40).nullable(), google_tag: str(40).nullable(), ask_consent: z.enum(["everyone", "eu_uk"]) })
         .optional(),
@@ -678,6 +680,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
     }
     if (data.store.low_stock_note !== undefined) settings.lowStockNote = data.store.low_stock_note;
     if (data.store.sold_out_products) settings.soldOutProducts = data.store.sold_out_products;
+    if (data.store.search_fixes) settings.searchFixes = data.store.search_fixes.map((f) => ({ from: f.from.toLowerCase().trim(), to: f.to.toLowerCase().trim() }));
     if (data.store.badges) settings.productBadges = { sale: data.store.badges.sale, soldOut: data.store.badges.sold_out, newDays: data.store.badges.new_days };
     if (data.store.ad_tracking) {
       // Only IDs in the platforms' formats come in; anything else is left off.

@@ -18,7 +18,7 @@ export default async function SearchPage({ params, searchParams }: { params: Pro
   const query = await searchParams;
   const shop = await loadShop(param);
   const [base, fx] = await Promise.all([storeBase(param), buyerFx(shop)]);
-  const { products, sort, facets } = await searchProducts(await db(), shop.id, browseOptions(query), fx);
+  const { products, sort, facets, showingFor } = await searchProducts(await db(), shop.id, browseOptions(query), fx);
   const compact = await localProducts(param, compactProducts(products));
   const t = await storeT(param);
   const q = query.q?.trim();
@@ -31,6 +31,7 @@ export default async function SearchPage({ params, searchParams }: { params: Pro
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 flex flex-col gap-8">
       <h1 className="text-3xl font-bold tracking-tight">{q ? t.resultsFor(q) : t.search}</h1>
+      {showingFor && <p className="hint" role="status">{t.showingFor(showingFor)}</p>}
       <BrowseBar action={`${base}/search`} params={query} sort={sort} currency={fx.currency} search count={compact.length} facets={facets} t={t} />
       {compact.length ? (
         <ProductGrid products={compact} data={{ base, currency: shop.currency, fx, t, badges: shop.productBadges, catalog: { products: compact, collections: [] } }} />
