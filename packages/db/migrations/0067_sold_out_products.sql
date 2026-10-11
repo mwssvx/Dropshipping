@@ -1,0 +1,1 @@
+ALTER TABLE "shops" ADD COLUMN "sold_out_products" text DEFAULT 'last' NOT NULL;

@@ -5,7 +5,7 @@ import { applyRules, collectionRulesSchema, type CollectionRules } from "./colle
 import { NotFoundError, UserError } from "./errors";
 import { uniqueHandle } from "./handles";
 import { listActiveProducts } from "./products";
-import { productSoldOut } from "./badges";
+import { placeSoldOut, productSoldOut, soldOutDisplay } from "./badges";
 
 /** "all" is every active product. It isn't stored, so no collection can take that handle. */
 export const ALL_COLLECTION = "all";
@@ -160,7 +160,10 @@ export async function getCollectionByHandle(db: Db, shopId: string, handle: stri
  * product order. Plain data, so the editor preview can render the same sections in the browser.
  */
 export async function storefrontCatalog(db: Db, shopId: string) {
-  const active = await listActiveProducts(db, shopId);
+  const [all, mode] = await Promise.all([listActiveProducts(db, shopId), soldOutDisplay(db, shopId)]);
+  const now = new Date();
+  const soldOut = new Set(all.filter((p) => productSoldOut(p, now)).map((p) => p.id));
+  const active = placeSoldOut(all, mode, (p) => soldOut.has(p.id));
   const products = active.map((p) => ({
     id: p.id,
     title: p.title,
@@ -170,7 +173,7 @@ export async function storefrontCatalog(db: Db, shopId: string) {
     compareAtMinor: p.variants[0]?.compareAtMinor ?? null,
     badge: p.badge,
     createdAt: p.createdAt,
-    soldOut: productSoldOut(p),
+    soldOut: soldOut.has(p.id),
   }));
   const rows = await db.query.collections.findMany({ where: eq(schema.collections.shopId, shopId), orderBy: asc(schema.collections.title) });
   const links = rows.length
@@ -179,13 +182,16 @@ export async function storefrontCatalog(db: Db, shopId: string) {
         orderBy: asc(schema.collectionProducts.position),
       })
     : [];
-  const now = new Date();
   const collections = rows.map((c) => ({
     id: c.id,
     title: c.title,
     handle: c.handle,
     imageUrl: c.imageUrl,
-    productIds: c.rules ? applyRules(active, c.rules, now).map((p) => p.id) : links.filter((l) => l.collectionId === c.id).map((l) => l.productId),
+    productIds: placeSoldOut(
+      c.rules ? applyRules(all, c.rules, now).map((p) => p.id) : links.filter((l) => l.collectionId === c.id).map((l) => l.productId),
+      mode,
+      (id) => soldOut.has(id),
+    ),
   }));
   return { products, collections };
 }

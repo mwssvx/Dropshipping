@@ -1,9 +1,9 @@
 // Badges on product cards: a label of the merchant's own ("Bestseller", "Limited edition") and
 // automatic ones the store works out, so they're never wrong: how much is off when a product is on
 // sale, "Sold out" when nothing can be ordered, and "New" for a while after it was added. A card
-// shows two at most, the merchant's own first.
+// shows two at most, the merchant's own first. Also where sold-out products sit in lists.
 import { and, eq } from "drizzle-orm";
-import { schema, type BadgeSettings, type Db } from "@sf/db";
+import { schema, SOLD_OUT_DISPLAY, type BadgeSettings, type Db, type SoldOutDisplay } from "@sf/db";
 import { BADGE_MAX_LENGTH } from "./badge-rules";
 import { NotFoundError, UserError } from "./errors";
 import { openPreorder } from "./preorders";
@@ -36,4 +36,26 @@ export async function setProductBadge(db: Db, shopId: string, productId: string,
     .returning({ id: schema.products.id });
   if (!row) throw new NotFoundError("Product");
   return badge;
+}
+
+/**
+ * A list with its sold-out products where the store wants them: left in place, moved after
+ * everything that can be bought (each part keeps its order), or left out.
+ */
+export function placeSoldOut<T>(items: T[], mode: SoldOutDisplay, soldOut: (item: T) => boolean) {
+  if (mode === "show") return items;
+  const available = items.filter((i) => !soldOut(i));
+  return mode === "hide" ? available : [...available, ...items.filter(soldOut)];
+}
+
+/** Where a store lists its sold-out products. */
+export async function soldOutDisplay(db: Db, shopId: string): Promise<SoldOutDisplay> {
+  const shop = await db.query.shops.findFirst({ where: eq(schema.shops.id, shopId), columns: { soldOutProducts: true } });
+  return shop?.soldOutProducts ?? "last";
+}
+
+export async function setSoldOutDisplay(db: Db, shopId: string, mode: string) {
+  if (!(SOLD_OUT_DISPLAY as readonly string[]).includes(mode)) throw new UserError("Pick where sold-out products go.");
+  await db.update(schema.shops).set({ soldOutProducts: mode as SoldOutDisplay, updatedAt: new Date() }).where(eq(schema.shops.id, shopId));
+  return mode as SoldOutDisplay;
 }

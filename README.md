@@ -549,3 +549,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **By tag**: an email campaign can go only to subscribers with one customer tag, like "vip" or a tag brought over from Shopify (`audience: "tagged"`, `campaigns.audience_tag`). The editor lists the tags subscribers have, with how many have each (`subscriberTags`).
 2. **By product**: or only to subscribers who paid for one product, any time, which suits a matching accessory or a new colour (`audience: "bought"`, `campaigns.audience_product_id`).
 3. Only the tag or product the audience needs is kept, a copy of a campaign keeps its audience, and the send button counts the people it goes to now (`campaignAudienceSize`). Everything else about sending is unchanged: only people who said yes, the monthly allowance, and unsubscribes before the email goes out are skipped.
+
+### Sold-out products (after launch, part 73)
+
+1. **Last by default**: collections, search and the home page's product grids list products nobody can order right now after everything that can be bought, whatever the sort, each part keeping its order (`placeSoldOut` in `packages/core/src/badges.ts`, applied in `browseProducts` and `storefrontCatalog`). A product open for pre-order counts as available.
+2. **Or hidden, or left where they are**: Admin → Products → Sold-out products (`shops.sold_out_products`: `last`, `hide` or `show`). A hidden product's own page still works, so saved links and back-in-stock alerts keep working.
+3. Store files carry the setting.

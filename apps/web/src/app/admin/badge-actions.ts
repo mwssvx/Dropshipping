@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { setBadgeSettings, setProductBadge, UserError } from "@sf/core";
+import { setBadgeSettings, setProductBadge, setSoldOutDisplay, UserError } from "@sf/core";
 import { requireShop } from "@/lib/server";
 
 export type BadgeState = { error?: string; saved?: boolean };
@@ -32,4 +32,18 @@ export async function productBadgeAction(productId: string, _: BadgeState, form:
     if (e instanceof UserError) return { error: e.message };
     throw e;
   }
+}
+
+/** Where sold-out products go in the store's lists. */
+export async function soldOutAction(_: BadgeState, form: FormData): Promise<BadgeState> {
+  const { shop, db } = await requireShop("products");
+  try {
+    await setSoldOutDisplay(db, shop.id, String(form.get("soldOut") ?? ""));
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath("/admin/products");
+  revalidatePath(`/s/${shop.handle}`, "layout");
+  return { saved: true };
 }

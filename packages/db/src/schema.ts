@@ -86,6 +86,10 @@ export type BulkEditSnapshot = {
 
 export type PricingRule = { kind: "multiplier" | "fixed"; value: number; ending: "99" | "95" | "00" | "none"; compareAtPercent: number | null; minPriceMinor: number };
 
+/** Sold-out products in lists: where they are, after everything that can be bought, or not at all. */
+export const SOLD_OUT_DISPLAY = ["show", "last", "hide"] as const;
+export type SoldOutDisplay = (typeof SOLD_OUT_DISPLAY)[number];
+
 export const shops = pgTable(
   "shops",
   {
@@ -173,6 +177,8 @@ export const shops = pgTable(
     // A password page before launch, or a holiday break. Null when the store is open.
     closure: jsonb("closure").$type<StoreClosure>(),
     productBadges: jsonb("product_badges").$type<BadgeSettings>().notNull().default({ sale: true, soldOut: true, newDays: 0 }),
+    // Where sold-out products go in collections, search and the home page.
+    soldOutProducts: text("sold_out_products", { enum: SOLD_OUT_DISPLAY }).notNull().default("last"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
