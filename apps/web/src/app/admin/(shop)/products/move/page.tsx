@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../../PageHeader";
 import { ShopifyImportForm } from "./ShopifyImportForm";
+import { ShopifyCustomersForm } from "./ShopifyCustomersForm";
 
 export const metadata = { title: "Move from Shopify" };
 
@@ -28,6 +29,15 @@ export default async function MoveFromShopifyPage() {
           </p>
         </section>
         <ShopifyImportForm />
+        <section className="flex flex-col gap-2" aria-labelledby="customers-heading">
+          <h2 id="customers-heading" className="font-semibold">Bring your customers over</h2>
+          <p className="hint text-sm">
+            In Shopify, open Customers, click Export and pick &quot;All customers&quot; as a CSV file. Names, notes and tags come across, and
+            customers who agreed to marketing email on Shopify can get your campaigns here. Nobody is subscribed who didn&apos;t agree, and
+            anyone who unsubscribed here stays unsubscribed. Past Shopify orders don&apos;t come across.
+          </p>
+        </section>
+        <ShopifyCustomersForm />
       </div>
     </main>
   );

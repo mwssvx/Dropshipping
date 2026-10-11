@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { asc, eq } from "drizzle-orm";
 import { schema } from "@sf/db";
-import { DemoModel, findRedirect, importShopifyProducts, parseCsv, readShopifyProducts } from "../src";
+import { DemoModel, findRedirect, importShopifyCustomers, importShopifyProducts, parseCsv, readShopifyProducts } from "../src";
 import { makeFixture } from "../evals/fixture";
 
 const HEADER =
@@ -84,5 +84,33 @@ describe("moving from Shopify", () => {
     await importShopifyProducts(g.db, (await g.shop()).id, FILE, { keepStatus: true });
     expect((await g.db.query.products.findFirst({ where: eq(schema.products.handle, "cloud-lamp") }))!.status).toBe("active");
     expect((await g.db.query.products.findFirst({ where: eq(schema.products.handle, "plain-mug") }))!.status).toBe("draft");
+  });
+});
+
+describe("moving customers from Shopify", () => {
+  const CUSTOMERS = [
+    "Customer ID,First Name,Last Name,Email,Accepts Email Marketing,Default Address Company,Default Address City,Phone,Accepts SMS Marketing,Total Spent,Total Orders,Note,Tax Exempt,Tags",
+    "1,Ada,Lovelace,ADA@example.com,yes,,London,,no,120.00,3,Prefers express,no,\"vip, newsletter\"",
+    "2,Alan,Turing,alan@example.com,no,,Manchester,,no,0.00,0,,no,",
+    "3,Grace,Hopper,grace@example.com,yes,,Arlington,,no,10.00,1,,no,wholesale",
+    "4,No,Email,,yes,,,,no,0,0,,no,",
+    "5,Bad,Address,not-an-email,yes,,,,no,0,0,,no,",
+  ].join("\n");
+
+  it("adds customers, keeps marketing consent, and never resubscribes someone who left", async () => {
+    const f = await makeFixture(new DemoModel());
+    const shopId = (await f.shop()).id;
+    // Grace is already here and unsubscribed; Alan is here with our own note.
+    await f.db.insert(schema.customers).values([
+      { shopId, email: "grace@example.com", unsubscribedAt: new Date(), tags: ["returning"] },
+      { shopId, email: "alan@example.com", name: "A. Turing", note: "Our note" },
+    ]);
+    expect(await importShopifyCustomers(f.db, shopId, CUSTOMERS)).toEqual({ added: 1, updated: 2, subscribed: 1, invalid: 2 });
+    const get = (email: string) => f.db.query.customers.findFirst({ where: eq(schema.customers.email, email) });
+    expect(await get("ada@example.com")).toMatchObject({ name: "Ada Lovelace", acceptsMarketing: true, note: "Prefers express", tags: ["vip", "newsletter"] });
+    expect(await get("alan@example.com")).toMatchObject({ name: "A. Turing", note: "Our note", acceptsMarketing: false });
+    expect(await get("grace@example.com")).toMatchObject({ name: "Grace Hopper", acceptsMarketing: false, tags: ["returning", "wholesale"] });
+    // A products file isn't a customers file.
+    await expect(importShopifyCustomers(f.db, shopId, FILE)).rejects.toThrow("isn't a Shopify customers file");
   });
 });
