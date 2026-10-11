@@ -1,14 +1,16 @@
 "use server";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { acceptInvite, createSession, deleteSession, finishTwoStep, requestPasswordReset, resetPassword, signIn, signUp, twoStepChallenge, UserError } from "@sf/core";
+import { acceptInvite, createSession, deleteSession, describeDevice, finishTwoStep, noteDevice, requestPasswordReset, resetPassword, signIn, signUp, twoStepChallenge, UserError } from "@sf/core";
 import { BRAND } from "@/lib/brand";
-import { adminUrl, db, mailer, requireUser, SESSION_COOKIE, SHOP_COOKIE, TWO_STEP_COOKIE } from "@/lib/server";
+import { adminUrl, db, mailer, platformUrl, requireUser, SESSION_COOKIE, SHOP_COOKIE, TWO_STEP_COOKIE } from "@/lib/server";
 
 export type AuthState = { error?: string; email?: string };
 
 async function startSession(userId: string) {
-  const { token, expiresAt } = await createSession(await db(), userId);
+  const device = describeDevice((await headers()).get("user-agent"));
+  await noteDevice({ db: await db(), mailer: mailer(), brand: BRAND, manageUrl: platformUrl("/admin/account") }, userId, device);
+  const { token, expiresAt } = await createSession(await db(), userId, device);
   (await cookies()).set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
