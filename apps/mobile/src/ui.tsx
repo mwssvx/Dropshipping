@@ -153,6 +153,7 @@ export function Field({
   autoCapitalize = "sentences",
   hint,
   onSubmit,
+  oneTimeCode,
 }: {
   label: string;
   value: string;
@@ -164,6 +165,8 @@ export function Field({
   autoCapitalize?: "none" | "sentences" | "words";
   hint?: string;
   onSubmit?: () => void;
+  /** A sign-in code: phones offer to fill it in from a text message or password manager. */
+  oneTimeCode?: boolean;
 }) {
   return (
     <View style={{ gap: space(1) }}>
@@ -181,6 +184,8 @@ export function Field({
         autoCapitalize={autoCapitalize}
         autoCorrect={!secure && autoCapitalize !== "none"}
         onSubmitEditing={onSubmit}
+        textContentType={oneTimeCode ? "oneTimeCode" : undefined}
+        autoComplete={oneTimeCode ? "one-time-code" : undefined}
       />
       {hint ? <Text style={s.hint}>{hint}</Text> : null}
     </View>

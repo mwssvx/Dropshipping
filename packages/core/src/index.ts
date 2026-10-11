@@ -16,6 +16,7 @@ export * from "./collection-rules";
 export * from "./search";
 export * from "./search-terms";
 export * from "./lowest-price";
+export * from "./two-step";
 export * from "./blog";
 export * from "./payment-links";
 export * from "./pricing";

@@ -117,10 +117,11 @@ export async function resetPassword(db: Db, token: string, password: string, now
   return { id: user.id, email: user.email };
 }
 
-/** Drops old sign-in attempts and used or expired reset links. Run by the scheduled job. */
+/** Drops old sign-in attempts, used or expired reset links and unfinished two-step sign-ins. Run by the scheduled job. */
 export async function pruneAuthRecords(db: Db, now = new Date()) {
   await db.delete(schema.authAttempts).where(lt(schema.authAttempts.createdAt, new Date(now.getTime() - 24 * 60 * MINUTE)));
   await db.delete(schema.passwordResets).where(lt(schema.passwordResets.expiresAt, new Date(now.getTime() - 24 * 60 * MINUTE)));
+  await db.delete(schema.signInChallenges).where(lt(schema.signInChallenges.expiresAt, now));
 }
 
 export async function createSession(db: Db, userId: string) {

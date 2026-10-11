@@ -174,6 +174,8 @@ export async function campaigns(): Promise<CampaignContext> {
 
 export const SESSION_COOKIE = "sf_session";
 export const SHOP_COOKIE = "sf_shop";
+/** A right password waiting for its two-step code (10 minutes). */
+export const TWO_STEP_COOKIE = "sf_two_step";
 
 export async function currentUser() {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;

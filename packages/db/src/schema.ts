@@ -34,6 +34,13 @@ export const users = pgTable("users", {
   name: text("name"),
   // Push notification kinds this person turned off in the app (see PUSH_KINDS).
   pushOff: jsonb("push_off").$type<string[]>().notNull().default([]),
+  // Two-step sign-in: a code from an authenticator app after the password. The secret is saved
+  // when setup starts and only counts once two_step_on_at is set; the last time step used stops a
+  // code being used twice. Recovery codes are kept hashed and each works once.
+  twoStepSecret: text("two_step_secret"),
+  twoStepOnAt: timestamp("two_step_on_at", { withTimezone: true }),
+  twoStepLastStep: integer("two_step_last_step"),
+  recoveryCodes: jsonb("recovery_codes").$type<string[]>().notNull().default([]),
   createdAt: createdAt(),
 });
 
@@ -1189,6 +1196,18 @@ export const passwordResets = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("password_resets_user_idx").on(t.userId)],
+);
+
+/** A right password for someone with two-step sign-in on, waiting for their code (10 minutes). */
+export const signInChallenges = pgTable(
+  "sign_in_challenges",
+  {
+    tokenHash: text("token_hash").primaryKey(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("sign_in_challenges_user_idx").on(t.userId)],
 );
 
 // Milestone 9: inviting people to help run a store. The invite link is emailed; only its hash is kept.
