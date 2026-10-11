@@ -78,6 +78,7 @@ export const PUSH_LABELS: Record<PushKind, string> = {
   new_order: "New orders",
   problem_order: "Orders that need you",
   payout_hold: "Payout holds and document requests",
+  dispute: "Payment disputes",
   margin_alert: "Margin alerts",
   agent_proposal: "Changes waiting for your OK",
   escalation_reply: "Replies from our support team",
@@ -87,6 +88,7 @@ const PUSH_AREA: Record<PushKind, Area> = {
   new_order: "orders",
   problem_order: "orders",
   payout_hold: "money",
+  dispute: "money",
   margin_alert: "assistant",
   agent_proposal: "assistant",
   escalation_reply: "assistant",
@@ -138,7 +140,7 @@ const clip = (s: string, n = 140) => (s.length > n ? `${s.slice(0, n - 1)}…` :
 
 /** What happened in a store since `since`, as notifications. `url` is a path inside the app. */
 export async function collectPushEvents(db: Db, shopId: string, since: Date): Promise<PushEvent[]> {
-  const [shop, orders, failed, holds, actions, staff] = await Promise.all([
+  const [shop, orders, failed, holds, actions, staff, disputes] = await Promise.all([
     db.query.shops.findFirst({ where: eq(schema.shops.id, shopId) }),
     db.query.orders.findMany({
       where: and(eq(schema.orders.shopId, shopId), inArray(schema.orders.paymentStatus, ["paid", "partially_refunded"]), gte(schema.orders.paidAt, since)),
@@ -177,6 +179,12 @@ export async function collectPushEvents(db: Db, shopId: string, since: Date): Pr
         ),
       )
       .limit(50),
+    db
+      .select({ d: schema.disputes, number: schema.orders.number })
+      .from(schema.disputes)
+      .leftJoin(schema.orders, eq(schema.orders.id, schema.disputes.orderId))
+      .where(and(eq(schema.disputes.shopId, shopId), gte(schema.disputes.createdAt, since)))
+      .limit(50),
   ]);
   if (!shop) return [];
   const events: PushEvent[] = [];
@@ -196,6 +204,17 @@ export async function collectPushEvents(db: Db, shopId: string, since: Date): Pr
   for (const a of actions) {
     const margin = a.agent === "margin";
     events.push({ kind: margin ? "margin_alert" : "agent_proposal", ref: a.id, title: margin ? "Margin alert" : "Waiting for your OK", body: clip(a.summary), url: "/", at: a.createdAt });
+  }
+  for (const { d, number } of disputes) {
+    const due = d.evidenceDueBy ? ` Answer by ${d.evidenceDueBy.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}.` : "";
+    events.push({
+      kind: "dispute",
+      ref: d.id,
+      title: number ? `Order #${number} was disputed` : "A payment was disputed",
+      body: clip(`${formatMoney(d.amountMinor, d.currency)} is held.${due} The evidence is ready to check and send.`),
+      url: d.orderId ? `/orders/${d.orderId}` : "/money",
+      at: d.createdAt,
+    });
   }
   for (const { m } of staff) {
     events.push({ kind: "escalation_reply", ref: m.id, title: "Our support team replied", body: clip(m.body), url: "/assistant", at: m.createdAt });

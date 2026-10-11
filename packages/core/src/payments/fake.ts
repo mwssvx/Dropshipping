@@ -1,6 +1,6 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { UserError } from "../errors";
-import type { PaymentEvent, PaymentProvider, PayoutAccountStatus } from "./provider";
+import type { DisputeEvidence, PaymentEvent, PaymentProvider, PayoutAccountStatus, ProviderDispute } from "./provider";
 
 /**
  * A local stand-in for Stripe. It signs its own webhooks with a dev secret so the webhook
@@ -27,6 +27,35 @@ export class FakePaymentProvider implements PaymentProvider {
     return { id: `fake_pi_${randomUUID()}` };
   }
 
+  /** Evidence sent for each dispute, and disputes given up, for tests. */
+  readonly disputeEvidence = new Map<string, DisputeEvidence>();
+  readonly acceptedDisputes = new Set<string>();
+
+  async submitDisputeEvidence(input: { disputeId: string; evidence: DisputeEvidence }) {
+    this.disputeEvidence.set(input.disputeId, input.evidence);
+  }
+
+  async acceptDispute(disputeId: string) {
+    this.acceptedDisputes.add(disputeId);
+  }
+
+  /** Build a signed dispute event, as the card network would cause. */
+  disputeEvent(dispute: Partial<ProviderDispute> & Pick<ProviderDispute, "paymentIntentId" | "amountMinor">) {
+    return this.event({
+      id: `fake_evt_${randomUUID()}`,
+      type: "dispute.updated",
+      dispute: {
+        id: `fake_dp_${randomUUID()}`,
+        currency: "USD",
+        reason: "product_not_received",
+        status: "needs_response",
+        inquiry: false,
+        evidenceDueBy: new Date(Date.now() + 7 * 86_400_000),
+        ...dispute,
+      },
+    });
+  }
+
   async clientSecret(paymentIntentId: string) {
     return `${paymentIntentId}_secret`;
   }
@@ -50,7 +79,10 @@ export class FakePaymentProvider implements PaymentProvider {
     const expected = Buffer.from(this.sign(rawBody));
     const got = Buffer.from(signature ?? "");
     if (expected.length !== got.length || !timingSafeEqual(expected, got)) throw new Error("Bad webhook signature");
-    return JSON.parse(rawBody) as PaymentEvent;
+    const event = JSON.parse(rawBody) as PaymentEvent;
+    // Dates don't survive JSON.
+    if (event.type === "dispute.updated" && event.dispute.evidenceDueBy) event.dispute.evidenceDueBy = new Date(event.dispute.evidenceDueBy);
+    return event;
   }
 
   async refund() {

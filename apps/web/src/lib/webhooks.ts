@@ -1,7 +1,7 @@
 import "server-only";
 import { after } from "next/server";
-import { handlePaymentEvent, onOrderPaid, sendShopNotifications, sendShopWebhooks } from "@sf/core";
-import { db, fulfillment, payments, pushSender, tax, webhooks } from "./server";
+import { handlePaymentEvent, notifyNewDisputes, onOrderPaid, sendShopNotifications, sendShopWebhooks } from "@sf/core";
+import { db, disputeNotices, fulfillment, payments, pushSender, tax, webhooks } from "./server";
 
 /**
  * Verify, then apply, a payment webhook. Used by the webhook route and the test-mode pay button.
@@ -14,7 +14,20 @@ export async function processPaymentWebhook(rawBody: string, signature: string |
   if (!event) return { status: "ignored" as const };
   const result = await handlePaymentEvent(await db(), provider.name, event);
   if (result.status === "processed" && result.becamePaid) afterOrderPaid(result.orderId);
+  if (result.status === "processed" && "disputeShopId" in result && result.disputeShopId) afterDispute(result.disputeShopId);
   return result;
+}
+
+/** A new or changed dispute: email the store's money people and push to their phones. */
+function afterDispute(shopId: string) {
+  after(async () => {
+    try {
+      await notifyNewDisputes(await disputeNotices(), { shopId });
+      await sendShopNotifications({ db: await db(), push: pushSender() }, shopId);
+    } catch (e) {
+      console.error(`Dispute notices for shop ${shopId} failed; the scheduled job will retry.`, e);
+    }
+  });
 }
 
 /** Confirmation email, gift cards, supplier orders, tax, push and webhooks, after the response is sent. */

@@ -1,5 +1,5 @@
-import { pruneAuthRecords, pruneBuyerRecords, pruneStockAlerts, sendPriceDrops, sendStockAlerts, syncSupplierStock, pruneInvites, pruneEvents, refreshAllVerified, runWebhooks, routeStuckOrders, sendCampaignBatches, runFakePayouts, runDueSubscriptions, runHealthChecks, runScheduledAgents, sendAbandonedCartEmails, sendAllNotifications, sendReferralRewards, syncTracking } from "@sf/core";
-import { agents, campaigns, fulfillment, pushSender, stock, subscriptions, testPayments, webhooks } from "@/lib/server";
+import { pruneAuthRecords, pruneBuyerRecords, pruneStockAlerts, sendPriceDrops, sendStockAlerts, syncSupplierStock, pruneInvites, pruneEvents, refreshAllVerified, runWebhooks, routeStuckOrders, sendCampaignBatches, runFakePayouts, notifyNewDisputes, runDueSubscriptions, runHealthChecks, runScheduledAgents, sendAbandonedCartEmails, sendAllNotifications, sendReferralRewards, syncTracking } from "@sf/core";
+import { agents, campaigns, disputeNotices, fulfillment, pushSender, stock, subscriptions, testPayments, webhooks } from "@/lib/server";
 
 /**
  * Scheduled job: place any paid orders that were missed, then pull tracking from suppliers, and
@@ -27,6 +27,8 @@ export async function GET(request: Request) {
   const restocked = await sendStockAlerts(await stock());
   const priceDrops = await sendPriceDrops(await stock());
   const payouts = testPayments() ? await runFakePayouts(ctx.db) : null;
+  // Disputes whose email didn't go out when the webhook came in.
+  const disputes = await notifyNewDisputes(await disputeNotices());
   // Store health warnings and the verified badge.
   const health = await runHealthChecks(ctx.db);
   const verified = await refreshAllVerified(ctx.db);
@@ -40,5 +42,5 @@ export async function GET(request: Request) {
   await pruneInvites(ctx.db);
   await pruneBuyerRecords(ctx.db);
   await pruneStockAlerts(ctx.db);
-  return Response.json({ routed, tracking, referrals, stock: stockSync, subscriptions: repeats, restocked, priceDrops, payouts, health, verified, reminders, campaigns: campaignEmails, ai, push, webhooks: hooks, pruned });
+  return Response.json({ routed, tracking, referrals, stock: stockSync, subscriptions: repeats, restocked, priceDrops, payouts, disputes, health, verified, reminders, campaigns: campaignEmails, ai, push, webhooks: hooks, pruned });
 }

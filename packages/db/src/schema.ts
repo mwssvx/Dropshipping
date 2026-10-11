@@ -865,7 +865,7 @@ export const pushDevices = pgTable(
   (t) => [index("push_devices_user_idx").on(t.userId)],
 );
 
-export const PUSH_KINDS = ["new_order", "problem_order", "payout_hold", "margin_alert", "agent_proposal", "escalation_reply"] as const;
+export const PUSH_KINDS = ["new_order", "problem_order", "payout_hold", "dispute", "margin_alert", "agent_proposal", "escalation_reply"] as const;
 export type PushKind = (typeof PUSH_KINDS)[number];
 
 // Every push we decided to send, one row per person per event, so an event never notifies twice.
@@ -1611,4 +1611,34 @@ export const subscriptions = pgTable(
     check("subscriptions_interval", sql`${t.intervalDays} between 7 and 120`),
     check("subscriptions_percent", sql`${t.percentOff} between 0 and 50`),
   ],
+);
+
+/**
+ * A buyer asked their bank to take a payment back (a chargeback), or asked a question first (an
+ * inquiry). The merchant answers with evidence before the due date, mostly gathered for them.
+ */
+export const disputes = pgTable(
+  "disputes",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    orderId: uuid("order_id").references((): AnyPgColumn => orders.id, { onDelete: "set null" }),
+    providerDisputeId: text("provider_dispute_id").notNull().unique(),
+    amountMinor: money("amount_minor").notNull(),
+    currency: text("currency").notNull(),
+    // The card network's reason: fraudulent, product_not_received, product_unacceptable, ...
+    reason: text("reason").notNull(),
+    status: text("status", { enum: ["needs_response", "under_review", "won", "lost", "closed"] }).notNull(),
+    // An inquiry: the bank asked, but hasn't taken the money back yet.
+    inquiry: boolean("inquiry").notNull().default(false),
+    evidenceDueBy: timestamp("evidence_due_by", { withTimezone: true }),
+    // What the merchant added to the evidence we put together, and when it went.
+    note: text("note"),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    // When the merchant was emailed about it.
+    notifiedAt: timestamp("notified_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("disputes_shop_idx").on(t.shopId, t.createdAt), index("disputes_order_idx").on(t.orderId)],
 );

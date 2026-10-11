@@ -112,7 +112,7 @@ export async function applyAccountStatus(db: Db, shopId: string, status: PayoutA
 }
 
 /** Apply a payout-account, payout or plan webhook. Returns false when it isn't for any of our shops. */
-export async function applyMoneyEvent(db: Db, event: Exclude<PaymentEvent, { type: "payment.succeeded" | "payment.failed" }>) {
+export async function applyMoneyEvent(db: Db, event: Exclude<PaymentEvent, { type: "payment.succeeded" | "payment.failed" | "dispute.updated" }>) {
   if (event.type === "plan.updated") {
     const shop = await db.query.shops.findFirst({ where: eq(schema.shops.id, event.shopId) });
     if (!shop) return false;

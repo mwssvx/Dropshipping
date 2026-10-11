@@ -4,6 +4,7 @@
 import { and, asc, eq, gte, inArray, lte } from "drizzle-orm";
 import { AD_CHANNELS, schema, type Db } from "@sf/db";
 import { z } from "zod";
+import { DISPUTE_FEE_MINOR } from "./disputes";
 import { NotFoundError, UserError } from "./errors";
 
 type Shop = typeof schema.shops.$inferSelect;
@@ -120,6 +121,13 @@ export async function profitReport(db: Db, shop: Shop, days: ProfitRange, now = 
       feeBack.set(r.orderId, (feeBack.get(r.orderId) ?? 0) + r.platformFeeRefundedMinor);
     }
   }
+  // A lost dispute takes the money back like a refund, and costs a fee on top.
+  const lost = new Map<string, number>();
+  if (orderIds.length) {
+    for (const d of await db.query.disputes.findMany({ where: and(inArray(schema.disputes.orderId, orderIds), eq(schema.disputes.status, "lost")), columns: { orderId: true, amountMinor: true } })) {
+      lost.set(d.orderId!, (lost.get(d.orderId!) ?? 0) + d.amountMinor);
+    }
+  }
   const variantIds = [...new Set(lines.map((l) => l.variantId).filter((x): x is string => !!x))];
   const variants = variantIds.length ? await db.query.variants.findMany({ where: inArray(schema.variants.id, variantIds), columns: { id: true, productId: true } }) : [];
   const productIds = [...new Set(variants.map((v) => v.productId))];
@@ -157,8 +165,9 @@ export async function profitReport(db: Db, shop: Shop, days: ProfitRange, now = 
     }
     // What the buyer paid for the goods: after discount, before shipping and tax.
     const goods = order.totalMinor - order.shippingMinor - order.taxMinor;
-    const refundedGoods = order.totalMinor ? Math.round((order.refundedMinor * goods) / order.totalMinor) : 0;
-    const fees = order.platformFeeMinor + order.processingFeeMinor - (feeBack.get(order.id) ?? 0);
+    const takenBack = Math.min(order.totalMinor, order.refundedMinor + (lost.get(order.id) ?? 0));
+    const refundedGoods = order.totalMinor ? Math.round((takenBack * goods) / order.totalMinor) : 0;
+    const fees = order.platformFeeMinor + order.processingFeeMinor - (feeBack.get(order.id) ?? 0) + (lost.has(order.id) ? DISPUTE_FEE_MINOR : 0);
     const sent = placed.has(order.id);
     for (const l of own) {
       const share = (l.unitPriceMinor * l.quantity) / gross;
