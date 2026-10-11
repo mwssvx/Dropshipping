@@ -11,10 +11,10 @@ const shot = async (p: Page, name: string) => {
 const FILE = [
   "Handle,Title,Body (HTML),Vendor,Published,Option1 Name,Option1 Value,Variant SKU,Variant Inventory Tracker,Variant Inventory Qty,Variant Price,Variant Compare At Price,Image Src,Image Position,Gift Card,SEO Title,SEO Description,Cost per item,Status",
   'cloud-lamp,Cloud Lamp,"<p>A soft, glowing cloud.</p>",Acme,true,Color,White,CL-W,shopify,12,29.99,39.99,,,false,Cloud Lamp | Night light,A soft cloud lamp for any room.,8.50,active',
-  ",,,,,,Pink,CL-P,shopify,4,31.99,,,,,,,,",
+  "cloud-lamp,,,,,,Pink,CL-P,shopify,4,31.99,,,,,,,,",
   "plain-mug,Plain Mug,<p>Holds tea.</p>,Acme,true,Title,Default Title,,,,12.00,,,,false,,,,draft",
   "gift-card,Gift Card,,Acme,true,Denominations,$25,,,,25.00,,,,true,,,,active",
-].join("\n").replace("\n,,,,,,Pink", "\ncloud-lamp,,,,,,Pink");
+].join("\n");
 
 test("products come over from a Shopify export", async ({ page }, info) => {
   const id = `${info.project.name}-${Date.now()}`;
@@ -61,4 +61,18 @@ test("products come over from a Shopify export", async ({ page }, info) => {
   // The mug was a draft on Shopify, so it stays off the store.
   const mug = await page.request.get(store.replace("cloud-lamp", "plain-mug"));
   expect(mug.status()).toBe(404);
+
+  // Then the customers, with who agreed to marketing email.
+  await page.goto("/admin/products/move");
+  const customers = [
+    "Customer ID,First Name,Last Name,Email,Accepts Email Marketing,Total Spent,Total Orders,Note,Tags",
+    `1,Ada,Lovelace,ada-${id}@example.com,yes,120.00,3,Prefers express,vip`,
+    `2,Alan,Turing,alan-${id}@example.com,no,0.00,0,,`,
+  ].join("\n");
+  await page.getByLabel("Shopify customers file (CSV)").setInputFiles({ name: "customers_export.csv", mimeType: "text/csv", buffer: Buffer.from(customers) });
+  await page.getByRole("button", { name: "Add customers" }).click();
+  await expect(page.getByText("2 customers added. 1 customer agreed to marketing email on Shopify, so they get your campaigns.")).toBeVisible();
+  await shot(page, "373-move-customers");
+  await page.getByRole("link", { name: "See your customers" }).click();
+  await expect(page.getByText(`ada-${id}@example.com`)).toBeVisible();
 });

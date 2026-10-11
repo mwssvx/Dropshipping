@@ -2,7 +2,7 @@
 // products here, with their options, prices, costs, stock, photos and search listings. Handles
 // are kept, so /products/<handle> links and search results still work once the domain points
 // here. One product spans several rows in that file: the first has the product, the rest add
-// options and photos.
+// options and photos. The customers file brings customers, and who agreed to marketing email.
 import { and, eq, inArray } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { UserError } from "./errors";
@@ -223,4 +223,80 @@ export async function importShopifyProducts(db: Db, shopId: string, text: string
     created++;
   }
   return { created, skipped, problems };
+}
+
+/**
+ * Adds the customers in a Shopify customers file (Customers → Export). Each becomes a customer
+ * with their name, note and tags; those who agreed to marketing email on Shopify stay subscribed.
+ * Someone already here keeps what we have: their name and note aren't replaced, tags are added,
+ * and anyone who unsubscribed here stays unsubscribed.
+ */
+export async function importShopifyCustomers(db: Db, shopId: string, text: string, now = new Date()) {
+  if (text.length > MAX_BYTES) throw new UserError("That file is over 10 MB. Export fewer customers at a time.");
+  const [header, ...rows] = parseCsv(text);
+  const col = new Map((header ?? []).map((h, i) => [h.trim().toLowerCase(), i]));
+  if (!col.has("email") || !col.has("first name")) {
+    throw new UserError("That isn't a Shopify customers file. In Shopify, open Customers, then Export, and pick \"CSV for Excel, Numbers, or other spreadsheet programs\".");
+  }
+  const get = (r: string[], name: string) => {
+    const i = col.get(name);
+    return i === undefined ? "" : (r[i] ?? "").trim();
+  };
+  const people = new Map<string, { name: string | null; marketing: boolean; note: string | null; tags: string[] }>();
+  let invalid = 0;
+  for (const r of rows) {
+    const email = get(r, "email").toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+      if (email || get(r, "first name")) invalid++;
+      continue;
+    }
+    const yes = (get(r, "accepts email marketing") || get(r, "accepts marketing")).toLowerCase();
+    people.set(email, {
+      name: [get(r, "first name"), get(r, "last name")].filter(Boolean).join(" ").slice(0, 120) || null,
+      marketing: yes === "yes" || yes === "true",
+      note: get(r, "note").slice(0, 2000) || null,
+      tags: get(r, "tags").split(",").map((t) => t.trim().toLowerCase()).filter(Boolean).slice(0, 20).map((t) => t.slice(0, 40)),
+    });
+    if (people.size > 50_000) throw new UserError("That file has more than 50,000 customers. Export them in parts.");
+  }
+  if (!people.size) throw new UserError("There are no customers with an email address in that file.");
+  const emails = [...people.keys()];
+  const existing = new Map<string, typeof schema.customers.$inferSelect>();
+  for (let i = 0; i < emails.length; i += 500) {
+    const found = await db.query.customers.findMany({ where: and(eq(schema.customers.shopId, shopId), inArray(schema.customers.email, emails.slice(i, i + 500))) });
+    for (const c of found) existing.set(c.email, c);
+  }
+  let added = 0;
+  let updated = 0;
+  let subscribed = 0;
+  for (const [email, p] of people) {
+    const had = existing.get(email);
+    if (!had) {
+      await db.insert(schema.customers).values({
+        shopId,
+        email,
+        name: p.name,
+        note: p.note,
+        tags: p.tags,
+        acceptsMarketing: p.marketing,
+        marketingConsentAt: p.marketing ? now : null,
+      });
+      added++;
+      if (p.marketing) subscribed++;
+      continue;
+    }
+    const subscribe = p.marketing && !had.acceptsMarketing && !had.unsubscribedAt;
+    await db
+      .update(schema.customers)
+      .set({
+        name: had.name ?? p.name,
+        note: had.note ?? p.note,
+        tags: [...new Set([...had.tags, ...p.tags])].slice(0, 20),
+        ...(subscribe ? { acceptsMarketing: true, marketingConsentAt: now } : {}),
+      })
+      .where(eq(schema.customers.id, had.id));
+    updated++;
+    if (subscribe) subscribed++;
+  }
+  return { added, updated, subscribed, invalid };
 }
