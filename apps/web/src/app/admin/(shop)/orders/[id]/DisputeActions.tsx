@@ -51,7 +51,7 @@ export function SimulateDispute({ orderId }: { orderId: string }) {
     <form action={action} className="flex flex-wrap items-end gap-3">
       <FormError message={state.error} />
       <div className="field">
-        <label className="label" htmlFor="sim-reason">Reason</label>
+        <label className="label" htmlFor="sim-reason">Bank says</label>
         <select className="input" id="sim-reason" name="reason" defaultValue="product_not_received">
           <option value="product_not_received">It never arrived</option>
           <option value="fraudulent">Card was stolen</option>

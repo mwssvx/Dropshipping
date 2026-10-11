@@ -79,7 +79,7 @@ test("merchants answer a dispute with the evidence we gathered", async ({ page, 
 
   // A second one: the merchant gives it up.
   await simulate.click();
-  await page.getByLabel("Reason").selectOption("fraudulent");
+  await page.getByLabel("Bank says").selectOption("fraudulent");
   await page.getByRole("button", { name: "Simulate a dispute" }).click();
   await expect(dispute.getByText("Needs your answer")).toBeVisible();
   await dispute.getByRole("button", { name: "Accept dispute" }).click();
