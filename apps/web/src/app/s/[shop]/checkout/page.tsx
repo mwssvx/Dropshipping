@@ -1,5 +1,6 @@
+import { PixelEvent } from "@/components/PixelEvent";
 import { redirect } from "next/navigation";
-import { addonOffer, convertPrice, countryName, formatMoney, lastCheckoutDetails, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, UserError } from "@sf/core";
+import { addonOffer, convertPrice, countryName, formatMoney, lastCheckoutDetails, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, storePixels, UserError } from "@sf/core";
 import { buyerFx } from "@/lib/currency";
 import { currentBuyer } from "@/lib/buyer";
 import { readCart, readDiscountCode, readGiftCardCode } from "@/lib/cart";
@@ -63,78 +64,81 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
   const offer = !quote.wholesale && hasGoods ? await addonOffer(await db(), shop, [...new Set(variants.map((v) => v.productId))]) : null;
   const offerTitle = offer ? (await localProducts(handle, [{ id: offer.product.id, title: offer.product.title }]))[0]!.title : "";
   return (
-    <Checkout
-      handle={handle}
-      defaultCountry={shop.country}
-      initial={initial}
-      paidByGiftCard={!!quote.giftCard && quote.dueMinor === 0}
-      countries={countries}
-      zones={choices}
-      text={{
-        checkout: t.checkout, orderSummary: t.orderSummary, contact: t.contact, newsAndOffers: t.newsAndOffers, delivery: t.delivery, email: t.email,
-        fullName: t.fullName, address: t.address, address2: t.address2, city: t.city, region: t.region, postalCode: t.postalCode, country: t.country,
-        shipping: t.shipping, noShipping: t.noShipping, placeOrder: t.placeOrder, continueToPayment: t.continueToPayment, continuing: t.continuing,
-        notAvailable: t.notAvailable, tax: t.tax, giftCheckbox: t.giftCheckbox, giftFrom: t.giftFrom, giftMessage: t.giftMessage,
-        giftRecipientEmail: t.giftRecipientEmail, giftNote: t.giftNote, orderNote: t.orderNote,
-      }}
-      taxLabel={quote.pricesIncludeTax ? t.taxIncluded : t.taxNextStep}
-      totalLabel={quote.pricesIncludeTax ? t.total : t.totalBeforeTax}
-      totalWithoutShipping={money(withoutShipping.totalMinor)}
-      summary={
-        <>
-          <ul className="flex flex-col gap-2 text-sm">
-            {quote.items.map((i) => (
-              <li key={i.key} className="flex justify-between gap-3">
-                <span>
-                  {titles.get(i.variantId) ?? i.title} <span className="hint">× {i.quantity}</span>
-                  {i.personalization && <span className="block hint">{i.personalization.map((p) => `${p.label}: ${p.value}`).join(" · ")}</span>}
-                  {i.preorderShipsBy && <span className="block hint">{t.preorderShipsBy(new Intl.DateTimeFormat(lang ?? "en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${i.preorderShipsBy}T12:00:00Z`)))}</span>}
-                  {i.priceNote && <span className="block hint">{i.priceNote}</span>}
-                </span>
-                <span className="num">{money(shown.units[i.variantId]! * i.quantity)}</span>
-              </li>
-            ))}
-          </ul>
-          <dl className="grid grid-cols-[1fr_auto] gap-y-1 num text-sm border-t border-border pt-3">
-            <dt className="hint">{t.subtotal}</dt><dd className="text-right">{money(shown.subtotalMinor)}</dd>
-            {(quote.discount || quote.bundle) && shown.discountMinor > 0 && (
-              <>
-                <dt className="hint">{quote.discount ? `${t.discount} (${quote.discount.code})` : `${t.bundle} (${quote.bundle!.title})`}</dt><dd className="text-right">−{money(shown.discountMinor)}</dd>
-              </>
-            )}
-          </dl>
-        </>
-      }
-      footer={
-        <>
-          {offer && (
-            <AddonOffer
-              action={addAddonAction.bind(null, handle, offer.addon.id)}
-              heading={t.addonHeading}
-              title={offerTitle}
-              pitch={offer.addon.pitch}
-              imageUrl={offer.product.imageUrl}
-              save={offer.addon.percentOff ? t.addonSave(offer.addon.percentOff) : null}
-              optionLabel={t.option}
-              choices={offer.variants.map((v) => ({
-                id: v.id,
-                title: v.title,
-                priceLabel: money(convertPrice(v.priceMinor, fx)),
-                wasLabel: v.wasMinor > v.priceMinor ? money(convertPrice(v.wasMinor, fx)) : null,
-              }))}
-              addLabel={Object.fromEntries(offer.variants.map((v) => [v.id, t.addonAdd(money(convertPrice(v.priceMinor, fx)))]))}
-            />
-          )}
-          {quote.giftCard && (
-            <dl className="grid grid-cols-[1fr_auto] gap-y-1 num text-sm">
-              <dt className="hint">{t.giftCard} ···· {quote.giftCard.last4}</dt>
-              <dd className="text-right">−{money(quote.giftCard.appliedMinor)}{quote.pricesIncludeTax ? "" : "+"}</dd>
-              <dd className="col-span-2 hint text-right font-sans">{t.giftCardPays}</dd>
+    <>
+      {storePixels(shop) && <PixelEvent name="begin_checkout" data={{ ids: quote.items.map((i) => i.variantId), value: (quote.goodsMinor - quote.discountMinor) / 100, currency: shop.currency }} />}
+      <Checkout
+        handle={handle}
+        defaultCountry={shop.country}
+        initial={initial}
+        paidByGiftCard={!!quote.giftCard && quote.dueMinor === 0}
+        countries={countries}
+        zones={choices}
+        text={{
+          checkout: t.checkout, orderSummary: t.orderSummary, contact: t.contact, newsAndOffers: t.newsAndOffers, delivery: t.delivery, email: t.email,
+          fullName: t.fullName, address: t.address, address2: t.address2, city: t.city, region: t.region, postalCode: t.postalCode, country: t.country,
+          shipping: t.shipping, noShipping: t.noShipping, placeOrder: t.placeOrder, continueToPayment: t.continueToPayment, continuing: t.continuing,
+          notAvailable: t.notAvailable, tax: t.tax, giftCheckbox: t.giftCheckbox, giftFrom: t.giftFrom, giftMessage: t.giftMessage,
+          giftRecipientEmail: t.giftRecipientEmail, giftNote: t.giftNote, orderNote: t.orderNote,
+        }}
+        taxLabel={quote.pricesIncludeTax ? t.taxIncluded : t.taxNextStep}
+        totalLabel={quote.pricesIncludeTax ? t.total : t.totalBeforeTax}
+        totalWithoutShipping={money(withoutShipping.totalMinor)}
+        summary={
+          <>
+            <ul className="flex flex-col gap-2 text-sm">
+              {quote.items.map((i) => (
+                <li key={i.key} className="flex justify-between gap-3">
+                  <span>
+                    {titles.get(i.variantId) ?? i.title} <span className="hint">× {i.quantity}</span>
+                    {i.personalization && <span className="block hint">{i.personalization.map((p) => `${p.label}: ${p.value}`).join(" · ")}</span>}
+                    {i.preorderShipsBy && <span className="block hint">{t.preorderShipsBy(new Intl.DateTimeFormat(lang ?? "en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${i.preorderShipsBy}T12:00:00Z`)))}</span>}
+                    {i.priceNote && <span className="block hint">{i.priceNote}</span>}
+                  </span>
+                  <span className="num">{money(shown.units[i.variantId]! * i.quantity)}</span>
+                </li>
+              ))}
+            </ul>
+            <dl className="grid grid-cols-[1fr_auto] gap-y-1 num text-sm border-t border-border pt-3">
+              <dt className="hint">{t.subtotal}</dt><dd className="text-right">{money(shown.subtotalMinor)}</dd>
+              {(quote.discount || quote.bundle) && shown.discountMinor > 0 && (
+                <>
+                  <dt className="hint">{quote.discount ? `${t.discount} (${quote.discount.code})` : `${t.bundle} (${quote.bundle!.title})`}</dt><dd className="text-right">−{money(shown.discountMinor)}</dd>
+                </>
+              )}
             </dl>
-          )}
-          {fx.rate !== 1 && <p className="hint text-xs">{t.fxNote(fx.currency)}</p>}
-        </>
-      }
-    />
+          </>
+        }
+        footer={
+          <>
+            {offer && (
+              <AddonOffer
+                action={addAddonAction.bind(null, handle, offer.addon.id)}
+                heading={t.addonHeading}
+                title={offerTitle}
+                pitch={offer.addon.pitch}
+                imageUrl={offer.product.imageUrl}
+                save={offer.addon.percentOff ? t.addonSave(offer.addon.percentOff) : null}
+                optionLabel={t.option}
+                choices={offer.variants.map((v) => ({
+                  id: v.id,
+                  title: v.title,
+                  priceLabel: money(convertPrice(v.priceMinor, fx)),
+                  wasLabel: v.wasMinor > v.priceMinor ? money(convertPrice(v.wasMinor, fx)) : null,
+                }))}
+                addLabel={Object.fromEntries(offer.variants.map((v) => [v.id, t.addonAdd(money(convertPrice(v.priceMinor, fx)))]))}
+              />
+            )}
+            {quote.giftCard && (
+              <dl className="grid grid-cols-[1fr_auto] gap-y-1 num text-sm">
+                <dt className="hint">{t.giftCard} ···· {quote.giftCard.last4}</dt>
+                <dd className="text-right">−{money(quote.giftCard.appliedMinor)}{quote.pricesIncludeTax ? "" : "+"}</dd>
+                <dd className="col-span-2 hint text-right font-sans">{t.giftCardPays}</dd>
+              </dl>
+            )}
+            {fx.rate !== 1 && <p className="hint text-xs">{t.fxNote(fx.currency)}</p>}
+          </>
+        }
+      />
+    </>
   );
 }

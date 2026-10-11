@@ -3,6 +3,7 @@ import { LANGUAGES, productFeed, shopLanguages } from "@sf/core";
 import { requireShop, storeAddress } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { CopyLink } from "./CopyLink";
+import { PixelsForm } from "./PixelsForm";
 
 export const metadata = { title: "Sales channels" };
 
@@ -49,6 +50,17 @@ export default async function ChannelsPage() {
             <p className="hint text-sm">{f.steps}</p>
           </section>
         ))}
+        <section className="card p-5 flex flex-col gap-3" aria-labelledby="pixels-heading">
+          <div>
+            <h2 id="pixels-heading" className="font-semibold">Ad tracking</h2>
+            <p className="hint text-sm">
+              Paste your pixel and tag IDs so your ads can see what they lead to. Your store tells them when someone views a product, adds to cart,
+              starts checkout and buys, with the price and the same IDs as your feeds. Visitors are asked first in a cookie banner in their
+              language, and nothing loads until they agree. Saying no doesn&apos;t stop anyone from shopping.
+            </p>
+          </div>
+          <PixelsForm meta={shop.adPixels?.meta ?? ""} tiktok={shop.adPixels?.tiktok ?? ""} google={shop.adPixels?.google ?? ""} consent={shop.cookieConsent} />
+        </section>
         <section className="card overflow-hidden" aria-labelledby="issues-heading">
           <h2 id="issues-heading" className="font-semibold px-5 pt-4 pb-2">To fix</h2>
           {issues.length === 0 ? (

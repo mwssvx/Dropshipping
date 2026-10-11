@@ -428,6 +428,13 @@
       "when": 1791691510452,
       "tag": "0060_low_stock_note",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1791692647805,
+      "tag": "0061_ad_pixels",
+      "breakpoints": true
     }
   ]
 }
