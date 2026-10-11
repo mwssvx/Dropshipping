@@ -7,6 +7,7 @@ import { schema, type Db } from "@sf/db";
 import { convertPrice, noConversion, type DisplayFx } from "./money";
 import { listActiveProducts } from "./products";
 import { placeSoldOut, productSoldOut, soldOutDisplay } from "./badges";
+import { fixedSearch } from "./search-terms";
 
 type ActiveProduct = Awaited<ReturnType<typeof listActiveProducts>>[number];
 
@@ -122,7 +123,10 @@ async function unitsSold(db: Db, shopId: string, productIds: string[]) {
  * order). "featured" keeps the order given; with a query the default is best match.
  */
 export async function browseProducts(db: Db, shopId: string, products: ActiveProduct[], options: BrowseOptions, fx: DisplayFx = noConversion("USD")) {
-  const terms = words(options.q ?? "");
+  // A search the merchant pointed at other words shows those words' results.
+  const fixes = options.q?.trim() ? ((await db.query.shops.findFirst({ where: eq(schema.shops.id, shopId), columns: { searchFixes: true } }))?.searchFixes ?? []) : [];
+  const showingFor = fixedSearch(fixes, options.q);
+  const terms = words(showingFor ?? options.q ?? "");
   const sort: Sort = options.sort && options.sort in SORTS ? (options.sort as Sort) : terms.length ? "relevance" : "featured";
   const price = (p: ActiveProduct) => convertPrice(lowestPrice(p), fx);
 
@@ -168,7 +172,7 @@ export async function browseProducts(db: Db, shopId: string, products: ActivePro
     newest: (a, b) => b.p.createdAt.getTime() - a.p.createdAt.getTime() || a.position - b.position,
   };
   const sorted = placeSoldOut(scored.sort(by[sort]).map((r) => r.p), await soldOutDisplay(db, shopId), (p) => productSoldOut(p));
-  return { products: sorted, sort, terms, facets };
+  return { products: sorted, sort, terms, facets, showingFor };
 }
 
 /** The search page: every active product in the store, filtered and sorted. */

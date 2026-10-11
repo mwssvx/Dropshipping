@@ -146,6 +146,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         <section className="card p-5 flex flex-col gap-3" aria-labelledby="searches-heading">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 id="searches-heading" className="font-semibold">What shoppers search for</h2>
+            <Link href="/admin/search-fixes" className="text-sm underline">Search fixes</Link>
             {searches.searches > 0 && (
               <p className="hint text-sm">
                 {searches.searches === 1 ? "1 search" : `${searches.searches.toLocaleString("en-US")} searches`}, {pct(searches.nothingShare)} found nothing
@@ -175,12 +176,16 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
                       {searches.nothing.map((s) => (
                         <li key={s.term} className="flex justify-between gap-3">
                           <a href={searchLink(s.term)} target="_blank" rel="noreferrer" className="hover:underline truncate">{s.term}</a>
-                          <span className="num hint shrink-0">{s.searches === 1 ? "1 search" : `${s.searches} searches`}</span>
+                          <span className="flex gap-3 shrink-0">
+                            <span className="num hint">{s.searches === 1 ? "1 search" : `${s.searches} searches`}</span>
+                            <Link href={`/admin/search-fixes?from=${encodeURIComponent(s.term)}`} className="underline" aria-label={`Fix the search “${s.term}”`}>Fix</Link>
+                          </span>
                         </li>
                       ))}
                     </ol>
                     <p className="hint text-xs">
-                      Shoppers wanted these and left empty-handed. Add a product they&apos;d buy, or use their words in a product&apos;s title or description.
+                      Shoppers wanted these and left empty-handed. Add a product they&apos;d buy, use their words in a product&apos;s title or description, or
+                      point the search at words that find something.
                     </p>
                   </>
                 ) : (

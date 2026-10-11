@@ -1,0 +1,1 @@
+ALTER TABLE "shops" ADD COLUMN "search_fixes" jsonb DEFAULT '[]'::jsonb NOT NULL;

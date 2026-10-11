@@ -561,3 +561,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Counted by word and day**: each plain search on the store adds to a count for its words that day, with how many products it found (`recordSearch` in `packages/core/src/search-terms.ts`, table `search_terms`). Re-sorting or filtering a search isn't counted again.
 2. **Private by design**: only the words are kept, never who searched, and anything that looks like an email address or a number of six or more digits isn't kept at all. Counts older than about 13 months are deleted with old visitor events.
 3. **On the Analytics page**: the most searched words for the period, with how many results each found last, and the ones that found nothing, apart, since they point at products to add or words to use in titles (`searchReport`). Each opens that search on the store.
+
+### Search fixes (after launch, part 75)
+
+1. **Point a search elsewhere**: when shoppers search for words the products don't use ("lampshade", a misspelling), the merchant points them at words that find what they meant (`setSearchFix` in `packages/core/src/search-terms.ts`, `shops.search_fixes`, up to 100). The whole search has to match, in any case and spacing.
+2. **Honest about it**: the store shows the other words' results and says "Showing results for …" in the buyer's language (`browseProducts` returns `showingFor`).
+3. **From the report**: each word under "Found nothing" on the Analytics page has a Fix link that opens Admin → Search fixes with it filled in. Store files carry the fixes.

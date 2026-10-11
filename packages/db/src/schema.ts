@@ -86,6 +86,9 @@ export type BulkEditSnapshot = {
 
 export type PricingRule = { kind: "multiplier" | "fixed"; value: number; ending: "99" | "95" | "00" | "none"; compareAtPercent: number | null; minPriceMinor: number };
 
+/** A search that shows another search's results instead, both as the store counts them. */
+export type SearchFix = { from: string; to: string };
+
 /** Sold-out products in lists: where they are, after everything that can be bought, or not at all. */
 export const SOLD_OUT_DISPLAY = ["show", "last", "hide"] as const;
 export type SoldOutDisplay = (typeof SOLD_OUT_DISPLAY)[number];
@@ -179,6 +182,8 @@ export const shops = pgTable(
     productBadges: jsonb("product_badges").$type<BadgeSettings>().notNull().default({ sale: true, soldOut: true, newDays: 0 }),
     // Where sold-out products go in collections, search and the home page.
     soldOutProducts: text("sold_out_products", { enum: SOLD_OUT_DISPLAY }).notNull().default("last"),
+    // Searches the merchant pointed elsewhere: "lampshade" shows the results for "lamp shade".
+    searchFixes: jsonb("search_fixes").$type<SearchFix[]>().notNull().default([]),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
