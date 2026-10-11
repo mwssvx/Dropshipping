@@ -19,6 +19,7 @@ import { createSale, MAX_SALES } from "./sales";
 import { createAddon, MAX_ADDONS, setAddonActive } from "./addons";
 import { openPreorder } from "./preorders";
 import { storePixels } from "./pixels";
+import { parseVideo } from "./video";
 
 export const EXPORT_FORMAT = "storefront-store";
 
@@ -128,6 +129,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       preorder: p.preorder ? { ships_by: p.preorder.shipsBy, limit: p.preorder.limit } : null,
       search_listing: p.seoTitle || p.seoDescription ? { title: p.seoTitle, description: p.seoDescription } : null,
       purchase_limit: p.purchaseLimit ? { min: p.purchaseLimit.min, max: p.purchaseLimit.max, per_customer: p.purchaseLimit.perCustomer } : null,
+      video_url: p.videoUrl,
       gift_card: p.giftCard,
       variants: variants
         .filter((v) => v.productId === p.id)
@@ -316,6 +318,7 @@ const importSchema = z.object({
           .max(3)
           .optional(),
         search_listing: z.object({ title: str(70).nullable(), description: str(160).nullable() }).nullable().optional(),
+        video_url: z.string().max(2000).nullable().optional(),
         purchase_limit: z
           .object({ min: z.number().int().min(2).max(99).nullable(), max: z.number().int().min(1).max(99).nullable(), per_customer: z.number().int().min(1).max(999).nullable() })
           .nullable()
@@ -512,6 +515,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
           seoTitle: x.search_listing?.title || null,
           seoDescription: x.search_listing?.description || null,
           purchaseLimit: x.purchase_limit ? { min: x.purchase_limit.min, max: x.purchase_limit.max, perCustomer: x.purchase_limit.per_customer } : null,
+          videoUrl: parseVideo(x.video_url) ? x.video_url!.trim() : null,
           // A pre-order whose date has passed isn't brought over.
           preorder: x.preorder && openPreorder({ preorder: { shipsBy: x.preorder.ships_by, limit: x.preorder.limit } }) ? { shipsBy: x.preorder.ships_by, limit: x.preorder.limit } : null,
         })

@@ -246,6 +246,8 @@ export const products = pgTable(
     preorder: jsonb("preorder").$type<Preorder>(),
     // Least and most a buyer can order, e.g. a limited drop capped at 2 per customer.
     purchaseLimit: jsonb("purchase_limit").$type<PurchaseLimit>(),
+    // A video for the product page: a YouTube or Vimeo link, or an https video file.
+    videoUrl: text("video_url"),
     // How the product shows in search results; the title and description are used when empty.
     seoTitle: text("seo_title"),
     seoDescription: text("seo_description"),

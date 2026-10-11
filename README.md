@@ -517,3 +517,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Password page before launch**: Admin → Store status → Behind a password (`setStoreClosure` in `packages/core/src/store-closure.ts`, `shops.closure`). Every store page sends visitors without the password to an "Opening soon" page with the merchant's message and opening date, where they can join the store's email list. The right password sets a cookie for 30 days; a new password lets out everyone who had the old one. Order, payment, unsubscribe and signup links from emails still open, and robots.txt keeps search engines out.
 2. **Holiday break**: Admin → Store status → On a break. Buyers can look around and fill their cart, but every page says the store is on a break (and when it's back), the cart has no checkout button, and new checkouts are refused (`onHoliday`). Subscription deliveries and after-checkout offers carry on.
 3. **Opens by itself**: either can end on a date the merchant sets (`activeClosure`), so nobody has to remember to switch the store back on. The admin shows a banner while the store is closed.
+
+### Product videos (after launch, part 68)
+
+1. **One video per product**: Admin → Products → a product → Video takes a YouTube link (watch, youtu.be, Shorts), a Vimeo link, or the https address of a video file such as a supplier's .mp4 (`setProductVideo` and `parseVideo` in `packages/core/src/video.ts`, `products.video_url`). Store files carry it.
+2. **After the photos**: the product page's gallery gets a video thumbnail after the photos, or shows the video as the main picture when there are no photos. Video files play in the page's own player.
+3. **Nothing loads until play**: YouTube and Vimeo players appear only when the buyer presses play, from youtube-nocookie.com and Vimeo with do-not-track, and the still is the product's own photo, so opening the page sends nothing to either.

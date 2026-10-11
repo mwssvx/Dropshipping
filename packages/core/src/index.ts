@@ -81,4 +81,5 @@ export * from "./seo";
 export * from "./purchase-limits";
 export * from "./pixels";
 export * from "./store-closure";
+export * from "./video";
 export * from "./shopify-import";

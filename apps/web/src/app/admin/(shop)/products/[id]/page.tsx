@@ -11,6 +11,7 @@ import { QuantityBreaksForm } from "./QuantityBreaksForm";
 import { PersonalizationForm } from "./PersonalizationForm";
 import { PreorderForm } from "./PreorderForm";
 import { PurchaseLimitForm } from "./PurchaseLimitForm";
+import { VideoForm } from "./VideoForm";
 import { SeoForm } from "./SeoForm";
 import { AddressForm } from "./AddressForm";
 import { PhotosPanel } from "./PhotosPanel";
@@ -103,6 +104,15 @@ export default async function EditProductPage({ params, searchParams }: { params
             optionsEditable: !product.giftCard && !product.variants.some((v) => v.supplierVariantRef),
           }} />
         <PhotosPanel productId={product.id} title={product.title} photos={productPhotos(product)} max={MAX_PHOTOS} />
+        {!product.giftCard && (
+          <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="video-heading">
+            <div>
+              <h2 id="video-heading" className="font-semibold">Video</h2>
+              <p className="hint">Paste a YouTube or Vimeo link, or the address of a video file (many suppliers have one). It shows after the photos, and the player only loads when a buyer presses play.</p>
+            </div>
+            <VideoForm productId={product.id} url={product.videoUrl ?? ""} />
+          </section>
+        )}
         {product.variants.length > 1 && productPhotos(product).length > 1 && !product.giftCard && (
           <VariantPhotosPanel productId={product.id} photos={productPhotos(product)}
             {...variantPhotoRows(product.variants.map((v) => ({ id: v.id, title: v.title, options: v.options ?? {}, imageUrl: v.imageUrl })))} />
