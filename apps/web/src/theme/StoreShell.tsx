@@ -102,6 +102,7 @@ export function StoreShell({
           <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
             {menus.footer.map((m, i) => <Link key={i} href={storeHref(base, m.href)} className="hover:text-accent">{m.label}</Link>)}
             <Link href={`${base}/track`} className="hover:text-accent">{t.trackOrder}</Link>
+            <Link href={`${base}/contact`} className="hover:text-accent">{t.contactUs}</Link>
           </nav>
           <div className="flex flex-wrap justify-between gap-4 hint">
             <span className="flex items-center gap-3 flex-wrap">

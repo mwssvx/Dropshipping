@@ -46,7 +46,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
             ))}
           </ol>
           <div className="border-t border-border pt-4">
-            <ReplyForm conversationId={conversation.id} primary={pending.length === 0} />
+            <ReplyForm conversationId={conversation.id} primary={pending.length === 0} hasOrder={!!order} />
           </div>
         </section>
         <aside className="flex flex-col gap-4">
@@ -56,12 +56,18 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
               <h2 className="font-semibold">Drafted reply</h2>
               {pending.map((a) => <ApprovalCard key={a.id} action={a} />)}
             </>
+          ) : order ? (
+            <div className="card p-4 text-sm flex flex-col gap-1">
+              <h2 className="font-semibold">Order #{order.number}</h2>
+              <p className="hint break-all">{order.email}</p>
+              <p className="hint">{order.shippingAddress.name}, {order.shippingAddress.city}</p>
+            </div>
           ) : (
-            order && (
+            conversation.email && (
               <div className="card p-4 text-sm flex flex-col gap-1">
-                <h2 className="font-semibold">Order #{order.number}</h2>
-                <p className="hint break-all">{order.email}</p>
-                <p className="hint">{order.shippingAddress.name}, {order.shippingAddress.city}</p>
+                <h2 className="font-semibold">From your contact page</h2>
+                <p className="hint break-all">{conversation.email}</p>
+                <p className="hint">Your reply is emailed to them.</p>
               </div>
             )
           )}

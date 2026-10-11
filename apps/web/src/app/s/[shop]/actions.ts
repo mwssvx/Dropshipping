@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie } from "@sf/core";
+import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
 import { agents, campaigns, db, fulfillment, payments, subscriptions, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
@@ -299,6 +299,32 @@ export async function passwordSignupAction(handle: string, form: FormData) {
     status = "invalid";
   }
   redirect(`${await storeBase(handle)}/password?signup=${status}`);
+}
+
+export type ContactState = { error?: string; sent?: boolean };
+
+/** The contact page. Messages about one of the buyer's own orders go to buyer support first. */
+export async function contactAction(handle: string, _: ContactState, form: FormData): Promise<ContactState> {
+  const shop = await loadShop(handle);
+  const get = (k: string) => String(form.get(k) ?? "");
+  let sent: Awaited<ReturnType<typeof sendContactMessage>>;
+  try {
+    sent = await sendContactMessage(await db(), shop, { name: get("name"), email: get("email"), order: get("order"), message: get("message"), website: get("website") });
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  if (sent?.orderId) {
+    const { conversationId, orderId } = sent;
+    after(async () => {
+      try {
+        await answerBuyer(await agents(), conversationId, orderId);
+      } catch (e) {
+        console.error("buyer support run failed", e);
+      }
+    });
+  }
+  return { sent: true };
 }
 
 /** "Track your order": emails the order's link to the address it was placed with, if there is one. */

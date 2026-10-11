@@ -85,18 +85,28 @@ export async function sendBuyerMessage(ctx: FulfillmentContext, messageId: strin
   const message = await db.query.messages.findFirst({ where: eq(schema.messages.id, messageId) });
   if (!message) throw new NotFoundError("Message");
   const c = (await db.query.conversations.findFirst({ where: eq(schema.conversations.id, message.conversationId) }))!;
-  if (c.kind !== "buyer" || !c.orderId || !c.email) throw new UserError("This conversation has no buyer to write to.");
+  if (c.kind !== "buyer" || !c.email) throw new UserError("This conversation has no buyer to write to.");
   if (message.status === "discarded") throw new UserError("That draft was discarded.");
   const text = (body ?? message.body).trim();
   if (text.length < 2) throw new UserError("Write a reply first.");
-  const order = (await db.query.orders.findFirst({ where: eq(schema.orders.id, c.orderId) }))!;
+  const order = c.orderId ? ((await db.query.orders.findFirst({ where: eq(schema.orders.id, c.orderId) })) ?? null) : null;
   const shop = (await db.query.shops.findFirst({ where: eq(schema.shops.id, c.shopId) }))!;
-  const link = await ctx.orderStatusUrl(shop, order);
-  const subject = `Re: your order #${order.number} from ${shop.name}`;
-  const fullText = `${text}\n\n—\n${shop.name}\nSee your order and reply here: ${link}`;
+  let subject: string;
+  let fullText: string;
+  if (order) {
+    subject = `Re: your order #${order.number} from ${shop.name}`;
+    fullText = `${text}\n\n—\n${shop.name}\nSee your order and reply here: ${await ctx.orderStatusUrl(shop, order)}`;
+  } else {
+    // No order to key the sent email on, so the message's own status says whether it went.
+    if (message.status === "sent") return { status: "already_sent" as const };
+    // A message from the contact page: the buyer writes there again to reply.
+    const contact = ctx.storeAddress ? `${await ctx.storeAddress(shop)}/contact` : null;
+    subject = `Re: your message to ${shop.name}`;
+    fullText = `${text}\n\n—\n${shop.name}${contact ? `\nTo reply, write to us again: ${contact}` : ""}`;
+  }
   const [email] = await db
     .insert(schema.emails)
-    .values({ shopId: shop.id, orderId: order.id, kind: "support_reply", ref: message.id, to: c.email, subject, bodyText: fullText })
+    .values({ shopId: shop.id, orderId: order?.id ?? null, kind: "support_reply", ref: message.id, to: c.email, subject, bodyText: fullText })
     .onConflictDoNothing()
     .returning({ id: schema.emails.id });
   await db.update(schema.messages).set({ status: "sent", body: text }).where(eq(schema.messages.id, message.id));

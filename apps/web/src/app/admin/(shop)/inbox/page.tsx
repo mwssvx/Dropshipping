@@ -19,7 +19,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       <PageHeader title="Inbox" />
       <div className="px-4 sm:px-8 flex flex-col gap-4">
         <p className="hint max-w-2xl">
-          Buyers ask questions from their order page. Buyer support answers the kinds of question you allow in <Link className="underline" href="/admin/ai">AI settings</Link>, drafts the rest for you to check, and hands you anything about refunds, changes or complaints.
+          Buyers write from their order page or your store&apos;s contact page. Buyer support answers the kinds of question you allow in <Link className="underline" href="/admin/ai">AI settings</Link>, drafts the rest for you to check, and hands you anything about refunds, changes or complaints.
         </p>
         <nav className="flex gap-1 bg-sunken rounded-lg p-1 self-start" aria-label="Filter">
           <Link href="/admin/inbox" className={tab(!all)} aria-current={!all ? "page" : undefined}>Needs you</Link>
