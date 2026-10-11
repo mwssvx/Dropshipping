@@ -41,6 +41,8 @@ export const users = pgTable("users", {
   twoStepOnAt: timestamp("two_step_on_at", { withTimezone: true }),
   twoStepLastStep: integer("two_step_last_step"),
   recoveryCodes: jsonb("recovery_codes").$type<string[]>().notNull().default([]),
+  // Devices ("Chrome on Mac") this person has signed in on, so a sign-in from a new one is emailed.
+  knownDevices: jsonb("known_devices").$type<string[]>().notNull().default([]),
   createdAt: createdAt(),
 });
 
@@ -50,6 +52,10 @@ export const sessions = pgTable(
     tokenHash: text("token_hash").primaryKey(),
     userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    // What the person signed in on ("Chrome on Mac", "Merchant app"), and when it was last used
+    // (updated at most every few minutes), for the list of devices on Your account.
+    device: text("device"),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [index("sessions_user_idx").on(t.userId)],

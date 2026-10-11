@@ -19,6 +19,8 @@ import {
   importProduct,
   finishTwoStep,
   twoStepChallenge,
+  APP_DEVICE,
+  noteDevice,
   listOrders,
   listPayouts,
   listProducts,
@@ -57,7 +59,7 @@ import {
 } from "@sf/core";
 import type { Db } from "@sf/db";
 import { BRAND } from "./brand";
-import { agents, db, fulfillment, mailer, notifyLater, payments, refunds, stock, storeAddress, suppliers, testPayments } from "./server";
+import { agents, db, fulfillment, mailer, platformUrl, notifyLater, payments, refunds, stock, storeAddress, suppliers, testPayments } from "./server";
 
 type User = { id: string; email: string };
 type ShopLink = { id: string; name: string; handle: string; role: string };
@@ -129,6 +131,12 @@ const ORDER_FILTERS: Record<string, (o: OrderRow) => boolean> = {
 
 /* Routes */
 
+async function appSession(db: Db, user: { id: string; email: string }) {
+  await noteDevice({ db, mailer: mailer(), brand: BRAND, manageUrl: platformUrl("/admin/account") }, user.id, APP_DEVICE);
+  const { token, expiresAt } = await createSession(db, user.id, APP_DEVICE);
+  return { token, expiresAt, user, shops: await listShopsForUser(db, user.id) };
+}
+
 const publicRoutes: Record<string, PublicHandler> = {
   "POST auth/login": async ({ req, db }) => {
     const b = await body(req);
@@ -136,15 +144,12 @@ const publicRoutes: Record<string, PublicHandler> = {
     // With two-step sign-in on, the app asks for the code and sends it to auth/two-step.
     const twoStep = await twoStepChallenge(db, user.id);
     if (twoStep) return { twoStep };
-    const { token, expiresAt } = await createSession(db, user.id);
-    return { token, expiresAt, user, shops: await listShopsForUser(db, user.id) };
+    return appSession(db, user);
   },
   "POST auth/two-step": async ({ req, db }) => {
     const b = await body(req);
     const done = await finishTwoStep({ db, mailer: mailer(), brand: BRAND }, str(b.twoStep), str(b.code));
-    const user = { id: done.id, email: done.email };
-    const { token, expiresAt } = await createSession(db, user.id);
-    return { token, expiresAt, user, shops: await listShopsForUser(db, user.id) };
+    return appSession(db, { id: done.id, email: done.email });
   },
 };
 

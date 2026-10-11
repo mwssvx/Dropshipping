@@ -1,7 +1,7 @@
 "use server";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { confirmTwoStep, renewRecoveryCodes, startTwoStepSetup, turnOffTwoStep, UserError } from "@sf/core";
+import { confirmTwoStep, endOtherSignIns, endSignIn, NotFoundError, renewRecoveryCodes, startTwoStepSetup, turnOffTwoStep, UserError } from "@sf/core";
 import { BRAND } from "@/lib/brand";
 import { db, mailer, requireUser, SESSION_COOKIE } from "@/lib/server";
 
@@ -54,4 +54,28 @@ export async function turnOffTwoStepAction(_: TwoStepState, form: FormData): Pro
   }
   revalidatePath("/admin/account");
   return { off: true };
+}
+
+export type SignInsState = { error?: string; ended?: number };
+
+/** Signs out one other device. */
+export async function endSignInAction(id: string, _: SignInsState, _form: FormData): Promise<SignInsState> {
+  const user = await requireUser();
+  try {
+    await endSignIn(await db(), user.id, id);
+  } catch (e) {
+    if (!(e instanceof NotFoundError)) throw e;
+  }
+  revalidatePath("/admin/account");
+  return { ended: 1 };
+}
+
+/** Signs out every device but this one. */
+export async function endOtherSignInsAction(_: SignInsState, _form: FormData): Promise<SignInsState> {
+  const user = await requireUser();
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token) return { error: "Sign in again." };
+  const ended = await endOtherSignIns(await db(), user.id, token);
+  revalidatePath("/admin/account");
+  return { ended };
 }

@@ -124,22 +124,33 @@ export async function pruneAuthRecords(db: Db, now = new Date()) {
   await db.delete(schema.signInChallenges).where(lt(schema.signInChallenges.expiresAt, now));
 }
 
-export async function createSession(db: Db, userId: string) {
+/** Signs someone in. The device ("Chrome on Mac") shows in their list of where they're signed in. */
+export async function createSession(db: Db, userId: string, device?: string | null) {
   const token = randomBytes(32).toString("base64url");
-  const expiresAt = new Date(Date.now() + SESSION_DAYS * 86_400_000);
-  await db.insert(schema.sessions).values({ tokenHash: hashToken(token), userId, expiresAt });
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + SESSION_DAYS * 86_400_000);
+  await db.insert(schema.sessions).values({ tokenHash: hashToken(token), userId, expiresAt, device: device ?? null, lastSeenAt: now });
   return { token, expiresAt };
 }
 
+/** How often a session's "last active" time is saved: often enough to be useful, not on every page. */
+const SEEN_EVERY = 5 * MINUTE;
+
 export async function getSessionUser(db: Db, token: string | undefined) {
   if (!token) return null;
-  const row = await db
-    .select({ id: schema.users.id, email: schema.users.email, name: schema.users.name })
+  const now = new Date();
+  const tokenHash = hashToken(token);
+  const [row] = await db
+    .select({ id: schema.users.id, email: schema.users.email, name: schema.users.name, lastSeenAt: schema.sessions.lastSeenAt })
     .from(schema.sessions)
     .innerJoin(schema.users, eq(schema.users.id, schema.sessions.userId))
-    .where(and(eq(schema.sessions.tokenHash, hashToken(token)), gt(schema.sessions.expiresAt, new Date())))
+    .where(and(eq(schema.sessions.tokenHash, tokenHash), gt(schema.sessions.expiresAt, now)))
     .limit(1);
-  return row[0] ?? null;
+  if (!row) return null;
+  if (!row.lastSeenAt || now.getTime() - row.lastSeenAt.getTime() > SEEN_EVERY) {
+    await db.update(schema.sessions).set({ lastSeenAt: now }).where(eq(schema.sessions.tokenHash, tokenHash));
+  }
+  return { id: row.id, email: row.email, name: row.name };
 }
 
 export async function deleteSession(db: Db, token: string) {

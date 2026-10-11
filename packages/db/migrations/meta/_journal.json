@@ -505,6 +505,13 @@
       "when": 1791712383466,
       "tag": "0071_two_step",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1791713989130,
+      "tag": "0072_session_devices",
+      "breakpoints": true
     }
   ]
 }

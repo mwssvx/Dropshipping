@@ -1,16 +1,20 @@
+import { cookies } from "next/headers";
 import QRCode from "qrcode";
-import { pendingTwoStep, twoStepStatus } from "@sf/core";
+import { listSignIns, pendingTwoStep, twoStepStatus } from "@sf/core";
 import { BRAND } from "@/lib/brand";
-import { requireShop } from "@/lib/server";
+import { requireShop, SESSION_COOKIE } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { startTwoStepAction } from "../../account-actions";
 import { ConfirmTwoStepForm, RenewCodesForm, TurnOffForm } from "./TwoStepForms";
+import { SignIns } from "./SignIns";
 
 export const metadata = { title: "Your account" };
 
 export default async function AccountPage({ searchParams }: { searchParams: Promise<{ recovered?: string }> }) {
   const { user, db } = await requireShop();
-  const [status, pending] = await Promise.all([twoStepStatus(db, user.id), pendingTwoStep(db, user.id, BRAND)]);
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  const [status, pending, signIns] = await Promise.all([twoStepStatus(db, user.id), pendingTwoStep(db, user.id, BRAND), listSignIns(db, user.id, token)]);
+  const now = Date.now();
   const recovered = (await searchParams).recovered === "1";
   const qr = pending ? await QRCode.toString(pending.uri, { type: "svg", margin: 1, errorCorrectionLevel: "M" }) : null;
   const since = status.since?.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
@@ -71,7 +75,37 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             </form>
           )}
         </section>
+
+        <section className="card p-5 flex flex-col gap-4" aria-labelledby="sign-ins-heading">
+          <div className="flex flex-col gap-1">
+            <h2 id="sign-ins-heading" className="font-semibold">Where you&apos;re signed in</h2>
+            <p className="hint">
+              Each browser and phone signed in to your account. Don&apos;t recognise one? Sign it out and change your password. We email you
+              when your account is signed in to on a new kind of device.
+            </p>
+          </div>
+          <SignIns
+            items={signIns.map((s) => ({
+              id: s.id,
+              device: s.device,
+              current: s.current,
+              signedIn: s.signedInAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }),
+              lastActive: ago(now - s.lastSeenAt.getTime()),
+            }))}
+          />
+        </section>
       </div>
     </main>
   );
+}
+
+/** "Active now", "Active 12 minutes ago", "Active 3 days ago". */
+function ago(ms: number) {
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 10) return "Active now";
+  if (minutes < 60) return `Active ${minutes} minutes ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return hours === 1 ? "Active 1 hour ago" : `Active ${hours} hours ago`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? "Active yesterday" : `Active ${days} days ago`;
 }
