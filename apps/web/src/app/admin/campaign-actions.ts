@@ -17,6 +17,8 @@ function readCampaign(form: FormData): CampaignInput {
     buttonLabel: String(form.get("buttonLabel") ?? ""),
     buttonPath: String(form.get("buttonPath") ?? ""),
     audience: String(form.get("audience") ?? "subscribers") as CampaignAudience,
+    audienceTag: form.get("audienceTag") === null ? null : String(form.get("audienceTag")),
+    audienceProductId: form.get("audienceProductId") === null ? null : String(form.get("audienceProductId")),
   };
 }
 

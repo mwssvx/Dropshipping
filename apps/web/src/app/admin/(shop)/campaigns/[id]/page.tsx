@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AUDIENCE_LABELS, audienceSizes, campaignAllowance, campaignStats, formatMoney, getCampaign, NotFoundError, renderCampaign } from "@sf/core";
-import { CAMPAIGN_AUDIENCES } from "@sf/db";
+import { campaignAllowance, campaignAudienceChoices, campaignAudienceSize, campaignAudienceText, campaignStats, formatMoney, getCampaign, NotFoundError, renderCampaign } from "@sf/core";
 import { requireShop, storeAddress } from "@/lib/server";
 import { cancelScheduledCampaignAction, deleteCampaignAction, duplicateCampaignAction } from "../../../campaign-actions";
 import { PageHeader } from "../../PageHeader";
@@ -19,9 +18,16 @@ export default async function CampaignPage({ params, searchParams }: { params: P
     if (e instanceof NotFoundError) notFound();
     throw e;
   });
-  const [sizes, stats, allowance, base] = await Promise.all([audienceSizes(db, shop.id), campaignStats(db, c.id), campaignAllowance(db, shop.id), storeAddress(shop)]);
+  const [size, options, stats, allowance, base, audienceText] = await Promise.all([
+    campaignAudienceSize(db, shop.id, c),
+    c.status === "draft" ? campaignAudienceChoices(db, shop.id) : null,
+    campaignStats(db, c.id),
+    campaignAllowance(db, shop.id),
+    storeAddress(shop),
+    campaignAudienceText(db, c),
+  ]);
   const preview = renderCampaign(shop, c, { name: "Ada Lovelace", clickUrl: `${base}${c.buttonPath ?? "/"}`, unsubscribeUrl: `${base}/unsubscribe/…` });
-  const recipients = c.status === "draft" ? sizes[c.audience] : c.recipients;
+  const recipients = c.status === "draft" ? size : c.recipients;
   const blocked = !shop.mailingAddress
     ? "Add your mailing address on the campaigns page first; the law requires it in marketing emails."
     : recipients === 0
@@ -42,7 +48,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
                 id={c.id}
                 initial={c}
                 saved={(await searchParams).saved === "1"}
-                audiences={CAMPAIGN_AUDIENCES.map((a) => ({ value: a, label: AUDIENCE_LABELS[a], size: sizes[a] }))}
+                {...options!}
               />
             </section>
             <Preview subject={preview.subject} text={preview.text} />
@@ -50,7 +56,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
               <h2 id="send-heading" className="font-semibold">Send</h2>
               <TestSendForm id={c.id} email={user.email} />
               <div className="border-t border-border pt-4">
-                <p className="text-sm pb-3">To {AUDIENCE_LABELS[c.audience].toLowerCase()}: <strong className="num">{recipients}</strong>. Save any edits first.</p>
+                <p className="text-sm pb-3">To {audienceText.replace(/^./, (ch) => ch.toLowerCase())}: <strong className="num">{recipients}</strong>. Save any edits first.</p>
                 <SendForm id={c.id} recipients={recipients} disabled={blocked} />
               </div>
             </section>

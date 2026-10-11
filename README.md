@@ -543,3 +543,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 2. **Moves with the photo**: the description follows its photo when it's reordered or becomes the main one, and goes when the photo is removed.
 3. **Search listings**: the page lists products on sale that have photos with no description, apart from the listing problems, since most supplier products start without them.
 4. **Moving in**: Shopify's "Image Alt Text" comes across with the products file, and store files carry descriptions both ways.
+
+### Campaign audiences (after launch, part 72)
+
+1. **By tag**: an email campaign can go only to subscribers with one customer tag, like "vip" or a tag brought over from Shopify (`audience: "tagged"`, `campaigns.audience_tag`). The editor lists the tags subscribers have, with how many have each (`subscriberTags`).
+2. **By product**: or only to subscribers who paid for one product, any time, which suits a matching accessory or a new colour (`audience: "bought"`, `campaigns.audience_product_id`).
+3. Only the tag or product the audience needs is kept, a copy of a campaign keeps its audience, and the send button counts the people it goes to now (`campaignAudienceSize`). Everything else about sending is unchanged: only people who said yes, the monthly allowance, and unsubscribes before the email goes out are skipped.
