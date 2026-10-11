@@ -200,6 +200,24 @@ export async function sendStockAlerts(ctx: Pick<StockContext, "db" | "mailer" | 
   return { sent };
 }
 
+/** The most "Only N left" can count up to. */
+export const LOW_STOCK_MAX = 50;
+
+/** Product pages say "Only N left" when an option's stock is at or below `n`; 0 turns it off. */
+export async function setLowStockNote(db: Db, shopId: string, n: number) {
+  if (!Number.isInteger(n) || n < 0 || n > LOW_STOCK_MAX) throw new UserError(`Pick a number from 0 to ${LOW_STOCK_MAX}. 0 turns the note off.`);
+  await db.update(schema.shops).set({ lowStockNote: n, updatedAt: new Date() }).where(eq(schema.shops.id, shopId));
+  return n;
+}
+
+/**
+ * How many to tell the buyer are left, when it's few enough to say so. Only real counts: never for
+ * options with no stock count, and never once they're sold out.
+ */
+export function lowStockLeft(shop: Pick<Shop, "lowStockNote">, stock: number | null) {
+  return stock != null && stock > 0 && stock <= shop.lowStockNote ? stock : null;
+}
+
 /** Buyers waiting on each option of a product, for the merchant. */
 export async function waitingForProduct(db: Db, shopId: string, productId: string) {
   const rows = await db

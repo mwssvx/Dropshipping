@@ -3,6 +3,7 @@ import { formatMoney, listCollections, listProducts, recentBulkEdits } from "@sf
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { BulkProducts, type BulkRow } from "./BulkProducts";
+import { LowStockForm } from "./LowStockForm";
 
 export const metadata = { title: "Products" };
 
@@ -44,6 +45,16 @@ export default async function ProductsPage() {
             recent={recent.map((r) => ({ id: r.id, summary: r.summary, when: when(r.createdAt), undone: !!r.undoneAt, canUndo: r.canUndo }))}
           />
         )}
+        <section className="card p-5 mt-6 flex flex-col gap-3 max-w-3xl" aria-labelledby="low-stock-heading">
+          <div>
+            <h2 id="low-stock-heading" className="font-semibold">Few left</h2>
+            <p className="hint">
+              Product pages say "Only 3 left" when an option is running low, so buyers know to order soon. The number is always the real stock
+              from your supplier or what you entered, never made up, and nothing shows for options without a stock count.
+            </p>
+          </div>
+          <LowStockForm value={shop.lowStockNote} />
+        </section>
       </div>
     </main>
   );

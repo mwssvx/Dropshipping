@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { formatMoney, sendStockAlerts, syncProductStock, UserError } from "@sf/core";
+import { formatMoney, sendStockAlerts, setLowStockNote, syncProductStock, UserError } from "@sf/core";
 import { requireShop, stock } from "@/lib/server";
 
 export type StockState = { error?: string; message?: string };
@@ -33,4 +33,21 @@ export async function checkSupplierStockAction(productId: string, _: StockState,
     }
   if (sent) parts.push(`${sent === 1 ? "1 buyer who was" : `${sent} buyers who were`} waiting got a back-in-stock email.`);
   return { message: parts.join(" ") };
+}
+
+export type LowStockState = { error?: string; saved?: number };
+
+/** Sets when product pages say "Only N left"; 0 turns it off. */
+export async function lowStockNoteAction(_: LowStockState, form: FormData): Promise<LowStockState> {
+  const { shop, db } = await requireShop("products");
+  const raw = String(form.get("lowStockNote") ?? "").trim();
+  try {
+    const saved = await setLowStockNote(db, shop.id, raw === "" ? Number.NaN : Number(raw));
+    revalidatePath("/admin/products");
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { saved };
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
 }

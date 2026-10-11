@@ -1,0 +1,1 @@
+ALTER TABLE "shops" ADD COLUMN "low_stock_note" integer DEFAULT 5 NOT NULL;

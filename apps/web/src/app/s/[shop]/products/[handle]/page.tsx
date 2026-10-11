@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, formatDeliveryWindow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold } from "@sf/core";
+import { bundlesForProduct, formatDeliveryWindow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { RecentlyViewed } from "@/components/RecentlyViewed";
 import { RememberView } from "@/components/RememberView";
@@ -116,6 +116,11 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const soldOut = product.variants.filter((x) => x.stock !== null && x.stock <= 0);
   const isSaved = (await savedIds(shop.id)).includes(product.id);
   const tiers = wholesale ? [] : product.quantityBreaks;
+  // "Only 3 left" for options with few left, from the real stock count.
+  const lowStock = Object.fromEntries(product.variants.flatMap((x) => {
+    const left = lowStockLeft(shop, x.stock);
+    return left ? [[x.id, t.lowStock(left)]] : [];
+  })) as Record<string, string>;
   // Purchase limits set the quantity box's range and show as a note under it.
   const limit = product.purchaseLimit;
   const fewest = limit?.min ?? 1;
@@ -183,6 +188,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                 initialId={v.id}
                 prices={Object.fromEntries(product.variants.map((x) => [x.id, <Price key={x.id} minor={x.priceMinor} compareAt={x.compareAtMinor} currency={shop.currency} fx={fx} />]))}
                 soldOutLabel={t.soldOut}
+                lowStock={lowStock}
               />
             ) : many ? (
               <fieldset className="flex flex-col gap-2">
@@ -195,13 +201,17 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                         <input type="radio" name="variantId" value={x.id} defaultChecked={x.id === v.id} disabled={out} className="sr-only peer" data-photo={x.imageUrl ?? undefined} />
                         <span>{x.title}</span>
                         <span className="hint num"><Price minor={x.priceMinor} currency={shop.currency} fx={fx} /></span>
+                        {lowStock[x.id] && <span className="text-xs text-warning font-medium">{lowStock[x.id]}</span>}
                       </label>
                     );
                   })}
                 </div>
               </fieldset>
             ) : (
-              <input type="hidden" name="variantId" value={v.id} />
+              <>
+                <input type="hidden" name="variantId" value={v.id} />
+                {lowStock[v.id] && <p className="text-sm text-warning font-medium">{lowStock[v.id]}</p>}
+              </>
             )}
             {product.personalization.map((f) => (
               <div key={f.id} className="field">

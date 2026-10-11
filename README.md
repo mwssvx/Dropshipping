@@ -493,3 +493,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Least and most per order**: Admin → Products → a product → Purchase limits sets the fewest and the most a buyer can order at once, counting every option of the product together (`setPurchaseLimit` in `packages/core/src/purchase-limits.ts`, `products.purchase_limit`). The product page shows the limits under a quantity box that follows them.
 2. **Most per customer**: for limited drops, a cap across all of a buyer's paid orders, matched by email (`boughtBefore`). It's checked at checkout, and in the cart already when the buyer is signed in. Free replacements don't count, and repeat deliveries of a subscription aren't stopped.
 3. **What the buyer sees**: the cart says what to change next to the item, in the store's language, and checkout won't start until it's fixed (`quoteCart` returns `limit` on the item; `startCheckout` refuses it). Store files carry the limits.
+
+### Few left (after launch, part 63)
+
+1. **"Only 3 left"**: product pages say how many are left of the option the buyer is looking at when its stock is at or below the store's number, 5 unless changed (`lowStockLeft` in `packages/core/src/stock.ts`, `shops.low_stock_note`). The count is always the real stock from the supplier sync or what the merchant entered; options without a stock count and sold-out options never show it.
+2. **The merchant's choice**: Admin → Products → Few left sets the number from 0 (off) to 50 (`setLowStockNote`). Store files carry it.

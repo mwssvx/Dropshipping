@@ -20,12 +20,15 @@ export function OptionPicker({
   initialId,
   prices,
   soldOutLabel,
+  lowStock = {},
 }: {
   options: { name: string; values: string[] }[];
   variants: PickerVariant[];
   initialId: string;
   prices: Record<string, ReactNode>;
   soldOutLabel: string;
+  /** "Only 2 left", by variant, for options with few left. */
+  lowStock?: Record<string, string>;
 }) {
   const [chosenId, setChosenId] = useState(initialId);
   const chosen = variants.find((v) => v.id === chosenId) ?? variants[0]!;
@@ -81,6 +84,7 @@ export function OptionPicker({
         <span>{chosen.title}</span>
         {prices[chosen.id]}
         {!chosen.available && <span className="text-critical">{soldOutLabel}</span>}
+        {chosen.available && lowStock[chosen.id] && <span className="text-warning font-medium">{lowStock[chosen.id]}</span>}
       </p>
     </div>
   );
