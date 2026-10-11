@@ -6,6 +6,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { convertPrice, noConversion, type DisplayFx } from "./money";
 import { listActiveProducts } from "./products";
+import { productSoldOut } from "./badges";
 
 type ActiveProduct = Awaited<ReturnType<typeof listActiveProducts>>[number];
 
@@ -179,5 +180,15 @@ export async function searchProducts(db: Db, shopId: string, options: BrowseOpti
 export const compactProducts = (products: ActiveProduct[]) =>
   products.map((p) => {
     const cheapest = p.variants.reduce((a, b) => (b.priceMinor < a.priceMinor ? b : a), p.variants[0]!);
-    return { id: p.id, title: p.title, handle: p.handle, imageUrl: p.imageUrl, priceMinor: cheapest?.priceMinor ?? 0, compareAtMinor: cheapest?.compareAtMinor ?? null };
+    return {
+      id: p.id,
+      title: p.title,
+      handle: p.handle,
+      imageUrl: p.imageUrl,
+      priceMinor: cheapest?.priceMinor ?? 0,
+      compareAtMinor: cheapest?.compareAtMinor ?? null,
+      badge: p.badge,
+      createdAt: p.createdAt,
+      soldOut: productSoldOut(p),
+    };
   });

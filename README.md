@@ -530,3 +530,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 2. **Into the inbox**: a message with an order number that matches the buyer's email joins that order's conversation, and buyer support answers it like a question from the order page. Anything else starts its own conversation marked as needing the merchant. Someone else's order number doesn't get anyone into that order.
 3. **Replies by email**: the merchant replies from the inbox as usual; without an order the reply is emailed with a link back to the contact page (`sendBuyerMessage`).
 4. **Spam**: a hidden field catches bots (they are thanked the same, and nothing is kept), each email address can send three messages an hour, and a store takes at most 50 new contact conversations an hour.
+
+### Product badges (after launch, part 70)
+
+1. **Automatic badges**: product cards show how much is off ("-20%", rounded down) when a product is on sale, "Sold out" when nothing can be ordered (an open pre-order counts as orderable), and "New" for a number of days after a product was added (`cardBadges` in `packages/core/src/badge-rules.ts`, `shops.product_badges`). Admin → Products → Badges turns each on or off; sale and sold out are on, "New" is off until the merchant picks a number of days.
+2. **The merchant's own**: any product can have a short label of up to 20 characters, like "Bestseller" (`setProductBadge`, `products.badge`). It comes first on the card and also shows above the title on the product page, with "New".
+3. Cards show two badges at most, in the buyer's language, and the theme editor's preview shows them too. Store files carry both settings.

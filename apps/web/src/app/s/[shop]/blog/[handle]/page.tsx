@@ -68,7 +68,7 @@ export default async function PostPage({ params }: { params: Promise<{ shop: str
       {products.length > 0 && (
         <section className="flex flex-col gap-4 border-t border-border pt-8" aria-labelledby="in-this-post">
           <h2 id="in-this-post" className="text-xl font-semibold">In this post</h2>
-          <ProductGrid products={products} data={{ base, currency: shop.currency, fx, catalog: { products, collections: [] } }} />
+          <ProductGrid products={products} data={{ base, currency: shop.currency, fx, badges: shop.productBadges, catalog: { products: [], collections: [] } }} />
         </section>
       )}
     </main>

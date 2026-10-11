@@ -83,4 +83,5 @@ export * from "./pixels";
 export * from "./store-closure";
 export * from "./video";
 export * from "./contact";
+export * from "./badges";
 export * from "./shopify-import";

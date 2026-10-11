@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, formatDeliveryWindow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels } from "@sf/core";
+import { bundlesForProduct, formatDeliveryWindow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { RecentlyViewed } from "@/components/RecentlyViewed";
 import { RememberView } from "@/components/RememberView";
 import { readRecent, recentCookie } from "@/lib/recent";
 import { ProductGallery } from "@/components/ProductGallery";
+import { badgeLabel } from "@/theme/Sections";
 import { currentBuyer } from "@/lib/buyer";
 import { db } from "@/lib/server";
 import { buyerCountry, buyerFx } from "@/lib/currency";
@@ -85,6 +86,8 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const alertKind = ALERT_MESSAGES[(query.alert ?? "") as keyof typeof ALERT_MESSAGES];
   const alert = alertKind ? { text: t[alertKind.key], ok: alertKind.ok } : undefined;
   const { shop, product } = await load(shopHandle, handle);
+  // The merchant's own label and "New" by the title; the price already shows a sale, and the options what's sold out.
+  const headBadges = cardBadges(shop.productBadges, { badge: product.badge, priceMinor: 0, createdAt: product.createdAt }).filter((b) => b.kind === "custom" || b.kind === "new");
   const buyable = product.variants.filter((x) => x.stock === null || x.stock > 0);
   const v = buyable[0] ?? product.variants[0];
   // Pre-orders keep sold-out options buyable until the date passes or the limit is reached.
@@ -148,6 +151,11 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
       <div className="flex flex-col gap-5">
         <Track shopId={shop.id} kind="product_view" productId={product.id} />
         {tracking && v && <PixelEvent name="view_item" data={{ ids: [v.id], value: pixelPrices[v.id]!, currency: shop.currency }} />}
+        {headBadges.length > 0 && (
+          <p className="flex gap-2">
+            {headBadges.map((b) => <span key={b.kind} className="sf-badge rounded-full bg-ink text-surface px-2.5 py-0.5 text-xs font-semibold">{badgeLabel(b, t)}</span>)}
+          </p>
+        )}
         <h1 className="text-3xl font-bold tracking-tight">{product.title}</h1>
         {reviews.count > 0 && (
           <a href="#reviews" className="text-sm flex items-center gap-2">
