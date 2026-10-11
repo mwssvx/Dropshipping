@@ -22,6 +22,7 @@ import { normalizeTags } from "./customers";
 import { cartLineKey, cleanPersonalization, missingPersonalization, personalizationValues } from "./personalization";
 import { openPreorder, preorderDeadline, preordersSold } from "./preorders";
 import { boughtBefore, describeLimitProblem, limitProblem } from "./purchase-limits";
+import { onHoliday } from "./store-closure";
 
 type Shop = typeof schema.shops.$inferSelect;
 type Order = typeof schema.orders.$inferSelect;
@@ -338,6 +339,8 @@ export async function startCheckout(
   const gift = parsed.data.gift ?? null;
   const followUp = input.followUp ?? null;
   const repeat = input.subscription ?? null;
+  // On a holiday break only orders already agreed to carry on: repeat deliveries and after-checkout offers.
+  if (!followUp && !repeat && onHoliday(shop)) throw new UserError("This store is on a break and isn't taking orders right now.", "shop_holiday");
   const noCodes = !!followUp || !!repeat;
   const quoted = await quoteCart(db, shop, input.lines, {
     discountCode: noCodes ? null : input.discountCode,

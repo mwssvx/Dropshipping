@@ -15,6 +15,7 @@ export function StoreShell({
   base,
   cartCount,
   closed,
+  notice,
   verified,
   picker,
   t = storeText(null),
@@ -27,6 +28,8 @@ export function StoreShell({
   base: string;
   cartCount: number;
   closed?: boolean;
+  /** A note from the store across the top of every page, like a holiday break. */
+  notice?: React.ReactNode;
   /** Shown as a badge in the footer, linking to what it means. */
   verified?: boolean;
   /** When the store sells in more than one currency: the choices, the buyer's, and how to switch. */
@@ -92,6 +95,7 @@ export function StoreShell({
         )}
       </header>
       {closed && <p className="banner banner-critical rounded-none text-center">{t.closed}</p>}
+      {!closed && notice && <div className="banner banner-info rounded-none text-center">{notice}</div>}
       <div className="flex-1">{children}</div>
       <footer className="border-t border-border">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col gap-6">

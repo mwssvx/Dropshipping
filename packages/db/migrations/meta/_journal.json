@@ -435,6 +435,13 @@
       "when": 1791692647805,
       "tag": "0061_ad_pixels",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1791698653298,
+      "tag": "0062_store_closure",
+      "breakpoints": true
     }
   ]
 }

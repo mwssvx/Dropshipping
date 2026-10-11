@@ -1,14 +1,14 @@
 import "server-only";
 import { cache } from "react";
-import { headers } from "next/headers";
-import { notFound, permanentRedirect } from "next/navigation";
-import { findRedirect, getShopByHandle, getShopByHostname, localizeCollections, localizedTheme, localizeProducts, NotFoundError, shopLanguages, withSales, type Language } from "@sf/core";
+import { cookies, headers } from "next/headers";
+import { notFound, permanentRedirect, redirect } from "next/navigation";
+import { findRedirect, getShopByHandle, hasStoreAccess, storeAccessCookie, getShopByHostname, localizeCollections, localizedTheme, localizeProducts, NotFoundError, shopLanguages, withSales, type Language } from "@sf/core";
 import { db } from "@/lib/server";
 import { STORE_HOST_HEADER, STORE_LANG_HEADER, STORE_PATH_HEADER } from "@/lib/brand";
 import { storeText } from "@/lib/store-text";
 
 /** The [shop] segment is a store handle, or a custom domain when the proxy mapped one. */
-export const loadShop = cache(async (param: string) => {
+async function findShop(param: string) {
   const key = decodeURIComponent(param).toLowerCase();
   if (key.includes(".")) {
     const shop = await getShopByHostname(await db(), key);
@@ -21,6 +21,29 @@ export const loadShop = cache(async (param: string) => {
     if (e instanceof NotFoundError) notFound();
     throw e;
   }
+}
+
+/**
+ * Pages a visitor reaches without the store password: the password page itself, robots.txt, and
+ * links people were sent by email (their order, unsubscribing, confirming a signup, a payment link).
+ */
+const OPEN_PATHS = /^\/(?:password|robots\.txt)$|^\/(?:orders|unsubscribe|subscribe|subscriptions|pay|r)\//;
+
+/**
+ * The store, for every page, route and action under it. While the store is behind a password,
+ * visitors who haven't given it are sent to the password page from wherever they land.
+ */
+export const loadShop = cache(async (param: string) => {
+  const shop = await findShop(param);
+  if (shop.closure) {
+    const h = await headers();
+    const path = h.get(STORE_PATH_HEADER) ?? "/";
+    if (!OPEN_PATHS.test(path) && !hasStoreAccess(shop, (await cookies()).get(storeAccessCookie(shop.id))?.value)) {
+      const lang = h.get(STORE_LANG_HEADER);
+      redirect(`${await storeRoot(param)}${lang ? `/${lang}` : ""}/password`);
+    }
+  }
+  return shop;
 });
 
 /**
@@ -100,4 +123,10 @@ export async function lineTitles(handle: string, items: { variantId: string; tit
     const product = local[n]!.title;
     return [i.variantId, product && v ? (v.title === "Default" ? product : `${product} – ${v.title}`) : i.title];
   }));
+}
+
+/** A closing or opening date (YYYY-MM-DD) the way the buyer reads dates, like "October 20". */
+export function closureDate(date: string | null, lang: Language | null) {
+  if (!date) return null;
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString(lang ?? "en-US", { month: "long", day: "numeric", timeZone: "UTC" });
 }
