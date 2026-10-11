@@ -184,6 +184,8 @@ export const shops = pgTable(
     soldOutProducts: text("sold_out_products", { enum: SOLD_OUT_DISPLAY }).notNull().default("last"),
     // Searches the merchant pointed elsewhere: "lampshade" shows the results for "lamp shade".
     searchFixes: jsonb("search_fixes").$type<SearchFix[]>().notNull().default([]),
+    // "Lowest price in the 30 days before the discount" next to reduced prices: the EU's rule.
+    lowestPriceNote: text("lowest_price_note", { enum: ["eu", "everyone", "off"] }).notNull().default("eu"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -1087,6 +1089,19 @@ export const searchTerms = pgTable(
     results: integer("results").notNull().default(0),
   },
   (t) => [uniqueIndex("search_terms_shop_term_day_uq").on(t.shopId, t.term, t.day), index("search_terms_shop_day_idx").on(t.shopId, t.day)],
+);
+
+// Every price each option has had, written by a trigger on variants (migration 0070) whenever the
+// price changes, so the store can say what the lowest price was before a discount.
+export const variantPrices = pgTable(
+  "variant_prices",
+  {
+    id: id(),
+    variantId: uuid("variant_id").notNull().references(() => variants.id, { onDelete: "cascade" }),
+    priceMinor: money("price_minor").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("variant_prices_variant_idx").on(t.variantId, t.startsAt)],
 );
 
 // Keys for the public REST API. Only a hash is stored; the key is shown once when created.

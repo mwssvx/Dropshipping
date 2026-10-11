@@ -567,3 +567,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Point a search elsewhere**: when shoppers search for words the products don't use ("lampshade", a misspelling), the merchant points them at words that find what they meant (`setSearchFix` in `packages/core/src/search-terms.ts`, `shops.search_fixes`, up to 100). The whole search has to match, in any case and spacing.
 2. **Honest about it**: the store shows the other words' results and says "Showing results for …" in the buyer's language (`browseProducts` returns `showingFor`).
 3. **From the report**: each word under "Found nothing" on the Analytics page has a Fix link that opens Admin → Search fixes with it filled in. Store files carry the fixes.
+
+### Lowest price before a discount (after launch, part 76)
+
+1. **The EU rule, worked out**: a product page showing a reduced price (crossed-out price above it) also says "Lowest price in the 30 days before this discount", in the buyer's language (`lowestPricesBefore` in `packages/core/src/lowest-price.ts`). The 30 days end when the running sale started, or else when the option's current price was set.
+2. **From the real history**: a database trigger records every price an option has had (`variant_prices`), and earlier sales count at what they charged. When the history doesn't reach back 30 days for an older product, nothing is shown rather than a guess.
+3. **Who sees it**: Admin → Sales → Lowest earlier price (`shops.lowest_price_note`): visitors in Europe (the EU, the rest of the EEA, the UK and Switzerland; the default), everyone, or nobody. Store files carry the setting.

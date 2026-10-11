@@ -3,6 +3,7 @@ import { requireShop } from "@/lib/server";
 import { deleteSaleAction, endSaleAction } from "../../sale-actions";
 import { PageHeader } from "../PageHeader";
 import { SaleForm } from "./SaleForm";
+import { LowestPriceForm } from "./LowestPriceForm";
 
 export const metadata = { title: "Sales" };
 
@@ -51,6 +52,17 @@ export default async function SalesPage() {
               </li>
             ))}
           </ul>
+        </section>
+        <section className="card p-5 flex flex-col gap-3" aria-labelledby="lowest-heading">
+          <div>
+            <h2 id="lowest-heading" className="font-semibold">Lowest earlier price</h2>
+            <p className="hint">
+              In the EU, a reduced price has to show the lowest price the product had in the 30 days before the discount. Your store works it out from
+              every price each option has had, including earlier sales, and shows it under any crossed-out price. Until it has 30 days of history for a
+              product, it says nothing rather than guess.
+            </p>
+          </div>
+          <LowestPriceForm value={shop.lowestPriceNote} />
         </section>
       </div>
     </main>
