@@ -1,18 +1,34 @@
 "use client";
-import { useActionState, useState } from "react";
+import { startTransition, useActionState, useState } from "react";
 import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import type { FormState } from "../../actions";
 import { saveCampaignAction, saveMailingAddressAction, sendTestCampaignAction, startCampaignAction, type TestState } from "../../campaign-actions";
 
-type Draft = { subject: string; body: string; buttonLabel: string | null; buttonPath: string | null; audience: string };
+type Draft = { subject: string; body: string; buttonLabel: string | null; buttonPath: string | null; audience: string; audienceTag: string | null; audienceProductId: string | null };
 
-export function CampaignEditor({ id, initial, audiences, saved }: { id: string | null; initial?: Draft; audiences: { value: string; label: string; size: number }[]; saved?: boolean }) {
-  const [state, action] = useActionState(saveCampaignAction.bind(null, id), (saved ? { saved: true } : {}) as FormState);
+export function CampaignEditor({ id, initial, audiences, tags, products, saved }: {
+  id: string | null;
+  initial?: Draft;
+  audiences: { value: string; label: string; size: number | null }[];
+  tags: { tag: string; count: number }[];
+  products: { id: string; title: string }[];
+  saved?: boolean;
+}) {
+  const [state, action, pending] = useActionState(saveCampaignAction.bind(null, id), (saved ? { saved: true } : {}) as FormState);
+  const [audience, setAudience] = useState(initial?.audience ?? "subscribers");
   return (
-    <form action={action} className="flex flex-col gap-4">
+    // Submitted by hand so React doesn't reset the fields (and the audience picked) after an error.
+    <form
+      className="flex flex-col gap-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const data = new FormData(e.currentTarget);
+        startTransition(() => action(data));
+      }}
+    >
       <FormError message={state.error} />
-      {state.saved && <p className="banner banner-success" role="status">Draft saved.</p>}
+      {state.saved && !pending && <p className="banner banner-success" role="status">Draft saved.</p>}
       <div className="field">
         <label className="label" htmlFor="subject">Subject</label>
         <input className="input" id="subject" name="subject" required maxLength={150} defaultValue={initial?.subject} placeholder="Our autumn sale starts now" />
@@ -33,13 +49,38 @@ export function CampaignEditor({ id, initial, audiences, saved }: { id: string |
           <p className="hint">A page on your store. We count who clicks it.</p>
         </div>
       </div>
-      <div className="field">
-        <label className="label" htmlFor="audience">Send to</label>
-        <select className="input" id="audience" name="audience" defaultValue={initial?.audience ?? "subscribers"}>
-          {audiences.map((a) => <option key={a.value} value={a.value}>{a.label} ({a.size})</option>)}
-        </select>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="field">
+          <label className="label" htmlFor="audience">Send to</label>
+          <select className="input" id="audience" name="audience" value={audience} onChange={(e) => setAudience(e.target.value)}>
+            {audiences.map((a) => <option key={a.value} value={a.value}>{a.size === null ? a.label : `${a.label} (${a.size})`}</option>)}
+          </select>
+        </div>
+        {audience === "tagged" && (
+          <div className="field">
+            <label className="label" htmlFor="audienceTag">Tag</label>
+            {tags.length ? (
+              <select className="input" id="audienceTag" name="audienceTag" defaultValue={initial?.audienceTag ?? ""}>
+                <option value="">Pick a tag</option>
+                {tags.map((t) => <option key={t.tag} value={t.tag}>{t.tag} ({t.count})</option>)}
+              </select>
+            ) : (
+              <p className="hint text-sm">None of your subscribers has a tag yet. Add tags on a customer&apos;s page.</p>
+            )}
+          </div>
+        )}
+        {audience === "bought" && (
+          <div className="field">
+            <label className="label" htmlFor="audienceProductId">Product</label>
+            <select className="input" id="audienceProductId" name="audienceProductId" defaultValue={initial?.audienceProductId ?? ""}>
+              <option value="">Pick a product</option>
+              {products.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+            </select>
+            <p className="hint">Subscribers who paid for it, any time. Handy for a matching accessory or a new colour.</p>
+          </div>
+        )}
       </div>
-      <SubmitButton className="btn btn-primary self-start">{id ? "Save draft" : "Save and preview"}</SubmitButton>
+      <button type="submit" className="btn btn-primary self-start" disabled={pending} aria-busy={pending}>{pending ? "Saving…" : id ? "Save draft" : "Save and preview"}</button>
     </form>
   );
 }

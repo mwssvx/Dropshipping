@@ -1,7 +1,8 @@
 // Email campaigns: the merchant writes one email (a subject, a few paragraphs and a button) and
 // sends it to buyers who said yes to marketing. Every email has a one-click unsubscribe and the
 // store's mailing address. Clicks are counted and orders placed within a week are credited to it.
-import { and, count, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
+// It can go to every subscriber, or only to those with one customer tag or who bought one product.
+import { and, asc, count, desc, eq, gte, inArray, isNull, lt, ne, sql } from "drizzle-orm";
 import { CAMPAIGN_AUDIENCES, schema, type CampaignAudience, type Db } from "@sf/db";
 import { z } from "zod";
 import type { Mailer } from "./email";
@@ -33,7 +34,21 @@ export const AUDIENCE_LABELS: Record<CampaignAudience, string> = {
   customers: "Subscribers who have bought",
   not_bought: "Subscribers who haven't bought yet",
   lapsed: "Subscribers who haven't bought in 90 days",
+  tagged: "Subscribers with a tag",
+  bought: "Subscribers who bought a product",
 };
+
+/** Audiences that need a tag or a product picked as well. */
+export const TARGETED_AUDIENCES = ["tagged", "bought"] as const satisfies readonly CampaignAudience[];
+type FixedAudience = Exclude<CampaignAudience, (typeof TARGETED_AUDIENCES)[number]>;
+type Target = Pick<Campaign, "audience" | "audienceTag" | "audienceProductId">;
+
+/** Who a campaign goes to, in words: "subscribers tagged vip". */
+export function describeAudience(c: Target, productTitle?: string | null) {
+  if (c.audience === "tagged") return `Subscribers tagged "${c.audienceTag ?? ""}"`;
+  if (c.audience === "bought") return productTitle ? `Subscribers who bought ${productTitle}` : "Subscribers who bought a product that's gone";
+  return AUDIENCE_LABELS[c.audience];
+}
 
 const campaignInput = z.object({
   subject: z.string().trim().min(1, "Write a subject line.").max(150, "Keep the subject under 150 characters."),
@@ -46,13 +61,30 @@ const campaignInput = z.object({
     .transform((v) => (v ? (v.startsWith("/") ? v : `/${v}`) : null))
     .refine((v) => v === null || (/^\/[\w\-./?=&%]*$/.test(v) && !v.startsWith("//")), "The button link should be a page on your store, like /products/lamp."),
   audience: z.enum(CAMPAIGN_AUDIENCES).default("subscribers"),
+  audienceTag: z.string().optional().nullable(),
+  audienceProductId: z.string().optional().nullable(),
 });
 export type CampaignInput = z.input<typeof campaignInput>;
 
-function parse(input: CampaignInput) {
+/** The draft's fields, with the tag or product its audience needs (and only that one). */
+async function parse(db: Db, shopId: string, input: CampaignInput) {
   const r = campaignInput.safeParse(input);
   if (!r.success) throw new UserError(r.error.issues[0]!.message);
-  return r.data;
+  const { audienceTag, audienceProductId, ...v } = r.data;
+  let tag: string | null = null;
+  let productId: string | null = null;
+  if (v.audience === "tagged") {
+    tag = audienceTag?.trim().toLowerCase().replace(/\s+/g, " ") || null;
+    if (!tag) throw new UserError("Pick the tag to send to.");
+  } else if (v.audience === "bought") {
+    productId = audienceProductId?.trim() || null;
+    const product =
+      productId && /^[0-9a-f-]{36}$/i.test(productId)
+        ? await db.query.products.findFirst({ where: and(eq(schema.products.id, productId), eq(schema.products.shopId, shopId)), columns: { id: true } })
+        : null;
+    if (!product) throw new UserError("Pick the product its buyers bought.");
+  }
+  return { ...v, audienceTag: tag, audienceProductId: productId };
 }
 
 // ---------------------------------------------------------------------------
@@ -147,7 +179,7 @@ export async function customerByToken(db: Db, shopId: string, token: string) {
 // Drafts
 
 export async function createCampaign(db: Db, shopId: string, userId: string | null, input: CampaignInput) {
-  const v = parse(input);
+  const v = await parse(db, shopId, input);
   const [row] = await db.insert(schema.campaigns).values({ shopId, createdBy: userId, ...v }).returning();
   return row!;
 }
@@ -161,7 +193,7 @@ async function find(db: Db, shopId: string, id: string) {
 export async function updateCampaign(db: Db, shopId: string, id: string, input: CampaignInput) {
   const c = await find(db, shopId, id);
   if (c.status !== "draft") throw new UserError("This campaign has already gone out. Duplicate it to send a new version.");
-  const [row] = await db.update(schema.campaigns).set({ ...parse(input), updatedAt: new Date() }).where(eq(schema.campaigns.id, id)).returning();
+  const [row] = await db.update(schema.campaigns).set({ ...(await parse(db, shopId, input)), updatedAt: new Date() }).where(eq(schema.campaigns.id, id)).returning();
   return row!;
 }
 
@@ -179,6 +211,8 @@ export async function duplicateCampaign(db: Db, shopId: string, userId: string |
     buttonLabel: c.buttonLabel ?? undefined,
     buttonPath: c.buttonPath ?? undefined,
     audience: c.audience,
+    audienceTag: c.audienceTag,
+    audienceProductId: c.audienceProductId,
   });
 }
 
@@ -190,7 +224,7 @@ export async function getCampaign(db: Db, shopId: string, id: string) {
 // Audiences
 
 /** Subscribers in an audience, as of now. */
-async function audience(db: Db, shopId: string, which: CampaignAudience, now = new Date()) {
+async function audience(db: Db, shopId: string, which: CampaignAudience, now = new Date(), target: Partial<Target> = {}) {
   const bought = sql<number>`(select count(*) from ${schema.orders} o where o.shop_id = ${schema.customers.shopId} and o.email = ${schema.customers.email} and o.payment_status in ('paid', 'partially_refunded', 'refunded'))`;
   const lastPaid = sql`(select max(o.paid_at) from ${schema.orders} o where o.shop_id = ${schema.customers.shopId} and o.email = ${schema.customers.email} and o.payment_status in ('paid', 'partially_refunded', 'refunded'))`;
   const filter =
@@ -200,7 +234,13 @@ async function audience(db: Db, shopId: string, which: CampaignAudience, now = n
         ? sql`${bought} = 0`
         : which === "lapsed"
           ? sql`${lastPaid} < ${new Date(now.getTime() - 90 * DAY)}`
-          : undefined;
+          : which === "tagged"
+            ? sql`${schema.customers.tags} @> ${JSON.stringify([target.audienceTag ?? ""])}::jsonb`
+            : which === "bought"
+              ? sql`exists (select 1 from ${schema.orders} o join ${schema.orderLines} l on l.order_id = o.id join ${schema.variants} v on v.id = l.variant_id
+                  where o.shop_id = ${schema.customers.shopId} and o.email = ${schema.customers.email}
+                  and o.payment_status in ('paid', 'partially_refunded', 'refunded') and v.product_id = ${target.audienceProductId ?? null})`
+              : undefined;
   return db
     .select({ id: schema.customers.id, email: schema.customers.email, name: schema.customers.name, token: schema.customers.emailToken })
     .from(schema.customers)
@@ -208,10 +248,51 @@ async function audience(db: Db, shopId: string, which: CampaignAudience, now = n
     .orderBy(schema.customers.createdAt);
 }
 
+/** How many subscribers each of the everyone-style audiences has now. */
 export async function audienceSizes(db: Db, shopId: string, now = new Date()) {
-  const sizes = {} as Record<CampaignAudience, number>;
-  for (const a of CAMPAIGN_AUDIENCES) sizes[a] = (await audience(db, shopId, a, now)).length;
+  const sizes = {} as Record<FixedAudience, number>;
+  for (const a of CAMPAIGN_AUDIENCES) {
+    if (!(TARGETED_AUDIENCES as readonly string[]).includes(a)) sizes[a as FixedAudience] = (await audience(db, shopId, a, now)).length;
+  }
   return sizes;
+}
+
+/** How many subscribers a campaign would go to now. */
+export async function campaignAudienceSize(db: Db, shopId: string, c: Target, now = new Date()) {
+  return (await audience(db, shopId, c.audience, now, c)).length;
+}
+
+/** What the campaign editor offers: each audience with its size, the subscribers' tags, and the store's products. */
+export async function campaignAudienceChoices(db: Db, shopId: string) {
+  const [sizes, tags, products] = await Promise.all([
+    audienceSizes(db, shopId),
+    subscriberTags(db, shopId),
+    db.query.products.findMany({
+      where: and(eq(schema.products.shopId, shopId), ne(schema.products.status, "archived"), eq(schema.products.giftCard, false)),
+      columns: { id: true, title: true },
+      orderBy: asc(schema.products.title),
+      limit: 500,
+    }),
+  ]);
+  const audiences = CAMPAIGN_AUDIENCES.map((a) => ({ value: a, label: AUDIENCE_LABELS[a], size: a in sizes ? sizes[a as FixedAudience] : null }));
+  return { audiences, tags, products };
+}
+
+/** Who a saved campaign goes to, in words, with its product's name. */
+export async function campaignAudienceText(db: Db, c: Target) {
+  const product = c.audienceProductId ? await db.query.products.findFirst({ where: eq(schema.products.id, c.audienceProductId), columns: { title: true } }) : null;
+  return describeAudience(c, product?.title);
+}
+
+/** The tags subscribers have, with how many have each, most first, for picking a tagged audience. */
+export async function subscriberTags(db: Db, shopId: string) {
+  const rows = await db
+    .select({ tags: schema.customers.tags })
+    .from(schema.customers)
+    .where(and(eq(schema.customers.shopId, shopId), eq(schema.customers.acceptsMarketing, true), sql`jsonb_array_length(${schema.customers.tags}) > 0`));
+  const counts = new Map<string, number>();
+  for (const r of rows) for (const t of r.tags) counts.set(t, (counts.get(t) ?? 0) + 1);
+  return [...counts].map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag)).slice(0, 100);
 }
 
 /** Campaign emails this store sent (or queued) since the first of the month, out of its allowance. */
@@ -280,7 +361,7 @@ export async function startCampaign(ctx: CampaignContext, shop: Shop, id: string
     throw new UserError("Add your mailing address first. The law requires it at the foot of every marketing email; a PO box works.", "needs_address");
   }
   if (opts.scheduledFor && opts.scheduledFor.getTime() < now.getTime() - 60_000) throw new UserError("Pick a time in the future.");
-  const people = await audience(db, shop.id, c.audience, now);
+  const people = await audience(db, shop.id, c.audience, now, c);
   if (!people.length) throw new UserError("Nobody in this audience has said yes to emails yet.", "empty");
   const { left } = await campaignAllowance(db, shop.id, now);
   if (people.length > left) {

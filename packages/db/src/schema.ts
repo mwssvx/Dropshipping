@@ -1196,7 +1196,8 @@ export const buyerSessions = pgTable(
 );
 
 // Email campaigns: a merchant writes one email and sends it to buyers who said yes to marketing.
-export const CAMPAIGN_AUDIENCES = ["subscribers", "customers", "not_bought", "lapsed"] as const;
+// "tagged" and "bought" narrow it to one customer tag or to buyers of one product.
+export const CAMPAIGN_AUDIENCES = ["subscribers", "customers", "not_bought", "lapsed", "tagged", "bought"] as const;
 export type CampaignAudience = (typeof CAMPAIGN_AUDIENCES)[number];
 
 export const campaigns = pgTable(
@@ -1209,6 +1210,8 @@ export const campaigns = pgTable(
     buttonLabel: text("button_label"),
     buttonPath: text("button_path"),
     audience: text("audience", { enum: CAMPAIGN_AUDIENCES }).notNull().default("subscribers"),
+    audienceTag: text("audience_tag"),
+    audienceProductId: uuid("audience_product_id").references(() => products.id, { onDelete: "set null" }),
     status: text("status", { enum: ["draft", "scheduled", "sending", "sent"] }).notNull().default("draft"),
     scheduledFor: timestamp("scheduled_for", { withTimezone: true }),
     recipients: integer("recipients").notNull().default(0),
