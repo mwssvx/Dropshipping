@@ -393,6 +393,13 @@
       "when": 1791682985207,
       "tag": "0055_winback",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1791684013707,
+      "tag": "0056_price_watch",
+      "breakpoints": true
     }
   ]
 }

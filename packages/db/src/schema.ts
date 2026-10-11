@@ -134,6 +134,10 @@ export const shops = pgTable(
     returnInstructions: text("return_instructions"),
     // How supplier cost becomes a retail price, for imports and "reprice everything".
     pricingRule: jsonb("pricing_rule").$type<PricingRule>(),
+    // Supplier price watch: warn when a cost rise leaves less than this margin, and optionally
+    // raise the price with the pricing rule straight away.
+    minMarginPercent: integer("min_margin_percent").notNull().default(20),
+    autoReprice: boolean("auto_reprice").notNull().default(false),
     // Languages the store is also shown in, besides English, like ["de", "fr"]. Buyers pick one
     // in the footer; each has its own address (/de/...).
     languages: jsonb("languages").$type<string[]>().notNull().default([]),
@@ -1654,4 +1658,28 @@ export const disputes = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [index("disputes_shop_idx").on(t.shopId, t.createdAt), index("disputes_order_idx").on(t.orderId)],
+);
+
+/**
+ * A supplier raised the cost of an option. Open until the merchant raises the price or keeps it;
+ * "repriced" when the store raised it on its own with the pricing rule.
+ */
+export const costChanges = pgTable(
+  "cost_changes",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+    variantId: uuid("variant_id").notNull().references(() => variants.id, { onDelete: "cascade" }),
+    costBeforeMinor: money("cost_before_minor").notNull(),
+    costAfterMinor: money("cost_after_minor").notNull(),
+    // The option's price when the cost went up, and after the store raised it.
+    priceMinor: money("price_minor").notNull(),
+    newPriceMinor: money("new_price_minor"),
+    status: text("status", { enum: ["open", "repriced", "raised", "kept"] }).notNull().default("open"),
+    notifiedAt: timestamp("notified_at", { withTimezone: true }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("cost_changes_shop_idx").on(t.shopId, t.status, t.createdAt), index("cost_changes_variant_idx").on(t.variantId, t.status)],
 );
