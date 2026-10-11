@@ -133,6 +133,16 @@ export async function adminUrl(path: string) {
   return `${proto}://${host}${path}`;
 }
 
+/** An absolute link into the admin from outside a request (emails sent by webhooks and the schedule). */
+export function platformUrl(path: string) {
+  return `${/^(localhost|127\.0\.0\.1)(:|$)/.test(ROOT_DOMAIN) ? "http" : "https"}://${ROOT_DOMAIN}${path}`;
+}
+
+/** Emailing the people who look after a store's money about new disputes. */
+export async function disputeNotices() {
+  return { db: await db(), mailer: mailer(), adminUrl: platformUrl };
+}
+
 /** Test mode: no real money moves, so the admin offers buttons to simulate payouts and holds. */
 export const testPayments = () => payments().name === "fake";
 

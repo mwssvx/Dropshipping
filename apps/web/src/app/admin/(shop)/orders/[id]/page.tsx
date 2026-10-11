@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { can, countryName, formatMoney, getOrder, orderEditOptions, listRefunds, replaceableLines, replacementBlocked, replacementsOf, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode } from "@sf/core";
-import { fulfillment, requireShop, storeAddress, suppliers } from "@/lib/server";
+import { can, countryName, disputeEvidence, disputeReason, disputesForOrder, formatMoney, getOrder, orderEditOptions, listRefunds, replaceableLines, replacementBlocked, replacementsOf, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode } from "@sf/core";
+import { fulfillment, requireShop, storeAddress, suppliers, testPayments } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
 import { editOrderAction } from "../../../actions";
 import { PaymentLinkActions } from "./PaymentLinkActions";
@@ -11,6 +11,7 @@ import { FixWithAiButton } from "./FixWithAiButton";
 import { RiskActions } from "./RiskActions";
 import { OrderNotesForm } from "./OrderNotesForm";
 import { ReplacementForm } from "./ReplacementForm";
+import { DisputeResponse, SimulateDecision, SimulateDispute } from "./DisputeActions";
 import { FulfilmentStatus, PaymentStatus } from "@/components/Status";
 import { PageHeader } from "../../PageHeader";
 
@@ -84,6 +85,11 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
   const net = order.totalMinor - order.refundedMinor - feeKept - order.processingFeeMinor;
   const held = !!order.heldAt && refundable;
   const RISK_LABEL = { low: "Low risk", medium: "Medium risk", high: "High risk" } as const;
+  // Chargebacks: the latest one, and the evidence we'd send while it waits for an answer.
+  const dispute = seesMoney ? ((await disputesForOrder(db, order.id))[0] ?? null) : null;
+  const evidence = dispute?.status === "needs_response" && dispute.orderId ? await disputeEvidence(db, shop, dispute.id) : null;
+  const DISPUTE_STATUS = { needs_response: "Needs your answer", under_review: "Bank reviewing", won: "Won", lost: "Lost", closed: "Closed" } as const;
+  const longDay = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
 
   return (
     <main className="pb-12">
@@ -114,6 +120,54 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
               <p className="text-sm hint">The buyer got their usual confirmation and isn&apos;t told about the hold.</p>
               <RiskActions orderId={order.id} canRefund={can(role, "refunds")} />
             </section>
+          )}
+          {dispute && (
+            <section id="dispute" className={`card p-5 flex flex-col gap-3 ${dispute.status === "needs_response" ? "border-critical" : ""}`} aria-labelledby="dispute-heading">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 id="dispute-heading" className="font-semibold">{dispute.inquiry ? "Question from the buyer's bank" : "Disputed"}: {formatMoney(dispute.amountMinor, dispute.currency)}</h2>
+                <span className={`pill ${dispute.status === "needs_response" || dispute.status === "lost" ? "pill-critical" : dispute.status === "won" ? "pill-success" : "pill-neutral"}`}>{DISPUTE_STATUS[dispute.status]}</span>
+              </div>
+              <p className="text-sm"><span className="font-medium">{disputeReason(dispute.reason).label}.</span> {disputeReason(dispute.reason).tip}</p>
+              {dispute.status === "needs_response" && (
+                <p className="text-sm">
+                  {dispute.evidenceDueBy && <>Answer by <strong>{longDay.format(dispute.evidenceDueBy)}</strong>. </>}
+                  {dispute.inquiry ? "Nothing has been taken back yet." : "The money is held until the bank decides."}
+                </p>
+              )}
+              {evidence && (
+                <>
+                  <h3 className="font-medium text-sm">What we&apos;ll send</h3>
+                  <ul className="text-sm flex flex-col gap-1" aria-label="Evidence">
+                    {evidence.checks.map((c) => (
+                      <li key={c.label}>
+                        <span aria-hidden className={c.ok ? "text-success" : "hint"}>{c.ok ? "✓" : "○"}</span> <span className="font-medium">{c.label}</span>
+                        <span className="sr-only">{c.ok ? " (included)" : " (missing)"}</span> <span className="hint">· {c.detail}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <details className="text-sm">
+                    <summary className="cursor-pointer">See everything we&apos;ll send</summary>
+                    <pre className="whitespace-pre-wrap text-xs bg-sunken rounded p-3 mt-2">{evidence.evidence.uncategorizedText}</pre>
+                  </details>
+                  <DisputeResponse disputeId={dispute.id} />
+                </>
+              )}
+              {dispute.status === "under_review" && (
+                <p className="text-sm" role="status">
+                  {dispute.submittedAt ? `Evidence sent on ${longDay.format(dispute.submittedAt)}. ` : ""}The bank is reviewing it, which can take a couple of months. We&apos;ll show the result here.
+                </p>
+              )}
+              {dispute.note && dispute.status !== "needs_response" && <p className="text-sm border-l-2 border-border pl-3">Your note: {dispute.note}</p>}
+              {dispute.status === "won" && <p className="banner banner-success" role="status">You won. The money is back in your balance.</p>}
+              {dispute.status === "lost" && <p className="banner banner-critical" role="status">The buyer kept the money. It counts against this order&apos;s profit, with the dispute fee.</p>}
+              {testPayments() && dispute.status === "under_review" && <SimulateDecision disputeId={dispute.id} />}
+            </section>
+          )}
+          {testPayments() && seesMoney && ["paid", "partially_refunded"].includes(order.paymentStatus) && (!dispute || ["won", "lost", "closed"].includes(dispute.status)) && (
+            <details className="card p-4 text-sm">
+              <summary className="cursor-pointer">Test mode: simulate a dispute</summary>
+              <div className="pt-3"><SimulateDispute orderId={order.id} /></div>
+            </details>
           )}
           {returns[0] && (returns[0].status === "requested" || returns[0].status === "approved") && (
             <p className="banner banner-warning" role="status">

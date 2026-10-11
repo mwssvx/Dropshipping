@@ -255,3 +255,9 @@ export async function notifyNewDisputes(ctx: { db: Db; mailer: Mailer; adminUrl:
 }
 
 export type { Dispute };
+
+/** Disputes waiting for the merchant's answer, for the admin menu. */
+export async function countOpenDisputes(db: Db, shopId: string) {
+  const [row] = await db.select({ n: count() }).from(schema.disputes).where(and(eq(schema.disputes.shopId, shopId), eq(schema.disputes.status, "needs_response")));
+  return row?.n ?? 0;
+}
