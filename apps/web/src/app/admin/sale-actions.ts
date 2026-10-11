@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { createSale, deleteSale, endSale, sendPriceDrops, UserError } from "@sf/core";
+import { createSale, deleteSale, endSale, sendPriceDrops, setLowestPriceNote, UserError } from "@sf/core";
 import { requireShop, stock } from "@/lib/server";
 
 export type SaleState = { error?: string; message?: string; key?: number };
@@ -59,4 +59,18 @@ export async function deleteSaleAction(id: string) {
     if (!(e instanceof UserError)) throw e;
   });
   refresh(shop.handle);
+}
+
+/** Who sees the lowest earlier price under reduced prices. */
+export async function lowestPriceAction(_: SaleState, form: FormData): Promise<SaleState> {
+  const { shop, db } = await requireShop("marketing");
+  try {
+    await setLowestPriceNote(db, shop.id, String(form.get("note") ?? ""));
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath("/admin/sales");
+  revalidatePath(`/s/${shop.handle}`, "layout");
+  return { message: "Saved." };
 }

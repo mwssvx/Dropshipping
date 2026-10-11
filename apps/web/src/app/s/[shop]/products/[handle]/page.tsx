@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, formatDeliveryWindow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges } from "@sf/core";
+import { bundlesForProduct, formatDeliveryWindow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { RecentlyViewed } from "@/components/RecentlyViewed";
 import { RememberView } from "@/components/RememberView";
@@ -140,6 +140,18 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const bundleTitles = new Map((await localProducts(shopHandle, bundles.flatMap((b) => b.products))).map((p) => [p.id, p.title]));
   // "Arrives Oct 18 – Oct 25 to United States", for the visitor's country when the store ships there.
   const delivery = buyable.length ? await productDelivery(await db(), shop, product.id, { country: await buyerCountry() }) : null;
+  // A reduced price says what the lowest price was in the 30 days before (the EU's rule).
+  const lowest = showsLowestPrice(shop.lowestPriceNote, await buyerCountry()) ? await lowestPricesBefore(await db(), shop.id, product, product.sale) : new Map<string, number>();
+  const shownPrice = (x: { id: string; priceMinor: number; compareAtMinor: number | null }) => (
+    <span className="inline-flex flex-col">
+      <Price minor={x.priceMinor} compareAt={x.compareAtMinor} currency={shop.currency} fx={fx} />
+      {lowest.has(x.id) && (
+        <span className="text-xs hint font-normal">
+          {t.lowestBefore} <Price minor={lowest.get(x.id)!} currency={shop.currency} fx={fx} />
+        </span>
+      )}
+    </span>
+  );
   const lang = (await storeLang(shopHandle)) ?? "en-US";
   const dayFormat = new Intl.DateTimeFormat(lang, { month: "short", day: "numeric", timeZone: "UTC" });
   const shipsBy = (d: string) => new Intl.DateTimeFormat(lang, { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
@@ -163,7 +175,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
             <span className="hint">{reviews.average} · {t.reviewCount(reviews.count)}</span>
           </a>
         )}
-        {v && <div className="text-xl"><Price minor={v.priceMinor} compareAt={v.compareAtMinor} currency={shop.currency} fx={fx} /></div>}
+        {v && <div className="text-xl">{byOption ? <Price minor={v.priceMinor} compareAt={v.compareAtMinor} currency={shop.currency} fx={fx} /> : shownPrice(v)}</div>}
         {offers.length > 0 && (
           <ul className="flex flex-wrap gap-2" aria-label="Offers">
             {offers.map((o) => <li key={o} className="pill pill-success">{o}</li>)}
@@ -199,7 +211,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                 options={defs}
                 variants={product.variants.map((x) => ({ id: x.id, title: x.title, options: x.options ?? {}, available: !!preorder || x.stock === null || x.stock > 0, imageUrl: x.imageUrl }))}
                 initialId={v.id}
-                prices={Object.fromEntries(product.variants.map((x) => [x.id, <Price key={x.id} minor={x.priceMinor} compareAt={x.compareAtMinor} currency={shop.currency} fx={fx} />]))}
+                prices={Object.fromEntries(product.variants.map((x) => [x.id, <span key={x.id}>{shownPrice(x)}</span>]))}
                 soldOutLabel={t.soldOut}
                 lowStock={lowStock}
               />
