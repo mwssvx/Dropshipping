@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH } from "@sf/core";
+import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX } from "@sf/core";
 import { requireShop, storeAddress, suppliers } from "@/lib/server";
 import { updateProductAction } from "../../../actions";
 import { setUpsellAction } from "../../../growth-actions";
@@ -104,7 +104,7 @@ export default async function EditProductPage({ params, searchParams }: { params
             // Supplier options are tied to the supplier's listing, and gift card options are amounts.
             optionsEditable: !product.giftCard && !product.variants.some((v) => v.supplierVariantRef),
           }} />
-        <PhotosPanel productId={product.id} title={product.title} photos={productPhotos(product)} max={MAX_PHOTOS} />
+        <PhotosPanel productId={product.id} title={product.title} photos={productPhotos(product)} texts={product.imageAlts} max={MAX_PHOTOS} textMax={PHOTO_TEXT_MAX} />
         {!product.giftCard && (
           <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="video-heading">
             <div>

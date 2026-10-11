@@ -1,5 +1,7 @@
 // Product photos: each product keeps up to ten photos in order, cover first. The cover is also
-// stored as products.image_url, which lists, carts, emails and search results read.
+// stored as products.image_url, which lists, carts, emails and search results read. Each photo can
+// have a short description of what it shows (alt text), which screen readers read out and image
+// search uses; without one the store describes it by the product's name.
 import { and, eq, inArray } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { NotFoundError, UserError } from "./errors";
@@ -27,6 +29,37 @@ export function photoColumns(urls: string[]) {
 /** A product's photos, also for rows saved before galleries (cover only). */
 export function productPhotos(p: { images: string[]; imageUrl: string | null }) {
   return p.images.length ? p.images : p.imageUrl ? [p.imageUrl] : [];
+}
+
+export const PHOTO_TEXT_MAX = 125;
+
+/** What a photo shows: the merchant's description, else the product's name and the photo's place. */
+export function photoText(p: { title: string; imageAlts?: Record<string, string> | null }, url: string, index = 0, count = 1) {
+  return p.imageAlts?.[url] || (count > 1 ? `${p.title}, photo ${index + 1} of ${count}` : p.title);
+}
+
+/**
+ * Saves a description for each of the product's photos, in their current order; an empty one
+ * goes back to the product's name. Gives how many photos now have a description.
+ */
+export async function setPhotoTexts(db: Db, shopId: string, productId: string, texts: string[]) {
+  const product = await db.query.products.findFirst({ where: and(eq(schema.products.id, productId), eq(schema.products.shopId, shopId)) });
+  if (!product) throw new NotFoundError("Product");
+  const photos = productPhotos(product);
+  if (texts.length !== photos.length) throw new UserError("The photos changed while you were writing. Reload the page and try again.");
+  const imageAlts: Record<string, string> = {};
+  photos.forEach((url, i) => {
+    const text = (texts[i] ?? "").replace(/\s+/g, " ").trim();
+    if (text.length > PHOTO_TEXT_MAX) throw new UserError(`Keep each description to ${PHOTO_TEXT_MAX} characters. Photo ${i + 1} is ${text.length}.`);
+    if (text) imageAlts[url] = text;
+  });
+  await db.update(schema.products).set({ imageAlts, updatedAt: new Date() }).where(eq(schema.products.id, product.id));
+  return Object.keys(imageAlts).length;
+}
+
+/** Descriptions kept for the photos that are still there. */
+export function keptPhotoTexts(alts: Record<string, string> | null | undefined, images: string[]) {
+  return Object.fromEntries(Object.entries(alts ?? {}).filter(([url, text]) => images.includes(url) && typeof text === "string" && text.trim()));
 }
 
 export type PhotoEdit =
@@ -57,7 +90,10 @@ export async function editProductPhotos(db: Db, shopId: string, productId: strin
     }
   }
   const cols = photoColumns(photos);
-  await db.update(schema.products).set({ ...cols, updatedAt: new Date() }).where(eq(schema.products.id, product.id));
+  await db
+    .update(schema.products)
+    .set({ ...cols, imageAlts: keptPhotoTexts(product.imageAlts, cols.images), updatedAt: new Date() })
+    .where(eq(schema.products.id, product.id));
   // A removed photo stops being any option's photo.
   const gone = productPhotos(product).filter((u) => !cols.images.includes(u));
   if (gone.length) {

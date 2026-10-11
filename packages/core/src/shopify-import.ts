@@ -6,7 +6,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { UserError } from "./errors";
-import { photoColumns, isPhotoUrl } from "./gallery";
+import { isPhotoUrl, keptPhotoTexts, photoColumns, PHOTO_TEXT_MAX } from "./gallery";
 import { toHandle } from "./handles";
 import { MAX_OPTIONS, MAX_VARIANTS } from "./products";
 import { SEO_DESCRIPTION_MAX, SEO_TITLE_MAX } from "./seo";
@@ -75,6 +75,8 @@ export type ShopifyProduct = {
   descriptionHtml: string;
   status: "active" | "draft" | "archived";
   images: string[];
+  /** Shopify's alt text for each photo, by its address. */
+  imageAlts: Record<string, string>;
   seoTitle: string | null;
   seoDescription: string | null;
   variants: ShopifyVariant[];
@@ -92,7 +94,7 @@ export function readShopifyProducts(text: string) {
     const i = col.get(name);
     return i === undefined ? "" : (r[i] ?? "").trim();
   };
-  const products = new Map<string, ShopifyProduct & { optionNames: string[]; photos: { url: string; position: number }[]; giftCard: boolean }>();
+  const products = new Map<string, ShopifyProduct & { optionNames: string[]; photos: { url: string; position: number; alt: string }[]; giftCard: boolean }>();
   const problems: string[] = [];
   for (const [n, r] of rows.entries()) {
     const line = n + 2;
@@ -116,6 +118,7 @@ export function readShopifyProducts(text: string) {
         // Older exports have only "Published".
         status: status === "active" || status === "draft" || status === "archived" ? status : get(r, "published").toLowerCase() === "true" ? "active" : "draft",
         images: [],
+        imageAlts: {},
         seoTitle: get(r, "seo title").slice(0, SEO_TITLE_MAX) || null,
         seoDescription: get(r, "seo description").slice(0, SEO_DESCRIPTION_MAX) || null,
         variants: [],
@@ -126,7 +129,10 @@ export function readShopifyProducts(text: string) {
       products.set(handle, p);
     }
     const src = get(r, "image src");
-    if (src && isPhotoUrl(src)) p.photos.push({ url: src, position: Number(get(r, "image position")) || 1000 + p.photos.length });
+    if (src && isPhotoUrl(src)) {
+      const alt = get(r, "image alt text").replace(/\s+/g, " ").slice(0, PHOTO_TEXT_MAX).trim();
+      p.photos.push({ url: src, position: Number(get(r, "image position")) || 1000 + p.photos.length, alt });
+    }
     // A row with a price is an option; rows without one only add photos.
     const priceRaw = get(r, "variant price");
     if (!priceRaw) continue;
@@ -171,7 +177,9 @@ export function readShopifyProducts(text: string) {
       continue;
     }
     const { optionNames: _o, photos, giftCard: _g, ...rest } = p;
-    out.push({ ...rest, images: photoColumns(photos.sort((a, b) => a.position - b.position).map((x) => x.url)).images });
+    const { images } = photoColumns(photos.sort((a, b) => a.position - b.position).map((x) => x.url));
+    const imageAlts = keptPhotoTexts(Object.fromEntries(photos.filter((x) => x.alt).map((x) => [x.url, x.alt])), images);
+    out.push({ ...rest, images, imageAlts });
   }
   return { products: out, problems };
 }
@@ -214,6 +222,7 @@ export async function importShopifyProducts(db: Db, shopId: string, text: string
           seoTitle: p.seoTitle,
           seoDescription: p.seoDescription,
           ...photoColumns(p.images),
+          imageAlts: p.imageAlts,
         })
         .returning({ id: schema.products.id });
       await tx.insert(schema.variants).values(p.variants.map((v, position) => ({ ...v, productId: row!.id, position })));

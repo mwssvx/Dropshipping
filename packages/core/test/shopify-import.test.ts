@@ -24,7 +24,7 @@ const FILE = [
     "Variant Compare At Price": "39.99", "Image Src": "https://cdn.shopify.com/cloud-1.jpg", "Image Position": "1", "Gift Card": "false",
     "SEO Title": "Cloud Lamp | Cosy night light", "SEO Description": "A soft cloud lamp.", "Cost per item": "8.50", Status: "active",
   }),
-  row({ Handle: "cloud-lamp", "Option1 Value": "Pink", "Option2 Value": "Large", "Variant SKU": "CL-P-L", "Variant Inventory Tracker": "shopify", "Variant Inventory Qty": "0", "Variant Price": "1,034.00", "Variant Image": "https://cdn.shopify.com/cloud-pink.jpg", "Image Src": "https://cdn.shopify.com/cloud-2.jpg", "Image Position": "2" }),
+  row({ Handle: "cloud-lamp", "Option1 Value": "Pink", "Option2 Value": "Large", "Variant SKU": "CL-P-L", "Variant Inventory Tracker": "shopify", "Variant Inventory Qty": "0", "Variant Price": "1,034.00", "Variant Image": "https://cdn.shopify.com/cloud-pink.jpg", "Image Src": "https://cdn.shopify.com/cloud-2.jpg", "Image Position": "2", "Image Alt Text": "Pink cloud lamp  on a nightstand" }),
   row({ Handle: "cloud-lamp", "Image Src": "https://cdn.shopify.com/cloud-3.jpg", "Image Position": "3" }),
   row({ Handle: "plain-mug", Title: "Plain Mug", "Option1 Name": "Title", "Option1 Value": "Default Title", "Variant Price": "12", Status: "draft" }),
   row({ Handle: "gift-card", Title: "Gift Card", "Option1 Name": "Denominations", "Option1 Value": "$25", "Variant Price": "25.00", "Gift Card": "true", Status: "active" }),
@@ -47,6 +47,7 @@ describe("moving from Shopify", () => {
       status: "active",
       seoTitle: "Cloud Lamp | Cosy night light",
       images: ["https://cdn.shopify.com/cloud-1.jpg", "https://cdn.shopify.com/cloud-2.jpg", "https://cdn.shopify.com/cloud-3.jpg"],
+      imageAlts: { "https://cdn.shopify.com/cloud-2.jpg": "Pink cloud lamp on a nightstand" },
     });
     expect(lamp.variants).toEqual([
       { title: "White / Small", options: { Color: "White", Size: "Small" }, sku: "CL-W-S", priceMinor: 2999, compareAtMinor: 3999, costMinor: 850, stock: 12, imageUrl: null },
@@ -71,6 +72,7 @@ describe("moving from Shopify", () => {
     expect(result).toMatchObject({ created: 3, skipped: [] });
     const lamp = await f.db.query.products.findFirst({ where: eq(schema.products.handle, "cloud-lamp") });
     expect(lamp).toMatchObject({ status: "draft", imageUrl: "https://cdn.shopify.com/cloud-1.jpg", seoDescription: "A soft cloud lamp." });
+    expect(lamp!.imageAlts).toEqual({ "https://cdn.shopify.com/cloud-2.jpg": "Pink cloud lamp on a nightstand" });
     const variants = await f.db.query.variants.findMany({ where: eq(schema.variants.productId, lamp!.id), orderBy: asc(schema.variants.position) });
     expect(variants.map((v) => [v.title, v.priceMinor, v.stock])).toEqual([["White / Small", 2999, 12], ["Pink / Large", 103400, 0]]);
     // The shortened handle sends its old address on.

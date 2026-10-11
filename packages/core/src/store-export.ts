@@ -8,7 +8,7 @@ import { collectionRulesSchema } from "./collection-rules";
 import { NotFoundError, UserError } from "./errors";
 import { CURRENCIES } from "./currency";
 import { csvCell } from "./payouts";
-import { photoColumns } from "./gallery";
+import { keptPhotoTexts, photoColumns, PHOTO_TEXT_MAX } from "./gallery";
 import { addRedirect } from "./redirects";
 import { parseTheme } from "./theme-doc";
 import { listShippingZones } from "./shipping";
@@ -120,6 +120,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       description_html: p.descriptionHtml,
       image_url: p.imageUrl,
       images: p.images,
+      photo_descriptions: p.imageAlts,
       status: p.status,
       source_url: p.sourceUrl,
       supplier: p.supplierId ? supplierOf(supplierRows.find((s) => s.id === p.supplierId), p.supplierProductRef) : null,
@@ -289,6 +290,7 @@ const importSchema = z.object({
         description_html: str(100_000).default(""),
         image_url: str(2000).nullable().optional(),
         images: z.array(str(2000)).max(10).optional(),
+        photo_descriptions: z.record(z.string().max(2000), str(PHOTO_TEXT_MAX)).optional(),
         status: z.enum(["draft", "active", "archived"]),
         source_url: str(2000).nullable().optional(),
         supplier: z
@@ -509,6 +511,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
           descriptionHtml: x.description_html,
           images,
           imageUrl: images[0] ?? null,
+          imageAlts: keptPhotoTexts(x.photo_descriptions, images),
           status: x.status,
           sourceUrl: x.source_url ?? null,
           supplierId: key ? supplierIds.get(key)! : null,

@@ -6,9 +6,10 @@ import type { ProductVideo } from "@sf/core";
  * The store's product photos: one large, with thumbnails to switch between them. Picking an option
  * that has its own photo (the red one) shows that photo: the option picker sends it as an
  * "sf:photo" event, and a plain option list marks its choices with data-photo. A product video comes
- * after the photos; YouTube and Vimeo only load once the buyer presses play.
+ * after the photos; YouTube and Vimeo only load once the buyer presses play. Each photo is described
+ * by the merchant's text for it, else by the product's name.
  */
-export function ProductGallery({ title, photos, video, text }: { title: string; photos: string[]; video?: ProductVideo | null; text?: { video: string; play: string } }) {
+export function ProductGallery({ title, photos, alts, video, text }: { title: string; photos: string[]; alts?: Record<string, string>; video?: ProductVideo | null; text?: { video: string; play: string } }) {
   const [current, setCurrent] = useState(0);
   const [playing, setPlaying] = useState(false);
   const words = text ?? { video: "Video", play: "Play video" };
@@ -60,7 +61,7 @@ export function ProductGallery({ title, photos, video, text }: { title: string; 
             </button>
           )
         ) : (
-          shown && <img src={shown} alt={photos.length > 1 ? `${title}, photo ${current + 1} of ${photos.length}` : title} width={800} height={800} fetchPriority="high" className="size-full object-cover" />
+          shown && <img src={shown} alt={alts?.[shown] || (photos.length > 1 ? `${title}, photo ${current + 1} of ${photos.length}` : title)} width={800} height={800} fetchPriority="high" className="size-full object-cover" />
         )}
       </div>
       {count > 1 && (

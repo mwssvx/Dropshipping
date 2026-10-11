@@ -232,6 +232,8 @@ export const products = pgTable(
     imageUrl: text("image_url"),
     /** Every photo in order, cover first. */
     images: jsonb("images").$type<string[]>().notNull().default([]),
+    /** What each photo shows, by its address, for screen readers and image search. */
+    imageAlts: jsonb("image_alts").$type<Record<string, string>>().notNull().default({}),
     status: text("status", { enum: ["draft", "active", "archived"] }).notNull().default("draft"),
     supplierId: uuid("supplier_id").references(() => suppliers.id, { onDelete: "set null" }),
     supplierProductRef: text("supplier_product_ref"),
