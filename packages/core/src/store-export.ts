@@ -124,6 +124,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       personalization: p.personalization.map((f) => ({ label: f.label, required: f.required, max_length: f.maxLength })),
       preorder: p.preorder ? { ships_by: p.preorder.shipsBy, limit: p.preorder.limit } : null,
       search_listing: p.seoTitle || p.seoDescription ? { title: p.seoTitle, description: p.seoDescription } : null,
+      purchase_limit: p.purchaseLimit ? { min: p.purchaseLimit.min, max: p.purchaseLimit.max, per_customer: p.purchaseLimit.perCustomer } : null,
       gift_card: p.giftCard,
       variants: variants
         .filter((v) => v.productId === p.id)
@@ -308,6 +309,10 @@ const importSchema = z.object({
           .max(3)
           .optional(),
         search_listing: z.object({ title: str(70).nullable(), description: str(160).nullable() }).nullable().optional(),
+        purchase_limit: z
+          .object({ min: z.number().int().min(2).max(99).nullable(), max: z.number().int().min(1).max(99).nullable(), per_customer: z.number().int().min(1).max(999).nullable() })
+          .nullable()
+          .optional(),
         preorder: z
           .object({ ships_by: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), limit: z.number().int().min(1).max(10_000).nullable() })
           .nullable()
@@ -499,6 +504,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
           personalization: (x.personalization ?? []).map((f, i) => ({ id: `f${i + 1}`, label: f.label, required: f.required, maxLength: f.max_length })),
           seoTitle: x.search_listing?.title || null,
           seoDescription: x.search_listing?.description || null,
+          purchaseLimit: x.purchase_limit ? { min: x.purchase_limit.min, max: x.purchase_limit.max, perCustomer: x.purchase_limit.per_customer } : null,
           // A pre-order whose date has passed isn't brought over.
           preorder: x.preorder && openPreorder({ preorder: { shipsBy: x.preorder.ships_by, limit: x.preorder.limit } }) ? { shipsBy: x.preorder.ships_by, limit: x.preorder.limit } : null,
         })

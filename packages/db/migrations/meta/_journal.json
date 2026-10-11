@@ -414,6 +414,13 @@
       "when": 1791688724899,
       "tag": "0058_product_seo",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1791689990668,
+      "tag": "0059_purchase_limits",
+      "breakpoints": true
     }
   ]
 }

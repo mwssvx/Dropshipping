@@ -237,6 +237,8 @@ export const products = pgTable(
     personalization: jsonb("personalization").$type<PersonalizationField[]>().notNull().default([]),
     // Pre-orders: sold-out options can still be bought, promised to ship by this date.
     preorder: jsonb("preorder").$type<Preorder>(),
+    // Least and most a buyer can order, e.g. a limited drop capped at 2 per customer.
+    purchaseLimit: jsonb("purchase_limit").$type<PurchaseLimit>(),
     // How the product shows in search results; the title and description are used when empty.
     seoTitle: text("seo_title"),
     seoDescription: text("seo_description"),
@@ -339,6 +341,9 @@ export type QuantityBreak = { minQty: number; percentOff: number };
 
 /** `shipsBy` is a YYYY-MM-DD date; `limit` caps how many can be pre-ordered in all. */
 export type Preorder = { shipsBy: string; limit: number | null };
+
+/** How many a buyer can take: per order (`min`, `max`) and in all, across their paid orders (`perCustomer`). */
+export type PurchaseLimit = { min: number | null; max: number | null; perCustomer: number | null };
 
 export type PersonalizationField = { id: string; label: string; required: boolean; maxLength: number };
 /** What the buyer typed, with the label as it was when they ordered. */

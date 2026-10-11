@@ -29,6 +29,8 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
   if (quote.wholesale && quote.wholesale.shortByMinor > 0) redirect(`${base}/cart`);
   // The cart says which personalisation is missing.
   if (quote.items.some((i) => i.missingPersonalization.length)) redirect(`${base}/cart`);
+  // And which quantities are outside a product's purchase limits.
+  if (quote.items.some((i) => i.limit)) redirect(`${base}/cart`);
   const fx = await buyerFx(shop);
   const t = await storeT(handle);
   const variants = await (await db()).query.variants.findMany({ where: (v, { inArray }) => inArray(v.id, quote.items.map((i) => i.variantId)) });
