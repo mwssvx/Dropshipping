@@ -523,3 +523,10 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **One video per product**: Admin → Products → a product → Video takes a YouTube link (watch, youtu.be, Shorts), a Vimeo link, or the https address of a video file such as a supplier's .mp4 (`setProductVideo` and `parseVideo` in `packages/core/src/video.ts`, `products.video_url`). Store files carry it.
 2. **After the photos**: the product page's gallery gets a video thumbnail after the photos, or shows the video as the main picture when there are no photos. Video files play in the page's own player.
 3. **Nothing loads until play**: YouTube and Vimeo players appear only when the buyer presses play, from youtube-nocookie.com and Vimeo with do-not-track, and the still is the product's own photo, so opening the page sends nothing to either.
+
+### Contact page (after launch, part 69)
+
+1. **Contact us**: every store has /contact, linked from the footer, with name, email, an optional order number and the message, in the buyer's language (`sendContactMessage` in `packages/core/src/contact.ts`). The store's business address shows below when the merchant has set one.
+2. **Into the inbox**: a message with an order number that matches the buyer's email joins that order's conversation, and buyer support answers it like a question from the order page. Anything else starts its own conversation marked as needing the merchant. Someone else's order number doesn't get anyone into that order.
+3. **Replies by email**: the merchant replies from the inbox as usual; without an order the reply is emailed with a link back to the contact page (`sendBuyerMessage`).
+4. **Spam**: a hidden field catches bots (they are thanked the same, and nothing is kept), each email address can send three messages an hour, and a store takes at most 50 new contact conversations an hour.
