@@ -74,3 +74,4 @@ export * from "./post-purchase";
 export * from "./personalization";
 export * from "./winback";
 export * from "./price-watch";
+export * from "./preorders";

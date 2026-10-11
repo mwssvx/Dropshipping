@@ -20,6 +20,7 @@ import { addonsByProduct, type CheckoutAddon } from "./addons";
 import { countryName, listShippingZones, priceRate, zoneFor } from "./shipping";
 import { normalizeTags } from "./customers";
 import { cartLineKey, cleanPersonalization, missingPersonalization, personalizationValues } from "./personalization";
+import { openPreorder, preorderDeadline, preordersSold } from "./preorders";
 
 type Shop = typeof schema.shops.$inferSelect;
 type Order = typeof schema.orders.$inferSelect;
@@ -74,6 +75,12 @@ export async function quoteCart(
   // The same option can be on several lines with different text; stock counts them together.
   const perVariant = new Map<string, number>();
   for (const l of wanted) perVariant.set(l.variantId, (perVariant.get(l.variantId) ?? 0) + l.quantity);
+  // Sold-out options of a product taking pre-orders can still be bought, up to its limit.
+  const preorderLeft = new Map<string, number>();
+  for (const r of rows) {
+    const p = openPreorder(r.product);
+    if (p?.limit != null && !preorderLeft.has(r.product.id)) preorderLeft.set(r.product.id, Math.max(0, p.limit - (await preordersSold(db, r.product.id))));
+  }
   for (const l of wanted) {
     const productId = rows.find((r) => r.variant.id === l.variantId)?.product.id;
     if (productId) perProduct.set(productId, (perProduct.get(productId) ?? 0) + l.quantity);
@@ -82,7 +89,13 @@ export async function quoteCart(
     const row = rows.find((r) => r.variant.id === l.variantId);
     if (!row) throw new UserError("An item in your cart is no longer available.", "unavailable");
     if (!Number.isInteger(l.quantity) || l.quantity > 99) throw new UserError("Quantity must be between 1 and 99.");
-    if (row.variant.stock !== null && row.variant.stock < (perVariant.get(l.variantId) ?? l.quantity)) {
+    const preorder = row.variant.stock !== null && row.variant.stock < (perVariant.get(l.variantId) ?? l.quantity) ? openPreorder(row.product) : null;
+    if (preorder && preorderLeft.has(row.product.id)) {
+      const left = preorderLeft.get(row.product.id)!;
+      if (left < l.quantity) throw new UserError(left > 0 ? `Only ${left} of ${row.product.title} left to pre-order.` : `Pre-orders for ${row.product.title} are full.`, "unavailable");
+      preorderLeft.set(row.product.id, left - l.quantity);
+    }
+    if (!preorder && row.variant.stock !== null && row.variant.stock < (perVariant.get(l.variantId) ?? l.quantity)) {
       throw new UserError(row.variant.stock > 0 ? `Only ${row.variant.stock} of ${row.product.title} left.` : `${row.product.title} is sold out.`, "unavailable");
     }
     const title = row.variant.title === "Default" ? row.product.title : `${row.product.title} – ${row.variant.title}`;
@@ -120,6 +133,8 @@ export async function quoteCart(
       addonId: withOthers?.id ?? null,
       giftCard,
       personalization: personalizationValues(row.product.personalization, custom),
+      /** Set (YYYY-MM-DD) when this line is a pre-order: sold out now, promised to ship by then. */
+      preorderShipsBy: preorder?.shipsBy ?? null,
       /** Required personalisation fields left empty, by label. Checkout won't start until they're filled. */
       missingPersonalization: missingPersonalization(row.product.personalization, custom),
     };
@@ -423,6 +438,12 @@ export async function startCheckout(
         ...(followUp ? { source: "post_purchase" as const, parentOrderId: followUp.parentOrderId } : {}),
         ...(repeat ? { source: "subscription" as const, subscriptionId: repeat.id } : {}),
         cardSaved: saveCard,
+        // The latest ship-by date of anything pre-ordered: the order waits for it.
+        preorderShipsBy: quote.items.reduce<Date | null>((latest, i) => {
+          if (!i.preorderShipsBy) return latest;
+          const d = preorderDeadline({ shipsBy: i.preorderShipsBy, limit: null });
+          return !latest || d > latest ? d : latest;
+        }, null),
         paymentIntentId: intent.id,
         ...(dueMinor ? {} : { paymentStatus: "paid" as const, paidAt: new Date() }),
       })
@@ -445,6 +466,7 @@ export async function startCheckout(
         unitCostMinor: i.unitCostMinor,
         addonId: i.addonId,
         personalization: i.personalization,
+        preorder: !!i.preorderShipsBy,
       })),
     );
     return order!;

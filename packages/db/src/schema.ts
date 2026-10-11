@@ -235,6 +235,8 @@ export const products = pgTable(
     quantityBreaks: jsonb("quantity_breaks").$type<QuantityBreak[]>().notNull().default([]),
     // Text the buyer types before adding to cart, like a name to engrave.
     personalization: jsonb("personalization").$type<PersonalizationField[]>().notNull().default([]),
+    // Pre-orders: sold-out options can still be bought, promised to ship by this date.
+    preorder: jsonb("preorder").$type<Preorder>(),
     // A gift card sold on the store: each one bought issues a code worth its variant's price.
     giftCard: boolean("gift_card").notNull().default(false),
     // When stock and cost were last read from the supplier; the daily sync starts with the oldest.
@@ -331,6 +333,9 @@ export type Presentment = {
 export type TaxBreakdownLine = { jurisdiction: string; label: string; rateBps: number; amountMinor: number };
 
 export type QuantityBreak = { minQty: number; percentOff: number };
+
+/** `shipsBy` is a YYYY-MM-DD date; `limit` caps how many can be pre-ordered in all. */
+export type Preorder = { shipsBy: string; limit: number | null };
 
 export type PersonalizationField = { id: string; label: string; required: boolean; maxLength: number };
 /** What the buyer typed, with the label as it was when they ordered. */
@@ -453,6 +458,10 @@ export const orders = pgTable(
     risk: jsonb("risk").$type<OrderRisk>(),
     heldAt: timestamp("held_at", { withTimezone: true }),
     riskReviewedAt: timestamp("risk_reviewed_at", { withTimezone: true }),
+    // Has pre-ordered items: waits for stock before going to the supplier, promised by this date.
+    preorderShipsBy: timestamp("preorder_ships_by", { withTimezone: true }),
+    // When the merchant was told it's past that date and still waiting.
+    preorderLateAt: timestamp("preorder_late_at", { withTimezone: true }),
     // Changes made after payment, before it shipped. The supplier order is cancelled and placed again.
     edits: jsonb("edits").$type<OrderEdit[]>().notNull().default([]),
     // What the buyer typed in "Note for the store" at checkout ("Please leave it with the neighbour").
@@ -495,6 +504,8 @@ export const orderLines = pgTable(
     /** Added from the checkout add-on offer, at its price. */
     addonId: uuid("addon_id").references((): AnyPgColumn => checkoutAddons.id, { onDelete: "set null" }),
     personalization: jsonb("personalization").$type<PersonalizationValue[]>(),
+    // Bought as a pre-order: it goes to the supplier once the option is back in stock.
+    preorder: boolean("preorder").notNull().default(false),
   },
   (t) => [index("order_lines_order_idx").on(t.orderId), check("order_lines_qty_pos", sql`${t.quantity} > 0`)],
 );

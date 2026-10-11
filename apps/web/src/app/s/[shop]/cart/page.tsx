@@ -8,7 +8,7 @@ import { readRecent } from "@/lib/recent";
 import { RecentlyViewed } from "@/components/RecentlyViewed";
 import { addToCartAction, removeCodeAction, removeGiftCardAction, updateCartAction } from "../actions";
 import { CodeForm } from "./CodeForm";
-import { lineTitles, loadShop, localProducts, storeBase, storeT } from "../data";
+import { lineTitles, loadShop, localProducts, storeBase, storeLang, storeT } from "../data";
 
 export const metadata = { title: "Cart" };
 
@@ -46,6 +46,8 @@ export default async function CartPage({ params, searchParams }: { params: Promi
   const recent = await localProducts(handle, await recentlyViewed(await db(), shop.id, await readRecent(shop.id), { exclude: [...new Set(variants.map((v) => v.productId))] }));
   // Item titles in the buyer's language, by the product each option belongs to.
   const t = await storeT(handle);
+  const lang = (await storeLang(handle)) ?? "en-US";
+  const shipsBy = (d: string) => new Intl.DateTimeFormat(lang, { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
   const titles = await lineTitles(handle, quote?.items ?? [], variants);
   // Shown in the buyer's currency when they picked one; the total is exactly what they'll pay.
   const fx = await buyerFx(shop);
@@ -94,6 +96,7 @@ export default async function CartPage({ params, searchParams }: { params: Promi
                   {i.missingPersonalization.length > 0 && (
                     <p className="text-sm text-critical" role="alert">{t.personalizeMissing(i.missingPersonalization.join(", "))}</p>
                   )}
+                  {i.preorderShipsBy && <p className="text-sm font-medium">{t.preorderShipsBy(shipsBy(i.preorderShipsBy))}</p>}
                   {i.priceNote && <p className="text-sm text-success">{i.priceNote}</p>}
                 </div>
                 <form action={updateCartAction.bind(null, handle)} className="flex items-center gap-2">

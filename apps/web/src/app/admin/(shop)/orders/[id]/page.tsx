@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { can, countryName, disputeEvidence, disputeReason, disputesForOrder, formatMoney, getOrder, orderEditOptions, listRefunds, replaceableLines, replacementBlocked, replacementsOf, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode } from "@sf/core";
+import { can, countryName, disputeEvidence, disputeReason, disputesForOrder, formatMoney, getOrder, orderEditOptions, listRefunds, replaceableLines, replacementBlocked, replacementsOf, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode, formatShipsBy, preorderWaitingOn } from "@sf/core";
 import { fulfillment, requireShop, storeAddress, suppliers, testPayments } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
 import { editOrderAction } from "../../../actions";
@@ -84,6 +84,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
   const feeKept = order.platformFeeMinor - refunds.reduce((s, r) => s + r.platformFeeRefundedMinor, 0);
   const net = order.totalMinor - order.refundedMinor - feeKept - order.processingFeeMinor;
   const held = !!order.heldAt && refundable;
+  const waitingFor = order.preorderShipsBy && order.fulfillmentStatus === "unfulfilled" && order.paymentStatus === "paid" ? await preorderWaitingOn(db, order.id) : [];
   const RISK_LABEL = { low: "Low risk", medium: "Medium risk", high: "High risk" } as const;
   // Chargebacks: the latest one, and the evidence we'd send while it waits for an answer.
   const dispute = seesMoney ? ((await disputesForOrder(db, order.id))[0] ?? null) : null;
@@ -108,6 +109,16 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
               {order.note && <p className="text-sm border-l-2 border-border pl-3 whitespace-pre-line">{order.note}</p>}
               <p className="text-sm hint">Once they pay, it goes to the supplier like any other order.</p>
               <PaymentLinkActions orderId={order.id} url={`${await storeAddress(shop)}/pay/${order.id}`} />
+            </section>
+          )}
+          {waitingFor.length > 0 && (
+            <section className="card border-warning p-5 flex flex-col gap-2" aria-labelledby="preorder-heading">
+              <h2 id="preorder-heading" className="font-semibold">Pre-order: waiting for stock</h2>
+              <p className="text-sm">
+                Promised to ship by {formatShipsBy(order.preorderShipsBy!)}. It goes to the supplier as soon as the daily stock check sees{" "}
+                {waitingFor.join(", ")} back in stock.
+                {order.preorderShipsBy! < new Date() && " The date has passed: let the buyer know, refund them, or source it elsewhere and add tracking."}
+              </p>
             </section>
           )}
           {held && order.risk && (
@@ -182,6 +193,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
                 <li key={l.id} className="flex justify-between gap-4 px-5 py-3 text-sm">
                   <span>
                     {l.title} <span className="hint">× {l.quantity}</span>
+                    {l.preorder && <span className="pill ml-2">Pre-order</span>}
                     {l.personalization && (
                       <span className="block mt-1" aria-label="Personalisation">
                         {l.personalization.map((p) => (

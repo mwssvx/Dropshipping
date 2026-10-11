@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { buyerAmounts, buyerThread, formatDeliveryDate, formatDeliveryWindow, orderDelivery, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems } from "@sf/core";
+import { buyerAmounts, buyerThread, formatDeliveryDate, formatDeliveryWindow, orderDelivery, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems, formatShipsBy } from "@sf/core";
 import Link from "next/link";
 import { db, fulfillment, storeAddress } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
@@ -96,6 +96,11 @@ export default async function OrderStatusPage({ params, searchParams }: { params
           <Link href={`${base}/subscriptions/${subscription.token}`} className="underline">Manage subscription</Link>
         </p>
       )}
+      {paid && order.preorderShipsBy && order.fulfillmentStatus === "unfulfilled" && (
+        <p className="banner banner-info" role="status">
+          This is a pre-order. It ships by {formatShipsBy(order.preorderShipsBy)}, and we'll email you tracking as soon as it's on its way.
+        </p>
+      )}
       {partOf && (
         <p className="banner banner-info">
           A delivery from your subscription, charged to your saved card. <Link href={`${base}/subscriptions/${partOf.token}`} className="underline">Manage subscription</Link>
@@ -165,7 +170,7 @@ export default async function OrderStatusPage({ params, searchParams }: { params
           ))}
         </section>
       )}
-      {paid && shipped.length === 0 && (
+      {paid && shipped.length === 0 && !order.preorderShipsBy && (
         <p className="hint text-sm">
           {order.lines.length === 1 ? "Your item usually ships" : "Your items usually ship"} within a few days. We&apos;ll email tracking to {order.email} as soon as it&apos;s on its way.
         </p>
@@ -188,6 +193,7 @@ export default async function OrderStatusPage({ params, searchParams }: { params
             <span>
               {l.title} × {l.quantity}
               {l.personalization && <span className="block hint">{l.personalization.map((p) => `${p.label}: ${p.value}`).join(" · ")}</span>}
+              {l.preorder && <span className="block hint">Pre-order</span>}
             </span>
             <span className="num">{money(due.lines[n]!)}</span>
           </div>

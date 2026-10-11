@@ -17,6 +17,7 @@ import { createBundle, MAX_BUNDLES } from "./bundles";
 import { createSizeChart, MAX_SIZE_CHARTS } from "./size-charts";
 import { createSale, MAX_SALES } from "./sales";
 import { createAddon, MAX_ADDONS, setAddonActive } from "./addons";
+import { openPreorder } from "./preorders";
 
 export const EXPORT_FORMAT = "storefront-store";
 
@@ -121,6 +122,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       goes_well_with: p.upsellProductId ? (handleOf.get(p.upsellProductId) ?? null) : null,
       quantity_breaks: p.quantityBreaks.map((t) => ({ min_qty: t.minQty, percent_off: t.percentOff })),
       personalization: p.personalization.map((f) => ({ label: f.label, required: f.required, max_length: f.maxLength })),
+      preorder: p.preorder ? { ships_by: p.preorder.shipsBy, limit: p.preorder.limit } : null,
       gift_card: p.giftCard,
       variants: variants
         .filter((v) => v.productId === p.id)
@@ -303,6 +305,10 @@ const importSchema = z.object({
         personalization: z
           .array(z.object({ label: str(40), required: z.boolean(), max_length: z.number().int().min(1).max(200) }))
           .max(3)
+          .optional(),
+        preorder: z
+          .object({ ships_by: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), limit: z.number().int().min(1).max(10_000).nullable() })
+          .nullable()
           .optional(),
         variants: z
           .array(
@@ -489,6 +495,8 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
           quantityBreaks: (x.quantity_breaks ?? []).map((t) => ({ minQty: t.min_qty, percentOff: t.percent_off })).sort((a, b) => a.minQty - b.minQty),
           giftCard: x.gift_card ?? false,
           personalization: (x.personalization ?? []).map((f, i) => ({ id: `f${i + 1}`, label: f.label, required: f.required, maxLength: f.max_length })),
+          // A pre-order whose date has passed isn't brought over.
+          preorder: x.preorder && openPreorder({ preorder: { shipsBy: x.preorder.ships_by, limit: x.preorder.limit } }) ? { shipsBy: x.preorder.ships_by, limit: x.preorder.limit } : null,
         })
         .returning({ id: schema.products.id });
       productIds.set(x.handle, row!.id);

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES } from "@sf/core";
+import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS } from "@sf/core";
 import { requireShop, storeAddress, suppliers } from "@/lib/server";
 import { updateProductAction } from "../../../actions";
 import { setUpsellAction } from "../../../growth-actions";
@@ -9,6 +9,7 @@ import { PageHeader } from "../../PageHeader";
 import { ProductForm } from "../ProductForm";
 import { QuantityBreaksForm } from "./QuantityBreaksForm";
 import { PersonalizationForm } from "./PersonalizationForm";
+import { PreorderForm } from "./PreorderForm";
 import { AddressForm } from "./AddressForm";
 import { PhotosPanel } from "./PhotosPanel";
 import { VariantPhotosPanel } from "./VariantPhotosPanel";
@@ -16,6 +17,7 @@ import { BackupPanel, type BackupView } from "./BackupPanel";
 import { StockPanel } from "./StockPanel";
 import { WriteListingButton } from "./WriteListingButton";
 
+const dateIn = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
 const toPrice = (m: number | null | undefined) => (m == null ? "" : (m / 100).toFixed(2));
 
 export default async function EditProductPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string; imported?: string; saved?: string; emailed?: string }> }) {
@@ -49,6 +51,7 @@ export default async function EditProductPage({ params, searchParams }: { params
       }
     : null;
   const waitingBy = await waitingForProduct(db, shop.id, product.id);
+  const preSold = product.preorder ? await preordersSold(db, product.id) : 0;
   const saves = await savedCount(db, shop.id, product.id);
   const waiting = product.variants.filter((v) => waitingBy.has(v.id)).map((v) => ({ option: v.title, count: waitingBy.get(v.id)! }));
   const others = (await listProducts(db, shop.id)).filter((p) => p.id !== product.id && p.status !== "archived");
@@ -163,6 +166,25 @@ export default async function EditProductPage({ params, searchParams }: { params
               </p>
             </div>
             <PersonalizationForm productId={product.id} fields={product.personalization} />
+          </section>
+        )}
+        {!product.giftCard && (
+          <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="preorder-heading">
+            <div>
+              <h2 id="preorder-heading" className="font-semibold">Pre-orders</h2>
+              <p className="hint">
+                Keep selling options that are sold out at your supplier, with a date you promise to ship by. Those orders wait and go to your
+                supplier as soon as the stock check sees them back. If the date passes first, we email you so you can tell the buyer.
+              </p>
+            </div>
+            {product.preorder && (
+              <p className="text-sm" role="note">
+                {preSold === 1 ? "1 pre-order" : `${preSold} pre-orders`} so far
+                {product.preorder.limit != null ? ` of ${product.preorder.limit}` : ""}.{" "}
+                {openPreorder(product) ? `Ships by ${formatShipsBy(product.preorder.shipsBy)}.` : `The ship-by date (${formatShipsBy(product.preorder.shipsBy)}) has passed, so sold-out options can't be bought. Pick a new date to keep taking pre-orders.`}
+              </p>
+            )}
+            <PreorderForm productId={product.id} preorder={product.preorder} min={dateIn(1)} max={dateIn(PREORDER_MAX_DAYS - 1)} />
           </section>
         )}
         <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="upsell-heading">
