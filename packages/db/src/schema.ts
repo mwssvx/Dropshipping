@@ -237,6 +237,9 @@ export const products = pgTable(
     personalization: jsonb("personalization").$type<PersonalizationField[]>().notNull().default([]),
     // Pre-orders: sold-out options can still be bought, promised to ship by this date.
     preorder: jsonb("preorder").$type<Preorder>(),
+    // How the product shows in search results; the title and description are used when empty.
+    seoTitle: text("seo_title"),
+    seoDescription: text("seo_description"),
     // A gift card sold on the store: each one bought issues a code worth its variant's price.
     giftCard: boolean("gift_card").notNull().default(false),
     // When stock and cost were last read from the supplier; the daily sync starts with the oldest.

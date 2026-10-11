@@ -27,6 +27,7 @@ export const AGENT_SPECS = {
 Call get_product, then save_listing once with a better title and description, then say in one or two sentences what you changed.
 A good title names the product the way a buyer would search for it, under 70 characters, without supplier filler like "hot sale", "2024 new", "free shipping" or model codes.
 A good description opens with one or two sentences on what it is and why someone would want it, then 3 to 6 bullet lines starting with "• " covering what the data actually supports (size options, what's in the box, delivery time). Don't claim materials, certifications, dimensions or benefits the data doesn't mention.
+Also give a search_description: one or two plain sentences under 160 characters that make someone searching want to click.
 ${RULES}`,
   },
   assistant: {

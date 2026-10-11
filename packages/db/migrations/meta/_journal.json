@@ -407,6 +407,13 @@
       "when": 1791685223526,
       "tag": "0057_preorders",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1791688724899,
+      "tag": "0058_product_seo",
+      "breakpoints": true
     }
   ]
 }
