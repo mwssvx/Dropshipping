@@ -30,10 +30,14 @@ async function load(shopHandle: string, handle: string, count = true) {
 export async function generateMetadata({ params }: { params: Promise<{ shop: string; handle: string }> }) {
   const { shop, handle } = await params;
   const { product } = await load(shop, handle, false);
-  const description = summary(product.descriptionHtml) || undefined;
+  // The merchant's search listing is written in the store's main language.
+  const own = !(await storeLang(shop));
+  const title = (own && product.seoTitle) || product.title;
+  const description = (own && product.seoDescription) || summary(product.descriptionHtml) || undefined;
   const photos = productPhotos(product);
   const images = photos.length ? photos.map((url) => ({ url })) : undefined;
-  return { title: product.title, description, openGraph: { title: product.title, description, images, type: "website" } };
+  // A search title is used exactly as written; otherwise the store's name follows the product's.
+  return { title: own && product.seoTitle ? { absolute: title } : title, description, openGraph: { title, description, images, type: "website" } };
 }
 
 function summary(text: string) {

@@ -132,6 +132,7 @@ const listingTools = [
     input: z.object({
       title: z.string().min(3).max(120).describe("Clear product name buyers would search for, no ALL CAPS, no emoji, no supplier junk words."),
       description: z.string().min(40).max(3000).describe("Plain text. A short opening paragraph, then 3 to 6 bullet lines starting with '• '."),
+      search_description: z.string().max(160).optional().describe("One or two plain sentences for search results, under 160 characters."),
     }),
     policy: async (_, run) => {
       const p = await run.ctx.db.query.products.findFirst({ where: eq(schema.products.id, run.productId!), columns: { status: true } });
@@ -142,7 +143,7 @@ const listingTools = [
       if (/<[a-z/][^>]*>/i.test(i.description)) throw new UserError("The description must be plain text, without HTML tags.");
       const [p] = await run.ctx.db
         .update(schema.products)
-        .set({ title: i.title.trim(), descriptionHtml: i.description.trim(), aiGenerated: true, updatedAt: new Date() })
+        .set({ title: i.title.trim(), descriptionHtml: i.description.trim(), ...(i.search_description?.trim() ? { seoDescription: i.search_description.trim() } : {}), aiGenerated: true, updatedAt: new Date() })
         .where(and(eq(schema.products.id, run.productId!), eq(schema.products.shopId, run.shop.id)))
         .returning({ id: schema.products.id });
       if (!p) throw new UserError("Product not found.");

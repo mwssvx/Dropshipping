@@ -84,7 +84,8 @@ function listing(s: State): BetaContentBlock[] {
     ].filter(Boolean);
     while (bullets.length < 3) bullets.push(bullets.length ? "Easy returns through our store" : `A ${title.toLowerCase()} that's ready to use out of the box`);
     const description = `${title}: a simple, good-looking pick for everyday use${options.length ? `, in ${options.length} options` : ""}.\n\n${bullets.map((b) => `• ${b}`).join("\n")}`;
-    return [toolCall("save_listing", { title, description })];
+    const search = `${title}${options.length ? `, in ${options.join(" or ").toLowerCase()}` : ""}${days ? `. Delivered in about ${days.replace("-", " to ")} days` : ""}.`.slice(0, 160);
+    return [toolCall("save_listing", { title, description, search_description: search })];
   }
   return [text(waiting(saved) ? `I wrote a new title (“${saved.input.title}”) and description. The product is on sale, so it's waiting for your OK.` : `I saved a new title (“${saved.input.title}”) and a clearer description with bullet points. The product is still a draft.`)];
 }

@@ -481,3 +481,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Learned from real orders**: products bought in the same paid order at least twice in the last 180 days are suggested on each other's page under "Often bought together", most often first, up to three (`boughtTogether` in `packages/core/src/growth.ts`). Free replacements and subscription deliveries don't count, and hidden, sold-out and gift card products are left out.
 2. **In the cart too**: after the merchant's own "Goes well with" picks, the cart offers what other buyers bought with what's in it, with one-click add, up to three in all. Titles are translated in each store language.
+
+### Search listings (after launch, part 61)
+
+1. **A listing per product**: Admin → Products → a product → Search engine listing sets the title (up to 70 characters) and description (up to 160) that search engines show, with a live preview and character counts (`setProductSeo` in `packages/core/src/seo.ts`, `products.seo_title` and `seo_description`). Empty fields fall back to the product's title and the start of its description. The store page uses them in its main language; translated pages keep their translated title and description.
+2. **What needs work**: Admin → Search listings checks every product on sale for supplier filler in the title ("hot sale", "2024 new", words in capitals), titles too long to show in full, nothing useful to show under the title, two products with the same title, and no photo (`seoReport`), with a link to fix each one.
+3. **AI fills it in**: "Write with AI" on a product now also writes a search description. Store files carry the listing.

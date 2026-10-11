@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS } from "@sf/core";
+import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX } from "@sf/core";
 import { requireShop, storeAddress, suppliers } from "@/lib/server";
 import { updateProductAction } from "../../../actions";
 import { setUpsellAction } from "../../../growth-actions";
@@ -10,6 +10,7 @@ import { ProductForm } from "../ProductForm";
 import { QuantityBreaksForm } from "./QuantityBreaksForm";
 import { PersonalizationForm } from "./PersonalizationForm";
 import { PreorderForm } from "./PreorderForm";
+import { SeoForm } from "./SeoForm";
 import { AddressForm } from "./AddressForm";
 import { PhotosPanel } from "./PhotosPanel";
 import { VariantPhotosPanel } from "./VariantPhotosPanel";
@@ -106,6 +107,18 @@ export default async function EditProductPage({ params, searchParams }: { params
             {...variantPhotoRows(product.variants.map((v) => ({ id: v.id, title: v.title, options: v.options ?? {}, imageUrl: v.imageUrl })))} />
         )}
         <AddressForm productId={product.id} handle={product.handle} prefix={(await storeAddress(shop)).replace(/^https?:\/\//, "")} />
+        {!product.giftCard && (
+          <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="seo-heading">
+            <div>
+              <h2 id="seo-heading" className="font-semibold">Search engine listing</h2>
+              <p className="hint">How this product shows in Google and other search results. Write it for someone searching: what it is, and why to click.</p>
+            </div>
+            <SeoForm productId={product.id} title={product.seoTitle ?? ""} description={product.seoDescription ?? ""}
+              fallback={{ title: product.title, description: searchSnippet(product.descriptionHtml) }}
+              url={`${(await storeAddress(shop)).replace(/^https?:\/\//, "")}/products/${product.handle}`}
+              max={{ title: SEO_TITLE_MAX, description: SEO_DESCRIPTION_MAX }} />
+          </section>
+        )}
         {shopLanguages(shop).length > 0 && (
           <p className="text-sm max-w-3xl">
             <span className="hint">Translations: </span>
