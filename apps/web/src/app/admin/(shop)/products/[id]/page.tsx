@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX } from "@sf/core";
+import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit } from "@sf/core";
 import { requireShop, storeAddress, suppliers } from "@/lib/server";
 import { updateProductAction } from "../../../actions";
 import { setUpsellAction } from "../../../growth-actions";
@@ -10,6 +10,7 @@ import { ProductForm } from "../ProductForm";
 import { QuantityBreaksForm } from "./QuantityBreaksForm";
 import { PersonalizationForm } from "./PersonalizationForm";
 import { PreorderForm } from "./PreorderForm";
+import { PurchaseLimitForm } from "./PurchaseLimitForm";
 import { SeoForm } from "./SeoForm";
 import { AddressForm } from "./AddressForm";
 import { PhotosPanel } from "./PhotosPanel";
@@ -198,6 +199,19 @@ export default async function EditProductPage({ params, searchParams }: { params
               </p>
             )}
             <PreorderForm productId={product.id} preorder={product.preorder} min={dateIn(1)} max={dateIn(PREORDER_MAX_DAYS - 1)} />
+          </section>
+        )}
+        {!product.giftCard && (
+          <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="limits-heading">
+            <div>
+              <h2 id="limits-heading" className="font-semibold">Purchase limits</h2>
+              <p className="hint">
+                Set how many a buyer can order. Use a most per customer for limited drops so one buyer can't take them all, or a least per
+                order for cheap items that only pay off in sets. All options of this product count together. Leave a box empty for no limit.
+              </p>
+            </div>
+            {product.purchaseLimit && <p className="text-sm" role="note">Buyers can order {describePurchaseLimit(product.purchaseLimit)}.</p>}
+            <PurchaseLimitForm productId={product.id} limit={product.purchaseLimit} />
           </section>
         )}
         <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="upsell-heading">

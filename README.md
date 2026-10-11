@@ -487,3 +487,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **A listing per product**: Admin → Products → a product → Search engine listing sets the title (up to 70 characters) and description (up to 160) that search engines show, with a live preview and character counts (`setProductSeo` in `packages/core/src/seo.ts`, `products.seo_title` and `seo_description`). Empty fields fall back to the product's title and the start of its description. The store page uses them in its main language; translated pages keep their translated title and description.
 2. **What needs work**: Admin → Search listings checks every product on sale for supplier filler in the title ("hot sale", "2024 new", words in capitals), titles too long to show in full, nothing useful to show under the title, two products with the same title, and no photo (`seoReport`), with a link to fix each one.
 3. **AI fills it in**: "Write with AI" on a product now also writes a search description. Store files carry the listing.
+
+### Purchase limits (after launch, part 62)
+
+1. **Least and most per order**: Admin → Products → a product → Purchase limits sets the fewest and the most a buyer can order at once, counting every option of the product together (`setPurchaseLimit` in `packages/core/src/purchase-limits.ts`, `products.purchase_limit`). The product page shows the limits under a quantity box that follows them.
+2. **Most per customer**: for limited drops, a cap across all of a buyer's paid orders, matched by email (`boughtBefore`). It's checked at checkout, and in the cart already when the buyer is signed in. Free replacements don't count, and repeat deliveries of a subscription aren't stopped.
+3. **What the buyer sees**: the cart says what to change next to the item, in the store's language, and checkout won't start until it's fixed (`quoteCart` returns `limit` on the item; `startCheckout` refuses it). Store files carry the limits.

@@ -99,13 +99,18 @@ export default async function CartPage({ params, searchParams }: { params: Promi
                   {i.missingPersonalization.length > 0 && (
                     <p className="text-sm text-critical" role="alert">{t.personalizeMissing(i.missingPersonalization.join(", "))}</p>
                   )}
+                  {i.limit && (
+                    <p className="text-sm text-critical" role="alert">
+                      {i.limit.kind === "min" ? t.limitMin(i.limit.limit) : i.limit.kind === "max" ? t.limitMax(i.limit.limit) : t.limitCustomer(i.limit.limit, i.limit.bought)}
+                    </p>
+                  )}
                   {i.preorderShipsBy && <p className="text-sm font-medium">{t.preorderShipsBy(shipsBy(i.preorderShipsBy))}</p>}
                   {i.priceNote && <p className="text-sm text-success">{i.priceNote}</p>}
                 </div>
                 <form action={updateCartAction.bind(null, handle)} className="flex items-center gap-2">
                   <input type="hidden" name="line" value={i.key} />
                   <label className="sr-only" htmlFor={`q-${n}`}>{t.quantity}</label>
-                  <input id={`q-${n}`} name="quantity" type="number" min={0} max={99} defaultValue={i.quantity} className="input w-16 num" />
+                  <input id={`q-${n}`} name="quantity" type="number" min={0} max={Math.min(99, i.purchaseLimit?.max ?? 99)} defaultValue={i.quantity} className="input w-16 num" />
                   <button className="btn btn-secondary">{t.update}</button>
                 </form>
                 <span className="num font-semibold w-20 text-right">{money(shown!.units[i.variantId]! * i.quantity)}</span>

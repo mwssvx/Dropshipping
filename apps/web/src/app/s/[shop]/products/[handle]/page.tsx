@@ -116,6 +116,11 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const soldOut = product.variants.filter((x) => x.stock !== null && x.stock <= 0);
   const isSaved = (await savedIds(shop.id)).includes(product.id);
   const tiers = wholesale ? [] : product.quantityBreaks;
+  // Purchase limits set the quantity box's range and show as a note under it.
+  const limit = product.purchaseLimit;
+  const fewest = limit?.min ?? 1;
+  const most = Math.min(99, limit?.max ?? 99, limit?.perCustomer ?? 99);
+  const limitNote = limit ? [limit.min != null ? t.noteMin(limit.min) : null, limit.max != null ? t.noteMax(limit.max) : null, limit.perCustomer != null ? t.noteCustomer(limit.perCustomer) : null].filter(Boolean).join(" · ") : "";
   // Buy X get Y offers that apply on their own; wholesale buyers have their own prices.
   const offers = wholesale ? [] : await productOffers(await db(), shop, product.id);
   // Wholesale buyers have their own prices, so bundles aren't offered to them.
@@ -208,14 +213,15 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                 <span id={`custom-${f.id}-hint`} className="hint text-xs">{t.personalizeHint(f.maxLength)}</span>
               </div>
             ))}
-            {tiers.length > 0 || wholesale ? (
+            {tiers.length > 0 || wholesale || limit ? (
               <div className="field w-28">
                 <label className="label" htmlFor="quantity">{t.quantity}</label>
-                <input className="input num" id="quantity" name="quantity" type="number" min={1} max={99} defaultValue={1} />
+                <input className="input num" id="quantity" name="quantity" type="number" min={fewest} max={most} defaultValue={fewest} aria-describedby={limitNote ? "limit-note" : undefined} />
               </div>
             ) : (
               <input type="hidden" name="quantity" value="1" />
             )}
+            {limitNote && <p id="limit-note" className="text-sm hint">{limitNote}</p>}
             {preorder && soldOut.length > 0 && (
               <p className="text-sm font-medium" role="note">
                 {buyable.length === 0 ? t.preorderShipsBy(shipsBy(preorder.shipsBy)) : t.preorderSome(shipsBy(preorder.shipsBy))}

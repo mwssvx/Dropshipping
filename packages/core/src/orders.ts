@@ -21,6 +21,7 @@ import { countryName, listShippingZones, priceRate, zoneFor } from "./shipping";
 import { normalizeTags } from "./customers";
 import { cartLineKey, cleanPersonalization, missingPersonalization, personalizationValues } from "./personalization";
 import { openPreorder, preorderDeadline, preordersSold } from "./preorders";
+import { boughtBefore, describeLimitProblem, limitProblem } from "./purchase-limits";
 
 type Shop = typeof schema.shops.$inferSelect;
 type Order = typeof schema.orders.$inferSelect;
@@ -85,6 +86,14 @@ export async function quoteCart(
     const productId = rows.find((r) => r.variant.id === l.variantId)?.product.id;
     if (productId) perProduct.set(productId, (perProduct.get(productId) ?? 0) + l.quantity);
   }
+  // Purchase limits count every option of a product together. The per-customer one needs to know
+  // who's buying: the email at checkout, or the signed-in buyer in the cart.
+  const limited = rows.filter((r) => r.product.purchaseLimit);
+  const buyer = opts.email ?? opts.buyerEmail;
+  const bought = buyer && limited.some((r) => r.product.purchaseLimit!.perCustomer != null)
+    ? await boughtBefore(db, shop.id, buyer, [...new Set(limited.map((r) => r.product.id))])
+    : new Map<string, number>();
+  const limitShown = new Set<string>();
   const items = wanted.map((l) => {
     const row = rows.find((r) => r.variant.id === l.variantId);
     if (!row) throw new UserError("An item in your cart is no longer available.", "unavailable");
@@ -113,6 +122,10 @@ export async function quoteCart(
       giftCard ? null : wholesale ? `Wholesale price, ${wholesale.percentOff}% off` : withOthers?.percentOff ? `Add-on price, ${withOthers.percentOff}% off` : tier ? describeBreak(tier) : null,
     ];
     const custom = cleanPersonalization(row.product.personalization, l.custom);
+    // Shown once, on the product's first line.
+    const problem = limitShown.has(row.product.id) ? null : limitProblem(row.product.purchaseLimit, perProduct.get(row.product.id) ?? l.quantity, bought.get(row.product.id) ?? 0);
+    if (problem) limitShown.add(row.product.id);
+    const limit = problem && { ...problem, product: row.product.title };
     return {
       /** Tells apart lines of the same option with different personalisation; matches the cart line it came from. */
       key: cartLineKey(l),
@@ -137,6 +150,10 @@ export async function quoteCart(
       preorderShipsBy: preorder?.shipsBy ?? null,
       /** Required personalisation fields left empty, by label. Checkout won't start until they're filled. */
       missingPersonalization: missingPersonalization(row.product.personalization, custom),
+      /** Too few or too many of this product for its purchase limits. Checkout won't start until it's fixed. */
+      limit,
+      /** The product's limits, so the cart's quantity box can follow them. */
+      purchaseLimit: row.product.purchaseLimit,
     };
   });
   const subtotalMinor = items.reduce((s, i) => s + i.lineMinor, 0);
@@ -335,6 +352,9 @@ export async function startCheckout(
   if (unfinished) {
     throw new UserError(`Add ${unfinished.missingPersonalization.join(" and ")} for ${unfinished.title} before checking out.`, "personalization_missing");
   }
+  // Repeat deliveries keep going; the buyer signed up for them.
+  const overLimit = repeat ? null : quoted.items.find((i) => i.limit);
+  if (overLimit) throw new UserError(describeLimitProblem(overLimit.limit!, overLimit.limit!.product), "purchase_limit");
   if (cart.wholesale && cart.wholesale.shortByMinor > 0) {
     throw new UserError(
       `Wholesale orders start at ${formatMoney(cart.wholesale.minOrderMinor, shop.currency)}. Add ${formatMoney(cart.wholesale.shortByMinor, shop.currency)} more to check out.`,
