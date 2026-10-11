@@ -176,3 +176,15 @@ export async function notifyCostChanges(ctx: { db: Db; mailer: Mailer; adminUrl:
   }
   return { sent };
 }
+
+/** Saves a new supplier cost for an option of this store, noting it if it's a rise. */
+export async function applySupplierCost(db: Db, shop: Shop, variantId: string, costMinor: number, now = new Date()) {
+  const [row] = await db
+    .select({ variant: schema.variants })
+    .from(schema.variants)
+    .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
+    .where(and(eq(schema.variants.id, variantId), eq(schema.products.shopId, shop.id)));
+  if (!row) throw new NotFoundError("Option");
+  await db.update(schema.variants).set({ costMinor }).where(eq(schema.variants.id, variantId));
+  return row.variant.costMinor === null ? null : recordCostChange(db, shop, row.variant, row.variant.costMinor, costMinor, now);
+}

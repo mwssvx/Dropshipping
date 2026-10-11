@@ -1,5 +1,5 @@
-import { pruneAuthRecords, pruneBuyerRecords, pruneStockAlerts, sendPriceDrops, sendStockAlerts, syncSupplierStock, pruneInvites, pruneEvents, refreshAllVerified, runWebhooks, routeStuckOrders, sendCampaignBatches, runFakePayouts, notifyNewDisputes, runDueSubscriptions, sendWinbackEmails, runHealthChecks, runScheduledAgents, sendAbandonedCartEmails, sendAllNotifications, sendReferralRewards, syncTracking } from "@sf/core";
-import { agents, campaigns, disputeNotices, fulfillment, pushSender, stock, subscriptions, testPayments, webhooks } from "@/lib/server";
+import { pruneAuthRecords, pruneBuyerRecords, pruneStockAlerts, sendPriceDrops, sendStockAlerts, syncSupplierStock, pruneInvites, pruneEvents, refreshAllVerified, runWebhooks, routeStuckOrders, sendCampaignBatches, runFakePayouts, notifyNewDisputes, runDueSubscriptions, sendWinbackEmails, notifyCostChanges, runHealthChecks, runScheduledAgents, sendAbandonedCartEmails, sendAllNotifications, sendReferralRewards, syncTracking } from "@sf/core";
+import { agents, campaigns, adminNotices, fulfillment, pushSender, stock, subscriptions, testPayments, webhooks } from "@/lib/server";
 
 /**
  * Scheduled job: place any paid orders that were missed, then pull tracking from suppliers, and
@@ -22,13 +22,15 @@ export async function GET(request: Request) {
   // Refer a friend: credit for friends whose first order has now arrived.
   const referrals = await sendReferralRewards(await campaigns());
   const stockSync = await syncSupplierStock(ctx);
+  // Supplier price rises that leave thin margins, or that raised prices on their own.
+  const priceRises = await notifyCostChanges(await adminNotices());
   // Subscribe and save: "coming up" emails, then deliveries that are due, after stock is fresh.
   const repeats = await runDueSubscriptions(await subscriptions());
   const restocked = await sendStockAlerts(await stock());
   const priceDrops = await sendPriceDrops(await stock());
   const payouts = testPayments() ? await runFakePayouts(ctx.db) : null;
   // Disputes whose email didn't go out when the webhook came in.
-  const disputes = await notifyNewDisputes(await disputeNotices());
+  const disputes = await notifyNewDisputes(await adminNotices());
   // Store health warnings and the verified badge.
   const health = await runHealthChecks(ctx.db);
   const verified = await refreshAllVerified(ctx.db);
@@ -44,5 +46,5 @@ export async function GET(request: Request) {
   await pruneInvites(ctx.db);
   await pruneBuyerRecords(ctx.db);
   await pruneStockAlerts(ctx.db);
-  return Response.json({ routed, tracking, referrals, stock: stockSync, subscriptions: repeats, restocked, priceDrops, payouts, disputes, health, verified, reminders, campaigns: campaignEmails, winback, ai, push, webhooks: hooks, pruned });
+  return Response.json({ routed, tracking, referrals, stock: stockSync, priceRises, subscriptions: repeats, restocked, priceDrops, payouts, disputes, health, verified, reminders, campaigns: campaignEmails, winback, ai, push, webhooks: hooks, pruned });
 }

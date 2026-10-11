@@ -138,8 +138,8 @@ export function platformUrl(path: string) {
   return `${/^(localhost|127\.0\.0\.1)(:|$)/.test(ROOT_DOMAIN) ? "http" : "https"}://${ROOT_DOMAIN}${path}`;
 }
 
-/** Emailing the people who look after a store's money about new disputes. */
-export async function disputeNotices() {
+/** Emailing a store's team about things that need them: new disputes, supplier price rises. */
+export async function adminNotices() {
   return { db: await db(), mailer: mailer(), adminUrl: platformUrl };
 }
 
