@@ -165,6 +165,8 @@ export const shops = pgTable(
     deliveryEstimates: boolean("delivery_estimates").notNull().default(true),
     processingDays: integer("processing_days").notNull().default(2),
     referralProgram: jsonb("referral_program").$type<ReferralProgram>(),
+    // Product pages say "Only 3 left" when an option's real stock is at or below this; 0 turns it off.
+    lowStockNote: integer("low_stock_note").notNull().default(5),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
