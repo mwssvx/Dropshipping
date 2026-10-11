@@ -1,4 +1,4 @@
-import { pruneAuthRecords, pruneBuyerRecords, pruneStockAlerts, sendPriceDrops, sendStockAlerts, syncSupplierStock, pruneInvites, pruneEvents, refreshAllVerified, runWebhooks, routeStuckOrders, sendCampaignBatches, runFakePayouts, notifyNewDisputes, runDueSubscriptions, runHealthChecks, runScheduledAgents, sendAbandonedCartEmails, sendAllNotifications, sendReferralRewards, syncTracking } from "@sf/core";
+import { pruneAuthRecords, pruneBuyerRecords, pruneStockAlerts, sendPriceDrops, sendStockAlerts, syncSupplierStock, pruneInvites, pruneEvents, refreshAllVerified, runWebhooks, routeStuckOrders, sendCampaignBatches, runFakePayouts, notifyNewDisputes, runDueSubscriptions, sendWinbackEmails, runHealthChecks, runScheduledAgents, sendAbandonedCartEmails, sendAllNotifications, sendReferralRewards, syncTracking } from "@sf/core";
 import { agents, campaigns, disputeNotices, fulfillment, pushSender, stock, subscriptions, testPayments, webhooks } from "@/lib/server";
 
 /**
@@ -34,6 +34,8 @@ export async function GET(request: Request) {
   const verified = await refreshAllVerified(ctx.db);
   const reminders = await sendAbandonedCartEmails(ctx);
   const campaignEmails = await sendCampaignBatches(await campaigns());
+  // Win-back codes for subscribers who haven't ordered in a while.
+  const winback = await sendWinbackEmails(await campaigns());
   const ai = await runScheduledAgents(await agents());
   const push = await sendAllNotifications({ db: ctx.db, push: pushSender() });
   const hooks = await runWebhooks(await webhooks());
@@ -42,5 +44,5 @@ export async function GET(request: Request) {
   await pruneInvites(ctx.db);
   await pruneBuyerRecords(ctx.db);
   await pruneStockAlerts(ctx.db);
-  return Response.json({ routed, tracking, referrals, stock: stockSync, subscriptions: repeats, restocked, priceDrops, payouts, disputes, health, verified, reminders, campaigns: campaignEmails, ai, push, webhooks: hooks, pruned });
+  return Response.json({ routed, tracking, referrals, stock: stockSync, subscriptions: repeats, restocked, priceDrops, payouts, disputes, health, verified, reminders, campaigns: campaignEmails, winback, ai, push, webhooks: hooks, pruned });
 }

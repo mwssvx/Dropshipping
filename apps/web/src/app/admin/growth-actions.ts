@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { createDiscount, moderateReview, parseMoney, sendAbandonedCartEmails, setDiscountActive, setGrowthSettings, setPostPurchaseOffer, setReferralProgram, setSubscriptionOffer, setUpsell, setWelcomeOffer, UserError } from "@sf/core";
+import { createDiscount, moderateReview, parseMoney, sendAbandonedCartEmails, setDiscountActive, setGrowthSettings, setPostPurchaseOffer, setReferralProgram, setSubscriptionOffer, setUpsell, setWelcomeOffer, setWinbackOffer, UserError } from "@sf/core";
 import { fulfillment, requireShop, testPayments } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -56,6 +56,19 @@ export async function setWelcomeOfferAction(_: FormState, form: FormData): Promi
       shop.id,
       form.get("on") === "on" ? { percentOff: int("percentOff"), minSubtotalMinor: min ? parseMoney(min) : 0, days: int("days") } : null,
     );
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath("/admin/marketing");
+  return { saved: true };
+}
+
+export async function setWinbackOfferAction(_: FormState, form: FormData): Promise<FormState> {
+  const { shop, db } = await requireShop("marketing");
+  try {
+    const int = (name: string) => Number.parseInt(String(form.get(name) ?? "").trim() || "NaN", 10);
+    await setWinbackOffer(db, shop.id, form.get("on") === "on" ? { afterDays: int("afterDays"), percentOff: int("percentOff"), days: int("days") } : null);
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
     throw e;

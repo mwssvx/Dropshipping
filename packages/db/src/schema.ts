@@ -54,6 +54,8 @@ export const sessions = pgTable(
  */
 /** A personal one-time code emailed to each new signup. Null on the shop means it's off. */
 export type WelcomeOffer = { percentOff: number; minSubtotalMinor: number; days: number };
+/** Email a code `afterDays` after a subscriber's last order; the code lasts `days`. */
+export type WinbackOffer = { afterDays: number; percentOff: number; days: number };
 
 /** One product offered on the order page right after paying, added with one click to the same card. */
 export type PostPurchaseOffer = { productId: string; percentOff: number; active: boolean };
@@ -149,6 +151,8 @@ export const shops = pgTable(
     invoiceNextNumber: integer("invoice_next_number").notNull().default(1),
     invoiceFooter: text("invoice_footer"),
     welcomeOffer: jsonb("welcome_offer").$type<WelcomeOffer>(),
+    // Win-back emails: a personal code for subscribers who haven't ordered in a while. Null when off.
+    winbackOffer: jsonb("winback_offer").$type<WinbackOffer>(),
     holdRiskyOrders: text("hold_risky_orders", { enum: ["off", "medium", "high"] }).notNull().default("high"),
     postPurchaseOffer: jsonb("post_purchase_offer").$type<PostPurchaseOffer>(),
     subscriptionOffer: jsonb("subscription_offer").$type<SubscriptionOffer>(),
@@ -283,6 +287,8 @@ export const customers = pgTable(
     optInSentAt: timestamp("opt_in_sent_at", { withTimezone: true }),
     // When we emailed their welcome code. Once per address, even if they sign up again later.
     welcomeCodeAt: timestamp("welcome_code_at", { withTimezone: true }),
+    // When we last sent a win-back code. Another goes only after they order again and then lapse again.
+    winbackSentAt: timestamp("winback_sent_at", { withTimezone: true }),
     // Their refer-a-friend link is <store>/refer/<code>. Made the first time they see it.
     referralCode: text("referral_code"),
     // Wholesale: a buyer applies from their store account and the merchant approves them.
@@ -936,7 +942,7 @@ export const discounts = pgTable(
     active: boolean("active").notNull().default(true),
     // Welcome and referral codes are made one per person, only work for that email, and stay off
     // the codes list.
-    source: text("source", { enum: ["merchant", "welcome", "referral"] }).notNull().default("merchant"),
+    source: text("source", { enum: ["merchant", "welcome", "referral", "winback"] }).notNull().default("merchant"),
     email: text("email"),
     createdAt: createdAt(),
   },
