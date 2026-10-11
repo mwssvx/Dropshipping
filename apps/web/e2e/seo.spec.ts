@@ -35,8 +35,8 @@ test("a product's search listing shows on the store and in the report", async ({
   const section = page.getByRole("region", { name: "Search engine listing" });
   const preview = section.getByLabel("Search result preview");
   await expect(preview).toContainText("Sunset Projection Lamp");
-  await section.getByLabel("Search title").fill("Sunset lamp that turns any room golden");
-  await section.getByLabel("Search description").fill("A sunset projection lamp in two sizes. Delivered in about a week, with easy returns.");
+  await section.getByLabel("Headline in search results").fill("Sunset lamp that turns any room golden");
+  await section.getByLabel("Snippet in search results").fill("A sunset projection lamp in two sizes. Delivered in about a week, with easy returns.");
   await expect(preview).toContainText("Sunset lamp that turns any room golden");
   await expect(section.getByText("38 of 70 characters.")).toBeVisible();
   await section.getByRole("button", { name: "Save search listing" }).click();

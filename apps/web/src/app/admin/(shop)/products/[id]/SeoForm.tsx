@@ -35,12 +35,12 @@ export function SeoForm({ productId, title, description, fallback, url, max }: {
         <span className="text-sm text-muted">{shownDescription || "Search engines will pick some text from the page."}</span>
       </div>
       <div className="field">
-        <label className="label" htmlFor="seo-title">Search title</label>
+        <label className="label" htmlFor="seo-title">Headline in search results</label>
         <input className="input" id="seo-title" name="seoTitle" value={t} maxLength={max.title} placeholder={fallback.title} onChange={(e) => setT(e.target.value)} aria-describedby="seo-title-hint" />
         <span id="seo-title-hint" className="hint text-xs">{t.length} of {max.title} characters. Leave it empty to use the product title.</span>
       </div>
       <div className="field">
-        <label className="label" htmlFor="seo-description">Search description</label>
+        <label className="label" htmlFor="seo-description">Snippet in search results</label>
         <textarea className="input" id="seo-description" name="seoDescription" rows={3} value={d} maxLength={max.description} placeholder={fallback.description} onChange={(e) => setD(e.target.value)} aria-describedby="seo-description-hint" />
         <span id="seo-description-hint" className="hint text-xs">{d.length} of {max.description} characters. Leave it empty to use the start of the description.</span>
       </div>
