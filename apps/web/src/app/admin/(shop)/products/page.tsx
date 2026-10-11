@@ -5,6 +5,7 @@ import { PageHeader } from "../PageHeader";
 import { BulkProducts, type BulkRow } from "./BulkProducts";
 import { LowStockForm } from "./LowStockForm";
 import { BadgeSettingsForm } from "./BadgeSettingsForm";
+import { SoldOutForm } from "./SoldOutForm";
 
 export const metadata = { title: "Products" };
 
@@ -69,6 +70,16 @@ export default async function ProductsPage() {
             </p>
           </div>
           <BadgeSettingsForm sale={shop.productBadges.sale} soldOut={shop.productBadges.soldOut} newDays={shop.productBadges.newDays} />
+        </section>
+        <section className="card p-5 mt-6 flex flex-col gap-3 max-w-3xl" aria-labelledby="sold-out-heading">
+          <div>
+            <h2 id="sold-out-heading" className="font-semibold">Sold-out products</h2>
+            <p className="hint">
+              Where products nobody can order right now go in collections, search and on your home page. Products open for pre-order count as
+              available. A hidden product&apos;s own page still works, so links people saved keep working and buyers can ask to hear when it&apos;s back.
+            </p>
+          </div>
+          <SoldOutForm value={shop.soldOutProducts} />
         </section>
       </div>
     </main>

@@ -470,6 +470,13 @@
       "when": 1791705725542,
       "tag": "0066_campaign_audiences",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1791707134685,
+      "tag": "0067_sold_out_products",
+      "breakpoints": true
     }
   ]
 }

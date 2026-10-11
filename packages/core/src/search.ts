@@ -6,7 +6,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { convertPrice, noConversion, type DisplayFx } from "./money";
 import { listActiveProducts } from "./products";
-import { productSoldOut } from "./badges";
+import { placeSoldOut, productSoldOut, soldOutDisplay } from "./badges";
 
 type ActiveProduct = Awaited<ReturnType<typeof listActiveProducts>>[number];
 
@@ -167,7 +167,7 @@ export async function browseProducts(db: Db, shopId: string, products: ActivePro
     price_desc: (a, b) => price(b.p) - price(a.p) || a.position - b.position,
     newest: (a, b) => b.p.createdAt.getTime() - a.p.createdAt.getTime() || a.position - b.position,
   };
-  const sorted = scored.sort(by[sort]).map((r) => r.p);
+  const sorted = placeSoldOut(scored.sort(by[sort]).map((r) => r.p), await soldOutDisplay(db, shopId), (p) => productSoldOut(p));
   return { products: sorted, sort, terms, facets };
 }
 
