@@ -476,3 +476,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Download CSV**: Admin → Orders → "Download as a spreadsheet" gives the orders shown (search, tag and "Needs attention" or "On hold" apply), optionally between two dates, oldest first (`ordersCsv` in `packages/core/src/order-export.ts`, route `/admin/orders/export.csv`).
 2. **One row per item**: each row has the order's number, dates, buyer, shipping address, statuses and money (subtotal, discount, shipping, tax, total, refunded), then the item, quantity, unit price, whether it was a pre-order and any personalisation, plus tracking, tags and both notes. Cells that a spreadsheet would run as a formula are defused.
+
+### Often bought together (after launch, part 60)
+
+1. **Learned from real orders**: products bought in the same paid order at least twice in the last 180 days are suggested on each other's page under "Often bought together", most often first, up to three (`boughtTogether` in `packages/core/src/growth.ts`). Free replacements and subscription deliveries don't count, and hidden, sold-out and gift card products are left out.
+2. **In the cart too**: after the merchant's own "Goes well with" picks, the cart offers what other buyers bought with what's in it, with one-click add, up to three in all. Titles are translated in each store language.

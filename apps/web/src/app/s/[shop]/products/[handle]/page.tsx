@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, formatDeliveryWindow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, wholesaleTermsFor, openPreorder, preordersSold } from "@sf/core";
+import { bundlesForProduct, formatDeliveryWindow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { RecentlyViewed } from "@/components/RecentlyViewed";
 import { RememberView } from "@/components/RememberView";
@@ -106,6 +106,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const recent = await localProducts(shopHandle, rawRecent);
   const askedKind = ASKED_MESSAGES[(query.asked ?? "") as keyof typeof ASKED_MESSAGES];
   const upsells = await localProducts(shopHandle, rawUpsells);
+  const together = (await localProducts(shopHandle, await boughtTogether(await db(), shop.id, [product.id]))).filter((p) => !upsells.some((u) => u.id === p.id));
   const buyer = await currentBuyer(shop.id);
   const wholesale = await wholesaleTermsFor(await db(), shop, buyer?.email);
   const soldOut = product.variants.filter((x) => x.stock !== null && x.stock <= 0);
@@ -317,6 +318,18 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           <section className="flex flex-col gap-3 border-t border-border pt-4" aria-labelledby="goes-well">
             <h2 id="goes-well" className="font-semibold">{t.goesWellWith}</h2>
             {upsells.map((u) => (
+              <Link key={u.id} href={`${base}/products/${u.handle}`} className="flex items-center gap-3 hover:underline">
+                <span className="size-12 rounded-md bg-sunken overflow-hidden shrink-0">{u.imageUrl && <img src={u.imageUrl} alt="" className="size-full object-cover" />}</span>
+                <span className="flex-1">{u.title}</span>
+                <span className="num"><Price minor={u.priceMinor} currency={shop.currency} fx={fx} /></span>
+              </Link>
+            ))}
+          </section>
+        )}
+        {together.length > 0 && (
+          <section className="flex flex-col gap-3 border-t border-border pt-4" aria-labelledby="bought-together">
+            <h2 id="bought-together" className="font-semibold">{t.boughtTogether}</h2>
+            {together.map((u) => (
               <Link key={u.id} href={`${base}/products/${u.handle}`} className="flex items-center gap-3 hover:underline">
                 <span className="size-12 rounded-md bg-sunken overflow-hidden shrink-0">{u.imageUrl && <img src={u.imageUrl} alt="" className="size-full object-cover" />}</span>
                 <span className="flex-1">{u.title}</span>

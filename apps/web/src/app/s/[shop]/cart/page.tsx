@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { convertAmount, convertPrice, formatMoney, pointsFor, presentQuote, quoteCart, recentlyViewed, upsellsFor, UserError } from "@sf/core";
+import { convertAmount, convertPrice, formatMoney, pointsFor, presentQuote, quoteCart, recentlyViewed, upsellsFor, boughtTogether, UserError } from "@sf/core";
 import { buyerCountry, buyerFx } from "@/lib/currency";
 import { readCart, readDiscountCode, readGiftCardCode } from "@/lib/cart";
 import { db } from "@/lib/server";
@@ -42,7 +42,10 @@ export default async function CartPage({ params, searchParams }: { params: Promi
     }
   }
   const variants = quote ? await (await db()).query.variants.findMany({ where: (v, { inArray }) => inArray(v.id, quote!.items.map((i) => i.variantId)) }) : [];
-  const upsells = quote ? await localProducts(handle, await upsellsFor(await db(), shop.id, [...new Set(variants.map((v) => v.productId))])) : [];
+  // The merchant's own picks first, then what other buyers bought with these, up to three.
+  const inCart = [...new Set(variants.map((v) => v.productId))];
+  const picks = quote ? [...(await upsellsFor(await db(), shop.id, inCart)), ...(await boughtTogether(await db(), shop.id, inCart))] : [];
+  const upsells = await localProducts(handle, picks.filter((p, i) => picks.findIndex((x) => x.id === p.id) === i).slice(0, 3));
   const recent = await localProducts(handle, await recentlyViewed(await db(), shop.id, await readRecent(shop.id), { exclude: [...new Set(variants.map((v) => v.productId))] }));
   // Item titles in the buyer's language, by the product each option belongs to.
   const t = await storeT(handle);
