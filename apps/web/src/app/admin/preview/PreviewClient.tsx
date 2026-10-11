@@ -1,4 +1,5 @@
 "use client";
+import type { BadgeSettings } from "@sf/db";
 import { useEffect, useState } from "react";
 import type { StorefrontCatalog } from "@sf/core";
 import type { ThemeDoc } from "@sf/core/theme";
@@ -6,11 +7,12 @@ import { HomeSections } from "@/theme/Sections";
 import { StoreShell } from "@/theme/StoreShell";
 import type { PreviewMessage } from "../(shop)/theme/ThemeEditor";
 
-export function PreviewClient({ initial, shopName, currency, catalog, base }: {
+export function PreviewClient({ initial, shopName, currency, catalog, badges, base }: {
   initial: ThemeDoc;
   shopName: string;
   currency: string;
   catalog: StorefrontCatalog;
+  badges?: BadgeSettings;
   base: string;
 }) {
   const [doc, setDoc] = useState(initial);
@@ -42,7 +44,7 @@ export function PreviewClient({ initial, shopName, currency, catalog, base }: {
   return (
     <StoreShell doc={doc} shopName={shopName} currency={currency} base={base} cartCount={0}>
       <main>
-        <HomeSections sections={doc.home} data={{ base, currency, catalog }} highlight={highlight} />
+        <HomeSections sections={doc.home} data={{ base, currency, catalog, badges }} highlight={highlight} />
       </main>
     </StoreShell>
   );

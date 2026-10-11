@@ -4,6 +4,7 @@ import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { BulkProducts, type BulkRow } from "./BulkProducts";
 import { LowStockForm } from "./LowStockForm";
+import { BadgeSettingsForm } from "./BadgeSettingsForm";
 
 export const metadata = { title: "Products" };
 
@@ -58,6 +59,16 @@ export default async function ProductsPage() {
             </p>
           </div>
           <LowStockForm value={shop.lowStockNote} />
+        </section>
+        <section className="card p-5 mt-6 flex flex-col gap-3 max-w-3xl" aria-labelledby="badges-heading">
+          <div>
+            <h2 id="badges-heading" className="font-semibold">Badges</h2>
+            <p className="hint">
+              Small labels on product cards across your store. These are worked out from your real prices, stock and dates, so they&apos;re never wrong.
+              You can also give any product a badge of its own, like “Bestseller”, on its page here.
+            </p>
+          </div>
+          <BadgeSettingsForm sale={shop.productBadges.sale} soldOut={shop.productBadges.soldOut} newDays={shop.productBadges.newDays} />
         </section>
       </div>
     </main>

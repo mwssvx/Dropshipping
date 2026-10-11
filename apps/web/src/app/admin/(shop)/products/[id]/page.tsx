@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit } from "@sf/core";
+import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH } from "@sf/core";
 import { requireShop, storeAddress, suppliers } from "@/lib/server";
 import { updateProductAction } from "../../../actions";
 import { setUpsellAction } from "../../../growth-actions";
@@ -12,6 +12,7 @@ import { PersonalizationForm } from "./PersonalizationForm";
 import { PreorderForm } from "./PreorderForm";
 import { PurchaseLimitForm } from "./PurchaseLimitForm";
 import { VideoForm } from "./VideoForm";
+import { BadgeForm } from "./BadgeForm";
 import { SeoForm } from "./SeoForm";
 import { AddressForm } from "./AddressForm";
 import { PhotosPanel } from "./PhotosPanel";
@@ -113,6 +114,13 @@ export default async function EditProductPage({ params, searchParams }: { params
             <VideoForm productId={product.id} url={product.videoUrl ?? ""} />
           </section>
         )}
+        <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="badge-heading">
+          <div>
+            <h2 id="badge-heading" className="font-semibold">Badge</h2>
+            <p className="hint">A short label on this product&apos;s card and page, like “Bestseller” or “Limited edition”. Up to {BADGE_MAX_LENGTH} characters.</p>
+          </div>
+          <BadgeForm productId={product.id} badge={product.badge ?? ""} max={BADGE_MAX_LENGTH} />
+        </section>
         {product.variants.length > 1 && productPhotos(product).length > 1 && !product.giftCard && (
           <VariantPhotosPanel productId={product.id} photos={productPhotos(product)}
             {...variantPhotoRows(product.variants.map((v) => ({ id: v.id, title: v.title, options: v.options ?? {}, imageUrl: v.imageUrl })))} />

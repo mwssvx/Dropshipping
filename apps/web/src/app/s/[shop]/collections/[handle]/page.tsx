@@ -35,7 +35,7 @@ export default async function CollectionPage({ params, searchParams }: { params:
   // The grid takes the catalog's compact product shape.
   const compact = await localProducts(param, compactProducts(products));
   const t = await storeT(param);
-  const data = { base, currency: shop.currency, fx, t, catalog: { products: compact, collections: [] } };
+  const data = { base, currency: shop.currency, fx, t, badges: shop.productBadges, catalog: { products: compact, collections: [] } };
   const filtered = !!(query.min || query.max || query.stock || query.sale || query.opt);
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 flex flex-col gap-8">

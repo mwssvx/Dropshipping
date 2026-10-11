@@ -5,6 +5,7 @@ import { applyRules, collectionRulesSchema, type CollectionRules } from "./colle
 import { NotFoundError, UserError } from "./errors";
 import { uniqueHandle } from "./handles";
 import { listActiveProducts } from "./products";
+import { productSoldOut } from "./badges";
 
 /** "all" is every active product. It isn't stored, so no collection can take that handle. */
 export const ALL_COLLECTION = "all";
@@ -167,6 +168,9 @@ export async function storefrontCatalog(db: Db, shopId: string) {
     imageUrl: p.imageUrl,
     priceMinor: p.variants[0]?.priceMinor ?? 0,
     compareAtMinor: p.variants[0]?.compareAtMinor ?? null,
+    badge: p.badge,
+    createdAt: p.createdAt,
+    soldOut: productSoldOut(p),
   }));
   const rows = await db.query.collections.findMany({ where: eq(schema.collections.shopId, shopId), orderBy: asc(schema.collections.title) });
   const links = rows.length

@@ -100,6 +100,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       subscribe_and_save: shop.subscriptionOffer ? { percent_off: shop.subscriptionOffer.percentOff, active: shop.subscriptionOffer.active } : null,
       delivery_estimates: { enabled: shop.deliveryEstimates, processing_days: shop.processingDays },
       low_stock_note: shop.lowStockNote,
+      badges: { sale: shop.productBadges.sale, sold_out: shop.productBadges.soldOut, new_days: shop.productBadges.newDays },
       ad_tracking: { meta_pixel: shop.adPixels?.meta ?? null, tiktok_pixel: shop.adPixels?.tiktok ?? null, google_tag: shop.adPixels?.google ?? null, ask_consent: shop.cookieConsent },
       hold_risky_orders: shop.holdRiskyOrders,
       refer_a_friend: shop.referralProgram ? { friend_percent_off: shop.referralProgram.friendPercentOff, reward: shop.referralProgram.rewardMinor, min_subtotal: shop.referralProgram.minSubtotalMinor } : null,
@@ -130,6 +131,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       search_listing: p.seoTitle || p.seoDescription ? { title: p.seoTitle, description: p.seoDescription } : null,
       purchase_limit: p.purchaseLimit ? { min: p.purchaseLimit.min, max: p.purchaseLimit.max, per_customer: p.purchaseLimit.perCustomer } : null,
       video_url: p.videoUrl,
+      badge: p.badge,
       gift_card: p.giftCard,
       variants: variants
         .filter((v) => v.productId === p.id)
@@ -243,6 +245,7 @@ const importSchema = z.object({
       subscribe_and_save: z.object({ percent_off: z.number().int().min(0).max(30), active: z.boolean() }).nullable().optional(),
       delivery_estimates: z.object({ enabled: z.boolean(), processing_days: z.number().int().min(0).max(14) }).optional(),
       low_stock_note: z.number().int().min(0).max(50).optional(),
+      badges: z.object({ sale: z.boolean(), sold_out: z.boolean(), new_days: z.number().int().min(0).max(90) }).optional(),
       ad_tracking: z
         .object({ meta_pixel: str(40).nullable(), tiktok_pixel: str(40).nullable(), google_tag: str(40).nullable(), ask_consent: z.enum(["everyone", "eu_uk"]) })
         .optional(),
@@ -319,6 +322,7 @@ const importSchema = z.object({
           .optional(),
         search_listing: z.object({ title: str(70).nullable(), description: str(160).nullable() }).nullable().optional(),
         video_url: z.string().max(2000).nullable().optional(),
+        badge: z.string().max(20).nullable().optional(),
         purchase_limit: z
           .object({ min: z.number().int().min(2).max(99).nullable(), max: z.number().int().min(1).max(99).nullable(), per_customer: z.number().int().min(1).max(999).nullable() })
           .nullable()
@@ -516,6 +520,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
           seoDescription: x.search_listing?.description || null,
           purchaseLimit: x.purchase_limit ? { min: x.purchase_limit.min, max: x.purchase_limit.max, perCustomer: x.purchase_limit.per_customer } : null,
           videoUrl: parseVideo(x.video_url) ? x.video_url!.trim() : null,
+          badge: x.badge?.trim() || null,
           // A pre-order whose date has passed isn't brought over.
           preorder: x.preorder && openPreorder({ preorder: { shipsBy: x.preorder.ships_by, limit: x.preorder.limit } }) ? { shipsBy: x.preorder.ships_by, limit: x.preorder.limit } : null,
         })
@@ -667,6 +672,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
       Object.assign(settings, { deliveryEstimates: data.store.delivery_estimates.enabled, processingDays: data.store.delivery_estimates.processing_days });
     }
     if (data.store.low_stock_note !== undefined) settings.lowStockNote = data.store.low_stock_note;
+    if (data.store.badges) settings.productBadges = { sale: data.store.badges.sale, soldOut: data.store.badges.sold_out, newDays: data.store.badges.new_days };
     if (data.store.ad_tracking) {
       // Only IDs in the platforms' formats come in; anything else is left off.
       const a = data.store.ad_tracking;

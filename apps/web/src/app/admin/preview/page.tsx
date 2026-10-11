@@ -8,5 +8,5 @@ export const metadata = { title: "Preview", robots: { index: false } };
 export default async function PreviewPage() {
   const { shop, db } = await requireShop("theme");
   const [theme, catalog] = await Promise.all([getTheme(db, shop), storefrontCatalog(db, shop.id)]);
-  return <PreviewClient initial={theme.draft} shopName={shop.name} currency={shop.currency} catalog={catalog} base={`/s/${shop.handle}`} />;
+  return <PreviewClient initial={theme.draft} shopName={shop.name} currency={shop.currency} catalog={catalog} badges={shop.productBadges} base={`/s/${shop.handle}`} />;
 }

@@ -26,7 +26,7 @@ export default async function SearchPage({ params, searchParams }: { params: Pro
       <h1 className="text-3xl font-bold tracking-tight">{q ? t.resultsFor(q) : t.search}</h1>
       <BrowseBar action={`${base}/search`} params={query} sort={sort} currency={fx.currency} search count={compact.length} facets={facets} t={t} />
       {compact.length ? (
-        <ProductGrid products={compact} data={{ base, currency: shop.currency, fx, t, catalog: { products: compact, collections: [] } }} />
+        <ProductGrid products={compact} data={{ base, currency: shop.currency, fx, t, badges: shop.productBadges, catalog: { products: compact, collections: [] } }} />
       ) : (
         <p className="hint">
           {t.nothingMatches(q ?? null)} {t.tryFewer} <Link href={`${base}/collections/all`} className="underline">{t.seeEverything}</Link>.

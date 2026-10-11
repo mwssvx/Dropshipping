@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { Section, SectionSettings, TrustIcon } from "@sf/core/theme";
 import type { StorefrontCatalog } from "@sf/core";
+import { cardBadges, type Badge, type BadgeFacts } from "@sf/core/badges";
+import type { BadgeSettings } from "@sf/db";
 import { storeText, type StoreText } from "@/lib/store-text";
 import type { DisplayFx } from "@sf/core/money";
 import { Price } from "@/components/Price";
@@ -23,6 +25,8 @@ export type SectionData = {
   signup?: { action: (form: FormData) => Promise<void>; status: "sent" | "invalid" | null; offerPercent?: number | null };
   /** The store's fixed words in the buyer's language; English when left out. */
   t?: StoreText;
+  /** Which automatic badges product cards show; the defaults when left out. */
+  badges?: BadgeSettings;
 };
 
 type Props<T extends keyof SectionSettings> = { s: SectionSettings[T]; data: SectionData; first: boolean };
@@ -69,23 +73,44 @@ function Hero({ s, data, first }: Props<"hero">) {
   );
 }
 
-export function ProductGrid({ products, data }: { products: StorefrontCatalog["products"]; data: SectionData }) {
+/** A badge's words in the buyer's language. */
+export function badgeLabel(b: Badge, t: StoreText) {
+  return b.kind === "custom" ? b.text : b.kind === "sold_out" ? t.soldOut : b.kind === "sale" ? t.badgeSale(b.percent) : t.badgeNew;
+}
+
+type GridProduct = Omit<StorefrontCatalog["products"][number], "badge" | "createdAt" | "soldOut"> & BadgeFacts;
+
+export function ProductGrid({ products, data }: { products: GridProduct[]; data: SectionData }) {
+  const t = data.t ?? storeText(null);
+  const now = new Date();
   return (
     <ul className="sf-grid grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8">
-      {products.map((p) => (
+      {products.map((p) => {
+        const badges = cardBadges(data.badges, p, now);
+        return (
         <li key={p.id}>
           <Link href={`${data.base}/products/${p.handle}`} className="sf-card group flex flex-col gap-2 h-full">
-            <div className="sf-media aspect-square rounded-lg bg-sunken overflow-hidden">
+            <div className="sf-media relative aspect-square rounded-lg bg-sunken overflow-hidden">
               {p.imageUrl && (
                 <img src={p.imageUrl} alt={p.title} width={600} height={600} loading="lazy" decoding="async"
                   className="size-full object-cover group-hover:scale-[1.02] transition-transform" />
+              )}
+              {badges.length > 0 && (
+                <span className="absolute top-2 left-2 flex flex-col items-start gap-1">
+                  {badges.map((b) => (
+                    <span key={b.kind} className={`sf-badge rounded-full px-2 py-0.5 text-xs font-semibold shadow-sm ${b.kind === "sold_out" ? "bg-surface text-muted" : b.kind === "sale" ? "bg-critical text-white" : "bg-ink text-surface"}`}>
+                      {badgeLabel(b, t)}
+                    </span>
+                  ))}
+                </span>
               )}
             </div>
             <span className="font-medium group-hover:underline">{p.title}</span>
             <Price minor={p.priceMinor} compareAt={p.compareAtMinor} currency={data.currency} fx={data.fx} />
           </Link>
         </li>
-      ))}
+        );
+      })}
     </ul>
   );
 }

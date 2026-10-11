@@ -172,6 +172,7 @@ export const shops = pgTable(
     cookieConsent: text("cookie_consent", { enum: ["everyone", "eu_uk"] }).notNull().default("everyone"),
     // A password page before launch, or a holiday break. Null when the store is open.
     closure: jsonb("closure").$type<StoreClosure>(),
+    productBadges: jsonb("product_badges").$type<BadgeSettings>().notNull().default({ sale: true, soldOut: true, newDays: 0 }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -248,6 +249,8 @@ export const products = pgTable(
     purchaseLimit: jsonb("purchase_limit").$type<PurchaseLimit>(),
     // A video for the product page: a YouTube or Vimeo link, or an https video file.
     videoUrl: text("video_url"),
+    // A short label of the merchant's own on product cards, like "Bestseller".
+    badge: text("badge"),
     // How the product shows in search results; the title and description are used when empty.
     seoTitle: text("seo_title"),
     seoDescription: text("seo_description"),
@@ -360,6 +363,9 @@ export type AdPixels = { meta: string | null; tiktok: string | null; google: str
  * `until` (YYYY-MM-DD) when set. `accessKey` is what a visitor's cookie holds once they gave the
  * password; it changes with the password.
  */
+/** Which automatic badges product cards show: "-20%" on sale, "Sold out", and "New" for this many days (0 is off). */
+export type BadgeSettings = { sale: boolean; soldOut: boolean; newDays: number };
+
 export type StoreClosure = { mode: "password" | "holiday"; message: string | null; until: string | null; passwordHash: string | null; accessKey: string | null };
 
 /** How many a buyer can take: per order (`min`, `max`) and in all, across their paid orders (`perCustomer`). */
