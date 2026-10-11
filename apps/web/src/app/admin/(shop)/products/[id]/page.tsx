@@ -8,6 +8,7 @@ import { setProductSupplierAction } from "../../../supplier-actions";
 import { PageHeader } from "../../PageHeader";
 import { ProductForm } from "../ProductForm";
 import { QuantityBreaksForm } from "./QuantityBreaksForm";
+import { PersonalizationForm } from "./PersonalizationForm";
 import { AddressForm } from "./AddressForm";
 import { PhotosPanel } from "./PhotosPanel";
 import { VariantPhotosPanel } from "./VariantPhotosPanel";
@@ -151,6 +152,18 @@ export default async function EditProductPage({ params, searchParams }: { params
             <QuantityBreaksForm productId={product.id} tiers={product.quantityBreaks} />
           </section>
           </>
+        )}
+        {!product.giftCard && (
+          <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="personalize-heading">
+            <div>
+              <h2 id="personalize-heading" className="font-semibold">Personalisation</h2>
+              <p className="hint">
+                Ask buyers for text before they add this to their cart, like a name to engrave or a message to print. It shows on the order and in
+                the receipt, and goes to your supplier with the item. Check that your supplier offers personalisation before turning it on.
+              </p>
+            </div>
+            <PersonalizationForm productId={product.id} fields={product.personalization} />
+          </section>
         )}
         <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="upsell-heading">
           <div>

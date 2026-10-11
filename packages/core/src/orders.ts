@@ -19,10 +19,12 @@ import { salePrice, salesFor } from "./sales";
 import { addonsByProduct, type CheckoutAddon } from "./addons";
 import { countryName, listShippingZones, priceRate, zoneFor } from "./shipping";
 import { normalizeTags } from "./customers";
+import { cartLineKey, cleanPersonalization, missingPersonalization, personalizationValues } from "./personalization";
 
 type Shop = typeof schema.shops.$inferSelect;
 type Order = typeof schema.orders.$inferSelect;
-export type CartLine = { variantId: string; quantity: number };
+/** `custom` is what the buyer typed into a personalised product's fields, by field id. */
+export type CartLine = { variantId: string; quantity: number; custom?: Record<string, string> };
 
 
 /**
@@ -69,6 +71,9 @@ export async function quoteCart(
   const goodsProducts = new Set(rows.filter((r) => !r.product.giftCard && wanted.some((l) => l.variantId === r.variant.id)).map((r) => r.product.id));
   // Quantity discounts count every variant of a product together (2 small + 1 large = 3).
   const perProduct = new Map<string, number>();
+  // The same option can be on several lines with different text; stock counts them together.
+  const perVariant = new Map<string, number>();
+  for (const l of wanted) perVariant.set(l.variantId, (perVariant.get(l.variantId) ?? 0) + l.quantity);
   for (const l of wanted) {
     const productId = rows.find((r) => r.variant.id === l.variantId)?.product.id;
     if (productId) perProduct.set(productId, (perProduct.get(productId) ?? 0) + l.quantity);
@@ -77,7 +82,7 @@ export async function quoteCart(
     const row = rows.find((r) => r.variant.id === l.variantId);
     if (!row) throw new UserError("An item in your cart is no longer available.", "unavailable");
     if (!Number.isInteger(l.quantity) || l.quantity > 99) throw new UserError("Quantity must be between 1 and 99.");
-    if (row.variant.stock !== null && row.variant.stock < l.quantity) {
+    if (row.variant.stock !== null && row.variant.stock < (perVariant.get(l.variantId) ?? l.quantity)) {
       throw new UserError(row.variant.stock > 0 ? `Only ${row.variant.stock} of ${row.product.title} left.` : `${row.product.title} is sold out.`, "unavailable");
     }
     const title = row.variant.title === "Default" ? row.product.title : `${row.product.title} – ${row.variant.title}`;
@@ -94,7 +99,10 @@ export async function quoteCart(
       sale ? `${sale.title}: ${sale.percentOff}% off` : null,
       giftCard ? null : wholesale ? `Wholesale price, ${wholesale.percentOff}% off` : withOthers?.percentOff ? `Add-on price, ${withOthers.percentOff}% off` : tier ? describeBreak(tier) : null,
     ];
+    const custom = cleanPersonalization(row.product.personalization, l.custom);
     return {
+      /** Tells apart lines of the same option with different personalisation; matches the cart line it came from. */
+      key: cartLineKey(l),
       variantId: row.variant.id,
       productId: row.product.id,
       productHandle: row.product.handle,
@@ -111,6 +119,9 @@ export async function quoteCart(
       /** Set when the line is the checkout add-on at its price. */
       addonId: withOthers?.id ?? null,
       giftCard,
+      personalization: personalizationValues(row.product.personalization, custom),
+      /** Required personalisation fields left empty, by label. Checkout won't start until they're filled. */
+      missingPersonalization: missingPersonalization(row.product.personalization, custom),
     };
   });
   const subtotalMinor = items.reduce((s, i) => s + i.lineMinor, 0);
@@ -305,6 +316,10 @@ export async function startCheckout(
     shippingRateId: input.shippingRateId,
   });
   const cart = followUp ? asFollowUp(quoted, followUp.percentOff) : repeat ? asFollowUp(quoted, repeat.percentOff, { keepShipping: true }) : quoted;
+  const unfinished = quoted.items.find((i) => i.missingPersonalization.length);
+  if (unfinished) {
+    throw new UserError(`Add ${unfinished.missingPersonalization.join(" and ")} for ${unfinished.title} before checking out.`, "personalization_missing");
+  }
   if (cart.wholesale && cart.wholesale.shortByMinor > 0) {
     throw new UserError(
       `Wholesale orders start at ${formatMoney(cart.wholesale.minOrderMinor, shop.currency)}. Add ${formatMoney(cart.wholesale.shortByMinor, shop.currency)} more to check out.`,
@@ -429,6 +444,7 @@ export async function startCheckout(
         unitPriceMinor: i.unitPriceMinor,
         unitCostMinor: i.unitCostMinor,
         addonId: i.addonId,
+        personalization: i.personalization,
       })),
     );
     return order!;

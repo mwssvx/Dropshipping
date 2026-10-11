@@ -77,8 +77,8 @@ export default async function CartPage({ params, searchParams }: { params: Promi
       ) : (
         <>
           <ul className="divide-y divide-border border-y border-border">
-            {quote.items.map((i) => (
-              <li key={i.variantId} className="py-4 flex gap-4 items-center">
+            {quote.items.map((i, n) => (
+              <li key={i.key} className="py-4 flex gap-4 items-center">
                 <div className="size-16 rounded-md bg-sunken overflow-hidden shrink-0">
                   {i.imageUrl && <img src={i.imageUrl} alt="" className="size-full object-cover" />}
                 </div>
@@ -88,12 +88,18 @@ export default async function CartPage({ params, searchParams }: { params: Promi
                     {i.listUnitPriceMinor !== i.unitPriceMinor && <s className="mr-1.5">{money(convertPrice(i.listUnitPriceMinor, fx))}</s>}
                     {money(shown!.units[i.variantId]!)} {t.each}
                   </p>
+                  {i.personalization?.map((p) => (
+                    <p key={p.fieldId} className="text-sm"><span className="hint">{p.label}:</span> {p.value}</p>
+                  ))}
+                  {i.missingPersonalization.length > 0 && (
+                    <p className="text-sm text-critical" role="alert">{t.personalizeMissing(i.missingPersonalization.join(", "))}</p>
+                  )}
                   {i.priceNote && <p className="text-sm text-success">{i.priceNote}</p>}
                 </div>
                 <form action={updateCartAction.bind(null, handle)} className="flex items-center gap-2">
-                  <input type="hidden" name="variantId" value={i.variantId} />
-                  <label className="sr-only" htmlFor={`q-${i.variantId}`}>{t.quantity}</label>
-                  <input id={`q-${i.variantId}`} name="quantity" type="number" min={0} max={99} defaultValue={i.quantity} className="input w-16 num" />
+                  <input type="hidden" name="line" value={i.key} />
+                  <label className="sr-only" htmlFor={`q-${n}`}>{t.quantity}</label>
+                  <input id={`q-${n}`} name="quantity" type="number" min={0} max={99} defaultValue={i.quantity} className="input w-16 num" />
                   <button className="btn btn-secondary">{t.update}</button>
                 </form>
                 <span className="num font-semibold w-20 text-right">{money(shown!.units[i.variantId]! * i.quantity)}</span>

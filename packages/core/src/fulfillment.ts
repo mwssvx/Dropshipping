@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
-import { schema, type Db } from "@sf/db";
+import { schema, type Db, type PersonalizationValue } from "@sf/db";
 import { z } from "zod";
 import { formatDeliveryWindow, orderDelivery } from "./delivery";
 import { NotFoundError, UserError } from "./errors";
@@ -12,6 +12,10 @@ import { issueGiftCardsForOrder } from "./gift-cards";
 import { earnPoints } from "./rewards";
 import { issueInvoice } from "./invoices";
 import { checkOrderRisk } from "./risk";
+import { describePersonalization } from "./personalization";
+
+/** A personalised item's text, under it in emails. */
+const personalised = (l: { personalization: PersonalizationValue[] | null }) => (l.personalization ? [`    ${describePersonalization(l.personalization)}`] : []);
 
 type Order = typeof schema.orders.$inferSelect;
 type Fulfillment = typeof schema.fulfillments.$inferSelect;
@@ -77,7 +81,7 @@ export async function routeOrder(ctx: FulfillmentContext, orderId: string) {
     const ref = product.supplierId && own.has(product.supplierId) ? variant.id : variant.supplierVariantRef;
     if (!product.supplierId || !ref) continue; // merchant ships these themselves
     const list = bySupplier.get(product.supplierId) ?? [];
-    list.push({ variantRef: ref, quantity: line.quantity, lineId: line.id, backup: product.backup?.gone ? undefined : product.backup?.variants[variant.id] && { supplierId: product.backup.supplierId, ...product.backup.variants[variant.id]! } });
+    list.push({ variantRef: ref, quantity: line.quantity, lineId: line.id, note: describePersonalization(line.personalization) ?? undefined, backup: product.backup?.gone ? undefined : product.backup?.variants[variant.id] && { supplierId: product.backup.supplierId, ...product.backup.variants[variant.id]! } });
     bySupplier.set(product.supplierId, list);
   }
 
@@ -125,7 +129,7 @@ export async function routeOrder(ctx: FulfillmentContext, orderId: string) {
               reference: claimed.id,
               email: order.email,
               address: order.shippingAddress,
-              lines: supplierLines.map((l) => ({ variantRef: l.variantRef, quantity: l.quantity })),
+              lines: supplierLines.map((l) => ({ variantRef: l.variantRef, quantity: l.quantity, ...(l.note ? { note: l.note } : {}) })),
             });
       await db
         .update(schema.fulfillments)
@@ -153,6 +157,8 @@ type RouteLine = {
   variantRef: string;
   quantity: number;
   lineId: string;
+  /** The buyer's personalisation, for the supplier. */
+  note?: string;
   /** The same option at the product's backup supplier. */
   backup?: { supplierId: string; ref: string; costMinor: number };
 };
@@ -184,7 +190,7 @@ async function placeWithBackup(ctx: FulfillmentContext, order: Order, claimed: F
       reference: claimed.id,
       email: order.email,
       address: order.shippingAddress,
-      lines: lines.map((l) => ({ variantRef: l.backup?.ref ?? l.variantRef, quantity: l.quantity })),
+      lines: lines.map((l) => ({ variantRef: l.backup?.ref ?? l.variantRef, quantity: l.quantity, ...(l.note ? { note: l.note } : {}) })),
     }));
   } catch (e) {
     if (e instanceof SupplierError) return false;
@@ -471,7 +477,7 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
         ``,
         `${shop.name} put together this order for you:`,
         ``,
-        ...lines.map((l, n) => `  ${l.title} × ${l.quantity}  ${formatMoney(paid.lines[n]!, paid.currency)}`),
+        ...lines.flatMap((l, n) => [`  ${l.title} × ${l.quantity}  ${formatMoney(paid.lines[n]!, paid.currency)}`, ...personalised(l)]),
         ``,
         `Total: ${formatMoney(paid.totalMinor, paid.currency)}, including shipping${order.taxMinor && !order.taxIncluded ? " and tax" : ""}`,
         ...(order.note ? [``, `A note from ${shop.name}:`, order.note] : []),
@@ -493,7 +499,7 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
         ``,
         `You started checking out at ${shop.name} but didn't finish. Your cart is saved:`,
         ``,
-        ...lines.map((l, n) => `  ${l.title} × ${l.quantity}  ${formatMoney(paid.lines[n]!, paid.currency)}`),
+        ...lines.flatMap((l, n) => [`  ${l.title} × ${l.quantity}  ${formatMoney(paid.lines[n]!, paid.currency)}`, ...personalised(l)]),
         ``,
         `Total: ${formatMoney(paid.totalMinor, paid.currency)}`,
         ...(paid.giftCardMinor ? [`Left to pay after your gift card: ${formatMoney(paid.chargedMinor, paid.currency)}`] : []),
@@ -566,7 +572,7 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
         ``,
         `${shop.name} is sending you a replacement${original ? ` for order #${original.number}` : ""}, at no charge:`,
         ``,
-        ...lines.map((l) => `  ${l.title} × ${l.quantity}`),
+        ...lines.flatMap((l) => [`  ${l.title} × ${l.quantity}`, ...personalised(l)]),
         ...(order.note ? [``, `From ${shop.name}: ${order.note}`] : []),
         ``,
         `It's order #${order.number}. We'll email you again when it ships. Track it any time: ${link}`,
@@ -586,7 +592,7 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
         ``,
         `Thanks for your order from ${shop.name}. Here's what you bought:`,
         ``,
-        ...lines.map((l, n) => `  ${l.title} × ${l.quantity}  ${formatMoney(paid.lines[n]!, paid.currency)}`),
+        ...lines.flatMap((l, n) => [`  ${l.title} × ${l.quantity}  ${formatMoney(paid.lines[n]!, paid.currency)}`, ...personalised(l)]),
         ``,
         `${paid.giftCardMinor ? "Total" : "Total paid"}: ${formatMoney(paid.totalMinor, paid.currency)}`,
         ...(paid.giftCardMinor

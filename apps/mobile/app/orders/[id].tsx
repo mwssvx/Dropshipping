@@ -24,7 +24,7 @@ type Detail = {
   fulfillmentStatus: string;
   paidAt: string | null;
   shippingAddress: { name: string; line1: string; line2?: string; city: string; region?: string; postalCode: string; country: string };
-  lines: { title: string; quantity: number; unitPriceMinor: number }[];
+  lines: { title: string; quantity: number; unitPriceMinor: number; personalization?: string | null }[];
   fulfillments: { status: string; problemMessage: string | null; backupNote?: string | null; carrier: string | null; trackingNumber: string | null; trackingUrl: string | null }[];
   refunds: { amountMinor: number; reason: string | null; createdAt: string }[];
   refundableMinor: number;
@@ -116,7 +116,7 @@ export default function OrderScreen() {
       <Section title="Items">
         <List>
           {o.lines.map((l, i) => (
-            <Row key={i} title={l.title} subtitle={`${l.quantity} × ${money(l.unitPriceMinor, o.currency)}`} />
+            <Row key={i} title={l.title} subtitle={`${l.quantity} × ${money(l.unitPriceMinor, o.currency)}${l.personalization ? `\n${l.personalization}` : ""}`} />
           ))}
           {o.discountMinor ? <Row title={o.discountCode ? `Discount (${o.discountCode})` : `Bundle (${o.bundleTitle})`} right={<Body>−{money(o.discountMinor, o.currency)}</Body>} /> : null}
           <Row title="Shipping" right={<Body>{o.shippingMinor ? money(o.shippingMinor, o.currency) : "Free"}</Body>} />

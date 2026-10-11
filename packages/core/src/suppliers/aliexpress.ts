@@ -226,7 +226,7 @@ export class AliExpressSupplier implements SupplierAdapter {
         product_count: l.quantity,
         sku_attr: skuAttr,
         ...(service ? { logistics_service_name: service } : {}),
-        order_memo: "Please don't include invoices or prices in the parcel.",
+        order_memo: `${l.note ? `Personalisation: ${l.note}. ` : ""}Please don't include invoices or prices in the parcel.`,
       });
     }
     const r = await this.call<{ is_success?: boolean; order_list?: { number?: (string | number)[] }; error_code?: string; error_msg?: string }>(

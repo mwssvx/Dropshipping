@@ -27,6 +27,8 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
     throw e;
   }
   if (quote.wholesale && quote.wholesale.shortByMinor > 0) redirect(`${base}/cart`);
+  // The cart says which personalisation is missing.
+  if (quote.items.some((i) => i.missingPersonalization.length)) redirect(`${base}/cart`);
   const fx = await buyerFx(shop);
   const t = await storeT(handle);
   const variants = await (await db()).query.variants.findMany({ where: (v, { inArray }) => inArray(v.id, quote.items.map((i) => i.variantId)) });
@@ -80,8 +82,12 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
         <>
           <ul className="flex flex-col gap-2 text-sm">
             {quote.items.map((i) => (
-              <li key={i.variantId} className="flex justify-between gap-3">
-                <span>{titles.get(i.variantId) ?? i.title} <span className="hint">× {i.quantity}</span>{i.priceNote && <span className="block hint">{i.priceNote}</span>}</span>
+              <li key={i.key} className="flex justify-between gap-3">
+                <span>
+                  {titles.get(i.variantId) ?? i.title} <span className="hint">× {i.quantity}</span>
+                  {i.personalization && <span className="block hint">{i.personalization.map((p) => `${p.label}: ${p.value}`).join(" · ")}</span>}
+                  {i.priceNote && <span className="block hint">{i.priceNote}</span>}
+                </span>
                 <span className="num">{money(shown.units[i.variantId]! * i.quantity)}</span>
               </li>
             ))}

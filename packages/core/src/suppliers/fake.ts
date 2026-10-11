@@ -75,7 +75,11 @@ export class FakeSupplier implements SupplierAdapter {
     };
   }
 
+  /** Every order placed, for tests. */
+  readonly placed: PlaceOrderInput[] = [];
+
   async placeOrder(input: PlaceOrderInput) {
+    this.placed.push(input);
     if (!SHIPS_TO.has(input.address.country)) {
       throw new SupplierError("address_unsupported", `The supplier doesn't ship to ${input.address.country}.`);
     }

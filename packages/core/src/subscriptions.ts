@@ -9,7 +9,8 @@ import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
 import { onOrderPaid, type FulfillmentContext } from "./fulfillment";
 import { formatMoney } from "./money";
-import { handlePaymentEvent, quoteCart, startCheckout } from "./orders";
+import { handlePaymentEvent, quoteCart, startCheckout, type CartLine } from "./orders";
+import { cartLineKey, personalizationInput } from "./personalization";
 import type { PaymentProvider } from "./payments";
 import type { TaxCalculator } from "./tax";
 import { percentOff } from "./wholesale";
@@ -61,19 +62,25 @@ export async function setSubscriptionOffer(db: Db, shopId: string, input: z.inpu
 /** The goods on an order that can be sent again: products still on sale, not gift cards. */
 async function repeatableLines(db: Db, orderId: string) {
   const rows = await db
-    .select({ variantId: schema.orderLines.variantId, quantity: schema.orderLines.quantity })
+    .select({ variantId: schema.orderLines.variantId, quantity: schema.orderLines.quantity, personalization: schema.orderLines.personalization })
     .from(schema.orderLines)
     .innerJoin(schema.variants, eq(schema.variants.id, schema.orderLines.variantId))
     .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
     .where(and(eq(schema.orderLines.orderId, orderId), eq(schema.products.status, "active"), eq(schema.products.giftCard, false), isNull(schema.orderLines.addonId)));
-  // One line per option, in case the order had the same thing twice.
-  const merged = new Map<string, number>();
-  for (const r of rows) merged.set(r.variantId!, Math.min(99, (merged.get(r.variantId!) ?? 0) + r.quantity));
-  return [...merged].map(([variantId, quantity]) => ({ variantId, quantity }));
+  // One line per option and text, in case the order had the same thing twice.
+  const merged = new Map<string, CartLine>();
+  for (const r of rows) {
+    const line: CartLine = { variantId: r.variantId!, quantity: r.quantity, ...(r.personalization ? { custom: personalizationInput(r.personalization) } : {}) };
+    const key = cartLineKey(line);
+    const seen = merged.get(key);
+    if (seen) seen.quantity = Math.min(99, seen.quantity + r.quantity);
+    else merged.set(key, line);
+  }
+  return [...merged.values()];
 }
 
 /** What one delivery costs today: the items at the subscription price, plus shipping (tax on top where it applies). */
-async function priceDelivery(db: Db, shop: Shop, lines: { variantId: string; quantity: number }[], country: string, percent: number) {
+async function priceDelivery(db: Db, shop: Shop, lines: CartLine[], country: string, percent: number) {
   const quote = await quoteCart(db, shop, lines, { country });
   const items = quote.items.map((i) => ({ variantId: i.variantId, title: i.title, quantity: i.quantity, priceMinor: i.unitPriceMinor, offerMinor: percentOff(i.unitPriceMinor, percent) }));
   const goodsMinor = items.reduce((s, i) => s + i.offerMinor * i.quantity, 0);

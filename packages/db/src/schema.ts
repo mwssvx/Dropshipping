@@ -225,6 +225,8 @@ export const products = pgTable(
     upsellProductId: uuid("upsell_product_id").references((): AnyPgColumn => products.id, { onDelete: "set null" }),
     // Quantity discounts, e.g. [{ minQty: 2, percentOff: 10 }, { minQty: 5, percentOff: 15 }].
     quantityBreaks: jsonb("quantity_breaks").$type<QuantityBreak[]>().notNull().default([]),
+    // Text the buyer types before adding to cart, like a name to engrave.
+    personalization: jsonb("personalization").$type<PersonalizationField[]>().notNull().default([]),
     // A gift card sold on the store: each one bought issues a code worth its variant's price.
     giftCard: boolean("gift_card").notNull().default(false),
     // When stock and cost were last read from the supplier; the daily sync starts with the oldest.
@@ -319,6 +321,10 @@ export type Presentment = {
 export type TaxBreakdownLine = { jurisdiction: string; label: string; rateBps: number; amountMinor: number };
 
 export type QuantityBreak = { minQty: number; percentOff: number };
+
+export type PersonalizationField = { id: string; label: string; required: boolean; maxLength: number };
+/** What the buyer typed, with the label as it was when they ordered. */
+export type PersonalizationValue = { fieldId: string; label: string; value: string };
 
 /** A gift order: who it's from, their message, and who to tell when it ships. */
 export type OrderGift = { from: string; message: string | null; recipientEmail: string | null };
@@ -478,6 +484,7 @@ export const orderLines = pgTable(
     unitCostMinor: money("unit_cost_minor"),
     /** Added from the checkout add-on offer, at its price. */
     addonId: uuid("addon_id").references((): AnyPgColumn => checkoutAddons.id, { onDelete: "set null" }),
+    personalization: jsonb("personalization").$type<PersonalizationValue[]>(),
   },
   (t) => [index("order_lines_order_idx").on(t.orderId), check("order_lines_qty_pos", sql`${t.quantity} > 0`)],
 );
@@ -1588,7 +1595,7 @@ export const subscriptions = pgTable(
     token: text("token").notNull().unique(),
     // The order the buyer subscribed from; its saved card is charged for each delivery.
     firstOrderId: uuid("first_order_id").notNull().references((): AnyPgColumn => orders.id, { onDelete: "cascade" }),
-    lines: jsonb("lines").$type<{ variantId: string; quantity: number }[]>().notNull(),
+    lines: jsonb("lines").$type<{ variantId: string; quantity: number; custom?: Record<string, string> }[]>().notNull(),
     shippingAddress: jsonb("shipping_address").$type<Address>().notNull(),
     intervalDays: integer("interval_days").notNull(),
     percentOff: integer("percent_off").notNull(),

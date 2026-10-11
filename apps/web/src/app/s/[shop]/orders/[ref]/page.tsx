@@ -184,7 +184,13 @@ export default async function OrderStatusPage({ params, searchParams }: { params
       )}
       <section className="card p-5 flex flex-col gap-3 text-sm">
         {order.lines.map((l, n) => (
-          <div key={l.id} className="flex justify-between gap-3"><span>{l.title} × {l.quantity}</span><span className="num">{money(due.lines[n]!)}</span></div>
+          <div key={l.id} className="flex justify-between gap-3">
+            <span>
+              {l.title} × {l.quantity}
+              {l.personalization && <span className="block hint">{l.personalization.map((p) => `${p.label}: ${p.value}`).join(" · ")}</span>}
+            </span>
+            <span className="num">{money(due.lines[n]!)}</span>
+          </div>
         ))}
         {order.discountMinor > 0 && (
           <div className="flex justify-between gap-3 hint"><span>{order.discountCode ? `Discount (${order.discountCode})` : `Bundle (${order.bundleTitle})`}</span><span className="num">−{money(due.discountMinor)}</span></div>

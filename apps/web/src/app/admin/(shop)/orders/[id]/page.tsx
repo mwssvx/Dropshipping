@@ -180,7 +180,16 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
             <ul className="divide-y divide-border">
               {order.lines.map((l) => (
                 <li key={l.id} className="flex justify-between gap-4 px-5 py-3 text-sm">
-                  <span>{l.title} <span className="hint">× {l.quantity}</span></span>
+                  <span>
+                    {l.title} <span className="hint">× {l.quantity}</span>
+                    {l.personalization && (
+                      <span className="block mt-1" aria-label="Personalisation">
+                        {l.personalization.map((p) => (
+                          <span key={p.fieldId} className="block"><span className="hint">{p.label}:</span> <q className="font-medium">{p.value}</q></span>
+                        ))}
+                      </span>
+                    )}
+                  </span>
                   <span className="num">{money(l.unitPriceMinor * l.quantity)}</span>
                 </li>
               ))}

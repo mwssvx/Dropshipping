@@ -100,7 +100,7 @@ export async function sendReplacement(ctx: FulfillmentContext, shop: Shop, order
     await tx.insert(schema.orderLines).values(
       wanted.map((i) => {
         const line = lines.find((l) => l.id === i.lineId)!;
-        return { orderId: row!.id, variantId: line.variantId, title: line.title, quantity: i.quantity, unitPriceMinor: 0, unitCostMinor: costOf(line.variantId!, line.unitCostMinor) };
+        return { orderId: row!.id, variantId: line.variantId, title: line.title, quantity: i.quantity, unitPriceMinor: 0, unitCostMinor: costOf(line.variantId!, line.unitCostMinor), personalization: line.personalization };
       }),
     );
     return row!;

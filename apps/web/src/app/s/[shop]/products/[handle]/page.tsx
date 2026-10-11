@@ -188,6 +188,16 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
             ) : (
               <input type="hidden" name="variantId" value={v.id} />
             )}
+            {product.personalization.map((f) => (
+              <div key={f.id} className="field">
+                <label className="label" htmlFor={`custom-${f.id}`}>
+                  {f.label}
+                  {!f.required && <span className="hint font-normal"> ({t.optional})</span>}
+                </label>
+                <input className="input" id={`custom-${f.id}`} name={`custom.${f.id}`} required={f.required} maxLength={f.maxLength} aria-describedby={`custom-${f.id}-hint`} autoComplete="off" />
+                <span id={`custom-${f.id}-hint`} className="hint text-xs">{t.personalizeHint(f.maxLength)}</span>
+              </div>
+            ))}
             {tiers.length > 0 || wholesale ? (
               <div className="field w-28">
                 <label className="label" htmlFor="quantity">{t.quantity}</label>
