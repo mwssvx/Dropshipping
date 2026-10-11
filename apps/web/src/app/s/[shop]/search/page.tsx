@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { compactProducts, searchProducts } from "@sf/core";
+import { after } from "next/server";
+import { compactProducts, recordSearch, searchProducts } from "@sf/core";
 import { db } from "@/lib/server";
 import { buyerFx } from "@/lib/currency";
 import { BrowseBar, browseOptions, type BrowseParams } from "@/theme/Browse";
@@ -21,6 +22,12 @@ export default async function SearchPage({ params, searchParams }: { params: Pro
   const compact = await localProducts(param, compactProducts(products));
   const t = await storeT(param);
   const q = query.q?.trim();
+  // A plain search counts toward the store's search report; re-sorting or filtering it doesn't.
+  if (q && Object.entries(query).every(([k, v]) => k === "q" || v === undefined || v === "")) {
+    after(async () => {
+      await recordSearch(await db(), shop.id, q, products.length).catch(() => {});
+    });
+  }
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 flex flex-col gap-8">
       <h1 className="text-3xl font-bold tracking-tight">{q ? t.resultsFor(q) : t.search}</h1>

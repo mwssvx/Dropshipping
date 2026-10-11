@@ -477,6 +477,13 @@
       "when": 1791707134685,
       "tag": "0067_sold_out_products",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1791708387021,
+      "tag": "0068_search_terms",
+      "breakpoints": true
     }
   ]
 }

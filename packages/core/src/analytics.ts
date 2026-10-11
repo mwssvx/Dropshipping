@@ -1,6 +1,7 @@
 // Store analytics: what visitors did (storefront_events) and what they bought (orders).
 import { and, count, countDistinct, desc, eq, gte, inArray, isNotNull, lt, ne, sql } from "drizzle-orm";
 import { schema, STOREFRONT_EVENTS, type Db, type StorefrontEventKind } from "@sf/db";
+import { pruneSearchTerms } from "./search-terms";
 
 const PAID = ["paid", "partially_refunded", "refunded"] as const;
 const DAY = 86_400_000;
@@ -124,10 +125,10 @@ function withDirect(list: { source: string; visitors: number }[], direct: number
   return (direct > 0 ? [...list, { source: "Direct", visitors: direct }] : list).sort((a, b) => b.visitors - a.visitors);
 }
 
-/** Deletes visitor events older than about 13 months, so the table doesn't grow forever. */
+/** Deletes visitor events and search counts older than about 13 months, so the tables don't grow forever. */
 export async function pruneEvents(db: Db, now = new Date()) {
   const cutoff = new Date(now.getTime() - 400 * DAY);
   const gone = await db.delete(schema.storefrontEvents).where(lt(schema.storefrontEvents.createdAt, cutoff)).returning({ id: schema.storefrontEvents.id });
-  return gone.length;
+  return gone.length + (await pruneSearchTerms(db, now));
 }
 
