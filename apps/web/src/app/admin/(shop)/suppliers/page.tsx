@@ -1,14 +1,22 @@
 import Link from "next/link";
-import { listOwnSuppliers, listSupplierLinks } from "@sf/core";
+import { listOwnSuppliers, listSupplierLinks, supplierLabel, supplierScorecard, SCORE_MIN_ORDERS, type SupplierGrade } from "@sf/core";
 import { requireShop, supplierPortalUrl, suppliers } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { AddSupplierForm, OwnSupplierCard } from "./SupplierForms";
 
 export const metadata = { title: "Suppliers" };
 
+const GRADES: Record<SupplierGrade, { label: string; pill: string }> = {
+  good: { label: "Good", pill: "pill-success" },
+  watch: { label: "Watch", pill: "pill-warning" },
+  poor: { label: "Poor", pill: "pill-critical" },
+  too_few: { label: "Too few orders", pill: "pill-neutral" },
+};
+const inDays = (d: number | null) => (d == null ? "–" : `${d} ${d === 1 ? "day" : "days"}`);
+
 export default async function SuppliersPage() {
   const { shop, db } = await requireShop("suppliers");
-  const [links, own] = await Promise.all([listSupplierLinks(db, shop.id), listOwnSuppliers(db, shop.id)]);
+  const [links, own, scores] = await Promise.all([listSupplierLinks(db, shop.id), listOwnSuppliers(db, shop.id), supplierScorecard(db, shop.id)]);
   const available = suppliers().available;
   const services = [
     {
@@ -32,6 +40,66 @@ export default async function SuppliersPage() {
       <PageHeader title="Suppliers" />
       <div className="px-4 sm:px-8 flex flex-col gap-4 max-w-3xl">
         <p className="hint">When a customer pays, their order goes to the supplier of each item automatically, and tracking comes back to you and the customer.</p>
+        {scores.length > 0 && (
+          <section className="card flex flex-col" aria-labelledby="scores-heading">
+            <div className="px-5 pt-4 pb-2">
+              <h2 id="scores-heading" className="font-semibold">How your suppliers are doing</h2>
+              <p className="text-sm hint">
+                Your orders from the last 90 days. Shipping and arrival times are the middle order&apos;s, counted from when it was placed. Problems are
+                orders that never arrived, arrived damaged, wrong or not as described, or that you replaced. Grades need {SCORE_MIN_ORDERS} orders.
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="table text-sm w-full">
+                <thead>
+                  <tr>
+                    <th scope="col">Supplier</th>
+                    <th scope="col" className="num">Orders</th>
+                    <th scope="col" className="num">Couldn&apos;t take</th>
+                    <th scope="col" className="num">Ships in</th>
+                    <th scope="col" className="num">Arrives in</th>
+                    <th scope="col" className="num">Problems</th>
+                    <th scope="col">Grade</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {scores.map((s) => (
+                    <tr key={s.supplier.id}>
+                      <td className="font-medium">{supplierLabel(suppliers(), s.supplier)}</td>
+                      <td className="num">{s.orders}</td>
+                      <td className="num">{s.failed} ({s.failedRate}%)</td>
+                      <td className="num">{inDays(s.shipDays)}</td>
+                      <td className="num">{inDays(s.deliverDays)}</td>
+                      <td className="num">{s.problems} ({s.problemRate}%)</td>
+                      <td><span className={`pill ${GRADES[s.grade].pill}`}>{GRADES[s.grade].label}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {scores.some((s) => s.late > 0 || ((s.grade === "poor" || s.grade === "watch") && s.productsWithoutBackup > 0)) && (
+              <ul className="px-5 py-4 text-sm flex flex-col gap-1 border-t border-border" aria-label="What to do">
+                {scores.map((s) => {
+                  const name = supplierLabel(suppliers(), s.supplier);
+                  return [
+                    s.late > 0 && (
+                      <li key={`${s.supplier.id}-late`}>
+                        {name} hasn&apos;t shipped {s.late === 1 ? "1 order" : `${s.late} orders`} placed over a week ago.{" "}
+                        <Link href="/admin/orders" className="underline">Check your orders</Link>
+                      </li>
+                    ),
+                    (s.grade === "poor" || s.grade === "watch") && s.productsWithoutBackup > 0 && (
+                      <li key={`${s.supplier.id}-backup`}>
+                        {s.productsWithoutBackup === 1 ? "1 product" : `${s.productsWithoutBackup} products`} from {name} {s.productsWithoutBackup === 1 ? "has" : "have"} no backup
+                        supplier. Add one on the product page so orders still go out when {name} can&apos;t take them.
+                      </li>
+                    ),
+                  ];
+                })}
+              </ul>
+            )}
+          </section>
+        )}
         {services.map((s) => (
           <section key={s.name} className="card p-5 flex flex-col gap-2" aria-label={s.label}>
             <div className="flex items-center justify-between gap-3">
