@@ -26,7 +26,7 @@ test("a product video plays only when the buyer asks", async ({ page, browser },
   const section = page.getByRole("region", { name: "Video" });
   await section.getByLabel("Video link").fill("https://example.com/lamp");
   await section.getByRole("button", { name: "Save video" }).click();
-  await expect(section.getByText("Paste a YouTube or Vimeo link")).toBeVisible();
+  await expect(section.getByText("Paste a YouTube or Vimeo link, or the https address of a video file")).toBeVisible();
   await section.getByLabel("Video link").fill("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
   await section.getByRole("button", { name: "Save video" }).click();
   await expect(section.getByText("Saved. The video shows after the photos on the product page.")).toBeVisible();
@@ -64,14 +64,18 @@ test("a product video plays only when the buyer asks", async ({ page, browser },
   await section.getByLabel("Video link").fill("https://cdn.example.com/lamp.mp4");
   await section.getByRole("button", { name: "Save video" }).click();
   await expect(section.getByText("Saved. The video shows after the photos on the product page.")).toBeVisible();
-  await buyer.reload();
-  await buyer.getByRole("button", { name: "Video", exact: true }).click();
-  await expect(buyer.locator("video")).toHaveAttribute("src", "https://cdn.example.com/lamp.mp4");
+  // The banner from the last save reads the same, so check the store until the new video is there.
+  await expect(async () => {
+    await buyer.reload();
+    await buyer.getByRole("button", { name: "Video", exact: true }).click({ timeout: 2000 });
+    await expect(buyer.locator("video")).toHaveAttribute("src", "https://cdn.example.com/lamp.mp4", { timeout: 2000 });
+  }).toPass();
 
   // Removing it.
   await section.getByLabel("Video link").fill("");
   await section.getByRole("button", { name: "Save video" }).click();
   await expect(section.getByText("Saved. This product has no video.")).toBeVisible();
   await buyer.reload();
+  await expect(buyer.getByRole("button", { name: "Add to cart" })).toBeVisible();
   await expect(buyer.getByRole("button", { name: "Video", exact: true })).toHaveCount(0);
 });
