@@ -12,7 +12,12 @@ export async function readCart(shopId: string): Promise<CartLine[]> {
     if (!Array.isArray(parsed)) return [];
     return parsed
       .filter((l): l is CartLine => typeof l?.variantId === "string" && Number.isInteger(l?.quantity))
-      .slice(0, 50);
+      .slice(0, 50)
+      .map((l) => {
+        // Personalisation is checked against the product again when the cart is priced.
+        const custom = l.custom && typeof l.custom === "object" ? Object.fromEntries(Object.entries(l.custom).filter(([, v]) => typeof v === "string")) : {};
+        return Object.keys(custom).length ? { variantId: l.variantId, quantity: l.quantity, custom } : { variantId: l.variantId, quantity: l.quantity };
+      });
   } catch {
     return [];
   }

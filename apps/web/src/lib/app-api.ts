@@ -51,6 +51,7 @@ import {
   type Area,
   type Role,
   type Shop,
+  describePersonalization,
 } from "@sf/core";
 import type { Db } from "@sf/db";
 import { agents, db, fulfillment, notifyLater, payments, refunds, stock, storeAddress, suppliers, testPayments } from "./server";
@@ -192,7 +193,7 @@ const routes: Record<string, Handler> = {
       buyerNote: o.buyerNote,
       staffNote: o.staffNote,
       tags: o.tags,
-      lines: o.lines.map((l) => ({ title: l.title, quantity: l.quantity, unitPriceMinor: l.unitPriceMinor })),
+      lines: o.lines.map((l) => ({ title: l.title, quantity: l.quantity, unitPriceMinor: l.unitPriceMinor, personalization: describePersonalization(l.personalization) })),
       fulfillments: o.fulfillments.map((f) => ({
         status: f.status,
         problemMessage: f.problemMessage,

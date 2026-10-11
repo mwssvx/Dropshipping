@@ -101,8 +101,8 @@ export async function quoteCart(
     ];
     const custom = cleanPersonalization(row.product.personalization, l.custom);
     return {
-      /** Tells apart lines of the same option with different personalisation. */
-      key: cartLineKey({ variantId: row.variant.id, custom }),
+      /** Tells apart lines of the same option with different personalisation; matches the cart line it came from. */
+      key: cartLineKey(l),
       variantId: row.variant.id,
       productId: row.product.id,
       productHandle: row.product.handle,

@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
+import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
 import { agents, campaigns, db, fulfillment, payments, subscriptions, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
@@ -28,12 +28,19 @@ export async function addToCartAction(handle: string, form: FormData) {
   const shop = await loadShop(handle);
   const variantId = String(form.get("variantId") ?? "");
   const quantity = Math.min(99, Math.max(1, Number(form.get("quantity") ?? 1) || 1));
-  const cart = await readCart(shop.id);
-  const line = cart.find((l) => l.variantId === variantId);
-  if (line) line.quantity = Math.min(99, line.quantity + quantity);
-  else cart.push({ variantId, quantity });
-  await writeCart(shop.id, cart);
   const variant = await (await db()).query.variants.findFirst({ where: (v, { eq }) => eq(v.id, variantId), columns: { productId: true } }).catch(() => undefined);
+  // What the buyer typed into a personalised product's fields ("custom.<field id>").
+  const typed = Object.fromEntries([...form.entries()].filter(([k]) => k.startsWith("custom.")).map(([k, v]) => [k.slice(7), String(v)]));
+  const fields = variant && Object.keys(typed).length
+    ? ((await (await db()).query.products.findFirst({ where: (p, { and, eq }) => and(eq(p.id, variant.productId), eq(p.shopId, shop.id)), columns: { personalization: true } }))?.personalization ?? [])
+    : [];
+  const custom = cleanPersonalization(fields, typed);
+  const added = custom ? { variantId, quantity, custom } : { variantId, quantity };
+  const cart = await readCart(shop.id);
+  const line = cart.find((l) => sameCartLine(l, added));
+  if (line) line.quantity = Math.min(99, line.quantity + quantity);
+  else cart.push(added);
+  await writeCart(shop.id, cart);
   await track(shop.id, "add_to_cart", variant?.productId);
   redirect(`${await storeBase(handle)}/cart`);
 }
@@ -78,9 +85,10 @@ export async function addAddonAction(handle: string, addonId: string, form: Form
 
 export async function updateCartAction(handle: string, form: FormData) {
   const shop = await loadShop(handle);
-  const variantId = String(form.get("variantId") ?? "");
+  // Lines are told apart by option and personalisation.
+  const key = String(form.get("line") ?? "");
   const quantity = Math.min(99, Math.max(0, Number(form.get("quantity") ?? 0) || 0));
-  const cart = (await readCart(shop.id)).map((l) => (l.variantId === variantId ? { ...l, quantity } : l));
+  const cart = (await readCart(shop.id)).map((l) => (cartLineKey(l) === key ? { ...l, quantity } : l));
   await writeCart(shop.id, cart);
   redirect(`${await storeBase(handle)}/cart`);
 }
