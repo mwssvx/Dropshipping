@@ -1,9 +1,9 @@
 "use server";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { confirmTwoStep, endOtherSignIns, endSignIn, NotFoundError, renewRecoveryCodes, startTwoStepSetup, turnOffTwoStep, UserError } from "@sf/core";
+import { confirmTwoStep, endOtherSignIns, endSignIn, NotFoundError, renewRecoveryCodes, setWeeklySummary, startTwoStepSetup, turnOffTwoStep, UserError } from "@sf/core";
 import { BRAND } from "@/lib/brand";
-import { db, mailer, requireUser, SESSION_COOKIE } from "@/lib/server";
+import { db, mailer, requireShop, requireUser, SESSION_COOKIE } from "@/lib/server";
 
 export type TwoStepState = { error?: string; codes?: string[]; off?: boolean };
 
@@ -78,4 +78,15 @@ export async function endOtherSignInsAction(_: SignInsState, _form: FormData): P
   const ended = await endOtherSignIns(await db(), user.id, token);
   revalidatePath("/admin/account");
   return { ended };
+}
+
+export type SummaryState = { error?: string; saved?: boolean };
+
+/** The Monday summary email of the store being looked at, for this person. */
+export async function weeklySummaryAction(_: SummaryState, form: FormData): Promise<SummaryState> {
+  const { shop, user, db: database } = await requireShop("money");
+  const on = form.get("weeklySummary") === "on";
+  await setWeeklySummary(database, shop.id, user.id, on);
+  revalidatePath("/admin/account");
+  return { saved: on };
 }

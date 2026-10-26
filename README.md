@@ -615,3 +615,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **A launch time for a draft**: a draft product's page has "Put on sale later". The merchant picks a time in their own time zone, up to a year ahead, and the product waits hidden from buyers. The products list marks it Scheduled (`packages/core/src/publish-later.ts`, column `products.publish_at`).
 2. **On sale on time**: due products go on sale on the first store visit after their time, when the admin, app or API lists products, and on the scheduled job for stores nobody visited. It's in the activity log when the merchant schedules or cancels it.
 3. **Hand changes win**: putting the product on sale or archiving it by hand (on the web, in the app or with bulk edit) cancels its launch time. A copy made with Duplicate doesn't take the original's time.
+
+### Monday summary (after launch, part 84)
+
+1. **Last week in one email**: every Monday, the people who can see a store's money get its sales, orders, average order, visitors and how many ordered, profit after supplier costs, fees and ads, and the three best sellers, each compared with the week before. Weeks run Monday to Sunday in UTC (`packages/core/src/weekly-summary.ts`).
+2. **What's waiting**: problem orders, held orders, paused payouts, warnings, buyer questions and changes waiting for an OK are listed with what to do about them, so a merchant who only reads email still knows what needs them.
+3. **Once, and not for nothing**: the daily job sends it once per store per week (claimed before sending), skips stores with a quiet fortnight and nothing waiting, and skips stores opened after the week ended. Each person can turn it off for each store under Your account (`shop_members.weekly_summary`).
