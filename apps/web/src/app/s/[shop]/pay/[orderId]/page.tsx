@@ -63,6 +63,12 @@ export default async function PayPage({ params }: { params: Promise<{ shop: stri
             <dd className="text-right">{money(due.taxMinor)}</dd>
           </>
         )}
+        {order.taxExemptId && (
+          <>
+            <dt className="hint">{t.taxExempt}</dt>
+            <dd className="text-right num">{order.taxExemptId}</dd>
+          </>
+        )}
         {due.giftCardMinor > 0 && (
           <>
             <dt className="hint">{t.total}</dt><dd className="text-right">{money(due.totalMinor)}</dd>

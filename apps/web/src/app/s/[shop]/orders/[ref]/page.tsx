@@ -212,6 +212,7 @@ export default async function OrderStatusPage({ params, searchParams }: { params
           <div className="flex justify-between gap-3 hint"><span>{order.discountCode ? `Discount (${order.discountCode})` : `Bundle (${order.bundleTitle})`}</span><span className="num">−{money(due.discountMinor)}</span></div>
         )}
         <div className="flex justify-between gap-3 hint"><span>Shipping{order.shippingMethod ? ` (${order.shippingMethod})` : ""}</span><span className="num">{due.shippingMinor ? money(due.shippingMinor) : "Free"}</span></div>
+        {order.taxExemptId && <div className="flex justify-between gap-3 hint"><span>Tax exempt</span><span className="num">{order.taxExemptId}</span></div>}
         {order.taxMinor > 0 && (
           <div className="flex justify-between gap-3 hint"><span>{order.taxBreakdown.map((t) => t.label).join(", ") || "Tax"}{order.taxIncluded ? " (included)" : ""}</span><span className="num">{money(due.taxMinor)}</span></div>
         )}

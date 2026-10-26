@@ -211,7 +211,11 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
               {order.discountMinor > 0 && <><dt className="hint">{order.discountCode ? `Discount (${order.discountCode})` : `Bundle (${order.bundleTitle})`}</dt><dd>−{money(order.discountMinor)}</dd></>}
               {!order.discountMinor && order.discountCode && <><dt className="hint">Code</dt><dd>{order.discountCode} (free shipping)</dd></>}
               <dt className="hint">Shipping{order.shippingMethod ? ` (${order.shippingMethod})` : ""}</dt><dd>{order.shippingMinor ? money(order.shippingMinor) : "Free"}</dd>
-              <dt className="hint">{order.taxBreakdown.length ? order.taxBreakdown.map((t) => t.label).join(", ") : "Tax"}{order.taxIncluded ? " (included)" : ""}</dt><dd>{money(order.taxMinor)}</dd>
+              {order.taxExemptId ? (
+                <><dt className="hint">Tax (exempt, {order.taxExemptId})</dt><dd>{money(0)}</dd></>
+              ) : (
+                <><dt className="hint">{order.taxBreakdown.length ? order.taxBreakdown.map((t) => t.label).join(", ") : "Tax"}{order.taxIncluded ? " (included)" : ""}</dt><dd>{money(order.taxMinor)}</dd></>
+              )}
               <dt className="font-semibold">Total</dt><dd className="font-semibold">{money(order.totalMinor)}</dd>
               {order.presentment && (
                 <><dt className="hint">Buyer paid in {order.presentment.currency}</dt><dd>{formatMoney(order.presentment.totalMinor, order.presentment.currency)}</dd></>

@@ -366,6 +366,9 @@ export const customers = pgTable(
     wholesaleTaxId: text("wholesale_tax_id"),
     wholesaleMessage: text("wholesale_message"),
     wholesaleRequestedAt: timestamp("wholesale_requested_at", { withTimezone: true }),
+    // Set by the merchant for a buyer who doesn't pay tax (a reseller, a charity): their
+    // exemption certificate or resale number. Signed in, they're charged no tax.
+    taxExemptId: text("tax_exempt_id"),
     // The merchant's own notes and labels ("vip", "wholesale lead"). Never shown to the buyer.
     note: text("note"),
     tags: jsonb("tags").$type<string[]>().notNull().default([]),
@@ -555,6 +558,8 @@ export const orders = pgTable(
     edits: jsonb("edits").$type<OrderEdit[]>().notNull().default([]),
     // What the buyer typed in "Note for the store" at checkout ("Please leave it with the neighbour").
     buyerNote: text("buyer_note"),
+    // Placed by a tax-exempt buyer, so no tax was charged: their exemption number, for the records.
+    taxExemptId: text("tax_exempt_id"),
     // When the buyer was asked to review what they got, once per order.
     reviewRequestedAt: timestamp("review_requested_at", { withTimezone: true }),
     // The merchant's own note and labels ("follow up", "vip"). Never shown to the buyer.

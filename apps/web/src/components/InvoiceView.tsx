@@ -28,6 +28,7 @@ export function InvoiceView({ doc }: { doc: InvoiceDocument }) {
           {buyer.address.map((l) => <p key={l} className="text-muted">{l}</p>)}
           <p className="text-muted break-all">{buyer.email}</p>
           {buyer.taxId && <p className="text-muted">Tax ID: <span className="num">{buyer.taxId}</span></p>}
+          {doc.taxExemptId && <p className="text-muted">Tax exemption: <span className="num">{doc.taxExemptId}</span></p>}
         </section>
         <dl className="grid grid-cols-[auto_1fr] content-start gap-x-4 gap-y-1 sm:justify-self-end">
           <dt className="text-muted">Issued</dt><dd>{day.format(doc.issuedAt)}</dd>
@@ -76,6 +77,7 @@ export function InvoiceView({ doc }: { doc: InvoiceDocument }) {
             {doc.discount && <Row label={doc.discount.label} value={`−${money(doc.discount.amountMinor)}`} />}
             <Row label={doc.shipping.label} value={doc.shipping.amountMinor ? money(doc.shipping.amountMinor) : "Free"} />
             {!doc.taxIncluded && doc.tax.map((t) => <Row key={t.label} label={t.label} value={money(t.amountMinor)} />)}
+            {doc.taxExemptId && <Row label="Tax (exempt)" value={money(0)} />}
             <Row label="Total" value={money(doc.totalMinor)} strong />
             {doc.taxIncluded && doc.tax.map((t) => <Row key={t.label} label={`Includes ${t.label}`} value={money(t.amountMinor)} />)}
             {doc.giftCardMinor > 0 && <Row label="Paid with gift card" value={money(doc.giftCardMinor)} />}
