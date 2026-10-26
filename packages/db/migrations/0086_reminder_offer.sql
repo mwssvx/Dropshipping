@@ -1,0 +1,1 @@
+ALTER TABLE "shops" ADD COLUMN "abandoned_cart_offer" jsonb;

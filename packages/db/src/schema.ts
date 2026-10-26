@@ -137,6 +137,8 @@ export const shops = pgTable(
     aiAutoPause: boolean("ai_auto_pause").notNull().default(false),
     // Remind buyers who started checkout but didn't pay (one email, an hour later).
     abandonedCartEmails: boolean("abandoned_cart_emails").notNull().default(true),
+    // A second checkout reminder, a day after the first, with a one-time code. Null means off.
+    abandonedCartOffer: jsonb("abandoned_cart_offer").$type<AbandonedCartOffer | null>(),
     // Show new reviews straight away instead of waiting for the merchant.
     reviewsAutoPublish: boolean("reviews_auto_publish").notNull().default(false),
     // Buyers are emailed asking for a review this many days after their order arrives; 0 turns it off.
@@ -456,6 +458,9 @@ export type ProductBackup = {
   checkedAt: string;
 };
 
+/** The second checkout reminder: a percentage off, in a code that works once, for that buyer, for 48 hours. */
+export type AbandonedCartOffer = { percentOff: number };
+
 export type Address = {
   name: string;
   line1: string;
@@ -645,7 +650,7 @@ export const emails = pgTable(
     id: id(),
     shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
     orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
-    kind: text("kind", { enum: ["order_confirmation", "shipping_update", "delivered", "refund", "support_reply", "abandoned_cart", "payment_link", "gift_shipped", "order_link", "order_updated"] }).notNull(),
+    kind: text("kind", { enum: ["order_confirmation", "shipping_update", "delivered", "refund", "support_reply", "abandoned_cart", "payment_link", "gift_shipped", "order_link", "order_updated", "abandoned_cart_offer"] }).notNull(),
     // Tells apart emails of a kind that can repeat (one per refund). Empty for once-only kinds.
     ref: text("ref").notNull().default(""),
     to: text("to").notNull(),
@@ -1040,7 +1045,7 @@ export const discounts = pgTable(
     // Welcome and referral codes are made one per person, only work for that email, and stay off
     // the codes list. Partner codes are listed on the Partners page instead, and personal codes (sent
     // to one customer from their page) on that customer's page.
-    source: text("source", { enum: ["merchant", "welcome", "referral", "winback", "partner", "personal", "batch"] }).notNull().default("merchant"),
+    source: text("source", { enum: ["merchant", "welcome", "referral", "winback", "partner", "personal", "batch", "reminder"] }).notNull().default("merchant"),
     email: text("email"),
     // One-time codes made together (for a giveaway or a card in the parcel) belong to a batch.
     batchId: uuid("batch_id").references((): AnyPgColumn => codeBatches.id, { onDelete: "cascade" }),

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { abandonedCartStats, describeDiscount, listCodeBatches, MAX_BATCH, formatMoney, listDiscounts, listProducts, POST_PURCHASE_MINUTES, postPurchaseStats, referralStats, SUBSCRIBE_WITHIN_DAYS, subscriptionStats, welcomeOfferStats, winbackDueCount, winbackStats } from "@sf/core";
 import { requireShop, testPayments } from "@/lib/server";
-import { sendRemindersNowAction, setDiscountActiveAction, setRemindersAction } from "../../growth-actions";
+import { sendOffersNowAction, sendRemindersNowAction, setDiscountActiveAction, setRemindersAction } from "../../growth-actions";
+import { ReminderOfferForm } from "./ReminderOfferForm";
 import { PageHeader } from "../PageHeader";
 import { DiscountForm } from "./DiscountForm";
 import { CodeBatchForm } from "./CodeBatchForm";
@@ -209,8 +210,9 @@ export default async function MarketingPage() {
         <section className="card p-5 flex flex-col gap-3" aria-labelledby="reminders-heading">
           <h2 id="reminders-heading" className="font-semibold">Checkout reminders</h2>
           <p className="text-sm">
-            When a buyer starts checkout but doesn't pay, we email them once, about an hour later, with a link straight back to
-            payment. Nobody gets more than one a day, and buyers who paid in the meantime are skipped.
+            When a buyer starts checkout but doesn't pay, we email them about an hour later with a link straight back to
+            payment. Nobody gets more than one a day, and buyers who paid in the meantime are skipped. You can also send a
+            second reminder a day later with a code.
           </p>
           <form action={setRemindersAction} className="flex flex-wrap items-center gap-3 text-sm">
             <label className="flex items-center gap-2">
@@ -219,6 +221,7 @@ export default async function MarketingPage() {
             </label>
             <button className="btn btn-secondary">Save</button>
           </form>
+          <ReminderOfferForm percentOff={shop.abandonedCartOffer?.percentOff ?? null} />
           <dl className="grid grid-cols-3 gap-3 border-t border-border pt-3 text-sm">
             <div><dt className="hint">Sent, last 30 days</dt><dd className="text-lg font-semibold num">{stats.sent}</dd></div>
             <div><dt className="hint">Then paid</dt><dd className="text-lg font-semibold num">{stats.recovered}</dd></div>
@@ -228,6 +231,12 @@ export default async function MarketingPage() {
             <form action={sendRemindersNowAction} className="flex items-center gap-3 border-t border-border pt-3">
               <button className="btn btn-secondary">Send reminders now</button>
               <span className="hint">Test mode: sends as if an hour had passed.</span>
+            </form>
+          )}
+          {testPayments() && shop.abandonedCartOffer && (
+            <form action={sendOffersNowAction} className="flex items-center gap-3">
+              <button className="btn btn-secondary">Send second reminders now</button>
+              <span className="hint">Test mode: sends as if a day had passed.</span>
             </form>
           )}
         </section>

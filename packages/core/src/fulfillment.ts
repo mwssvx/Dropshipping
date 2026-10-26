@@ -517,6 +517,33 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
       ].join("\n"),
     };
   }
+  if (kind === "abandoned_cart_offer") {
+    const code = await ctx.db.query.discounts.findFirst({ where: and(eq(schema.discounts.shopId, shop.id), eq(schema.discounts.code, ref)) });
+    if (!code) throw new NotFoundError("Discount code");
+    const lines = await ctx.db.query.orderLines.findMany({ where: eq(schema.orderLines.orderId, order.id) });
+    const pay = ctx.payUrl ? await ctx.payUrl(shop, order) : link;
+    const until = code.endsAt!.toLocaleString("en-US", { weekday: "long", hour: "numeric", minute: "2-digit", timeZone: "UTC", timeZoneName: "short" });
+    return {
+      subject: `${code.value}% off what you left at ${shop.name}`,
+      text: [
+        `Hi ${first},`,
+        ``,
+        `Your cart at ${shop.name} is still saved:`,
+        ``,
+        ...lines.flatMap((l) => [`  ${l.title} × ${l.quantity}`, ...personalised(l)]),
+        ``,
+        `Here's ${code.value}% off if you'd like to finish your order:`,
+        ``,
+        `    ${code.code}`,
+        ``,
+        `It works once, with this email address, until ${until}.`,
+        ``,
+        `Back to your cart, with the code added: ${pay}/cart?code=${code.code}`,
+        ``,
+        `This is the last email about this cart.`,
+      ].join("\n"),
+    };
+  }
   if (kind === "order_updated") {
     const edit = order.edits[Number(ref)];
     if (!edit) throw new NotFoundError("Order change");

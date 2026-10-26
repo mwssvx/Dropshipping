@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { createDiscount, moderateReview, parseMoney, sendAbandonedCartEmails, setDiscountActive, setGrowthSettings, setPostPurchaseOffer, setReferralProgram, setReviewRequestDays, setSubscriptionOffer, setUpsell, setWelcomeOffer, setWinbackOffer, UserError } from "@sf/core";
+import { createDiscount, moderateReview, parseMoney, sendAbandonedCartEmails, setAbandonedCartOffer, setDiscountActive, setGrowthSettings, setPostPurchaseOffer, setReferralProgram, setReviewRequestDays, setSubscriptionOffer, setUpsell, setWelcomeOffer, setWinbackOffer, UserError } from "@sf/core";
 import { fulfillment, logged, requireShop, testPayments } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -152,6 +152,32 @@ export async function sendRemindersNowAction() {
   await requireShop("marketing");
   if (!testPayments()) return;
   await sendAbandonedCartEmails(await fulfillment(), new Date(Date.now() + HOUR + 60_000));
+  revalidatePath("/admin/marketing");
+}
+
+export type ReminderOfferState = { error?: string; saved?: number | null };
+
+/** The second checkout reminder: off, or on with a percentage off in a one-time code. */
+export async function setReminderOfferAction(_: ReminderOfferState, form: FormData): Promise<ReminderOfferState> {
+  const { shop, db, user } = await requireShop("marketing");
+  const on = form.get("enabled") === "on";
+  const percent = on ? Number.parseInt(String(form.get("percentOff") ?? "").trim() || "0", 10) : null;
+  try {
+    await setAbandonedCartOffer(db, shop.id, percent);
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  await logged({ shop, user, db }, percent ? `Turned on the second checkout reminder with ${percent}% off` : "Turned off the second checkout reminder", { href: "/admin/marketing#reminders-heading" });
+  revalidatePath("/admin/marketing");
+  return { saved: percent };
+}
+
+/** Test mode only: send second reminders as if a day had passed since the first ones. */
+export async function sendOffersNowAction() {
+  await requireShop("marketing");
+  if (!testPayments()) return;
+  await sendAbandonedCartEmails(await fulfillment(), new Date(Date.now() + 25 * HOUR));
   revalidatePath("/admin/marketing");
 }
 
