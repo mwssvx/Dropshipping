@@ -609,3 +609,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Start the next listing from one you have**: the product page has a Duplicate button. The copy is called "Copy of …", gets its own web address and is saved as a draft, so buyers don't see it until the merchant puts it on sale (`duplicateProduct` in `packages/core/src/products.ts`).
 2. **What comes along**: photos and their descriptions, options with prices, SKUs and supplier listings, the backup supplier (matched to the copy's own options), settings like badges, search listing, purchase limits and personalisation, and the collections and size charts the original is in. Reviews, questions and translations stay with the original.
 3. **Stock isn't counted twice**: a product the merchant stocks themselves starts at 0 in the copy, and the page says so. Supplier products keep the supplier's numbers until the next stock check.
+
+### Put on sale later (after launch, part 83)
+
+1. **A launch time for a draft**: a draft product's page has "Put on sale later". The merchant picks a time in their own time zone, up to a year ahead, and the product waits hidden from buyers. The products list marks it Scheduled (`packages/core/src/publish-later.ts`, column `products.publish_at`).
+2. **On sale on time**: due products go on sale on the first store visit after their time, when the admin, app or API lists products, and on the scheduled job for stores nobody visited. It's in the activity log when the merchant schedules or cancels it.
+3. **Hand changes win**: putting the product on sale or archiving it by hand (on the web, in the app or with bulk edit) cancels its launch time. A copy made with Duplicate doesn't take the original's time.

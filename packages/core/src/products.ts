@@ -4,6 +4,7 @@ import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
 import { uniqueHandle } from "./handles";
 import { editProductPhotos, inheritedPhoto, photoColumns } from "./gallery";
+import { publishDueProducts } from "./publish-later";
 
 export const MAX_VARIANTS = 100;
 export const MAX_OPTIONS = 3;
@@ -73,7 +74,7 @@ export async function duplicateProduct(db: Db, shopId: string, productId: string
       columns: { id: true },
     })),
   );
-  const { id: _id, createdAt: _c, updatedAt: _u, stockCheckedAt: _s, ...fields } = original;
+  const { id: _id, createdAt: _c, updatedAt: _u, stockCheckedAt: _s, publishAt: _p, ...fields } = original;
   return db.transaction(async (tx) => {
     const [copy] = await tx.insert(schema.products).values({ ...fields, title, handle, status: "draft" }).returning();
     const ids = new Map<string, string>();
@@ -106,7 +107,8 @@ export async function updateProduct(db: Db, shopId: string, productId: string, i
   return db.transaction(async (tx) => {
     const [product] = await tx
       .update(schema.products)
-      .set({ ...data, updatedAt: new Date() })
+      // A product put on sale (or archived) by hand no longer waits for its scheduled time.
+      .set({ ...data, ...(data.status === "draft" ? {} : { publishAt: null }), updatedAt: new Date() })
       .where(and(eq(schema.products.id, productId), eq(schema.products.shopId, shopId)))
       .returning();
     if (!product) throw new NotFoundError("Product");
@@ -136,6 +138,8 @@ export async function updateProduct(db: Db, shopId: string, productId: string, i
 }
 
 export async function listProducts(db: Db, shopId: string) {
+  // The admin, the app and the API all list from here, so scheduled drafts show as on sale on time.
+  await publishDueProducts(db, shopId);
   const rows = await db.query.products.findMany({
     where: eq(schema.products.shopId, shopId),
     orderBy: desc(schema.products.createdAt),
@@ -204,7 +208,7 @@ export async function patchProduct(db: Db, shopId: string, productId: string, in
   const current = await getProduct(db, shopId, productId);
   if (status === "active" && current.variants.every((v) => v.priceMinor === 0)) throw new UserError("Set a price before making it active.");
   await db.transaction(async (tx) => {
-    await tx.update(schema.products).set({ ...(status ? { status } : {}), updatedAt: new Date() }).where(eq(schema.products.id, productId));
+    await tx.update(schema.products).set({ ...(status ? { status } : {}), ...(status && status !== "draft" ? { publishAt: null } : {}), updatedAt: new Date() }).where(eq(schema.products.id, productId));
     for (const v of variants ?? []) {
       if (!current.variants.some((c) => c.id === v.id)) throw new NotFoundError("Variant");
       const set = { ...(v.priceMinor !== undefined ? { priceMinor: v.priceMinor } : {}), ...(v.stock !== undefined ? { stock: v.stock } : {}) };

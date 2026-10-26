@@ -19,6 +19,7 @@ export default async function ProductsPage() {
       title: p.title,
       imageUrl: p.imageUrl,
       status: p.status,
+      scheduled: p.status === "draft" && !!p.publishAt,
       price: v ? formatMoney(v.priceMinor, shop.currency) : "—",
       margin: v?.costMinor != null && v.priceMinor > 0 ? Math.round(((v.priceMinor - v.costMinor) / v.priceMinor) * 100) : null,
     };
