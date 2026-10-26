@@ -711,3 +711,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **One more nudge, with a reason to come back**: on the Marketing page, under Checkout reminders, "Send a second reminder a day later, with a code" (5% to 50% off). A day after the first reminder, a buyer who still hasn't paid gets a code that works once, only with their email, for 48 hours (`sendAbandonedCartOffers` in `packages/core/src/growth.ts`).
 2. **Their cart, on any device**: the email's link (`<store>/pay/<order>/cart?code=…`) puts what's still for sale from that checkout back in the cart with the code added, so it works when the email is opened on a phone.
 3. **No code farming, honest counts**: one second reminder per buyer every four days, none if they paid for anything since, and it's the last email about that cart. The reminder stats count sales made with these codes as won back. Store export and import keep the setting.
+
+### Phone number at checkout (after launch, part 100)
+
+1. **For the courier**: checkout can ask for a phone number, optional by default. On the Shipping page, under "Phone number at checkout", a store picks optional, required or don't ask. Numbers are checked ("Include the area code, like +1 512 555 0100") and never used for marketing.
+2. **Passed on**: the number goes to the supplier with the order (CJ's `shippingPhone`, AliExpress's `mobile_no`, and your own suppliers' order page), so carriers that need one can deliver.
+3. **Where the merchant needs it**: the order page shows it as a call link, the phone app has a Call button, and changing an order's address keeps or updates it. Store export and import keep the setting.

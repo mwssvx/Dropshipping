@@ -1,10 +1,17 @@
 import { countryName, describeRate, EVERYWHERE_ELSE, formatDeliveryWindow, formatMoney, listProducts, listShippingZones, productDelivery, rateDays, SHIPPING_COUNTRIES } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
+import { setCheckoutPhoneAction } from "../../shipping-actions";
 import { DeliveryEstimatesForm } from "./DeliveryEstimatesForm";
 import { DeleteButton, RateForm, StarterButton, ZoneForm, type Country } from "./ShippingForms";
 
 export const metadata = { title: "Shipping" };
+
+const PHONE_CHOICES = [
+  ["optional", "Ask for it, but buyers can leave it empty"],
+  ["required", "Buyers must enter one"],
+  ["off", "Don't ask"],
+] as const;
 
 export default async function ShippingPage() {
   const { shop, db } = await requireShop("shipping");
@@ -96,6 +103,25 @@ export default async function ShippingPage() {
                   : "Delivery dates are off."}
             </p>
           )}
+        </section>
+        <section className="card p-5 flex flex-col gap-3" aria-labelledby="phone-heading">
+          <h2 id="phone-heading" className="font-semibold">Phone number at checkout</h2>
+          <p className="text-sm">
+            Couriers call or text when they can&apos;t find an address, and some countries&apos; carriers need a number to deliver at all.
+            The number goes to your supplier with the order and shows on the order page. It&apos;s never used for marketing.
+          </p>
+          <form action={setCheckoutPhoneAction} className="flex flex-col gap-2 text-sm">
+            <fieldset className="flex flex-col gap-2">
+              <legend className="sr-only">Ask for a phone number</legend>
+              {PHONE_CHOICES.map(([value, label]) => (
+                <label key={value} className="flex items-center gap-2">
+                  <input type="radio" name="checkoutPhone" value={value} defaultChecked={shop.checkoutPhone === value} />
+                  {label}
+                </label>
+              ))}
+            </fieldset>
+            <button className="btn btn-secondary self-start">Save</button>
+          </form>
         </section>
         <section className="card p-5 flex flex-col gap-3" aria-labelledby="new-zone">
           <h2 id="new-zone" className="font-semibold">Add a zone</h2>

@@ -1,0 +1,1 @@
+ALTER TABLE "shops" ADD COLUMN "checkout_phone" text DEFAULT 'optional' NOT NULL;

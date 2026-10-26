@@ -21,7 +21,7 @@ function Field({ id, label, values, ...rest }: { id: string; label: string; valu
 
 /** The checkout's words in the buyer's language. */
 export type CheckoutText = Record<
-  | "checkout" | "orderSummary" | "contact" | "newsAndOffers" | "delivery" | "email" | "fullName" | "address" | "address2" | "city" | "region"
+  | "checkout" | "orderSummary" | "contact" | "newsAndOffers" | "delivery" | "email" | "fullName" | "address" | "address2" | "city" | "region" | "phone"
   | "postalCode" | "country" | "shipping" | "noShipping" | "placeOrder" | "continueToPayment" | "continuing" | "notAvailable" | "tax"
   | "giftCheckbox" | "giftFrom" | "giftMessage" | "giftRecipientEmail" | "giftNote" | "orderNote",
   string
@@ -32,6 +32,8 @@ type Props = {
   text: CheckoutText;
   defaultCountry: string;
   initial?: Record<string, string>;
+  /** Whether the store asks for a phone number for the courier. */
+  askPhone: "off" | "optional" | "required";
   paidByGiftCard?: boolean;
   countries: [string, string][];
   /** Null when nothing in the cart ships (only gift cards). */
@@ -81,7 +83,7 @@ export function Checkout({ summary, footer, taxLabel, totalLabel, totalWithoutSh
 }
 
 function CheckoutForm({
-  handle, text: t, initial, paidByGiftCard, countries, zones, country, onCountry, rates, rate, onRate,
+  handle, text: t, initial, askPhone, paidByGiftCard, countries, zones, country, onCountry, rates, rate, onRate,
 }: Omit<Props, "summary" | "footer" | "taxLabel" | "totalLabel" | "totalWithoutShipping" | "defaultCountry"> & {
   country: string;
   onCountry: (c: string) => void;
@@ -127,6 +129,9 @@ function CheckoutForm({
             {countries.map(([c, n]) => <option key={c} value={c}>{n}</option>)}
           </select>
         </div>
+        {askPhone !== "off" && zones && (
+          <Field id="phone" label={t.phone} type="tel" autoComplete="tel" inputMode="tel" maxLength={30} required={askPhone === "required"} values={v} />
+        )}
       </fieldset>
       {zones && (
         <fieldset className="flex flex-col gap-2">

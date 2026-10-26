@@ -147,7 +147,7 @@ export class CjSupplier implements SupplierAdapter {
       shippingAddress2: a.line2 ?? "",
       shippingZip: a.postalCode,
       shippingCustomerName: a.name,
-      shippingPhone: "",
+      shippingPhone: a.phone ?? "",
       email: input.email,
       logisticName: cheapest.logisticName,
       fromCountryCode: "CN",

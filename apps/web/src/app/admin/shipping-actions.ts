@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseMoney, setDeliveryEstimates, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
-import { requireShop } from "@/lib/server";
+import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseMoney, setCheckoutPhone, setDeliveryEstimates, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
+import { logged, requireShop } from "@/lib/server";
 import type { FormState } from "./actions";
 
 async function attempt(fn: () => Promise<unknown>): Promise<FormState> {
@@ -84,4 +84,16 @@ export async function setDeliveryEstimatesAction(_: FormState, form: FormData): 
   }
   revalidatePath("/admin/shipping");
   return { saved: true };
+}
+
+/** Whether checkout asks for a phone number for the courier. */
+export async function setCheckoutPhoneAction(form: FormData) {
+  const { shop, db, user } = await requireShop("shipping");
+  const mode = String(form.get("checkoutPhone") ?? "optional") as "off" | "optional" | "required";
+  await setCheckoutPhone(db, shop.id, mode).catch((e) => {
+    if (!(e instanceof UserError)) throw e;
+  });
+  const said = { off: "doesn't ask for a phone number", optional: "asks for an optional phone number", required: "needs a phone number" }[mode] ?? "asks for a phone number";
+  await logged({ shop, user, db }, `Checkout now ${said}`, { href: "/admin/shipping#phone-heading" });
+  revalidatePath("/admin/shipping");
 }

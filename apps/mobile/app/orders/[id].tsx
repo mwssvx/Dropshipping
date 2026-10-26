@@ -23,7 +23,7 @@ type Detail = {
   paymentStatus: string;
   fulfillmentStatus: string;
   paidAt: string | null;
-  shippingAddress: { name: string; line1: string; line2?: string; city: string; region?: string; postalCode: string; country: string };
+  shippingAddress: { name: string; line1: string; line2?: string; city: string; region?: string; postalCode: string; country: string; phone?: string };
   lines: { title: string; quantity: number; unitPriceMinor: number; personalization?: string | null }[];
   fulfillments: { status: string; problemMessage: string | null; backupNote?: string | null; carrier: string | null; trackingNumber: string | null; trackingUrl: string | null }[];
   refunds: { amountMinor: number; reason: string | null; createdAt: string }[];
@@ -132,6 +132,9 @@ export default function OrderScreen() {
           <Body muted>
             {[o.shippingAddress.line1, o.shippingAddress.line2, o.shippingAddress.city, o.shippingAddress.region, o.shippingAddress.postalCode, o.shippingAddress.country].filter(Boolean).join(", ")}
           </Body>
+          {o.shippingAddress.phone ? (
+            <Button kind="secondary" label={`Call ${o.shippingAddress.phone}`} onPress={() => void Linking.openURL(`tel:${o.shippingAddress.phone!.replace(/[^\d+]/g, "")}`)} />
+          ) : null}
           {o.buyerNote ? <Body>Their note: {o.buyerNote}</Body> : null}
         </Card>
       </Section>
