@@ -46,7 +46,7 @@ describe("changing an order before it ships", () => {
     expect(mail.text).toContain("9 Oak Ave");
 
     await expect(editOrder(f.ctx, shop.id, order.id, { address: after.shippingAddress }, "merchant")).rejects.toThrow("Nothing changed");
-    await expect(editOrder(f.ctx, shop.id, order.id, { address: { ...after.shippingAddress, country: "CA" } }, "merchant")).rejects.toThrow("another address in United States");
+    await expect(editOrder(f.ctx, shop.id, order.id, { address: { ...after.shippingAddress, country: "CA", region: "ON", postalCode: "K1A 0B1" } }, "merchant")).rejects.toThrow("another address in United States");
   });
 
   it("gives buyers a few hours, and leaves the order alone when the supplier is already on it", async () => {

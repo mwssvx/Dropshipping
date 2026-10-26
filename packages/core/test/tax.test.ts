@@ -47,6 +47,8 @@ async function storeIn(country: string) {
 
 const fresh = async (id: string) => (await db.query.shops.findFirst({ where: eq(schema.shops.id, id) }))!;
 
+const POSTAL: Record<string, string> = { US: "78701", GB: "SW1A 1AA", CA: "K1A 0B1", DE: "10115", FR: "75001", HU: "1051" };
+
 async function buy(s: Awaited<ReturnType<typeof storeIn>>, address: { country: string; region?: string; postalCode?: string }) {
   const { order } = await startCheckout(
     db,
@@ -54,7 +56,7 @@ async function buy(s: Awaited<ReturnType<typeof storeIn>>, address: { country: s
     await fresh(s.shop.id),
     {
       email: "buyer@example.com",
-      address: { name: "Bo Buyer", line1: "1 High St", city: "Town", postalCode: address.postalCode ?? "12345", ...address },
+      address: { name: "Bo Buyer", line1: "1 High St", city: "Town", postalCode: address.postalCode ?? POSTAL[address.country] ?? "12345", ...address },
       lines: [{ variantId: s.variant.id, quantity: 1 }],
     },
     tax,

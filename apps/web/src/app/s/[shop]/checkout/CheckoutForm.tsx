@@ -1,7 +1,6 @@
 "use client";
-import { useActionState, useState } from "react";
+import { startTransition, useActionState, useState } from "react";
 import { FormError } from "@/components/FormError";
-import { SubmitButton } from "@/components/SubmitButton";
 import { checkoutAction } from "../actions";
 
 /** A shipping rate priced for this cart, in the buyer's currency. */
@@ -90,10 +89,19 @@ function CheckoutForm({
   rate: RateChoice | undefined;
   onRate: (id: string) => void;
 }) {
-  const [state, action] = useActionState(checkoutAction.bind(null, handle), {});
+  const [state, action, pending] = useActionState(checkoutAction.bind(null, handle), {});
   const v = state.values ?? initial;
   return (
-    <form action={action} className="flex flex-col gap-6">
+    // Submitted by hand: React resets a form after its action, which would put the country back
+    // to the first in the list while the page still prices the one the buyer picked.
+    <form
+      className="flex flex-col gap-6"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const data = new FormData(e.currentTarget);
+        startTransition(() => action(data));
+      }}
+    >
       <FormError message={state.error} />
       <fieldset className="flex flex-col gap-4">
         <legend className="font-semibold mb-2">{t.contact}</legend>
@@ -144,7 +152,9 @@ function CheckoutForm({
         <label className="label" htmlFor="note">{t.orderNote}</label>
         <textarea className="input" id="note" name="note" rows={2} maxLength={500} defaultValue={v?.note} />
       </div>
-      <SubmitButton className="btn btn-primary btn-lg" pendingText={t.continuing}>{paidByGiftCard ? t.placeOrder : t.continueToPayment}</SubmitButton>
+      <button type="submit" className="btn btn-primary btn-lg" disabled={pending} aria-busy={pending}>
+        {pending ? t.continuing : paidByGiftCard ? t.placeOrder : t.continueToPayment}
+      </button>
     </form>
   );
 }

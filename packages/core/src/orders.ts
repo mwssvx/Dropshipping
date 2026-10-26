@@ -12,6 +12,7 @@ import { BuiltInTaxCalculator, listTaxRegistrations, type TaxCalculator } from "
 import { presentQuote } from "./currency";
 import { creditableCampaign } from "./campaigns";
 import { convertAmount, formatMoney, type DisplayFx } from "./money";
+import { checkAddress } from "./address-check";
 import { breakFor, describeBreak, percentOff, wholesaleTermsFor } from "./wholesale";
 import { findGiftCard } from "./gift-cards";
 import { bundleSavings, bundlesInCart } from "./bundles";
@@ -286,7 +287,16 @@ export const addressSchema = z.object({
   region: z.string().trim().optional(),
   postalCode: z.string().trim().min(2, "Enter the postal code."),
   country: z.string().trim().length(2, "Choose a country."),
-});
+})
+  // A postal code in the wrong shape is the usual reason a parcel comes back; ask while the buyer is here.
+  .transform((a, ctx) => {
+    const checked = checkAddress(a);
+    if (checked.problem) {
+      ctx.addIssue({ code: "custom", message: checked.problem.message, path: [checked.problem.field] });
+      return z.NEVER;
+    }
+    return checked.address;
+  });
 
 const giftSchema = z.object({
   from: z.string().trim().min(1, "Add who the gift is from.").max(60, "Keep the name under 60 characters."),

@@ -21,6 +21,8 @@ import {
 } from "../src";
 
 export const DAY = 86_400_000;
+/** A postal code in the right shape for each country the tests ship to. */
+const POSTAL: Record<string, string> = { US: "78701", JP: "100-0001", GB: "SW1A 1AA", CA: "K1A 0B1", DE: "10115", FR: "75001" };
 const LAMP = DEMO_SUPPLIER_LINKS[0]!;
 const STAND = DEMO_SUPPLIER_LINKS[1]!;
 const PROJECTOR = DEMO_SUPPLIER_LINKS[2]!; // sells out when ordered
@@ -57,7 +59,7 @@ export async function makeFixture(model: ModelClient, opts: { country?: string }
     const [v] = await variants(productId);
     const { order } = await startCheckout(db, payments, await shop(), {
       email: `buyer${++n}@example.com`,
-      address: { name: o.name ?? "Ada Lovelace", line1: "1 Main St", city: "Austin", region: "TX", postalCode: "78701", country: o.country ?? "US" },
+      address: { name: o.name ?? "Ada Lovelace", line1: "1 Main St", city: "Austin", region: "TX", postalCode: POSTAL[o.country ?? "US"] ?? "78701", country: o.country ?? "US" },
       lines: [{ variantId: v!.id, quantity: 1 }],
       note: o.note,
     });

@@ -7,7 +7,8 @@ import {
 } from "../src";
 import { makeFixture } from "../evals/fixture";
 
-const address = (country: string) => ({ name: "Ada Lovelace", line1: "1 Main St", city: "Somewhere", postalCode: "12345", country });
+const POSTAL: Record<string, string> = { US: "78701", DE: "10115", FR: "75001" };
+const address = (country: string) => ({ name: "Ada Lovelace", line1: "1 Main St", city: "Somewhere", region: country === "US" ? "TX" : undefined, postalCode: POSTAL[country] ?? "12345", country });
 
 async function setup() {
   const f = await makeFixture(new DemoModel());
