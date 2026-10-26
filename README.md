@@ -663,3 +663,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **One click**: the Customers page has "Download all customers as a spreadsheet", or "these customers" when a search or tag is on, and the file follows it (`customersCsv` in `packages/core/src/customer-export.ts`). It's for a mailing tool, an accountant or the merchant's own records, and up to 20,000 customers go in one file.
 2. **What's in it**: email, name, the city and country of their latest order, orders, first and last order dates, whether they're subscribed to emails, whether they've signed in, tags and when they became a customer. The amount spent is only there for people who can see the store's money.
 3. **Safe to open**: cells a spreadsheet would run as a formula (a name starting with "=", for example) are defused, like every other download.
+
+### Search as you type (after launch, part 92)
+
+1. **Suggestions**: on the store's search page, typing two letters or more shows up to six matching products under the box, with a photo and the price in the buyer's currency (sales included), or "Sold out". They come from the same search as the results page, so the merchant's search fixes and translations apply (`apps/web/src/app/s/[shop]/search/suggest/route.ts`).
+2. **Keyboard and screen readers**: the box is a combobox. The arrow keys move through the suggestions, Enter opens the picked product, the last row runs the full search, and Escape closes the list (a second Escape clears the box). Without JavaScript it's the plain search form it was.
+3. **Reports stay honest**: suggestions don't count in the store's search report; only searches the buyer actually runs do.

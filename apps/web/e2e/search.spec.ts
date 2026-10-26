@@ -36,7 +36,7 @@ test("buyers search the store, then sort and filter the results", async ({ page 
   await page.goto(store);
   await page.getByRole("link", { name: "Search", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Search" })).toBeVisible();
-  await page.getByRole("searchbox", { name: "Search" }).fill("lamps");
+  await page.getByRole("combobox", { name: "Search" }).fill("lamps");
   await page.getByRole("button", { name: "Search", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Results for “lamps”" })).toBeVisible();
   await expect(page.getByText("1 product", { exact: true })).toBeVisible();
@@ -45,7 +45,7 @@ test("buyers search the store, then sort and filter the results", async ({ page 
   await expect(page.getByRole("link", { name: /Magnetic Phone Stand/ })).toHaveCount(0);
   await shot(page, "111-search-results");
 
-  await page.getByRole("searchbox", { name: "Search" }).fill("teapot");
+  await page.getByRole("combobox", { name: "Search" }).fill("teapot");
   await page.getByRole("button", { name: "Search", exact: true }).click();
   await expect(page.getByText("Nothing matches “teapot”")).toBeVisible();
   await page.getByRole("link", { name: "see everything" }).click();
@@ -67,4 +67,32 @@ test("buyers search the store, then sort and filter the results", async ({ page 
   await page.getByLabel("Highest price").fill("0.50");
   await page.getByRole("button", { name: "Apply" }).click();
   await expect(page.getByText("Nothing matches those filters.")).toBeVisible();
+});
+
+test("the search box suggests products as the buyer types", async ({ page }, info) => {
+  const id = `${info.project.name}-sg-${Date.now()}`;
+  const store = await newMerchantWithProducts(page, id);
+  await page.goto(`${store}/search`);
+  const box = page.getByRole("combobox", { name: "Search" });
+  await box.pressSequentially("proj");
+  const list = page.getByRole("listbox", { name: "Suggestions" });
+  await expect(list.getByRole("option")).toHaveText([/^Sunset Projection Lamp\$\d+\.\d{2}/, "See all results for “proj”"]);
+  await shot(page, "401-search-suggestions");
+
+  // Escape closes them; the arrow keys and Enter open the picked product.
+  await box.press("Escape");
+  await expect(list).toHaveCount(0);
+  await expect(box).toHaveValue("proj");
+  await box.pressSequentially("ection");
+  await expect(list.getByRole("option").first()).toContainText("Sunset Projection Lamp");
+  await box.press("ArrowDown");
+  await expect(list.getByRole("option").first()).toHaveAttribute("aria-selected", "true");
+  await box.press("Enter");
+  await expect(page).toHaveURL(/\/products\/sunset-projection-lamp/);
+
+  // The last row runs the whole search.
+  await page.goto(`${store}/search`);
+  await page.getByRole("combobox", { name: "Search" }).pressSequentially("stand");
+  await page.getByRole("option", { name: "See all results for “stand”" }).click();
+  await expect(page.getByRole("heading", { name: "Results for “stand”" })).toBeVisible();
 });
