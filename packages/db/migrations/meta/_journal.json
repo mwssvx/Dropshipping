@@ -547,6 +547,13 @@
       "when": 1793000573400,
       "tag": "0077_partners",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1793002361456,
+      "tag": "0078_buyer_cancel",
+      "breakpoints": true
     }
   ]
 }

@@ -7,9 +7,10 @@ import { schema, type Address, type OrderEdit } from "@sf/db";
 import { NotFoundError, UserError } from "./errors";
 import { refreshOrderFulfillment, routeOrder, sendOrderEmail, type FulfillmentContext } from "./fulfillment";
 import { addressSchema } from "./orders";
-import { cancelUnshipped } from "./refunds";
+import { cancelUnshipped, refundOrder, type RefundContext } from "./refunds";
 import { assessOrderRisk, shouldHold } from "./risk";
 import { countryName } from "./shipping";
+import { can } from "./team";
 
 /** Buyers can change their order themselves for this long after paying, until it ships. */
 export const BUYER_EDIT_HOURS = 12;
@@ -200,4 +201,69 @@ async function reopen(ctx: FulfillmentContext, fulfillmentIds: string[], orderId
     .where(and(inArray(schema.fulfillments.id, fulfillmentIds), eq(schema.fulfillments.status, "cancelled")));
   await routeOrder(ctx, orderId);
   await refreshOrderFulfillment(ctx.db, orderId, ctx.now?.() ?? new Date());
+}
+
+/** Whether the buyer can cancel this order from its page right now, and until when. */
+export async function buyerCancelOptions(ctx: Pick<FulfillmentContext, "db" | "now">, shopId: string, orderId: string) {
+  const { order, fulfillments } = await load(ctx, shopId, orderId);
+  const shop = await ctx.db.query.shops.findFirst({ where: eq(schema.shops.id, shopId), columns: { buyerCancel: true } });
+  const reason = !shop?.buyerCancel || !order.paymentIntentId || order.totalMinor <= 0 || order.source === "replacement" ? "off" : blocked(order, fulfillments, "buyer", ctx.now?.() ?? new Date());
+  return { canCancel: !reason, until: buyerDeadline(order) };
+}
+
+/**
+ * The buyer cancels their own order before it ships, in the first hours after paying: supplier
+ * orders are stopped, then the whole order is refunded. If a supplier won't stop theirs (it's
+ * already packing), nothing changes and the buyer is told to message the store. The people who
+ * handle orders are emailed either way it ends.
+ */
+export async function cancelOrderByBuyer(ctx: RefundContext & { adminUrl: (path: string) => string }, shopId: string, orderId: string, input: { reason?: string } = {}) {
+  const { db } = ctx;
+  const now = ctx.now?.() ?? new Date();
+  const { canCancel } = await buyerCancelOptions(ctx, shopId, orderId);
+  if (!canCancel) throw new UserError("This order can't be cancelled online any more. Message the store below and they'll see what they can do.", "too_late");
+  const { order } = await load(ctx, shopId, orderId);
+  const why = input.reason?.trim().slice(0, 300) || null;
+  const cancel = await cancelUnshipped(ctx, order.id);
+  if (cancel.notCancelled.length) {
+    await reopen(ctx, cancel.cancelledIds, order.id);
+    throw new UserError("It's already being packed, so it can't be cancelled online. Message the store below and they'll see what they can do.", "too_late");
+  }
+  const edit: OrderEdit = { at: now.toISOString(), by: "buyer", changes: [why ? `Cancelled: ${why}` : "Cancelled"] };
+  await db.update(schema.orders).set({ edits: [...order.edits, edit], updatedAt: now }).where(eq(schema.orders.id, order.id));
+
+  const shop = (await db.query.shops.findFirst({ where: eq(schema.shops.id, shopId) }))!;
+  const tell = async (subject: string, lines: string[]) => {
+    const people = await db
+      .select({ email: schema.users.email, role: schema.shopMembers.role })
+      .from(schema.shopMembers)
+      .innerJoin(schema.users, eq(schema.users.id, schema.shopMembers.userId))
+      .where(eq(schema.shopMembers.shopId, shopId));
+    for (const p of people.filter((x) => can(x.role, "orders"))) {
+      await ctx.mailer.send({ to: p.email, subject, text: ["Hi,", "", ...lines, "", ctx.adminUrl(`/admin/orders/${order.id}`)].join("\n") });
+    }
+  };
+  const said = why ? ` They said: "${why}"` : "";
+  try {
+    const result = await refundOrder(ctx, shopId, order.id, { reason: why ? `Cancelled by the buyer: ${why}` : "Cancelled by the buyer" });
+    await tell(`Order #${order.number} at ${shop.name} was cancelled by the buyer`, [
+      `The buyer cancelled order #${order.number} from its page before it shipped.${said}`,
+      ``,
+      `Supplier orders were stopped and the buyer was refunded in full. There's nothing for you to do.`,
+    ]);
+    return result;
+  } catch (e) {
+    if (!(e instanceof UserError)) throw e;
+    await tell(`Refund needed: order #${order.number} at ${shop.name} was cancelled`, [
+      `The buyer cancelled order #${order.number} before it shipped, and the supplier orders were stopped, but the refund didn't go through: ${e.message}${said}`,
+      ``,
+      `Refund it from the order page:`,
+    ]);
+    throw new UserError("Your order is cancelled, but the refund didn't go through right away. The store has been told and will refund you.", "refund_failed");
+  }
+}
+
+/** Turns buyers cancelling their own orders on or off for a store. */
+export async function setBuyerCancel(db: FulfillmentContext["db"], shopId: string, on: boolean) {
+  await db.update(schema.shops).set({ buyerCancel: on, updatedAt: new Date() }).where(eq(schema.shops.id, shopId));
 }

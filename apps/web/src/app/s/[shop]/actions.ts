@@ -3,9 +3,9 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer } from "@sf/core";
+import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, cancelOrderByBuyer, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
-import { agents, campaigns, db, fulfillment, payments, subscriptions, tax } from "@/lib/server";
+import { agents, campaigns, db, fulfillment, payments, platformUrl, refunds, subscriptions, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
 import { loadShop, storeBase } from "./data";
 import { buyerFx, currencyCookie } from "@/lib/currency";
@@ -434,6 +434,22 @@ export async function editOrderByBuyerAction(handle: string, ref: string, _: Ord
   }
   revalidatePath(`${await storeBase(handle)}/orders/${ref}`);
   return { message: "Saved. We've emailed you the change." };
+}
+
+export type CancelState = { error?: string; done?: boolean };
+
+/** The buyer cancels their order from its page, before it ships, for a full refund. */
+export async function cancelOrderByBuyerAction(handle: string, ref: string, _: CancelState, form: FormData): Promise<CancelState> {
+  const shop = await loadShop(handle);
+  try {
+    const order = await getOrderByPaymentIntent(await db(), shop.id, ref);
+    await cancelOrderByBuyer({ ...(await refunds()), adminUrl: platformUrl }, shop.id, order.id, { reason: String(form.get("reason") ?? "") });
+  } catch (e) {
+    if (e instanceof UserError || e instanceof NotFoundError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath(`${await storeBase(handle)}/orders/${ref}`);
+  return { done: true };
 }
 
 export type ReferState = { sent?: string; error?: string };

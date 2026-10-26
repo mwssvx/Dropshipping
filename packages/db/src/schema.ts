@@ -187,6 +187,8 @@ export const shops = pgTable(
     referralProgram: jsonb("referral_program").$type<ReferralProgram>(),
     // Product pages say "Only 3 left" when an option's real stock is at or below this; 0 turns it off.
     lowStockNote: integer("low_stock_note").notNull().default(5),
+    // Buyers can cancel a paid order from its page in the first hours, until it ships, for a full refund.
+    buyerCancel: boolean("buyer_cancel").notNull().default(true),
     // Ad tracking: Meta, TikTok and Google tags, and which visitors are asked before they load.
     adPixels: jsonb("ad_pixels").$type<AdPixels>(),
     cookieConsent: text("cookie_consent", { enum: ["everyone", "eu_uk"] }).notNull().default("everyone"),
