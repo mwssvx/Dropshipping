@@ -27,6 +27,7 @@ const saleInput = z
     productIds: z.array(z.string().uuid("Pick products from your store.")).max(200, "Pick up to 200 products, or use a collection.").default([]),
     startsAt: z.date({ error: "Pick when the sale starts." }),
     endsAt: z.date().nullish(),
+    countdown: z.boolean().default(false),
   })
   .refine((s) => !s.endsAt || s.endsAt > s.startsAt, { message: "The sale has to end after it starts." })
   .refine((s) => s.scope !== "collection" || !!s.collectionId, { message: "Pick the collection that's on sale." })
@@ -38,6 +39,7 @@ export async function createSale(db: Db, shopId: string, input: SaleInput, now =
   if (!parsed.success) throw new UserError(parsed.error.issues[0]!.message);
   const data = parsed.data;
   if (data.endsAt && data.endsAt <= now) throw new UserError("That end time has already passed.");
+  if (data.countdown && !data.endsAt) throw new UserError("A countdown needs an end time. Pick when the sale ends.");
   const [{ n }] = (await db.select({ n: count() }).from(schema.sales).where(eq(schema.sales.shopId, shopId))) as [{ n: number }];
   if (n >= MAX_SALES) throw new UserError(`A store can keep up to ${MAX_SALES} sales. Delete old ones first.`);
   let productIds: string[] = [];
@@ -66,6 +68,7 @@ export async function createSale(db: Db, shopId: string, input: SaleInput, now =
       // A start in the past means now, so the list reads true.
       startsAt: data.startsAt < now ? now : data.startsAt,
       endsAt: data.endsAt ?? null,
+      countdown: data.countdown,
     })
     .returning();
   return row!;
@@ -112,7 +115,27 @@ export async function listSales(db: Db, shopId: string, now = new Date()) {
     .sort((a, b) => order[a.status] - order[b.status] || (a.status === "ended" ? b.startsAt.getTime() - a.startsAt.getTime() : 0));
 }
 
-export type SaleInfo = { id: string; title: string; percentOff: number; startsAt: Date; endsAt: Date | null };
+export type SaleInfo = { id: string; title: string; percentOff: number; startsAt: Date; endsAt: Date | null; countdown: boolean };
+
+/** How close to the end a countdown shows, so a long sale doesn't tick for weeks. */
+export const COUNTDOWN_WINDOW_MS = 7 * 86_400_000;
+
+/** The end time to count down to on the store, or null when there's nothing to count. */
+export function countdownTo(sale: Pick<SaleInfo, "endsAt" | "countdown"> | null | undefined, now = new Date()) {
+  if (!sale?.countdown || !sale.endsAt) return null;
+  const left = sale.endsAt.getTime() - now.getTime();
+  return left > 0 && left <= COUNTDOWN_WINDOW_MS ? sale.endsAt : null;
+}
+
+/** A running sale on everything that counts down, for the banner across the store (the biggest one). */
+export async function storeWideCountdown(db: Db, shopId: string, now = new Date()) {
+  const running = await db.query.sales.findMany({
+    where: and(eq(schema.sales.shopId, shopId), eq(schema.sales.scope, "all"), eq(schema.sales.countdown, true), lte(schema.sales.startsAt, now), gt(schema.sales.endsAt, now)),
+  });
+  const sale = running.sort((a, b) => b.percentOff - a.percentOff)[0];
+  const endsAt = countdownTo(sale, now);
+  return sale && endsAt ? { title: sale.title, percentOff: sale.percentOff, endsAt } : null;
+}
 
 /** The sale each product is in right now (the biggest, when several overlap). */
 export async function salesFor(db: Db, shopId: string, productIds: string[], now = new Date()): Promise<Map<string, SaleInfo>> {
@@ -135,7 +158,7 @@ export async function salesFor(db: Db, shopId: string, productIds: string[], now
         s.scope === "all" ||
         (s.scope === "products" && s.productIds.includes(id)) ||
         (s.scope === "collection" && !!members.get(s.collectionId!)?.has(id));
-      if (covers && s.percentOff > (result.get(id)?.percentOff ?? 0)) result.set(id, { id: s.id, title: s.title, percentOff: s.percentOff, startsAt: s.startsAt, endsAt: s.endsAt });
+      if (covers && s.percentOff > (result.get(id)?.percentOff ?? 0)) result.set(id, { id: s.id, title: s.title, percentOff: s.percentOff, startsAt: s.startsAt, endsAt: s.endsAt, countdown: s.countdown });
     }
   }
   return result;

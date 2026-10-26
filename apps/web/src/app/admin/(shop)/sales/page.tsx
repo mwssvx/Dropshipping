@@ -37,7 +37,7 @@ export default async function SalesPage() {
               <li key={s.id} className="card p-4 flex flex-wrap items-center gap-3" aria-label={s.title}>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium">{s.title} <span className="hint">· {s.percentOff}% off</span></p>
-                  <p className="hint text-sm">{s.covers} · {s.endsAt ? `${when.format(s.startsAt)} to ${when.format(s.endsAt)}` : `From ${when.format(s.startsAt)}, until you end it`}</p>
+                  <p className="hint text-sm">{s.covers} · {s.endsAt ? `${when.format(s.startsAt)} to ${when.format(s.endsAt)}` : `From ${when.format(s.startsAt)}, until you end it`}{s.countdown ? " · counts down on the store" : ""}</p>
                 </div>
                 <span className={`pill ${STATUS[s.status].pill}`}>{STATUS[s.status].label}</span>
                 {s.status === "running" ? (

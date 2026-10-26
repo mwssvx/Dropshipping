@@ -1,0 +1,1 @@
+ALTER TABLE "sales" ADD COLUMN "countdown" boolean DEFAULT false NOT NULL;

@@ -220,6 +220,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
         products: x.productIds.map((id) => handleOf.get(id)).filter((h): h is string => !!h),
         starts_at: x.startsAt.toISOString(),
         ends_at: iso(x.endsAt),
+        countdown: x.countdown,
       })),
     // Products, collections and pages are matched by handle; the theme has none.
     translations: translationRows.flatMap((t) => {
@@ -426,6 +427,7 @@ const importSchema = z.object({
         products: z.array(handle).max(200),
         starts_at: z.string().datetime({ offset: true }),
         ends_at: z.string().datetime({ offset: true }).nullable(),
+        countdown: z.boolean().optional(),
       }),
     )
     .max(MAX_SALES)
@@ -805,6 +807,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
             productIds: x.products.map((h) => productIds.get(h)!).filter(Boolean),
             startsAt: new Date(x.starts_at),
             endsAt: x.ends_at ? new Date(x.ends_at) : null,
+            countdown: !!x.countdown && !!x.ends_at,
           });
           salesAdded++;
         } catch (e) {

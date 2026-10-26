@@ -1,9 +1,10 @@
 import { readCart } from "@/lib/cart";
 import { Track } from "@/components/Track";
 import { StoreShell } from "@/theme/StoreShell";
-import { activeClosure, LANGUAGES, needsConsent, shopCurrencies, shopLanguages, storePixels } from "@sf/core";
+import { activeClosure, LANGUAGES, needsConsent, shopCurrencies, shopLanguages, storePixels, storeWideCountdown } from "@sf/core";
+import { SaleCountdown } from "@/components/SaleCountdown";
 import { AdPixels } from "@/components/AdPixels";
-import { storeAddress } from "@/lib/server";
+import { db, storeAddress } from "@/lib/server";
 import { buyerCountry, buyerFx } from "@/lib/currency";
 import { setCurrencyAction } from "./actions";
 import { themeLayoutAttrs, themeStyle } from "@/theme/style";
@@ -46,11 +47,17 @@ export default async function StoreLayout({ children, params }: { children: Reac
       </div>
     );
   }
+  // A store-wide sale counting down gets the banner, unless the store is on a break.
+  const sale = closure?.mode === "holiday" ? null : await storeWideCountdown(await db(), shop.id);
   const notice = closure?.mode === "holiday" ? (
     <>
       <p className="font-medium">{t.holidayBanner(closureDate(closure.until, lang))}</p>
       {closure.message && <p className="text-sm whitespace-pre-line">{closure.message}</p>}
     </>
+  ) : sale ? (
+    <p className="font-medium">
+      {t.saleBanner(sale.title, sale.percentOff)} <SaleCountdown endsAt={sale.endsAt.toISOString()} lang={lang ?? "en-US"} text={{ endsIn: t.saleEndsIn, ended: t.saleEnded }} className="num" />
+    </p>
   ) : undefined;
   const count = (await readCart(shop.id)).reduce((s, l) => s + l.quantity, 0);
   const currencies = shopCurrencies(shop);

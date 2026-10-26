@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, formatDeliveryWindow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice } from "@sf/core";
+import { bundlesForProduct, formatDeliveryWindow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, countdownTo } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
+import { SaleCountdown } from "@/components/SaleCountdown";
 import { RecentlyViewed } from "@/components/RecentlyViewed";
 import { RememberView } from "@/components/RememberView";
 import { readRecent, recentCookie } from "@/lib/recent";
@@ -154,6 +155,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
     </span>
   );
   const lang = (await storeLang(shopHandle)) ?? "en-US";
+  const saleEnds = countdownTo(product.sale);
   const dayFormat = new Intl.DateTimeFormat(lang, { month: "short", day: "numeric", timeZone: "UTC" });
   const shipsBy = (d: string) => new Intl.DateTimeFormat(lang, { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
   const jsonLd = JSON.stringify(productJsonLd(product, shop.currency, reviews)).replace(/</g, "\\u003c");
@@ -187,6 +189,8 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
             {t.saleNote(product.sale.percentOff, product.sale.endsAt ? new Intl.DateTimeFormat((await storeLang(shopHandle)) ?? "en-US", { month: "long", day: "numeric", timeZone: "UTC" }).format(product.sale.endsAt) : null)}
           </p>
         )}
+        {/* Outside the status line above, so screen readers aren't read every tick. */}
+        {saleEnds && <SaleCountdown endsAt={saleEnds.toISOString()} lang={lang} text={{ endsIn: t.saleEndsIn, ended: t.saleEnded }} className="text-sm font-medium num" />}
         {v && wholesale && (
           <p className="banner banner-info" role="status">
             {t.wholesalePrice} <strong className="num"><Price minor={percentOff(v.priceMinor, wholesale.percentOff)} currency={shop.currency} fx={fx} /></strong> ({t.percentOff(wholesale.percentOff)})

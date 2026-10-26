@@ -74,6 +74,12 @@ function Fields({ state, action, products, collections }: { state: SaleState; ac
           <input type="hidden" name="endsAt" value={iso(ends)} />
         </div>
       </div>
+      <div className="flex flex-col gap-1">
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" name="countdown" disabled={!ends} aria-describedby="countdown-hint" /> Count down to the end on the store
+        </label>
+        <p id="countdown-hint" className="hint text-sm">In the last 7 days, product pages in the sale show the time left, and a sale on everything gets a banner across the store. It needs an end time, and the clock is the real one: prices go back when it reaches zero.</p>
+      </div>
       <SubmitButton className="btn btn-primary self-start" pendingText="Saving…">Add sale</SubmitButton>
     </form>
   );
