@@ -7,7 +7,7 @@ import { TranslationForm } from "../../../LanguageForms";
 
 export const metadata = { title: "Translation" };
 
-const FIELD_NAMES: Record<string, string> = { title: "Title", description: "Description", body: "Text" };
+const FIELD_NAMES: Record<string, string> = { title: "Title", description: "Description", body: "Text", details: "Details (one per line, label: value)" };
 
 export default async function TranslationPage({ params }: { params: Promise<{ lang: string; kind: string; ref: string }> }) {
   const { lang, kind, ref } = await params;

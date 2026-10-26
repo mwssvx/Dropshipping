@@ -62,6 +62,7 @@ function productJsonLd(product: Awaited<ReturnType<typeof load>>["product"], cur
       priceCurrency: currency,
       availability: `https://schema.org/${x.stock === null || x.stock > 0 ? "InStock" : "OutOfStock"}`,
     })),
+    ...(product.details.length ? { additionalProperty: product.details.map((d) => ({ "@type": "PropertyValue", name: d.label, value: d.value })) } : {}),
     ...(rating.count && rating.average !== null ? { aggregateRating: { "@type": "AggregateRating", ratingValue: rating.average, reviewCount: rating.count } } : {}),
   };
 }
@@ -324,6 +325,21 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           <p className="text-sm">{t.arrivesIn(v.shipDaysMin, v.shipDaysMax)}</p>
         )}
         {product.descriptionHtml && <div className="text-muted whitespace-pre-line leading-relaxed">{product.descriptionHtml}</div>}
+        {product.details.length > 0 && (
+          <section aria-labelledby="product-details-heading" className="flex flex-col gap-2">
+            <h2 id="product-details-heading" className="font-semibold">{t.productDetails}</h2>
+            <table className="w-full text-sm">
+              <tbody>
+                {product.details.map((d, i) => (
+                  <tr key={i} className="border-t border-border">
+                    <th scope="row" className="text-left font-medium py-2 pr-4 align-top w-2/5">{d.label}</th>
+                    <td className="py-2 text-muted">{d.value}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        )}
         <ul className="hint flex flex-col gap-1 border-t border-border pt-4">
           <li>{t.secureCheckout}</li>
           <li>{t.questions}</li>

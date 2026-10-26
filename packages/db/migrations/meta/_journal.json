@@ -568,6 +568,13 @@
       "when": 1793005572545,
       "tag": "0080_sold_out_alerts",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1793007852735,
+      "tag": "0081_product_details",
+      "breakpoints": true
     }
   ]
 }

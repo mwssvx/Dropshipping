@@ -4,6 +4,7 @@ import { schema, TRANSLATABLE, type Db, type TranslatableKind } from "@sf/db";
 import { NotFoundError, UserError } from "./errors";
 import { getPublishedTheme } from "./themes";
 import type { ThemeDoc } from "./theme-doc";
+import { detailsText, parseDetails } from "./product-details";
 
 /*
  * Store languages. A store is written in English; merchants can also show it in the languages of
@@ -97,9 +98,9 @@ async function sources(db: Db, shop: { id: string; name: string }, only?: { kind
     const rows = await db.query.products.findMany({
       where: and(eq(schema.products.shopId, shop.id), ne(schema.products.status, "archived"), only ? eq(schema.products.id, only.refId) : undefined),
       orderBy: asc(schema.products.title),
-      columns: { id: true, title: true, descriptionHtml: true },
+      columns: { id: true, title: true, descriptionHtml: true, details: true },
     });
-    for (const p of rows) out.push({ kind: "product", refId: p.id, label: p.title, fields: { title: p.title, description: p.descriptionHtml } });
+    for (const p of rows) out.push({ kind: "product", refId: p.id, label: p.title, fields: { title: p.title, description: p.descriptionHtml, details: detailsText(p.details) } });
   }
   return out.map((s) => ({ ...s, fields: Object.fromEntries(Object.entries(s.fields).filter(([, v]) => v.trim())) }));
 }
@@ -158,7 +159,7 @@ export async function getTranslation(db: Db, shop: { id: string; name: string; l
   return { kind: k, refId, label: source.label, source: source.fields, fields: row?.fields ?? {}, status: statusOf(source, row), byAi: row?.byAi ?? false };
 }
 
-const LIMITS: Record<string, number> = { title: 200, description: 20_000, body: 50_000 };
+const LIMITS: Record<string, number> = { title: 200, description: 20_000, body: 50_000, details: 6_000 };
 
 /**
  * Save a translation. Fields left empty fall back to the original; a translation with nothing in
@@ -229,14 +230,21 @@ export async function translationsFor(db: Db, shopId: string, language: string |
   return map;
 }
 
-/** Products (or anything with a product id and title) with their titles and descriptions in the buyer's language. */
-export async function localizeProducts<T extends { id: string; title: string; descriptionHtml?: string }>(db: Db, shopId: string, language: string | null, items: T[]): Promise<T[]> {
+/** Products (or anything with a product id and title) with their titles, descriptions and details in the buyer's language. */
+export async function localizeProducts<T extends { id: string; title: string; descriptionHtml?: string; details?: { label: string; value: string }[] }>(db: Db, shopId: string, language: string | null, items: T[]): Promise<T[]> {
   if (!language || !items.length) return items;
   const map = await translationsFor(db, shopId, language, "product", items.map((i) => i.id));
   return items.map((i) => {
     const t = map.get(i.id);
     if (!t) return i;
-    return { ...i, title: t.title || i.title, ...(i.descriptionHtml !== undefined ? { descriptionHtml: t.description || i.descriptionHtml } : {}) };
+    // A translated table that lost every line keeps the original.
+    const details = t.details ? parseDetails(t.details) : [];
+    return {
+      ...i,
+      title: t.title || i.title,
+      ...(i.descriptionHtml !== undefined ? { descriptionHtml: t.description || i.descriptionHtml } : {}),
+      ...(i.details !== undefined && details.length ? { details } : {}),
+    };
   });
 }
 

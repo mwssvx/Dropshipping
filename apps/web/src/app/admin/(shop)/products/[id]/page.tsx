@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts } from "@sf/core";
+import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts, detailsText, MAX_DETAILS } from "@sf/core";
 import { requireShop, storeAddress, suppliers } from "@/lib/server";
 import { duplicateProductAction, updateProductAction } from "../../../actions";
 import { setUpsellAction } from "../../../growth-actions";
@@ -12,6 +12,7 @@ import { PersonalizationForm } from "./PersonalizationForm";
 import { PreorderForm } from "./PreorderForm";
 import { PurchaseLimitForm } from "./PurchaseLimitForm";
 import { VideoForm } from "./VideoForm";
+import { DetailsForm } from "./DetailsForm";
 import { BadgeForm } from "./BadgeForm";
 import { PublishLaterPanel } from "./PublishLaterPanel";
 import { SeoForm } from "./SeoForm";
@@ -136,6 +137,15 @@ export default async function EditProductPage({ params, searchParams }: { params
               <p className="hint">Paste a YouTube or Vimeo link, or the address of a video file (many suppliers have one). It shows after the photos, and the player only loads when a buyer presses play.</p>
             </div>
             <VideoForm productId={product.id} url={product.videoUrl ?? ""} />
+          </section>
+        )}
+        {!product.giftCard && (
+          <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="details-heading">
+            <div>
+              <h2 id="details-heading" className="font-semibold">Details</h2>
+              <p className="hint">Short facts buyers look for, like material, size, weight or what&apos;s in the box. They show as a table under the description, and search engines read them too.</p>
+            </div>
+            <DetailsForm productId={product.id} text={detailsText(product.details)} max={MAX_DETAILS} />
           </section>
         )}
         <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="badge-heading">
