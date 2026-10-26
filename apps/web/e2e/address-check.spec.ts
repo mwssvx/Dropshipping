@@ -32,6 +32,9 @@ test("checkout asks for a real postal code and state, and tidies them", async ({
   await buyer.getByLabel("Postal code").fill("78701 1234");
   await buyer.getByRole("button", { name: "Continue to payment" }).click();
   await expect(buyer.getByText("Enter the state, like TX or Texas.")).toBeVisible();
+  // What was typed and picked stays after an error.
+  await expect(buyer.getByLabel("Country")).toHaveValue("US");
+  await expect(buyer.getByLabel("Postal code")).toHaveValue("78701 1234");
   await buyer.getByLabel("State or region").fill("texas");
   await buyer.getByRole("button", { name: "Continue to payment" }).click();
   await buyer.getByRole("button", { name: /^Pay/ }).click();
