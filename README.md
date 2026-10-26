@@ -603,3 +603,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Answer buyers from the phone**: Today has a "Buyer inbox" button for anyone who can see the inbox. It lists conversations that need the merchant (or all of them), and each one opens with its messages, the order it's about or the contact-page email, and a reply box (`apps/mobile/app/inbox/`, app API `GET inbox`, `GET inbox/:id`, `POST inbox/:id/reply`).
 2. **Same rules as the web**: saved replies come filled in for the conversation, a field it can't fill stays in braces with a warning and the reply is refused until it's replaced, and owners see buyer support's drafted reply to approve or change.
 3. **A push for each waiting question**: a buyer message that buyer support handed to the merchant sends a "Buyer questions that need you" notification that opens the conversation. It can be turned off in the app's notification settings like the others.
+
+### Duplicate a product (after launch, part 82)
+
+1. **Start the next listing from one you have**: the product page has a Duplicate button. The copy is called "Copy of …", gets its own web address and is saved as a draft, so buyers don't see it until the merchant puts it on sale (`duplicateProduct` in `packages/core/src/products.ts`).
+2. **What comes along**: photos and their descriptions, options with prices, SKUs and supplier listings, the backup supplier (matched to the copy's own options), settings like badges, search listing, purchase limits and personalisation, and the collections and size charts the original is in. Reviews, questions and translations stay with the original.
+3. **Stock isn't counted twice**: a product the merchant stocks themselves starts at 0 in the copy, and the page says so. Supplier products keep the supplier's numbers until the next stock check.

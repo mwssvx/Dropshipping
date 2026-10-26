@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX } from "@sf/core";
 import { requireShop, storeAddress, suppliers } from "@/lib/server";
-import { updateProductAction } from "../../../actions";
+import { duplicateProductAction, updateProductAction } from "../../../actions";
 import { setUpsellAction } from "../../../growth-actions";
 import { setProductSupplierAction } from "../../../supplier-actions";
 import { PageHeader } from "../../PageHeader";
@@ -24,9 +24,9 @@ import { WriteListingButton } from "./WriteListingButton";
 const dateIn = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
 const toPrice = (m: number | null | undefined) => (m == null ? "" : (m / 100).toFixed(2));
 
-export default async function EditProductPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string; imported?: string; saved?: string; emailed?: string }> }) {
+export default async function EditProductPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string; imported?: string; saved?: string; emailed?: string; duplicated?: string }> }) {
   const { id } = await params;
-  const { created, imported, saved, emailed } = await searchParams;
+  const { created, imported, saved, emailed, duplicated } = await searchParams;
   const sentCount = Number(emailed) || 0;
   const { shop, db } = await requireShop("products");
   const found = await getProduct(db, shop.id, id).catch((e) => {
@@ -62,9 +62,22 @@ export default async function EditProductPage({ params, searchParams }: { params
   return (
     <main className="pb-12">
       <PageHeader title={product.title} back={<Link href="/admin/products" className="hint hover:text-ink">← Products</Link>}
-        actions={product.status === "active" ? <a className="btn btn-secondary" href={`/s/${shop.handle}/products/${product.handle}`} target="_blank">View on store ↗</a> : undefined} />
+        actions={
+          <>
+            <form action={duplicateProductAction.bind(null, product.id)}>
+              <button className="btn btn-secondary">Duplicate</button>
+            </form>
+            {product.status === "active" && <a className="btn btn-secondary" href={`/s/${shop.handle}/products/${product.handle}`} target="_blank">View on store ↗</a>}
+          </>
+        } />
       <div className="px-4 sm:px-8 flex flex-col gap-4">
         {created && <p role="status" className="banner banner-info">Product added.</p>}
+        {duplicated && (
+          <p role="status" className="banner banner-info">
+            This is a copy, saved as a draft so buyers can't see it yet. Change what's different, then put it on sale. Reviews and questions stay with the original.
+            {!product.supplierId && product.variants.some((v) => v.stock !== null) && " Its stock starts at 0, so enter how many you have."}
+          </p>
+        )}
         {saved && (
           <p role="status" className="banner banner-info">
             Saved.{sentCount > 0 && ` ${sentCount === 1 ? "1 buyer who was" : `${sentCount} buyers who were`} waiting got a back-in-stock email.`}

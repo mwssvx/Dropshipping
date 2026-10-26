@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import {
   addManualTracking,
   createProduct,
+  duplicateProduct,
   createShop,
   importProduct,
   parseMoney,
@@ -137,6 +138,14 @@ export async function updateProductAction(productId: string, _: FormState, form:
   revalidatePath(`/s/${shop.handle}`, "layout");
   // The form remounts with the saved values, so the confirmation rides on the address.
   redirect(`/admin/products/${productId}?saved=1${sent ? `&emailed=${sent}` : ""}`);
+}
+
+export async function duplicateProductAction(productId: string) {
+  const { shop, db, user } = await requireShop("products");
+  const copy = await duplicateProduct(db, shop.id, productId);
+  await logged({ shop, user, db }, `Duplicated a product as “${copy.title}”`, { href: `/admin/products/${copy.id}` });
+  revalidatePath("/admin/products");
+  redirect(`/admin/products/${copy.id}?duplicated=1`);
 }
 
 export async function importProductAction(_: FormState, form: FormData): Promise<FormState> {
