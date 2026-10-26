@@ -15,7 +15,7 @@
     "@sf/db": "workspace:*",
     "@stripe/react-stripe-js": "^3.11.0",
     "@stripe/stripe-js": "^7.10.0",
-    "next": "^16.0.0",
+    "next": "^16.4.1",
     "qrcode": "1.5.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

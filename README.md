@@ -585,3 +585,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Every device listed**: Admin → Your account → Where you're signed in shows each browser and merchant app session with a readable name ("Chrome on Mac", "Merchant app"), when it signed in and when it was last used, this device first (`listSignIns` in `packages/core/src/devices.ts`; `sessions.device`, `sessions.last_seen_at`, saved at most every 5 minutes).
 2. **Sign out from afar**: any other device can be signed out on its own, or all of them at once (`endSignIn`, `endOtherSignIns`). Only the person's own sessions can be ended.
 3. **New-device emails**: signing in on a kind of device the account hasn't used before sends an email with a link to this page (`noteDevice`, `users.known_devices`). The first device on record, at sign-up, sends nothing. Device names are coarse, so this is a hint to look, not proof; two-step sign-in is the real lock.
+
+### Activity (after launch, part 79)
+
+1. **Who did what**: Admin → Activity (owners only) lists what people on the team did, newest first and grouped by day, each linking to what changed: refunds and return decisions, free replacements, orders sent again, released, changed or given tracking, products added, imported, edited and bulk-edited (and undone), discount codes, gift cards, the team (invites, roles, removals, handing over the store), API keys and webhooks, domains, the store's look and status, the plan, payouts and loading a store file (`logActivity` and `listActivity` in `packages/core/src/activity.ts`, table `activity`).
+2. **Filter by person**: once a store has a team, one tap shows a single person's actions. Entries keep the person's email, so they still read right after someone leaves.
+3. Writing an entry never stops the action itself, and entries are deleted after 400 days by the scheduled job (`pruneActivity`).

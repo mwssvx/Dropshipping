@@ -4,6 +4,7 @@ import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { openDb, type Db } from "@sf/db";
 import {
+  logActivity,
   dnsTargetsFromEnv,
   domainHostFromEnv,
   fxFromEnv,
@@ -202,6 +203,22 @@ export async function requireShop(area?: Area) {
   const { shop, role } = await requireMember(database, user.id, pick.id);
   if (area && !can(role, area)) redirect(`/admin?denied=${area}`);
   return { user, shop, role, shops, db: database };
+}
+
+/**
+ * Notes a team member's action in the store's activity log, after it worked. "{order}" in the
+ * summary becomes the order's number when orderId is given. Never fails the action itself.
+ */
+export async function logged(
+  who: { shop: { id: string }; user: { id: string; email: string }; db: Db },
+  summary: string,
+  opts?: { orderId?: string; href?: string },
+) {
+  try {
+    await logActivity(who.db, { shopId: who.shop.id, userId: who.user.id, email: who.user.email }, summary, opts);
+  } catch (e) {
+    console.error("Couldn't write to the activity log", e);
+  }
 }
 
 export async function refunds(): Promise<RefundContext> {

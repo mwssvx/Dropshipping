@@ -21,7 +21,7 @@ import {
   UserError,
   type ProductInput,
 } from "@sf/core";
-import { db, fulfillment, notifyLater, requireShop, requireUser, SHOP_COOKIE, stock, suppliers } from "@/lib/server";
+import { db, fulfillment, logged, notifyLater, requireShop, requireUser, SHOP_COOKIE, stock, suppliers } from "@/lib/server";
 import { readOrderEdit } from "@/lib/order-edit";
 import type { OrderEditState } from "@/components/OrderEditForm";
 
@@ -105,10 +105,12 @@ function readProduct(form: FormData): ProductInput {
 }
 
 export async function createProductAction(_: FormState, form: FormData): Promise<FormState> {
-  const { shop, db } = await requireShop("products");
+  const { shop, db, user } = await requireShop("products");
   let id: string;
   try {
-    id = (await createProduct(db, shop.id, readProduct(form))).id;
+    const input = readProduct(form);
+    id = (await createProduct(db, shop.id, input)).id;
+    await logged({ shop, user, db }, `Added the product “${input.title}”`, { href: `/admin/products/${id}` });
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
     throw e;
@@ -118,9 +120,11 @@ export async function createProductAction(_: FormState, form: FormData): Promise
 }
 
 export async function updateProductAction(productId: string, _: FormState, form: FormData): Promise<FormState> {
-  const { shop, db } = await requireShop("products");
+  const { shop, db, user } = await requireShop("products");
   try {
-    await updateProduct(db, shop.id, productId, readProduct(form));
+    const input = readProduct(form);
+    await updateProduct(db, shop.id, productId, input);
+    await logged({ shop, user, db }, `Edited the product “${input.title}”`, { href: `/admin/products/${productId}` });
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
     throw e;
@@ -136,7 +140,7 @@ export async function updateProductAction(productId: string, _: FormState, form:
 }
 
 export async function importProductAction(_: FormState, form: FormData): Promise<FormState> {
-  const { shop, db } = await requireShop("products");
+  const { shop, db, user } = await requireShop("products");
   let id: string;
   try {
     const prices: Record<string, number> = {};
@@ -156,6 +160,7 @@ export async function importProductAction(_: FormState, form: FormData): Promise
       publish: form.get("publish") === "1",
     });
     id = product.id;
+    await logged({ shop, user, db }, `Imported the product “${product.title}” from a supplier`, { href: `/admin/products/${id}` });
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
     throw e;
@@ -164,10 +169,11 @@ export async function importProductAction(_: FormState, form: FormData): Promise
   redirect(`/admin/products/${id}?imported=1`);
 }
 
-async function orderAction(orderId: string, run: (shopId: string) => Promise<unknown>): Promise<FormState> {
-  const { shop } = await requireShop("orders");
+async function orderAction(orderId: string, run: (shopId: string) => Promise<unknown>, done?: string): Promise<FormState> {
+  const { shop, user, db } = await requireShop("orders");
   try {
     await run(shop.id);
+    if (done) await logged({ shop, user, db }, done, { orderId });
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
     throw e;
@@ -180,7 +186,7 @@ async function orderAction(orderId: string, run: (shopId: string) => Promise<unk
 }
 
 export async function retryOrderAction(orderId: string, _: FormState, _form: FormData): Promise<FormState> {
-  return orderAction(orderId, async (shopId) => retryOrder(await fulfillment(), shopId, orderId));
+  return orderAction(orderId, async (shopId) => retryOrder(await fulfillment(), shopId, orderId), "Sent order {order} to the supplier again");
 }
 
 export type OrderNotesState = { error?: string; saved?: boolean; note?: string; tags?: string };
@@ -203,11 +209,12 @@ export async function orderNotesAction(orderId: string, _: OrderNotesState, form
 
 /** The merchant changes the address or a size before the order ships. */
 export async function editOrderAction(orderId: string, _: OrderEditState, form: FormData): Promise<OrderEditState> {
-  const { shop } = await requireShop("orders");
+  const { shop, user, db } = await requireShop("orders");
   let held = false;
   let resent = false;
   try {
     ({ held, resent } = await editOrder(await fulfillment(), shop.id, orderId, readOrderEdit(form), "merchant"));
+    await logged({ shop, user, db }, "Changed the address or items on order {order}", { orderId });
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
     throw e;
@@ -225,13 +232,14 @@ export async function editOrderAction(orderId: string, _: OrderEditState, form: 
 }
 
 export async function releaseHeldOrderAction(orderId: string, _: FormState, _form: FormData): Promise<FormState> {
-  return orderAction(orderId, async (shopId) => releaseHeldOrder(await fulfillment(), shopId, orderId));
+  return orderAction(orderId, async (shopId) => releaseHeldOrder(await fulfillment(), shopId, orderId), "Released held order {order} to the supplier");
 }
 
 export async function setRiskHoldAction(_: FormState, form: FormData): Promise<FormState> {
-  const { shop, db } = await requireShop("orders");
+  const { shop, db, user } = await requireShop("orders");
   try {
     await setRiskHold(db, shop.id, String(form.get("hold") ?? ""));
+    await logged({ shop, user, db }, "Changed which risky orders are held for review", { href: "/admin/orders" });
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
     throw e;
@@ -247,6 +255,7 @@ export async function addTrackingAction(orderId: string, _: FormState, form: For
       trackingNumber: String(form.get("trackingNumber") ?? ""),
       url: String(form.get("trackingUrl") ?? ""),
     }),
+    "Added tracking to order {order}",
   );
 }
 

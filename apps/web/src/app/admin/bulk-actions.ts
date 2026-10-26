@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { applyBulkEdit, previewBulkEdit, sendPriceDrops, undoBulkEdit, UserError, type BulkEditInput } from "@sf/core";
-import { requireShop, stock } from "@/lib/server";
+import { logged, requireShop, stock } from "@/lib/server";
 
 export type BulkState = {
   key?: string;
@@ -51,6 +51,7 @@ export async function bulkEditAction(_: BulkState, form: FormData): Promise<Bulk
   }
   try {
     const edit = await applyBulkEdit(db, shop, ids, input, { allowBelowCost: form.get("belowCost") === "on", userId: user.id });
+    await logged({ shop, user, db }, `Bulk edit: ${edit.summary}`, { href: "/admin/products" });
     // Buyers who saved a product hear about it when it gets cheaper.
     if (input.kind === "price") await sendPriceDrops(await stock(), { shopId: shop.id });
     revalidatePath("/admin/products");
@@ -64,9 +65,11 @@ export async function bulkEditAction(_: BulkState, form: FormData): Promise<Bulk
 }
 
 export async function undoBulkEditAction(editId: string, _: BulkState): Promise<BulkState> {
-  const { shop, db } = await requireShop("products");
+  const { shop, db, user } = await requireShop("products");
   try {
     const { kept } = await undoBulkEdit(db, shop.id, editId);
+    const edit = await db.query.bulkEdits.findFirst({ where: (b, { and, eq }) => and(eq(b.id, editId), eq(b.shopId, shop.id)), columns: { summary: true } });
+    await logged({ shop, user, db }, `Undid the bulk edit: ${edit?.summary ?? "a change to products"}`, { href: "/admin/products" });
     revalidatePath("/admin/products");
     revalidatePath(`/s/${shop.handle}`, "layout");
     return { done: kept ? `Undone. ${kept === 1 ? "1 change was" : `${kept} changes were`} edited since, so we left ${kept === 1 ? "it" : "them"} alone` : "Undone" };

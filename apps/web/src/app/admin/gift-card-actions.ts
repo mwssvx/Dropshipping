@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { createGiftCardProduct, issueGiftCard, parseMoney, resendGiftCard, setGiftCardDisabled, UserError } from "@sf/core";
-import { campaigns, requireShop } from "@/lib/server";
+import { createGiftCardProduct, formatMoney, issueGiftCard, parseMoney, resendGiftCard, setGiftCardDisabled, UserError } from "@sf/core";
+import { campaigns, logged, requireShop } from "@/lib/server";
 import type { FormState } from "./actions";
 
 function amount(raw: string) {
@@ -36,15 +36,13 @@ export async function sellGiftCardsAction(_: FormState, form: FormData): Promise
 }
 
 export async function issueGiftCardAction(_: FormState, form: FormData): Promise<FormState> {
-  const { shop, user } = await requireShop("gift_cards");
+  const { shop, user, db } = await requireShop("gift_cards");
   return attempt(async () => {
     const raw = String(form.get("amount") ?? "").trim();
-    const { sent } = await issueGiftCard(await campaigns(), shop, {
-      email: String(form.get("email") ?? ""),
-      amountMinor: raw ? amount(raw) : 0,
-      note: String(form.get("note") ?? ""),
-      userId: user.id,
-    });
+    const email = String(form.get("email") ?? "").trim();
+    const amountMinor = raw ? amount(raw) : 0;
+    const { sent } = await issueGiftCard(await campaigns(), shop, { email, amountMinor, note: String(form.get("note") ?? ""), userId: user.id });
+    await logged({ shop, user, db }, `Gave a ${formatMoney(amountMinor, shop.currency)} gift card to ${email}`, { href: "/admin/gift-cards" });
     if (!sent) throw new UserError("The gift card was made but the email didn't go out. Use \"Send a new code\" on it to try again.");
   });
 }
@@ -55,6 +53,10 @@ export async function resendGiftCardAction(id: string, _: FormState, _form: Form
 }
 
 export async function setGiftCardDisabledAction(id: string, disabled: boolean, _: FormState, _form: FormData): Promise<FormState> {
-  const { shop, db } = await requireShop("gift_cards");
-  return attempt(() => setGiftCardDisabled(db, shop.id, id, disabled));
+  const { shop, db, user } = await requireShop("gift_cards");
+  return attempt(async () => {
+    await setGiftCardDisabled(db, shop.id, id, disabled);
+    const card = await db.query.giftCards.findFirst({ where: (g, { and, eq }) => and(eq(g.id, id), eq(g.shopId, shop.id)), columns: { last4: true } });
+    await logged({ shop, user, db }, `${disabled ? "Turned off" : "Turned back on"} the gift card ending ${card?.last4 ?? "…"}`, { href: "/admin/gift-cards" });
+  });
 }
