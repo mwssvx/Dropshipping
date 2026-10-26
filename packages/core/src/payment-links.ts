@@ -27,7 +27,7 @@ export async function createPaymentLink(
     ctx.db,
     ctx.payments,
     shop,
-    { email: input.email, address: input.address, lines, discountCode: input.discountCode || null, shippingRateId: input.shippingRateId || null },
+    { email: input.email, address: input.address, lines, discountCode: input.discountCode || null, shippingRateId: input.shippingRateId || null, taxExemptFor: input.email },
     taxCalculator,
   );
   const [row] = await ctx.db.update(schema.orders).set({ source: "payment_link", note }).where(eq(schema.orders.id, order.id)).returning();

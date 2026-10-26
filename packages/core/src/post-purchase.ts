@@ -80,7 +80,8 @@ export async function postPurchaseOfferFor(db: Db, shop: Shop, order: Order, opt
     const item = quote?.items[0];
     if (!item) continue;
     const offerMinor = percentOff(item.unitPriceMinor, offer.percentOff);
-    const t = await tax.calculate({
+    // A tax-exempt buyer's offer has no tax either, as the order it follows.
+    const t = order.taxExemptId ? { taxMinor: 0, included: shop.pricesIncludeTax } : await tax.calculate({
       currency: shop.currency,
       lines: [{ reference: v.id, amountMinor: offerMinor }],
       shippingMinor: 0,

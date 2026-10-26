@@ -181,6 +181,7 @@ export async function exportCustomerData(db: Db, shop: { id: string; name: strin
       marketing_consent_at: customer.marketingConsentAt?.toISOString() ?? null,
       unsubscribed_at: customer.unsubscribedAt?.toISOString() ?? null,
       wholesale: customer.wholesaleStatus === "none" ? null : { status: customer.wholesaleStatus, company: customer.wholesaleCompany, tax_id: customer.wholesaleTaxId, message: customer.wholesaleMessage },
+      tax_exemption: customer.taxExemptId,
       merchant_note: customer.note,
       tags: customer.tags,
     },

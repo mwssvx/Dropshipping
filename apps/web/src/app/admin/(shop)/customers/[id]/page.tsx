@@ -4,7 +4,7 @@ import { can, creditFor, customerPoints, formatMoney, getCustomerProfile, NotFou
 import { FulfilmentStatus, PaymentStatus } from "@/components/Status";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../../PageHeader";
-import { EraseForm, NotesForm, PersonalCodeForm } from "./CustomerForms";
+import { EraseForm, NotesForm, PersonalCodeForm, TaxExemptionForm } from "./CustomerForms";
 import { AdjustPointsForm } from "../../rewards/RewardsForms";
 
 export const metadata = { title: "Customer" };
@@ -26,6 +26,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const money = (m: number) => formatMoney(m, shop.currency);
   const points = await customerPoints(db, customer.id);
   const marketing = can(role, "marketing");
+  const taxes = can(role, "taxes");
   const codes = marketing ? await personalCodesFor(db, shop.id, customer.email) : [];
   const off = (c: (typeof codes)[number]) => (c.kind === "percent" ? `${c.value}% off` : `${money(c.value)} off`);
 
@@ -134,6 +135,20 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                 </address>
               ))}
             </section>
+          )}
+          {taxes ? (
+            <section className="card p-5 flex flex-col gap-3 text-sm" aria-labelledby="exempt-h">
+              <h2 id="exempt-h" className="font-semibold">Tax exemption</h2>
+              <p className="hint">
+                {customer.taxExemptId
+                  ? "They're charged no tax when signed in to their account. The number is printed on their invoices."
+                  : "For a reseller or charity that doesn't pay tax. Keep a copy of their certificate. They're charged no tax when signed in to their account."}
+                {shop.pricesIncludeTax && " Your prices include tax, so they pay the price shown and the order records no tax."}
+              </p>
+              <TaxExemptionForm id={customer.id} number={customer.taxExemptId} />
+            </section>
+          ) : (
+            customer.taxExemptId && <p className="text-sm"><span className="pill pill-info">Tax exempt</span> <span className="num">{customer.taxExemptId}</span></p>
           )}
           {marketing && (
             <section className="card p-5 flex flex-col gap-3 text-sm" aria-labelledby="code-h">

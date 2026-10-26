@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eraseCustomer, parseMoney, sendPersonalCode, updateCustomerNotes, UserError } from "@sf/core";
+import { eraseCustomer, parseMoney, sendPersonalCode, setTaxExemption, updateCustomerNotes, UserError } from "@sf/core";
 import { campaigns, logged, requireShop } from "@/lib/server";
 
 export type NotesState = { error?: string; saved?: boolean; note?: string; tags?: string };
@@ -60,6 +60,24 @@ export async function sendPersonalCodeAction(id: string, _: CodeState, form: For
     return { sent: code.code };
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+}
+
+export type ExemptionState = { error?: string; saved?: "set" | "removed"; number?: string };
+
+/** Records or removes a customer's tax exemption. Tax settings, so not for staff. */
+export async function taxExemptionAction(id: string, _: ExemptionState, form: FormData): Promise<ExemptionState> {
+  const { shop, db, user } = await requireShop("taxes");
+  const number = form.get("intent") === "remove" ? "" : String(form.get("exemption") ?? "");
+  if (form.get("intent") !== "remove" && !number.trim()) return { error: "Enter their exemption certificate or resale number." };
+  try {
+    const saved = await setTaxExemption(db, shop.id, id, number);
+    await logged({ shop, user, db }, saved.taxExemptId ? `Made ${saved.email} tax exempt (${saved.taxExemptId})` : `Removed the tax exemption for ${saved.email}`, { href: `/admin/customers/${id}` });
+    revalidatePath(`/admin/customers/${id}`);
+    return { saved: saved.taxExemptId ? "set" : "removed", number: saved.taxExemptId ?? "" };
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message, number };
     throw e;
   }
 }

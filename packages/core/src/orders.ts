@@ -8,7 +8,8 @@ import type { PaymentEvent, PaymentProvider } from "./payments";
 import { applyDiscount, automaticOffers, bxgyMissing, describeDiscount, findUsableDiscount, spreadDiscount, type Discount, type OfferUnit } from "./discounts";
 import { applyMoneyEvent } from "./payouts";
 import { estimateProcessingFee, platformFeeFor } from "./plans";
-import { BuiltInTaxCalculator, listTaxRegistrations, type TaxCalculator } from "./tax";
+import { BuiltInTaxCalculator, listTaxRegistrations, type TaxCalculator, type TaxResult } from "./tax";
+import { taxExemptionFor } from "./tax-exempt";
 import { presentQuote } from "./currency";
 import { creditableCampaign } from "./campaigns";
 import { convertAmount, formatMoney, type DisplayFx } from "./money";
@@ -354,6 +355,11 @@ export async function startCheckout(
     subscription?: { id: string; percentOff: number };
     /** The buyer is on the store's checkout page, so the store's phone setting applies. */
     storefront?: boolean;
+    /**
+     * Whose tax exemption applies when nobody is signed in: set only by the merchant's own tools
+     * (a payment link they built), never from a form the buyer fills in.
+     */
+    taxExemptFor?: string | null;
   },
   taxCalculator: TaxCalculator = new BuiltInTaxCalculator(),
 ) {
@@ -402,7 +408,14 @@ export async function startCheckout(
   // Tax is on what the buyer actually pays for each line, after the discount. Gift cards bought
   // here aren't taxed: tax is paid when they're spent.
   const taxed = spreadDiscount(cart.items.map((i) => (i.giftCard ? 0 : i.lineMinor)), cart.discountMinor);
-  const tax = await taxCalculator.calculate({
+  // A tax-exempt buyer pays none, when signed in. Repeat deliveries and after-checkout offers
+  // follow the order they came from. Where prices include tax, they pay the price as shown.
+  const taxExemptId = followUp
+    ? ((await db.query.orders.findFirst({ where: eq(schema.orders.id, followUp.parentOrderId), columns: { taxExemptId: true } }))?.taxExemptId ?? null)
+    : repeat
+      ? await subscriptionExemption(db, repeat.id)
+      : await taxExemptionFor(db, shop.id, input.buyerEmail ?? input.taxExemptFor);
+  const tax: TaxResult = taxExemptId ? { taxMinor: 0, included: shop.pricesIncludeTax, breakdown: [], calculationId: null } : await taxCalculator.calculate({
     currency: cart.currency,
     lines: cart.items.map((i, n) => ({ reference: i.variantId, amountMinor: taxed[n]! })),
     shippingMinor: cart.shippingMinor,
@@ -488,6 +501,7 @@ export async function startCheckout(
         // Only something that ships can be a gift; gift cards are emailed to the buyer.
         gift: gift && cart.items.some((i) => !i.giftCard) ? gift : null,
         buyerNote: parsed.data.note,
+        taxExemptId,
         ...(followUp ? { source: "post_purchase" as const, parentOrderId: followUp.parentOrderId } : {}),
         ...(repeat ? { source: "subscription" as const, subscriptionId: repeat.id } : {}),
         cardSaved: saveCard,
@@ -691,4 +705,14 @@ export async function getOrderByPaymentIntent(db: Db, shopId: string, paymentInt
   });
   if (!order) throw new NotFoundError("Order");
   return getOrder(db, shopId, order.id);
+}
+
+/** The exemption on the order a subscription started from. */
+async function subscriptionExemption(db: Db, subscriptionId: string) {
+  const [row] = await db
+    .select({ taxExemptId: schema.orders.taxExemptId })
+    .from(schema.subscriptions)
+    .innerJoin(schema.orders, eq(schema.orders.id, schema.subscriptions.firstOrderId))
+    .where(eq(schema.subscriptions.id, subscriptionId));
+  return row?.taxExemptId ?? null;
 }

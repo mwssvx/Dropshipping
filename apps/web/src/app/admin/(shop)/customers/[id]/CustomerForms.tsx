@@ -2,7 +2,7 @@
 import { useActionState, useState } from "react";
 import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
-import { customerNotesAction, eraseCustomerAction, sendPersonalCodeAction, type CodeState, type NotesState } from "../../../customer-actions";
+import { customerNotesAction, eraseCustomerAction, sendPersonalCodeAction, taxExemptionAction, type CodeState, type ExemptionState, type NotesState } from "../../../customer-actions";
 
 export function NotesForm({ id, note, tags }: { id: string; note: string; tags: string }) {
   const [state, action] = useActionState(customerNotesAction.bind(null, id), {} as NotesState);
@@ -72,6 +72,26 @@ export function PersonalCodeForm({ id, currency }: { id: string; currency: strin
       </div>
       <SubmitButton className="btn btn-secondary self-start" pendingText="Sending…">Email them a code</SubmitButton>
       <span className="hint">It works once, only with their email.</span>
+    </form>
+  );
+}
+
+/** A buyer who doesn't pay tax: their certificate or resale number, kept on each order. */
+export function TaxExemptionForm({ id, number }: { id: string; number: string | null }) {
+  const [state, action] = useActionState(taxExemptionAction.bind(null, id), {} as ExemptionState);
+  const current = state.saved ? state.number || null : number;
+  return (
+    <form action={action} className="flex flex-col gap-3" key={`${state.saved ?? ""}${current ?? ""}`}>
+      <FormError message={state.error} />
+      {state.saved && <p className="text-success" role="status">{state.saved === "set" ? "They pay no tax from now on." : "They pay tax again."}</p>}
+      <div className="field">
+        <label className="label" htmlFor="exemption">Exemption certificate or resale number</label>
+        <input className="input" id="exemption" name="exemption" defaultValue={state.error ? state.number : (current ?? "")} maxLength={60} autoComplete="off" />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <SubmitButton className="btn btn-secondary">{current ? "Save number" : "Make tax exempt"}</SubmitButton>
+        {current && <button className="btn btn-secondary text-critical" name="intent" value="remove">Remove exemption</button>}
+      </div>
     </form>
   );
 }

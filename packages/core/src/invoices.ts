@@ -190,6 +190,8 @@ export async function invoiceDocument(db: Db, shopId: string, documentId: string
     shipping: { label: order.shippingMethod ? `Shipping (${order.shippingMethod})` : "Shipping", amountMinor: due.shippingMinor },
     tax: order.taxBreakdown.map((t, i) => ({ label: t.label, ratePct: t.rateBps / 100, amountMinor: taxParts[i]! })),
     taxIncluded: order.taxIncluded,
+    /** The buyer's exemption number when no tax was charged because they're exempt. */
+    taxExemptId: order.taxExemptId,
     totalMinor: due.totalMinor,
     giftCardMinor: due.giftCardMinor,
     paidMinor: due.chargedMinor,

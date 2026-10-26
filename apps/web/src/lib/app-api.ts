@@ -213,6 +213,7 @@ const routes: Record<string, Handler> = {
       discountCode: o.discountCode,
       bundleTitle: o.bundleTitle,
       taxMinor: o.taxMinor,
+      taxExemptId: o.taxExemptId,
       buyerNote: o.buyerNote,
       staffNote: o.staffNote,
       tags: o.tags,

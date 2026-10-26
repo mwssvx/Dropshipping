@@ -1,6 +1,6 @@
 import { PixelEvent } from "@/components/PixelEvent";
 import { redirect } from "next/navigation";
-import { addonOffer, convertPrice, countryName, formatMoney, lastCheckoutDetails, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, onHoliday, storePixels, UserError } from "@sf/core";
+import { addonOffer, convertPrice, countryName, formatMoney, lastCheckoutDetails, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, onHoliday, storePixels, taxExemptionFor, UserError } from "@sf/core";
 import { buyerFx } from "@/lib/currency";
 import { currentBuyer } from "@/lib/buyer";
 import { readCart, readDiscountCode, readGiftCardCode } from "@/lib/cart";
@@ -35,6 +35,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
   if (quote.items.some((i) => i.limit)) redirect(`${base}/cart`);
   const fx = await buyerFx(shop);
   const t = await storeT(handle);
+  const exempt = buyer ? await taxExemptionFor(await db(), shop.id, buyer.email) : null;
   const variants = await (await db()).query.variants.findMany({ where: (v, { inArray }) => inArray(v.id, quote.items.map((i) => i.variantId)) });
   const titles = await lineTitles(handle, quote.items, variants);
   const shown = presentQuote({ ...quote, taxMinor: 0 }, fx);
@@ -83,8 +84,8 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
           notAvailable: t.notAvailable, tax: t.tax, giftCheckbox: t.giftCheckbox, giftFrom: t.giftFrom, giftMessage: t.giftMessage,
           giftRecipientEmail: t.giftRecipientEmail, giftNote: t.giftNote, orderNote: t.orderNote,
         }}
-        taxLabel={quote.pricesIncludeTax ? t.taxIncluded : t.taxNextStep}
-        totalLabel={quote.pricesIncludeTax ? t.total : t.totalBeforeTax}
+        taxLabel={exempt ? t.taxExempt : quote.pricesIncludeTax ? t.taxIncluded : t.taxNextStep}
+        totalLabel={exempt || quote.pricesIncludeTax ? t.total : t.totalBeforeTax}
         totalWithoutShipping={money(withoutShipping.totalMinor)}
         summary={
           <>

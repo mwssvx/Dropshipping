@@ -717,3 +717,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **For the courier**: checkout can ask for a phone number, optional by default. On the Shipping page, under "Phone number at checkout", a store picks optional, required or don't ask. Numbers are checked ("Include the area code, like +1 512 555 0100") and never used for marketing.
 2. **Passed on**: the number goes to the supplier with the order (CJ's `shippingPhone`, AliExpress's `mobile_no`, and your own suppliers' order page), so carriers that need one can deliver.
 3. **Where the merchant needs it**: the order page shows it as a call link, the phone app has a Call button, and changing an order's address keeps or updates it. Store export and import keep the setting.
+
+### Tax-exempt buyers (after launch, part 101)
+
+1. **For resellers and charities**: on a customer's page, under "Tax exemption", the merchant enters their exemption certificate or resale number. Only roles that can change tax settings see it (`setTaxExemption` in `packages/core/src/tax-exempt.ts`).
+2. **Signed in, no tax**: that buyer pays no tax when they check out signed in to their store account. Typing their email as a guest isn't enough. After-checkout offers and repeat deliveries follow the order they came from, and a payment link the merchant builds for them is exempt too. Where prices include tax, they pay the price shown and the order records no tax.
+3. **For the records**: the number is kept on each order, shown on the order page, the buyer's pay page and the invoice, and included in the customer's data download.

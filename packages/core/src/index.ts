@@ -46,6 +46,7 @@ export * from "./team";
 export * from "./buyers";
 export * from "./customers";
 export * from "./tag-rules";
+export * from "./tax-exempt";
 export * from "./address-check";
 export * from "./stock";
 export * from "./gallery";
