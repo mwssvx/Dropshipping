@@ -14,7 +14,7 @@ type Attention = { kind: string; title: string; body: string; url: string; tone:
 type Today = { currency: string; salesTodayMinor: number | null; ordersToday: number; sales7dMinor: number | null; orders7d: number; attention: Attention[]; pending: Proposal[] };
 
 // Things the app doesn't do itself open the web admin.
-const WEB_ONLY: Record<string, string> = { "/notices": "/admin/trust", "/inbox": "/admin/inbox" };
+const WEB_ONLY: Record<string, string> = { "/notices": "/admin/trust" };
 
 export default function TodayScreen() {
   const { me } = useSession();
@@ -84,6 +84,7 @@ export default function TodayScreen() {
               )}
             </Section>
           )}
+          {can("inbox") && <Button label="Buyer inbox" kind="secondary" onPress={() => router.push("/inbox")} />}
           <Button label="Import a product" kind="secondary" onPress={() => router.push("/import")} />
         </>
       )}

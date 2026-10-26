@@ -597,3 +597,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Answers kept once**: Inbox → Saved replies holds up to 30 short answers the merchant gives often, each with a name. A new store can add three starters (where is my order, how long shipping takes, returns) and change them (`packages/core/src/saved-replies.ts`, table `saved_replies`). They travel in the store file.
 2. **Filled in per conversation**: in a conversation, "Start from" puts a saved reply in the reply box with `{first_name}`, `{order_number}`, `{tracking_link}` and `{store_name}` filled from the buyer, their order and its tracking. The merchant can still change the words before sending.
 3. **Nothing half-filled goes out**: a field the conversation can't fill (no order, or no tracking yet) stays in braces with a warning, and the reply is refused until it's replaced, both for typed replies and edited drafts.
+
+### Buyer inbox in the app (after launch, part 81)
+
+1. **Answer buyers from the phone**: Today has a "Buyer inbox" button for anyone who can see the inbox. It lists conversations that need the merchant (or all of them), and each one opens with its messages, the order it's about or the contact-page email, and a reply box (`apps/mobile/app/inbox/`, app API `GET inbox`, `GET inbox/:id`, `POST inbox/:id/reply`).
+2. **Same rules as the web**: saved replies come filled in for the conversation, a field it can't fill stays in braces with a warning and the reply is refused until it's replaced, and owners see buyer support's drafted reply to approve or change.
+3. **A push for each waiting question**: a buyer message that buyer support handed to the merchant sends a "Buyer questions that need you" notification that opens the conversation. It can be turned off in the app's notification settings like the others.

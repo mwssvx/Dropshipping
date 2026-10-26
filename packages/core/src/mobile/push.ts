@@ -1,5 +1,5 @@
 // Push notifications for the merchant app. Events are found by looking at what changed (new paid
-// orders, problem orders, payout holds, agent proposals, staff replies) rather than hooked into each
+// orders, problem orders, payout holds, agent proposals, staff replies, buyer questions) rather than hooked into each
 // place that changes them, and each event notifies each person once (push_messages unique key), so
 // running the sweep often, or from several places at once, is safe.
 import { and, eq, gte, inArray, isNotNull, ne, or } from "drizzle-orm";
@@ -82,6 +82,7 @@ export const PUSH_LABELS: Record<PushKind, string> = {
   margin_alert: "Margin alerts",
   agent_proposal: "Changes waiting for your OK",
   escalation_reply: "Replies from our support team",
+  buyer_message: "Buyer questions that need you",
 };
 /** Who gets each kind: staff, for example, don't hear about payouts or AI proposals. */
 const PUSH_AREA: Record<PushKind, Area> = {
@@ -92,6 +93,7 @@ const PUSH_AREA: Record<PushKind, Area> = {
   margin_alert: "assistant",
   agent_proposal: "assistant",
   escalation_reply: "assistant",
+  buyer_message: "inbox",
 };
 
 /** Not a kind of its own: turning this off makes new-order notifications silent. */
@@ -140,7 +142,7 @@ const clip = (s: string, n = 140) => (s.length > n ? `${s.slice(0, n - 1)}…` :
 
 /** What happened in a store since `since`, as notifications. `url` is a path inside the app. */
 export async function collectPushEvents(db: Db, shopId: string, since: Date): Promise<PushEvent[]> {
-  const [shop, orders, failed, holds, actions, staff, disputes] = await Promise.all([
+  const [shop, orders, failed, holds, actions, staff, disputes, asks] = await Promise.all([
     db.query.shops.findFirst({ where: eq(schema.shops.id, shopId) }),
     db.query.orders.findMany({
       where: and(eq(schema.orders.shopId, shopId), inArray(schema.orders.paymentStatus, ["paid", "partially_refunded"]), gte(schema.orders.paidAt, since)),
@@ -185,6 +187,21 @@ export async function collectPushEvents(db: Db, shopId: string, since: Date): Pr
       .leftJoin(schema.orders, eq(schema.orders.id, schema.disputes.orderId))
       .where(and(eq(schema.disputes.shopId, shopId), gte(schema.disputes.createdAt, since)))
       .limit(50),
+    // Buyer messages buyer support handed over (or couldn't take); ones it answered stay quiet.
+    db
+      .select({ m: schema.messages, c: schema.conversations })
+      .from(schema.messages)
+      .innerJoin(schema.conversations, eq(schema.conversations.id, schema.messages.conversationId))
+      .where(
+        and(
+          eq(schema.conversations.shopId, shopId),
+          eq(schema.conversations.kind, "buyer"),
+          eq(schema.conversations.status, "needs_merchant"),
+          eq(schema.messages.author, "buyer"),
+          gte(schema.messages.createdAt, since),
+        ),
+      )
+      .limit(50),
   ]);
   if (!shop) return [];
   const events: PushEvent[] = [];
@@ -215,6 +232,9 @@ export async function collectPushEvents(db: Db, shopId: string, since: Date): Pr
       url: d.orderId ? `/orders/${d.orderId}` : "/money",
       at: d.createdAt,
     });
+  }
+  for (const { m, c } of asks) {
+    events.push({ kind: "buyer_message", ref: m.id, title: c.subject.startsWith("Order #") ? `Question about order ${c.subject.slice(6)}` : c.subject, body: clip(m.body), url: `/inbox/${c.id}`, at: m.createdAt });
   }
   for (const { m } of staff) {
     events.push({ kind: "escalation_reply", ref: m.id, title: "Our support team replied", body: clip(m.body), url: "/assistant", at: m.createdAt });
