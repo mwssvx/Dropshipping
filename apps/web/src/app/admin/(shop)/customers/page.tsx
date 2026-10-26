@@ -48,6 +48,13 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             ))}
           </nav>
         )}
+        {customers.length > 0 && (
+          <p className="text-sm">
+            <a className="underline" href={`/admin/customers/export.csv${filtered ? `?${new URLSearchParams({ ...(q ? { q } : {}), ...(tag ? { tag } : {}) })}` : ""}`} download>
+              Download {filtered ? "these customers" : "all customers"} as a spreadsheet
+            </a>
+          </p>
+        )}
         {customers.length === 0 ? (
           <div className="card p-6 hint">{q ? `No customers match "${q}".` : tag ? `Nobody is tagged "${tag}".` : "Customers show up here after their first checkout."}</div>
         ) : (

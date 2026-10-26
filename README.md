@@ -657,3 +657,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Told once**: after the daily stock check, when every option of a product on sale has run out at its supplier (and at its backup supplier, if it has one), the people who look after products get one email listing it, with a link to the product (`notifySoldOut` in `packages/core/src/supplier-sold-out.ts`). They're told again only if it comes back and runs out again. Products taking pre-orders still sell, so they're left out, and so are products added by hand.
 2. **Where it shows**: Home and the phone app's Today screen list it under what needs attention, and so does the Monday summary. The Products page has a "Sold out at the supplier" list that says which ones have a backup supplier that's out too.
 3. **What to do**: add a backup supplier so orders go there instead, or take the product off sale. The store sells it again by itself when the supplier restocks.
+
+### Customers as a spreadsheet (after launch, part 91)
+
+1. **One click**: the Customers page has "Download all customers as a spreadsheet", or "these customers" when a search or tag is on, and the file follows it (`customersCsv` in `packages/core/src/customer-export.ts`). It's for a mailing tool, an accountant or the merchant's own records, and up to 20,000 customers go in one file.
+2. **What's in it**: email, name, the city and country of their latest order, orders, first and last order dates, whether they're subscribed to emails, whether they've signed in, tags and when they became a customer. The amount spent is only there for people who can see the store's money.
+3. **Safe to open**: cells a spreadsheet would run as a formula (a name starting with "=", for example) are defused, like every other download.
