@@ -1,4 +1,4 @@
-import { publishDueProducts, pruneActivity, sendWeeklySummaries, pruneAuthRecords, pruneBuyerRecords, pruneStockAlerts, sendPriceDrops, sendStockAlerts, syncSupplierStock, pruneInvites, pruneEvents, refreshAllVerified, runWebhooks, routeStuckOrders, sendCampaignBatches, runFakePayouts, notifyNewDisputes, runDueSubscriptions, sendWinbackEmails, notifyCostChanges, notifyLatePreorders, runHealthChecks, runScheduledAgents, sendAbandonedCartEmails, sendAllNotifications, sendReferralRewards, syncTracking } from "@sf/core";
+import { publishDueProducts, sendReviewRequests, pruneActivity, sendWeeklySummaries, pruneAuthRecords, pruneBuyerRecords, pruneStockAlerts, sendPriceDrops, sendStockAlerts, syncSupplierStock, pruneInvites, pruneEvents, refreshAllVerified, runWebhooks, routeStuckOrders, sendCampaignBatches, runFakePayouts, notifyNewDisputes, runDueSubscriptions, sendWinbackEmails, notifyCostChanges, notifyLatePreorders, runHealthChecks, runScheduledAgents, sendAbandonedCartEmails, sendAllNotifications, sendReferralRewards, syncTracking } from "@sf/core";
 import { agents, campaigns, adminNotices, fulfillment, pushSender, stock, subscriptions, testPayments, webhooks } from "@/lib/server";
 
 /**
@@ -7,7 +7,7 @@ import { agents, campaigns, adminNotices, fulfillment, pushSender, stock, subscr
  * buyers whose saved items got cheaper hear about it). Pre-orders back in stock are placed. Buyers whose referred friend's order
  * arrived get their store credit, and subscription deliveries that are due are placed and charged.
  * Also checks store health and the verified badge, and in test mode stands in for the payment
- * processor's daily payouts. Buyers who left a checkout get one reminder, email campaigns go out in batches, and on Mondays store owners get last week's summary. Then the AI agents look at problem orders and thin margins, and last
+ * processor's daily payouts. Buyers who left a checkout get one reminder, buyers whose order arrived a few days ago are asked for a review, email campaigns go out in batches, and on Mondays store owners get last week's summary. Then the AI agents look at problem orders and thin margins, and last
  * phones get push notifications and webhooks go out for anything new. Old visitor events are pruned.
  * Called by the scheduler with "Authorization: Bearer $CRON_SECRET". Open in development.
  */
@@ -39,6 +39,8 @@ export async function GET(request: Request) {
   const health = await runHealthChecks(ctx.db);
   const verified = await refreshAllVerified(ctx.db);
   const reminders = await sendAbandonedCartEmails(ctx);
+  // A few days after an order arrives, the buyer is asked how it was.
+  const reviewRequests = await sendReviewRequests(ctx);
   const campaignEmails = await sendCampaignBatches(await campaigns());
   // Win-back codes for subscribers who haven't ordered in a while.
   const winback = await sendWinbackEmails(await campaigns());
@@ -53,5 +55,5 @@ export async function GET(request: Request) {
   await pruneBuyerRecords(ctx.db);
   await pruneStockAlerts(ctx.db);
   await pruneActivity(ctx.db);
-  return Response.json({ published, routed, tracking, referrals, stock: stockSync, priceRises, preorders, subscriptions: repeats, restocked, priceDrops, payouts, disputes, health, verified, reminders, campaigns: campaignEmails, winback, summaries, ai, push, webhooks: hooks, pruned });
+  return Response.json({ published, routed, tracking, referrals, stock: stockSync, priceRises, preorders, subscriptions: repeats, restocked, priceDrops, payouts, disputes, health, verified, reminders, reviewRequests, campaigns: campaignEmails, winback, summaries, ai, push, webhooks: hooks, pruned });
 }

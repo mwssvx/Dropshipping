@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { createDiscount, moderateReview, parseMoney, sendAbandonedCartEmails, setDiscountActive, setGrowthSettings, setPostPurchaseOffer, setReferralProgram, setSubscriptionOffer, setUpsell, setWelcomeOffer, setWinbackOffer, UserError } from "@sf/core";
+import { createDiscount, moderateReview, parseMoney, sendAbandonedCartEmails, setDiscountActive, setGrowthSettings, setPostPurchaseOffer, setReferralProgram, setReviewRequestDays, setSubscriptionOffer, setUpsell, setWelcomeOffer, setWinbackOffer, UserError } from "@sf/core";
 import { fulfillment, logged, requireShop, testPayments } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -159,6 +159,24 @@ export async function setReviewsAutoPublishAction(form: FormData) {
   const { shop, db } = await requireShop("reviews");
   await setGrowthSettings(db, shop.id, { reviewsAutoPublish: form.get("reviewsAutoPublish") === "on" });
   revalidatePath("/admin/reviews");
+}
+
+export type ReviewRequestState = { error?: string; saved?: number };
+
+/** How many days after delivery buyers are asked for a review; 0 turns it off. */
+export async function setReviewRequestDaysAction(_: ReviewRequestState, form: FormData): Promise<ReviewRequestState> {
+  const { shop, db, user } = await requireShop("reviews");
+  const on = form.get("enabled") === "on";
+  const days = on ? Number.parseInt(String(form.get("days") ?? ""), 10) : 0;
+  try {
+    await setReviewRequestDays(db, shop.id, Number.isNaN(days) ? -1 : days);
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  await logged({ shop, user, db }, days ? `Set review requests to go out ${days} ${days === 1 ? "day" : "days"} after delivery` : "Turned off review requests", { href: "/admin/reviews" });
+  revalidatePath("/admin/reviews");
+  return { saved: days };
 }
 
 export async function moderateReviewAction(id: string, status: "published" | "hidden") {

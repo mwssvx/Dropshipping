@@ -639,3 +639,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Cancel from the order page**: in the first 12 hours after paying, before it ships, a buyer can open "Cancel this order" on their order page, say why if they like, and cancel. Supplier orders are stopped first, then the whole order is refunded and the buyer gets the refund email (`cancelOrderByBuyer` in `packages/core/src/order-edits.ts`).
 2. **Never half done**: if a supplier won't stop its order (it's already packing), nothing changes and the buyer is told to message the store. If the refund itself fails, the buyer is told the store will refund them, and the team gets a "Refund needed" email with a link to the order.
 3. **The team hears about it**: everyone who handles orders gets an email saying the buyer cancelled and why. Owners and admins can turn it off under "Buyer cancellations" on the Orders page (`shops.buyer_cancel`, on by default).
+
+### Review requests (after launch, part 88)
+
+1. **Asked once it has arrived**: a few days after an order is delivered (7 by default), the daily job emails the buyer "How was …?" with the items they haven't reviewed yet and a link to the review form on their order page (`sendReviewRequests` in `packages/core/src/review-requests.ts`, columns `shops.review_request_days` and `orders.review_requested_at`).
+2. **Only where it fits**: once per order, never for gifts (the buyer didn't receive it), free replacements, refunded orders, orders already reviewed, or buyers who unsubscribed from the store's emails. Each email has a one-click unsubscribe. Orders that arrived more than 30 days before they'd be due are never asked, so turning it on doesn't email old buyers.
+3. **Merchant control**: the Reviews page sets the wait (1 to 30 days) or turns it off, and shows how many requests went out in the last 30 days and how many of those orders got a review.

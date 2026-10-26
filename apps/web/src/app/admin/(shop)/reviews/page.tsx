@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { listReviews, reviewPhotoUrl } from "@sf/core";
+import { listReviews, reviewPhotoUrl, reviewRequestStats } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { moderateReviewAction, removeReviewPhotoAction, setReviewsAutoPublishAction } from "../../growth-actions";
 import { PageHeader } from "../PageHeader";
 import { ReplyForm } from "./ReplyForm";
+import { ReviewRequestForm } from "./ReviewRequestForm";
 
 export const metadata = { title: "Reviews" };
 
@@ -17,14 +18,14 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
   const { shop, db } = await requireShop("reviews");
   const { show } = await searchParams;
   const status = TABS.find((t) => t.key === show)?.key ?? "pending";
-  const rows = await listReviews(db, shop.id, { status });
+  const [rows, requests] = await Promise.all([listReviews(db, shop.id, { status }), reviewRequestStats(db, shop.id)]);
 
   return (
     <main className="pb-12">
       <PageHeader title="Reviews" />
       <div className="px-4 sm:px-8 flex flex-col gap-4 max-w-3xl">
         <p className="hint">
-          Only buyers whose order has shipped can review, so every review is from a real customer. The delivery email asks them for one.
+          Only buyers whose order has shipped can review, so every review is from a real customer. The shipping email asks them for one, and a review request follows once it has arrived.
         </p>
         <form action={setReviewsAutoPublishAction} className="card p-4 flex flex-wrap items-center gap-3 text-sm">
           <label className="flex items-center gap-2 flex-1 min-w-60">
@@ -34,6 +35,15 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
           </label>
           <button className="btn btn-secondary">Save</button>
         </form>
+        <section className="card p-4 flex flex-col gap-2" aria-labelledby="requests-heading">
+          <h2 id="requests-heading" className="font-semibold">Review requests</h2>
+          <ReviewRequestForm days={shop.reviewRequestDays} />
+          {requests.sent > 0 && (
+            <p className="hint text-sm">
+              Last 30 days: {requests.sent} sent, and {requests.reviewed} of those orders got a review.
+            </p>
+          )}
+        </section>
         <nav className="flex gap-1 border-b border-border" aria-label="Review status">
           {TABS.map((t) => (
             <Link key={t.key} href={`/admin/reviews?show=${t.key}`} aria-current={t.key === status ? "page" : undefined}
