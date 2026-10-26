@@ -115,6 +115,11 @@ export function supplierPortalUrl(token: string) {
   return `${ROOT_DOMAIN.startsWith("localhost") ? "http" : "https"}://${ROOT_DOMAIN}/supplier/${token}`;
 }
 
+/** A partner's private page with their code and what they've earned. On the platform's address, not a store's. */
+export function partnerPortalUrl(token: string) {
+  return `${ROOT_DOMAIN.startsWith("localhost") ? "http" : "https"}://${ROOT_DOMAIN}/partner/${token}`;
+}
+
 /** The address buyers should see: the store's main custom domain once one is connected. */
 export async function storeAddress(shop: { id: string; handle: string }) {
   const domain = await primaryDomain(await db(), shop.id);

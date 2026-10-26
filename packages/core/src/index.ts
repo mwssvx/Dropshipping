@@ -93,3 +93,4 @@ export * from "./badges";
 export * from "./shopify-import";
 export * from "./publish-later";
 export * from "./weekly-summary";
+export * from "./partners";

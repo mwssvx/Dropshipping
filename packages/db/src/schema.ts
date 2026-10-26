@@ -1024,8 +1024,8 @@ export const discounts = pgTable(
     endsAt: timestamp("ends_at", { withTimezone: true }),
     active: boolean("active").notNull().default(true),
     // Welcome and referral codes are made one per person, only work for that email, and stay off
-    // the codes list.
-    source: text("source", { enum: ["merchant", "welcome", "referral", "winback"] }).notNull().default("merchant"),
+    // the codes list. Partner codes are listed on the Partners page instead.
+    source: text("source", { enum: ["merchant", "welcome", "referral", "winback", "partner"] }).notNull().default("merchant"),
     email: text("email"),
     createdAt: createdAt(),
   },
@@ -1838,4 +1838,48 @@ export const costChanges = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("cost_changes_shop_idx").on(t.shopId, t.status, t.createdAt), index("cost_changes_variant_idx").on(t.variantId, t.status)],
+);
+
+/**
+ * Partners: people who promote the store (a creator, a blogger, a friend with a following) with
+ * their own discount code. Orders paid with the code earn them a share of the goods, and the
+ * merchant records what they've paid them. Each partner sees their own numbers through a private
+ * link (portal_token), with no buyer details.
+ */
+export const partners = pgTable(
+  "partners",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    email: text("email"),
+    discountId: uuid("discount_id").notNull().references(() => discounts.id, { onDelete: "restrict" }),
+    // Their share of goods paid for with the code, after the discount and less refunds, in basis points (1000 = 10%).
+    commissionBps: integer("commission_bps").notNull(),
+    portalToken: text("portal_token")
+      .notNull()
+      .unique()
+      .default(sql`replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '')`),
+    active: boolean("active").notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("partners_discount_uq").on(t.discountId),
+    index("partners_shop_idx").on(t.shopId),
+    check("partners_commission_ok", sql`${t.commissionBps} >= 0 and ${t.commissionBps} <= 5000`),
+  ],
+);
+
+// What the merchant paid a partner, recorded by hand (the money moves outside the store).
+export const partnerPayouts = pgTable(
+  "partner_payouts",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    partnerId: uuid("partner_id").notNull().references(() => partners.id, { onDelete: "cascade" }),
+    amountMinor: money("amount_minor").notNull(),
+    note: text("note"),
+    paidAt: timestamp("paid_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("partner_payouts_partner_idx").on(t.partnerId), check("partner_payouts_amount_ok", sql`${t.amountMinor} > 0`)],
 );
