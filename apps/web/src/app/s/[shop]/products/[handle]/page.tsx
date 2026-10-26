@@ -420,7 +420,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           <ul className="grid gap-4 sm:grid-cols-2">
             {reviews.reviews.map((r) => (
               <li key={r.id} id={`review-${r.id}`} className="card p-4 flex flex-col gap-2 scroll-mt-20">
-                <div className="flex items-center gap-2"><Stars value={r.rating} label={t.stars(r.rating)} /><span className="font-medium text-sm">{r.name}</span></div>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1"><Stars value={r.rating} label={t.stars(r.rating)} /><span className="font-medium text-sm">{r.name}</span>{r.orderId && <span className="hint text-xs">{t.verifiedBuyer}</span>}</div>
                 <p className="text-sm whitespace-pre-line">{r.body}</p>
                 {r.photoIds.length > 0 && (
                   <div className="flex gap-2">

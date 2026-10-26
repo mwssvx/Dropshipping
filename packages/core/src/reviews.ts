@@ -87,7 +87,8 @@ export async function listReviews(db: Db, shopId: string, filter: { status?: "pe
     .select({ review: schema.reviews, productTitle: schema.products.title, orderNumber: schema.orders.number })
     .from(schema.reviews)
     .innerJoin(schema.products, eq(schema.products.id, schema.reviews.productId))
-    .innerJoin(schema.orders, eq(schema.orders.id, schema.reviews.orderId))
+    // Reviews brought over from another platform have no order.
+    .leftJoin(schema.orders, eq(schema.orders.id, schema.reviews.orderId))
     .where(and(eq(schema.reviews.shopId, shopId), filter.status ? eq(schema.reviews.status, filter.status) : undefined))
     .orderBy(desc(schema.reviews.createdAt))
     .limit(200);

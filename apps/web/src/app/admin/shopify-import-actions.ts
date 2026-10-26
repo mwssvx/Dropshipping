@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { importShopifyCustomers, importShopifyProducts, UserError } from "@sf/core";
+import { importReviews, importShopifyCustomers, importShopifyProducts, UserError } from "@sf/core";
 import { requireShop } from "@/lib/server";
 
 export type ShopifyImportState = { error?: string; created?: number; skipped?: string[]; problems?: string[] };
@@ -34,6 +34,25 @@ export async function shopifyCustomersAction(_: ShopifyCustomersState, form: For
     const result = await importShopifyCustomers(db, shop.id, await file.text());
     revalidatePath("/admin/customers");
     return result;
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+}
+
+export type ReviewsImportState = { error?: string; result?: Awaited<ReturnType<typeof importReviews>> };
+
+/** Adds the reviews in a review app's export to the matching products. */
+export async function reviewsImportAction(_: ReviewsImportState, form: FormData): Promise<ReviewsImportState> {
+  const { shop, db } = await requireShop("reviews");
+  const file = form.get("file");
+  if (!(file instanceof File) || !file.size) return { error: "Choose the reviews file you exported." };
+  if (file.size > 10 * 1024 * 1024) return { error: "That file is over 10 MB. Export fewer reviews at a time." };
+  try {
+    const result = await importReviews(db, shop.id, await file.text());
+    revalidatePath("/admin/reviews");
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { result };
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
     throw e;

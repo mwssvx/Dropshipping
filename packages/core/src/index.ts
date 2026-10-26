@@ -91,6 +91,7 @@ export * from "./store-closure";
 export * from "./video";
 export * from "./product-details";
 export * from "./code-batches";
+export * from "./review-import";
 export * from "./contact";
 export * from "./badges";
 export * from "./shopify-import";

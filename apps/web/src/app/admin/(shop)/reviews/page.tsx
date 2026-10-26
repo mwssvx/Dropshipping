@@ -26,6 +26,7 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
       <div className="px-4 sm:px-8 flex flex-col gap-4 max-w-3xl">
         <p className="hint">
           Only buyers whose order has shipped can review, so every review is from a real customer. The shipping email asks them for one, and a review request follows once it has arrived.
+          {" "}Moving from Shopify? <Link href="/admin/products/move#reviews-heading" className="underline">Bring your reviews over</Link>.
         </p>
         <form action={setReviewsAutoPublishAction} className="card p-4 flex flex-wrap items-center gap-3 text-sm">
           <label className="flex items-center gap-2 flex-1 min-w-60">
@@ -61,7 +62,7 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                   <span className="text-warning" role="img" aria-label={`${r.rating} out of 5 stars`}>{"★".repeat(r.rating)}<span className="text-border">{"★".repeat(5 - r.rating)}</span></span>
                   <span className="font-medium">{r.name}</span>
-                  <span className="hint">on {productTitle} · order #{orderNumber} · {r.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                  <span className="hint">on {productTitle} · {orderNumber != null ? `order #${orderNumber}` : `from ${r.importedFrom ?? "another platform"}`} · {r.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
                 </div>
                 <p className="text-sm whitespace-pre-line">{r.body}</p>
                 {r.photoIds.length > 0 && (
