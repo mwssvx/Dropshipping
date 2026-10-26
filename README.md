@@ -699,3 +699,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Rules on the Customers page**: "Customers who spent at least $200 get the tag vip", or placed at least N orders, bought a certain product, or haven't ordered in N days. Each rule shows how many customers have its tag and links to them (`packages/core/src/tag-rules.ts`).
 2. **Kept in step**: a buyer is tagged the moment their order is paid, existing customers are tagged when the rule is added, and the scheduled job takes tags off after refunds or brings in customers who just lapsed. Removing a rule takes its tag off again.
 3. **Your own tags stay yours**: rules only take off tags they added (`customers.auto_tags`), never ones typed on a customer's page; the customer page says which tags came from a rule. Use the tags in the list filter and for email campaign audiences. Store export and import keep the rules.
+
+### Address check at checkout (after launch, part 98)
+
+1. **Fixed before paying, not after the parcel comes back**: checkout checks the postal code against the shape each country uses (US, Canada, UK, Ireland, every EU country, and the other countries stores ship to most) and asks for a US state or Canadian province, with an example: "Check the postal code. In the United Kingdom it looks like SW1A 1AA." (`packages/core/src/address-check.ts`).
+2. **Tidied for the supplier**: "sw1a1aa" becomes "SW1A 1AA", "1012ab" becomes "1012 AB", "Texas" becomes "TX", so labels print the way carriers expect.
+3. **Everywhere an address is entered**: checkout, payment links, and changing an order's address (by the buyer or the merchant) all use the same check. Countries without a known shape are taken as typed.

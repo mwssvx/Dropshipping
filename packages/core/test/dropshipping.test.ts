@@ -226,7 +226,7 @@ describe("order routing and tracking", () => {
 
   it("flags a country the supplier can't ship to, and won't retry another store's order", async () => {
     const s = await shop();
-    const order = await paidOrder(s, STAND, { ...address, country: "JP" });
+    const order = await paidOrder(s, STAND, { ...address, country: "JP", postalCode: "100-0001" });
     await routeOrder(ctx, order.id);
     expect((await getOrder(db, s.id, order.id)).fulfillments[0]).toMatchObject({ problemCode: "address_unsupported" });
 
