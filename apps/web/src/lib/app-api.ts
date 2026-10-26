@@ -56,6 +56,11 @@ import {
   type Role,
   type Shop,
   describePersonalization,
+  getConversation,
+  listInbox,
+  listPendingActions,
+  merchantReply,
+  savedRepliesFor,
 } from "@sf/core";
 import type { Db } from "@sf/db";
 import { BRAND } from "./brand";
@@ -321,6 +326,46 @@ const routes: Record<string, Handler> = {
     return { ok: true, message: "Sent. We'll tell you when it's checked." };
   },
 
+  "GET inbox": async ({ url, db, shop }) => {
+    const show = url.searchParams.get("show") === "all" ? "all" : "needs_you";
+    const rows = await listInbox(db, shop.id, show);
+    return {
+      conversations: rows.map((c) => ({
+        id: c.id,
+        subject: c.subject,
+        status: c.status,
+        drafts: c.drafts,
+        last: c.last ? { author: c.last.author, body: c.last.body.slice(0, 200) } : null,
+        updatedAt: c.updatedAt,
+      })),
+    };
+  },
+  "GET inbox/:id": async ({ params, db, shop }) => {
+    const { conversation: c, messages, order } = await getConversation(db, shop.id, params.id!);
+    const ids = new Set(messages.map((m) => m.id));
+    const [pending, saved] = await Promise.all([
+      listPendingActions(db, shop.id).then((r) => r.filter((a) => ids.has(String(a.input.message_id)))),
+      c.email ? savedRepliesFor(db, shop.id, c.id) : [],
+    ]);
+    return {
+      id: c.id,
+      subject: c.subject,
+      status: c.status,
+      statusReason: c.statusReason,
+      email: c.email,
+      order: order ? { id: order.id, number: order.number, name: order.shippingAddress.name } : null,
+      messages: messages.filter((m) => m.status === "sent").map((m) => ({ id: m.id, author: m.author, body: m.body, createdAt: m.createdAt })),
+      // A reply the assistant drafted, waiting for the merchant's OK.
+      pending,
+      saved,
+    };
+  },
+  "POST inbox/:id/reply": async ({ req, params, shop }) => {
+    const r = await merchantReply(await fulfillment(), shop.id, params.id!, str((await body(req)).message));
+    notifyLater(shop.id);
+    return { ok: true, status: r.status, message: r.status === "failed" ? "Saved, but the email didn't go out. Try again in a minute." : "Sent by email." };
+  },
+
   "GET assistant": async ({ db, shop }) => {
     const [messages, budget] = await Promise.all([assistantMessages(db, shop.id, 40), aiBudget(db, shop)]);
     return {
@@ -354,6 +399,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("products") || path.startsWith("imports")) return "products";
   if (path.startsWith("money")) return "money";
   if (path.startsWith("assistant") || path.startsWith("actions")) return "assistant";
+  if (path.startsWith("inbox")) return "inbox";
   if (path === "today") return "home";
   return null;
 }

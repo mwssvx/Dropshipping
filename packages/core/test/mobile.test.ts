@@ -13,6 +13,8 @@ import {
   getMedia,
   sendAllNotifications,
   sendShopNotifications,
+  sendContactMessage,
+  merchantReply,
   setPushSettings,
   staffReply,
   askAssistant,
@@ -84,6 +86,20 @@ describe("push notifications", () => {
     expect(titles.some((t) => t.startsWith("New order"))).toBe(false);
     const off = await f.db.query.pushMessages.findMany({ where: eq(schema.pushMessages.status, "off") });
     expect(off.map((m) => m.kind)).toEqual(["new_order"]);
+  });
+
+  it("tells the merchant about buyer questions that wait for them, and not ones already answered", async () => {
+    const f = await setup();
+    await registerDevice(f.db, f.owner.id, { token: TOKEN, platform: "ios" }, new Date(Date.now() - 3_600_000));
+    const shop = await f.shop();
+    const first = await sendContactMessage(f.db, shop, { name: "Grace Hopper", email: "grace@example.com", message: "Do you ship to Canada?" });
+    const second = await sendContactMessage(f.db, shop, { name: "Alan Turing", email: "alan@example.com", message: "Can I change my size?" });
+    await merchantReply(f.ctx, shop.id, second!.conversationId, "Yes, reply with the size you'd like.");
+    await sendShopNotifications(f.pctx, shop.id);
+    const asks = f.push.sent.filter((m) => m.url?.startsWith("/inbox/"));
+    expect(asks).toHaveLength(1);
+    expect(asks[0]).toMatchObject({ title: "Message from Grace Hopper", body: "Do you ship to Canada?", url: `/inbox/${first!.conversationId}` });
+    expect((await todaySummary(f.db, shop)).attention.find((a) => a.kind === "inbox")).toMatchObject({ body: "Open the inbox to answer them.", url: "/inbox" });
   });
 
   it("forgets phones the push service says are gone", async () => {

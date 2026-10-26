@@ -47,7 +47,7 @@ export async function todaySummary(db: Db, shop: Shop, now = new Date(), role: R
   if (held) attention.push({ kind: "risk", tone: "warning", title: `${held} ${held === 1 ? "order" : "orders"} on hold`, body: held === 1 ? "It looked risky, so it waits for you before going to the supplier." : "They looked risky, so they wait for you before going to the supplier.", url: "/orders?show=held" });
   const toSend = open.length - problems - held;
   if (toSend) attention.push({ kind: "to_send", tone: "info", title: `${toSend} ${toSend === 1 ? "order" : "orders"} on the way to the supplier`, body: "These are sent automatically.", url: "/orders?show=to_send" });
-  if (inbox) attention.push({ kind: "inbox", tone: "warning", title: `${inbox} buyer ${inbox === 1 ? "question needs" : "questions need"} you`, body: "Open the inbox on the web admin to answer.", url: "/inbox" });
+  if (inbox) attention.push({ kind: "inbox", tone: "warning", title: `${inbox} buyer ${inbox === 1 ? "question needs" : "questions need"} you`, body: "Open the inbox to answer them.", url: "/inbox" });
 
   // Staff see order counts and order problems, not sales totals, payouts or AI proposals.
   const seesMoney = can(role, "money");

@@ -184,3 +184,47 @@ test("money, holds, the assistant, and approvals made offline", async ({ page, b
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page.getByRole("heading", { name: /Sign in to/ })).toBeVisible();
 });
+
+test("a buyer's question: answered from the app with a saved reply", async ({ page, browser }) => {
+  const id = `i${Date.now()}`;
+  const { web, email } = await merchant(browser, id);
+  await web.goto(`${WEB}/admin/inbox/replies`);
+  await web.getByRole("button", { name: "Add starter replies" }).click();
+  await expect(web.getByRole("region", { name: "Returns" })).toBeVisible();
+
+  const buyer = await (await browser.newContext()).newPage();
+  await buyer.goto(`${WEB}/s/pocket-shop-${id}/contact`);
+  await buyer.getByLabel("Your name").fill("Grace Hopper");
+  await buyer.getByLabel("Email").fill(`grace-${id}@example.com`);
+  await buyer.getByLabel("Message").fill("Do your lamps work with UK plugs?");
+  await buyer.getByRole("button", { name: "Send message" }).click();
+  await expect(buyer.getByText("Thanks, your message is on its way.")).toBeVisible();
+
+  await signIn(page, email);
+  await expect(page.getByText("1 buyer question needs you")).toBeVisible();
+  await page.getByRole("button", { name: "Buyer inbox" }).click();
+  await expect(page.getByRole("heading", { name: "Inbox", level: 1 })).toBeVisible();
+  await page.getByText("Message from Grace Hopper").click();
+  await expect(page.getByText("Do your lamps work with UK plugs?", { exact: true })).toBeVisible();
+  await shot(page, "393-app-conversation");
+
+  // A saved reply that needs an order number can't go out as it is.
+  const box = page.getByRole("textbox", { name: "Your reply" });
+  await page.getByRole("button", { name: "How long shipping takes" }).click();
+  await expect(box).toHaveValue(/^Hi Grace,\n\nOrders usually leave us/);
+  await expect(page.getByText(/Replace \{order_number\} before sending/)).toBeVisible();
+  await page.getByRole("button", { name: "Send reply" }).click();
+  await expect(page.getByText(/Replace \{order_number\} in the reply first/)).toBeVisible();
+
+  await box.fill("Hi Grace, yes: every lamp comes with a UK plug.");
+  await page.getByRole("button", { name: "Send reply" }).click();
+  await expect(page.getByText("Sent by email.")).toBeVisible();
+  await expect(box).toHaveValue("");
+  await expect(page.getByText("Hi Grace, yes: every lamp comes with a UK plug.", { exact: true })).toBeVisible();
+
+  // Answered, so it leaves "Needs you".
+  await page.getByRole("link", { name: /Inbox/ }).first().click();
+  await expect(page.getByText("All caught up")).toBeVisible();
+  await page.getByRole("tab", { name: "All" }).click();
+  await expect(page.getByLabel("Message from Grace Hopper").filter({ visible: true })).toContainText("Answered");
+});

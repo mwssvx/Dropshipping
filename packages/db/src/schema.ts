@@ -955,7 +955,7 @@ export const pushDevices = pgTable(
   (t) => [index("push_devices_user_idx").on(t.userId)],
 );
 
-export const PUSH_KINDS = ["new_order", "problem_order", "payout_hold", "dispute", "margin_alert", "agent_proposal", "escalation_reply"] as const;
+export const PUSH_KINDS = ["new_order", "problem_order", "payout_hold", "dispute", "margin_alert", "agent_proposal", "escalation_reply", "buyer_message"] as const;
 export type PushKind = (typeof PUSH_KINDS)[number];
 
 // Every push we decided to send, one row per person per event, so an event never notifies twice.
