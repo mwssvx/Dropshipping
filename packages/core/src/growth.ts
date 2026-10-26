@@ -1,5 +1,6 @@
 // Small growth tools: abandoned checkout reminders, "goes well with" and "often bought together"
 // suggestions, and their settings.
+import { randomBytes } from "node:crypto";
 import { and, desc, eq, gt, gte, inArray, lte, ne, notInArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { schema, type Db } from "@sf/db";
@@ -54,7 +55,87 @@ export async function sendAbandonedCartEmails(ctx: FulfillmentContext, now = new
     if (recent) continue;
     if ((await sendOrderEmail(ctx, order.id, "abandoned_cart")).status === "sent") sent++;
   }
-  return { sent };
+  return { sent, offers: await sendAbandonedCartOffers(ctx, now) };
+}
+
+// The second reminder: a day after the first, for checkouts up to four days old.
+const OFFER_AFTER = 24 * HOUR;
+const OFFER_WINDOW = 96 * HOUR;
+const OFFER_LASTS = 48 * HOUR;
+// No 0/O or 1/I, so codes can be read out and typed from a phone.
+const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const reminderCode = () => `BACK-${[...randomBytes(6)].map((b) => ALPHABET[b % ALPHABET.length]).join("")}`;
+
+/** Turns the second reminder on with a percentage off, or off with null. */
+export async function setAbandonedCartOffer(db: Db, shopId: string, percentOff: number | null) {
+  if (percentOff !== null && (!Number.isInteger(percentOff) || percentOff < 5 || percentOff > 50)) {
+    throw new UserError("Pick between 5% and 50% off.");
+  }
+  await db.update(schema.shops).set({ abandonedCartOffer: percentOff === null ? null : { percentOff }, updatedAt: new Date() }).where(eq(schema.shops.id, shopId));
+}
+
+/**
+ * A second reminder with a one-time code, a day after the first, for stores that turned it on.
+ * The code works once, only with the buyer's email, for 48 hours. Skipped when the buyer paid for
+ * any order since, and sent once per buyer per four days, so starting a checkout and leaving it
+ * isn't a way to farm codes.
+ */
+async function sendAbandonedCartOffers(ctx: FulfillmentContext, now: Date) {
+  const { db } = ctx;
+  const first = alias(schema.emails, "first");
+  const candidates = await db
+    .select({ order: schema.orders, offer: schema.shops.abandonedCartOffer })
+    .from(schema.orders)
+    .innerJoin(schema.shops, eq(schema.shops.id, schema.orders.shopId))
+    .innerJoin(first, and(eq(first.orderId, schema.orders.id), eq(first.kind, "abandoned_cart"), lte(first.createdAt, new Date(now.getTime() - OFFER_AFTER))))
+    .where(
+      and(
+        eq(schema.orders.paymentStatus, "pending"),
+        eq(schema.orders.source, "checkout"),
+        gte(schema.orders.createdAt, new Date(now.getTime() - OFFER_WINDOW)),
+        sql`${schema.shops.abandonedCartOffer} is not null`,
+        eq(schema.shops.abandonedCartEmails, true),
+        eq(schema.shops.status, "active"),
+        sql`not exists (select 1 from ${schema.emails} e where e.order_id = ${schema.orders.id} and e.kind = 'abandoned_cart_offer')`,
+      ),
+    )
+    .limit(500);
+  let sent = 0;
+  for (const { order, offer } of candidates) {
+    const [paidSince] = await db
+      .select({ id: schema.orders.id })
+      .from(schema.orders)
+      .where(and(eq(schema.orders.shopId, order.shopId), eq(schema.orders.email, order.email), notInArray(schema.orders.paymentStatus, ["pending", "failed"]), gte(schema.orders.createdAt, order.createdAt)))
+      .limit(1);
+    if (paidSince) continue;
+    const [recent] = await db
+      .select({ id: schema.emails.id })
+      .from(schema.emails)
+      .where(and(eq(schema.emails.shopId, order.shopId), eq(schema.emails.kind, "abandoned_cart_offer"), eq(schema.emails.to, order.email), gte(schema.emails.createdAt, new Date(now.getTime() - OFFER_WINDOW))))
+      .limit(1);
+    if (recent) continue;
+    let code: typeof schema.discounts.$inferSelect | undefined;
+    for (let i = 0; i < 5 && !code; i++) {
+      [code] = await db
+        .insert(schema.discounts)
+        .values({
+          shopId: order.shopId,
+          code: reminderCode(),
+          kind: "percent",
+          value: offer!.percentOff,
+          usageLimit: 1,
+          oncePerCustomer: true,
+          endsAt: new Date(now.getTime() + OFFER_LASTS),
+          source: "reminder",
+          email: order.email.toLowerCase(),
+        })
+        .onConflictDoNothing()
+        .returning();
+    }
+    if (!code) continue;
+    if ((await sendOrderEmail(ctx, order.id, "abandoned_cart_offer", code.code)).status === "sent") sent++;
+  }
+  return sent;
 }
 
 /** Reminders sent since a date, and how many of those checkouts were then paid. */
@@ -65,7 +146,21 @@ export async function abandonedCartStats(db: Db, shopId: string, since: Date) {
     .innerJoin(schema.orders, eq(schema.orders.id, schema.emails.orderId))
     .where(and(eq(schema.emails.shopId, shopId), eq(schema.emails.kind, "abandoned_cart"), gte(schema.emails.createdAt, since)));
   const recovered = rows.filter((r) => ["paid", "partially_refunded", "refunded"].includes(r.paid));
-  return { sent: rows.length, recovered: recovered.length, recoveredMinor: recovered.reduce((s, r) => s + r.total, 0) };
+  // A second reminder's code is used on a new checkout, so those are counted by the code.
+  const [offers] = await db
+    .select({ sent: sql<number>`count(*)`.mapWith(Number) })
+    .from(schema.emails)
+    .where(and(eq(schema.emails.shopId, shopId), eq(schema.emails.kind, "abandoned_cart_offer"), gte(schema.emails.createdAt, since)));
+  const won = await db
+    .select({ total: schema.orders.totalMinor })
+    .from(schema.orders)
+    .innerJoin(schema.discounts, eq(schema.discounts.id, schema.orders.discountId))
+    .where(and(eq(schema.orders.shopId, shopId), eq(schema.discounts.source, "reminder"), inArray(schema.orders.paymentStatus, ["paid", "partially_refunded", "refunded"]), gte(schema.orders.createdAt, since)));
+  return {
+    sent: rows.length + offers!.sent,
+    recovered: recovered.length + won.length,
+    recoveredMinor: recovered.reduce((s, r) => s + r.total, 0) + won.reduce((s, r) => s + r.total, 0),
+  };
 }
 
 export async function setUpsell(db: Db, shopId: string, productId: string, upsellProductId: string | null) {

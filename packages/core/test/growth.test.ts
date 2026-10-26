@@ -5,6 +5,7 @@ import {
   abandonedCartStats,
   createDiscount,
   DemoModel,
+  exportStore,
   handlePaymentEvent,
   listDiscounts,
   moderateReview,
@@ -12,6 +13,7 @@ import {
   quoteCart,
   reviewableItems,
   sendAbandonedCartEmails,
+  setAbandonedCartOffer,
   setGrowthSettings,
   setUpsell,
   spreadDiscount,
@@ -125,6 +127,54 @@ describe("abandoned checkout reminders", () => {
     await f.checkout({ email: "grace@example.com" });
     await setGrowthSettings(f.db, (await f.shop()).id, { abandonedCartEmails: false });
     expect((await sendAbandonedCartEmails(f.ctx, new Date(Date.now() + 2 * HOUR))).sent).toBe(0);
+  });
+});
+
+describe("second checkout reminder with a code", () => {
+  it("sends a one-time code for that buyer a day after the first reminder, once", async () => {
+    const f = await setup();
+    const shop = await f.shop();
+    await expect(setAbandonedCartOffer(f.db, shop.id, 70)).rejects.toThrow("between 5% and 50%");
+    await setAbandonedCartOffer(f.db, shop.id, 10);
+    const { order } = await f.checkout();
+    const ctx = { ...f.ctx, payUrl: (_: unknown, o: { id: string }) => `https://store.example/pay/${o.id}` };
+    expect(await sendAbandonedCartEmails(ctx, new Date(Date.now() + 2 * HOUR))).toEqual({ sent: 1, offers: 0 });
+    // Not before a day has passed since the first one.
+    expect((await sendAbandonedCartEmails(ctx, new Date(Date.now() + 12 * HOUR))).offers).toBe(0);
+    expect((await sendAbandonedCartEmails(ctx, new Date(Date.now() + 26 * HOUR))).offers).toBe(1);
+    expect((await sendAbandonedCartEmails(ctx, new Date(Date.now() + 30 * HOUR))).offers).toBe(0);
+
+    const mail = f.mailer.sent.at(-1)!;
+    expect(mail.subject).toBe("10% off what you left at Glow Lamps");
+    const code = mail.text.match(/BACK-[A-Z2-9]{6}/)![0];
+    expect(mail.text).toContain(`https://store.example/pay/${order.id}/cart?code=${code}`);
+    expect(mail.text).toContain("Sunset Projection Lamp – Small × 1");
+
+    // Only for that buyer's email, and once.
+    await expect(f.checkout({ email: "grace@example.com", code })).rejects.toThrow();
+    const { order: back } = await f.checkout({ code });
+    expect(Math.abs(back.discountMinor - back.subtotalMinor * 0.1)).toBeLessThanOrEqual(1);
+    await f.pay(back);
+    await expect(f.checkout({ code })).rejects.toThrow();
+    // It stays off the codes list, and the reminder stats count the sale.
+    expect((await listDiscounts(f.db, shop.id)).some((d) => d.code === code)).toBe(false);
+    expect(await abandonedCartStats(f.db, shop.id, new Date(Date.now() - DAY))).toMatchObject({ sent: 2, recovered: 1, recoveredMinor: back.totalMinor });
+  });
+
+  it("isn't sent when the store has it off, or the buyer paid in the meantime", async () => {
+    const f = await setup();
+    const shop = await f.shop();
+    await f.checkout();
+    expect((await sendAbandonedCartEmails(f.ctx, new Date(Date.now() + 2 * HOUR))).sent).toBe(1);
+    expect((await sendAbandonedCartEmails(f.ctx, new Date(Date.now() + 26 * HOUR))).offers).toBe(0);
+
+    await setAbandonedCartOffer(f.db, shop.id, 15);
+    await f.pay((await f.checkout()).order);
+    expect((await sendAbandonedCartEmails(f.ctx, new Date(Date.now() + 26 * HOUR))).offers).toBe(0);
+    // The setting travels in the store file.
+    expect((await exportStore(f.db, shop.id)).store.abandoned_cart_offer).toEqual({ percent_off: 15 });
+    await setAbandonedCartOffer(f.db, shop.id, null);
+    expect((await f.shop()).abandonedCartOffer).toBeNull();
   });
 });
 

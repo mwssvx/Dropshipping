@@ -705,3 +705,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Fixed before paying, not after the parcel comes back**: checkout checks the postal code against the shape each country uses (US, Canada, UK, Ireland, every EU country, and the other countries stores ship to most) and asks for a US state or Canadian province, with an example: "Check the postal code. In the United Kingdom it looks like SW1A 1AA." (`packages/core/src/address-check.ts`).
 2. **Tidied for the supplier**: "sw1a1aa" becomes "SW1A 1AA", "1012ab" becomes "1012 AB", "Texas" becomes "TX", so labels print the way carriers expect.
 3. **Everywhere an address is entered**: checkout, payment links, and changing an order's address (by the buyer or the merchant) all use the same check. Countries without a known shape are taken as typed.
+
+### Second checkout reminder with a code (after launch, part 99)
+
+1. **One more nudge, with a reason to come back**: on the Marketing page, under Checkout reminders, "Send a second reminder a day later, with a code" (5% to 50% off). A day after the first reminder, a buyer who still hasn't paid gets a code that works once, only with their email, for 48 hours (`sendAbandonedCartOffers` in `packages/core/src/growth.ts`).
+2. **Their cart, on any device**: the email's link (`<store>/pay/<order>/cart?code=…`) puts what's still for sale from that checkout back in the cart with the code added, so it works when the email is opened on a phone.
+3. **No code farming, honest counts**: one second reminder per buyer every four days, none if they paid for anything since, and it's the last email about that cart. The reminder stats count sales made with these codes as won back. Store export and import keep the setting.
