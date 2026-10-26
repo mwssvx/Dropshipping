@@ -47,7 +47,7 @@ export type SubscriptionContext = FulfillmentContext & {
 };
 
 const offerInput = z.object({
-  percentOff: z.number({ invalid_type_error: "Enter the percent off." }).int("Use a whole number.").min(0, "The discount can't be negative.").max(30, "Keep it to 30% off or less."),
+  percentOff: z.number({ error: "Enter the percent off." }).int("Use a whole number.").min(0, "The discount can't be negative.").max(30, "Keep it to 30% off or less."),
   active: z.boolean(),
 });
 
