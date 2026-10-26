@@ -25,7 +25,7 @@ describe("buy X get Y", () => {
     const f = await makeFixture(new DemoModel());
     const shop = await f.shop();
     const [lamp] = await f.variants(f.products.lamp.id);
-    await expect(createDiscount(f.db, shop.id, { code: "AUTO10", kind: "percent", value: 10, automatic: true })).rejects.toThrow("Only buy X get Y");
+    await expect(createDiscount(f.db, shop.id, { code: "AUTO10", kind: "percent", value: 10, automatic: true })).rejects.toThrow("Set a minimum order");
     await expect(createDiscount(f.db, shop.id, { code: "B0G1", kind: "bxgy", value: 100, buyQty: 0, getQty: 1 })).rejects.toThrow("how many they buy");
     await createDiscount(f.db, shop.id, { code: "BUY2GET1", kind: "bxgy", value: 100, buyQty: 2, getQty: 1, automatic: true });
 

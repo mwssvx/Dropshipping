@@ -133,7 +133,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const fewest = limit?.min ?? 1;
   const most = Math.min(99, limit?.max ?? 99, limit?.perCustomer ?? 99);
   const limitNote = limit ? [limit.min != null ? t.noteMin(limit.min) : null, limit.max != null ? t.noteMax(limit.max) : null, limit.perCustomer != null ? t.noteCustomer(limit.perCustomer) : null].filter(Boolean).join(" · ") : "";
-  // Buy X get Y offers that apply on their own; wholesale buyers have their own prices.
+  // Offers that apply on their own (buy X get Y, money off over an amount); wholesale buyers have their own prices.
   const offers = wholesale ? [] : await productOffers(await db(), shop, product.id);
   // Wholesale buyers have their own prices, so bundles aren't offered to them.
   const bundles = wholesale ? [] : await bundlesForProduct(await db(), shop.id, product.id);
