@@ -18,7 +18,7 @@ export const POST_PURCHASE_MINUTES = 15;
 
 const offerInput = z.object({
   productId: z.string().uuid("Pick a product to offer.").nullable(),
-  percentOff: z.number({ invalid_type_error: "Enter the percent off." }).int("Use a whole number.").min(0, "The discount can't be negative.").max(50, "Keep it to 50% off or less."),
+  percentOff: z.number({ error: "Enter the percent off." }).int("Use a whole number.").min(0, "The discount can't be negative.").max(50, "Keep it to 50% off or less."),
   active: z.boolean(),
 });
 

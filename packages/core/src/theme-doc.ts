@@ -115,12 +115,9 @@ export const SECTION_LABELS: Record<SectionType, { name: string; about: string }
 };
 
 const sectionId = z.string().regex(/^[a-z0-9]{4,24}$/, "Section ids are short lowercase codes.");
-const section = z.discriminatedUnion(
-  "type",
-  SECTION_TYPES.map((type) =>
-    z.object({ id: sectionId, type: z.literal(type), hidden: z.boolean().default(false), settings: sectionSchemas[type] }),
-  ) as unknown as [z.ZodDiscriminatedUnionOption<"type">, ...z.ZodDiscriminatedUnionOption<"type">[]],
-);
+const sectionOf = (type: SectionType) =>
+  z.object({ id: sectionId, type: z.literal(type), hidden: z.boolean().default(false), settings: sectionSchemas[type] as z.ZodType<Record<string, unknown>> });
+const section = z.discriminatedUnion("type", SECTION_TYPES.map(sectionOf) as [ReturnType<typeof sectionOf>, ...ReturnType<typeof sectionOf>[]]);
 
 const themeDoc = z.object({
   version: z.literal(1).default(1),
@@ -138,10 +135,10 @@ const themeDoc = z.object({
         cards: z.enum(["plain", "framed"]).default("plain"),
         buttons: z.enum(["filled", "outline"]).default("filled"),
       })
-      .default({}),
+      .prefault({}),
     logoText: text(60),
     logoUrl: imageUrl,
-    seo: z.object({ title: text(70), description: text(320) }).default({}),
+    seo: z.object({ title: text(70), description: text(320) }).prefault({}),
   }),
   menus: z.object({ header: z.array(menuItem).max(12).default([]), footer: z.array(menuItem).max(20).default([]) }),
   home: z.array(section).max(30),

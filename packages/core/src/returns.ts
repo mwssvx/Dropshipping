@@ -66,7 +66,7 @@ export async function returnOptions(db: Db, shop: Shop, order: Order, now = new 
 }
 
 const requestSchema = z.object({
-  reason: z.enum(RETURN_REASONS, { errorMap: () => ({ message: "Pick a reason." }) }),
+  reason: z.enum(RETURN_REASONS, { error: "Pick a reason." }),
   note: z.string().trim().max(1000, "Keep the note under 1,000 characters.").optional(),
   items: z.array(z.object({ lineId: z.string().uuid(), quantity: z.number().int().min(0).max(99) })),
 });

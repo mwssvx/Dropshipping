@@ -21,7 +21,7 @@ const bundleInput = z.object({
     .max(4, "A bundle has up to four products.")
     .refine((ids) => new Set(ids).size === ids.length, "Pick each product once."),
   percentOff: z.coerce
-    .number({ invalid_type_error: "Enter the discount as a number." })
+    .number({ error: "Enter the discount as a number." })
     .int("Use a whole number for the discount.")
     .min(1, "Enter a discount of at least 1%.")
     .max(MAX_BUNDLE_PERCENT, `Bundles save up to ${MAX_BUNDLE_PERCENT}%.`),

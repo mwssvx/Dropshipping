@@ -18,7 +18,7 @@ export type CheckoutAddon = typeof schema.checkoutAddons.$inferSelect;
 const addonInput = z.object({
   productId: z.string().uuid("Pick a product from your store."),
   percentOff: z.coerce
-    .number({ invalid_type_error: "Enter the discount as a number." })
+    .number({ error: "Enter the discount as a number." })
     .int("Use a whole number for the discount.")
     .min(0, "The discount can't be negative.")
     .max(MAX_ADDON_PERCENT, `Add-ons take up to ${MAX_ADDON_PERCENT}% off.`),

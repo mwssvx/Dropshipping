@@ -41,7 +41,7 @@ export function transitDays(variants: ShipDays[], rate: Pick<Rate, "minDays" | "
 const settingsInput = z.object({
   enabled: z.boolean(),
   processingDays: z
-    .number({ invalid_type_error: "Enter the processing days as a whole number." })
+    .number({ error: "Enter the processing days as a whole number." })
     .int("Enter the processing days as a whole number.")
     .min(0, "Processing time is between 0 and 14 days.")
     .max(14, "Processing time is between 0 and 14 days."),

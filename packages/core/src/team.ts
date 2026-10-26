@@ -65,7 +65,7 @@ async function seatsUsed(db: Db, shopId: string, now: Date) {
 
 const inviteInput = z.object({
   email: z.string().trim().toLowerCase().email("Enter a valid email address."),
-  role: z.enum(["admin", "staff"], { errorMap: () => ({ message: "Choose Admin or Staff." }) }),
+  role: z.enum(["admin", "staff"], { error: "Choose Admin or Staff." }),
 });
 
 export type InviteContext = { db: Db; mailer: Mailer; brand: string; inviteUrl: (token: string) => string };

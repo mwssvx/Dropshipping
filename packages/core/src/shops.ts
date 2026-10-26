@@ -25,7 +25,7 @@ const RESERVED = new Set(["www", "admin", "api", "app", "checkout", "help", "sta
 
 const newShop = z.object({
   name: z.string().trim().min(2, "Give your store a name of at least 2 characters.").max(80),
-  country: z.enum(LAUNCH_COUNTRIES, { errorMap: () => ({ message: "We don't support that country yet." }) }),
+  country: z.enum(LAUNCH_COUNTRIES, { error: "We don't support that country yet." }),
 });
 
 export async function createShop(db: Db, userId: string, input: { name: string; country: string }) {

@@ -235,8 +235,8 @@ const str = (max: number) => z.string().max(max);
 const date = z.string().datetime().nullable().optional();
 
 const importSchema = z.object({
-  format: z.literal(EXPORT_FORMAT, { errorMap: () => ({ message: "This isn't a store file from us." }) }),
-  version: z.literal(1, { errorMap: () => ({ message: "This store file is from a newer version. Update and try again." }) }),
+  format: z.literal(EXPORT_FORMAT, { error: "This isn't a store file from us." }),
+  version: z.literal(1, { error: "This store file is from a newer version. Update and try again." }),
   store: z
     .object({
       prices_include_tax: z.boolean().optional(),

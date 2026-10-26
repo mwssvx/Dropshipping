@@ -18,14 +18,14 @@ const saleInput = z
   .object({
     title: z.string().trim().min(1, "Give the sale a name, like Summer sale.").max(60, "Keep the name under 60 characters."),
     percentOff: z.coerce
-      .number({ invalid_type_error: "Enter the discount as a number." })
+      .number({ error: "Enter the discount as a number." })
       .int("Use a whole number for the discount.")
       .min(1, "Enter a discount of at least 1%.")
       .max(MAX_SALE_PERCENT, `A sale takes up to ${MAX_SALE_PERCENT}% off.`),
     scope: z.enum(["all", "collection", "products"]),
     collectionId: z.string().uuid().nullish(),
     productIds: z.array(z.string().uuid("Pick products from your store.")).max(200, "Pick up to 200 products, or use a collection.").default([]),
-    startsAt: z.date({ invalid_type_error: "Pick when the sale starts." }),
+    startsAt: z.date({ error: "Pick when the sale starts." }),
     endsAt: z.date().nullish(),
   })
   .refine((s) => !s.endsAt || s.endsAt > s.startsAt, { message: "The sale has to end after it starts." })
