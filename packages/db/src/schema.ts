@@ -137,6 +137,8 @@ export const shops = pgTable(
     aiAutoPause: boolean("ai_auto_pause").notNull().default(false),
     // Remind buyers who started checkout but didn't pay (one email, an hour later).
     abandonedCartEmails: boolean("abandoned_cart_emails").notNull().default(true),
+    // A phone number at checkout, for the courier: not asked, optional, or required.
+    checkoutPhone: text("checkout_phone", { enum: ["off", "optional", "required"] }).notNull().default("optional"),
     // A second checkout reminder, a day after the first, with a one-time code. Null means off.
     abandonedCartOffer: jsonb("abandoned_cart_offer").$type<AbandonedCartOffer | null>(),
     // Show new reviews straight away instead of waiting for the merchant.
@@ -469,6 +471,8 @@ export type Address = {
   region?: string;
   postalCode: string;
   country: string;
+  /** For the courier, when the store asks for it at checkout. Passed on to the supplier. */
+  phone?: string;
 };
 
 export const orders = pgTable(

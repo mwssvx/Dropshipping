@@ -66,6 +66,12 @@ const OFFER_LASTS = 48 * HOUR;
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const reminderCode = () => `BACK-${[...randomBytes(6)].map((b) => ALPHABET[b % ALPHABET.length]).join("")}`;
 
+/** Whether checkout asks for a phone number for the courier. */
+export async function setCheckoutPhone(db: Db, shopId: string, mode: "off" | "optional" | "required") {
+  if (!["off", "optional", "required"].includes(mode)) throw new UserError("Pick whether checkout asks for a phone number.");
+  await db.update(schema.shops).set({ checkoutPhone: mode, updatedAt: new Date() }).where(eq(schema.shops.id, shopId));
+}
+
 /** Turns the second reminder on with a percentage off, or off with null. */
 export async function setAbandonedCartOffer(db: Db, shopId: string, percentOff: number | null) {
   if (percentOff !== null && (!Number.isInteger(percentOff) || percentOff < 5 || percentOff > 50)) {

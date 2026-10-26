@@ -88,7 +88,7 @@ export async function orderEditOptions(ctx: Pick<FulfillmentContext, "db" | "now
 }
 
 const sameAddress = (a: Address, b: Address) =>
-  (["name", "line1", "line2", "city", "region", "postalCode", "country"] as const).every((k) => (a[k] ?? "") === (b[k] ?? ""));
+  (["name", "line1", "line2", "city", "region", "postalCode", "country", "phone"] as const).every((k) => (a[k] ?? "") === (b[k] ?? ""));
 
 /**
  * Changes the delivery address and/or swaps lines to another variant of the same product at the
@@ -112,7 +112,8 @@ export async function editOrder(
   const changes: string[] = [];
   let address: Address | null = null;
   if (input.address) {
-    const parsed = addressSchema.safeParse({ ...input.address, country: input.address.country ?? order.shippingAddress.country });
+    // A form without a phone field keeps the number the order has.
+    const parsed = addressSchema.safeParse({ ...input.address, country: input.address.country ?? order.shippingAddress.country, phone: input.address.phone ?? order.shippingAddress.phone });
     if (!parsed.success) throw new UserError(parsed.error.issues[0]!.message);
     const next = { ...parsed.data, line2: parsed.data.line2 || undefined, region: parsed.data.region || undefined };
     // Shipping and tax were worked out for this country.

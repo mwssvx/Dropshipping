@@ -95,10 +95,18 @@ function regionCode(list: Record<string, string>, input: string) {
   return Object.entries(list).find(([, name]) => fold(name) === folded)?.[0] ?? null;
 }
 
-export type AddressProblem = { field: "postalCode" | "region"; message: string };
+export type AddressProblem = { field: "postalCode" | "region" | "phone"; message: string };
+
+/** "+1 (512) 555-0100" is fine: digits with the usual separators, 6 to 15 digits in all. */
+function tidyPhone(input: string) {
+  const phone = input.trim().replace(/\s+/g, " ");
+  if (!/^\+?[\d ().\-/]+$/.test(phone)) return null;
+  const digits = phone.replace(/\D/g, "").length;
+  return digits >= 6 && digits <= 15 ? phone : null;
+}
 
 /** The address tidied, or what the buyer should fix. */
-export function checkAddress<A extends Pick<Address, "country" | "postalCode"> & { region?: string | null }>(address: A): { address: A; problem: null } | { address: null; problem: AddressProblem } {
+export function checkAddress<A extends Pick<Address, "country" | "postalCode"> & { region?: string | null; phone?: string | null }>(address: A): { address: A; problem: null } | { address: null; problem: AddressProblem } {
   const country = address.country.toUpperCase();
   let next = address;
   const format = FORMATS[country];
@@ -120,6 +128,11 @@ export function checkAddress<A extends Pick<Address, "country" | "postalCode"> &
       };
     }
     next = { ...next, region: code };
+  }
+  if (address.phone) {
+    const phone = tidyPhone(address.phone);
+    if (!phone) return { address: null, problem: { field: "phone", message: "Check the phone number. Include the area code, like +1 512 555 0100." } };
+    next = { ...next, phone };
   }
   return { address: next, problem: null };
 }

@@ -4,7 +4,7 @@ import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 
 export type OrderEditState = { error?: string; message?: string };
-type Address = { name: string; line1: string; line2?: string; city: string; region?: string; postalCode: string; country: string };
+type Address = { name: string; line1: string; line2?: string; city: string; region?: string; postalCode: string; country: string; phone?: string };
 type Line = { id: string; title: string; quantity: number; variantId: string | null; choices: { variantId: string; title: string }[] };
 
 /**
@@ -42,6 +42,7 @@ export function OrderEditForm({ action, address, lines, countryName, summary, no
           {field("city", "City")}
           {field("region", "State or region (optional)", false)}
           {field("postalCode", "Postal code")}
+          {field("phone", "Phone for the courier (optional)", false)}
           <p className="hint text-sm sm:col-span-2">In {countryName}. To send it to another country, the order has to be cancelled and placed again.</p>
         </fieldset>
         {swappable.length > 0 && (

@@ -71,12 +71,14 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
         handle={handle}
         defaultCountry={shop.country}
         initial={initial}
+        askPhone={shop.checkoutPhone}
         paidByGiftCard={!!quote.giftCard && quote.dueMinor === 0}
         countries={countries}
         zones={choices}
         text={{
           checkout: t.checkout, orderSummary: t.orderSummary, contact: t.contact, newsAndOffers: t.newsAndOffers, delivery: t.delivery, email: t.email,
           fullName: t.fullName, address: t.address, address2: t.address2, city: t.city, region: t.region, postalCode: t.postalCode, country: t.country,
+          phone: shop.checkoutPhone === "required" ? t.phone : t.phoneOptional,
           shipping: t.shipping, noShipping: t.noShipping, placeOrder: t.placeOrder, continueToPayment: t.continueToPayment, continuing: t.continuing,
           notAvailable: t.notAvailable, tax: t.tax, giftCheckbox: t.giftCheckbox, giftFrom: t.giftFrom, giftMessage: t.giftMessage,
           giftRecipientEmail: t.giftRecipientEmail, giftNote: t.giftNote, orderNote: t.orderNote,

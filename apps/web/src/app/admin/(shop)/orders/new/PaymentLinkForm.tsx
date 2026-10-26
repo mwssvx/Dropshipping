@@ -62,6 +62,7 @@ export function PaymentLinkForm({ variants, countries, defaultCountry }: { varia
               {countries.map(([c, n]) => <option key={c} value={c}>{n}</option>)}
             </select>
           </div>
+          <Field id="phone" label="Phone for the courier (optional)" type="tel" values={v} />
         </fieldset>
       </div>
       <aside className="flex flex-col gap-4 lg:sticky lg:top-6">

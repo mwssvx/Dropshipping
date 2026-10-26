@@ -243,7 +243,7 @@ export class AliExpressSupplier implements SupplierAdapter {
             province: a.region ?? "",
             zip: a.postalCode,
             country: a.country,
-            mobile_no: "",
+            mobile_no: a.phone ?? "",
           },
           product_items: items,
         }),

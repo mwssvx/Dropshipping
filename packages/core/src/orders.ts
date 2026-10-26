@@ -287,6 +287,7 @@ export const addressSchema = z.object({
   region: z.string().trim().optional(),
   postalCode: z.string().trim().min(2, "Enter the postal code."),
   country: z.string().trim().length(2, "Choose a country."),
+  phone: z.string().trim().max(30, "Check the phone number.").optional().transform((p) => p || undefined),
 })
   // A postal code in the wrong shape is the usual reason a parcel comes back; ask while the buyer is here.
   .transform((a, ctx) => {
@@ -351,13 +352,20 @@ export async function startCheckout(
      * unpaid; the caller charges the saved card.
      */
     subscription?: { id: string; percentOff: number };
+    /** The buyer is on the store's checkout page, so the store's phone setting applies. */
+    storefront?: boolean;
   },
   taxCalculator: TaxCalculator = new BuiltInTaxCalculator(),
 ) {
   if (shop.status !== "active") throw new UserError("This store isn't taking orders right now.", "shop_inactive");
   const parsed = checkoutSchema.safeParse(input);
   if (!parsed.success) throw new UserError(parsed.error.issues[0]!.message);
-  const { email, address } = parsed.data;
+  const { email } = parsed.data;
+  let { address } = parsed.data;
+  if (input.storefront) {
+    if (shop.checkoutPhone === "off") address = { ...address, phone: undefined };
+    else if (shop.checkoutPhone === "required" && !address.phone) throw new UserError("Enter a phone number for the courier.", "phone_missing");
+  }
   const gift = parsed.data.gift ?? null;
   const followUp = input.followUp ?? null;
   const repeat = input.subscription ?? null;

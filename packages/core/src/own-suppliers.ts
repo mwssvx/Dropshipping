@@ -154,7 +154,7 @@ async function itemsFor(db: Db, orderId: string, supplierId: string) {
 const poRef = (order: Order) => `PO-${order.number}`;
 
 function addressLines(a: Order["shippingAddress"]) {
-  return [a.name, a.line1, a.line2, [a.city, a.region, a.postalCode].filter(Boolean).join(" "), a.country].filter(Boolean) as string[];
+  return [a.name, a.line1, a.line2, [a.city, a.region, a.postalCode].filter(Boolean).join(" "), a.country, a.phone && `Phone: ${a.phone}`].filter(Boolean) as string[];
 }
 
 /** Called by routeOrder for an own supplier. The buyer's email address is never shared. */

@@ -20,7 +20,7 @@ export async function createPaymentLinkAction(_: LinkState, form: FormData): Pro
       shop,
       {
         email: v("email"),
-        address: { name: v("name"), line1: v("line1"), line2: v("line2") || undefined, city: v("city"), region: v("region") || undefined, postalCode: v("postalCode"), country: v("country") },
+        address: { name: v("name"), line1: v("line1"), line2: v("line2") || undefined, city: v("city"), region: v("region") || undefined, postalCode: v("postalCode"), country: v("country"), phone: v("phone") || undefined },
         lines,
         discountCode: v("discountCode") || null,
         note: v("note"),
