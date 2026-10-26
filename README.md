@@ -591,3 +591,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Who did what**: Admin → Activity (owners only) lists what people on the team did, newest first and grouped by day, each linking to what changed: refunds and return decisions, free replacements, orders sent again, released, changed or given tracking, products added, imported, edited and bulk-edited (and undone), discount codes, gift cards, the team (invites, roles, removals, handing over the store), API keys and webhooks, domains, the store's look and status, the plan, payouts and loading a store file (`logActivity` and `listActivity` in `packages/core/src/activity.ts`, table `activity`).
 2. **Filter by person**: once a store has a team, one tap shows a single person's actions. Entries keep the person's email, so they still read right after someone leaves.
 3. Writing an entry never stops the action itself, and entries are deleted after 400 days by the scheduled job (`pruneActivity`).
+
+### Saved replies (after launch, part 80)
+
+1. **Answers kept once**: Inbox → Saved replies holds up to 30 short answers the merchant gives often, each with a name. A new store can add three starters (where is my order, how long shipping takes, returns) and change them (`packages/core/src/saved-replies.ts`, table `saved_replies`). They travel in the store file.
+2. **Filled in per conversation**: in a conversation, "Start from" puts a saved reply in the reply box with `{first_name}`, `{order_number}`, `{tracking_link}` and `{store_name}` filled from the buyer, their order and its tracking. The merchant can still change the words before sending.
+3. **Nothing half-filled goes out**: a field the conversation can't fill (no order, or no tracking yet) stays in braces with a warning, and the reply is refused until it's replaced, both for typed replies and edited drafts.

@@ -1223,6 +1223,21 @@ export const activity = pgTable(
   (t) => [index("activity_shop_idx").on(t.shopId, t.createdAt), index("activity_user_idx").on(t.shopId, t.userId, t.createdAt)],
 );
 
+// Saved replies: the merchant's own short answers to common buyer questions, put into the inbox's
+// reply box with the buyer's name, order number and tracking filled in.
+export const savedReplies = pgTable(
+  "saved_replies",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("saved_replies_shop_idx").on(t.shopId, t.title)],
+);
+
 /** A right password for someone with two-step sign-in on, waiting for their code (10 minutes). */
 export const signInChallenges = pgTable(
   "sign_in_challenges",
