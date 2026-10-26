@@ -365,6 +365,9 @@ export const customers = pgTable(
     // The merchant's own notes and labels ("vip", "wholesale lead"). Never shown to the buyer.
     note: text("note"),
     tags: jsonb("tags").$type<string[]>().notNull().default([]),
+    // The tags in `tags` that a tag rule added, so the rule can take them off again when the
+    // customer stops matching. A tag the merchant typed by hand is never in here.
+    autoTags: jsonb("auto_tags").$type<string[]>().notNull().default([]),
     // Secret in each marketing email's unsubscribe link.
     emailToken: text("email_token").notNull().unique().default(sql`replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '')`),
     createdAt: createdAt(),
@@ -1057,6 +1060,26 @@ export const codeBatches = pgTable("code_batches", {
   active: boolean("active").notNull().default(true),
   createdAt: createdAt(),
 });
+
+// Tag customers automatically: "spent $200 or more" → vip, "no order in 90 days" → lapsed. A rule
+// keeps its tag in step with the customer: added when they match, taken off when they don't.
+export const TAG_RULE_KINDS = ["spent", "orders", "bought", "lapsed"] as const;
+export const customerTagRules = pgTable(
+  "customer_tag_rules",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    tag: text("tag").notNull(),
+    kind: text("kind", { enum: TAG_RULE_KINDS }).notNull(),
+    // spent: an amount in minor units; orders: a number of orders; lapsed: days since the last
+    // order. Unused for bought.
+    threshold: integer("threshold").notNull().default(0),
+    // bought: the product.
+    productId: uuid("product_id").references(() => products.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("customer_tag_rules_shop_idx").on(t.shopId)],
+);
 
 // Refer a friend: one row per friend who asked for their code from someone's link. Each email
 // can be referred once per store. The referrer's credit is a gift card, sent once the friend's

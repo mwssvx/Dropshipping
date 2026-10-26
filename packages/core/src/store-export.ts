@@ -2,7 +2,7 @@
 // codes, bundles, settings, translations) as one JSON file that loads into a new store, plus products as CSV.
 // Orders and customers stay out of the JSON file: they belong to the payments account.
 import { and, asc, eq, inArray } from "drizzle-orm";
-import { schema, SOLD_OUT_DISPLAY, type Db } from "@sf/db";
+import { schema, SOLD_OUT_DISPLAY, TAG_RULE_KINDS, type Db } from "@sf/db";
 import { z } from "zod";
 import { collectionRulesSchema } from "./collection-rules";
 import { NotFoundError, UserError } from "./errors";
@@ -14,6 +14,7 @@ import { parseTheme } from "./theme-doc";
 import { listShippingZones } from "./shipping";
 import { LANGUAGE_CODES, saveTranslation } from "./languages";
 import { createBundle, MAX_BUNDLES } from "./bundles";
+import { createTagRule, MAX_TAG_RULES } from "./tag-rules";
 import { createSizeChart, MAX_SIZE_CHARTS } from "./size-charts";
 import { MAX_SAVED_REPLIES, saveSavedReply } from "./saved-replies";
 import { createSale, MAX_SALES } from "./sales";
@@ -43,7 +44,7 @@ function backupOf(p: typeof schema.products.$inferSelect, links: (typeof schema.
 export async function exportStore(db: Db, shopId: string, now = new Date()) {
   const shop = await db.query.shops.findFirst({ where: eq(schema.shops.id, shopId) });
   if (!shop) throw new NotFoundError("Store");
-  const [products, collections, links, pages, theme, discounts, supplierRows, posts, redirectRows, translationRows, bundleRows, saleRows, addonRows, chartRows, replyRows] = await Promise.all([
+  const [products, collections, links, pages, theme, discounts, supplierRows, posts, redirectRows, translationRows, bundleRows, saleRows, addonRows, chartRows, replyRows, tagRuleRows] = await Promise.all([
     db.query.products.findMany({ where: eq(schema.products.shopId, shopId), orderBy: asc(schema.products.createdAt) }),
     db.query.collections.findMany({ where: eq(schema.collections.shopId, shopId), orderBy: asc(schema.collections.createdAt) }),
     db
@@ -64,6 +65,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
     db.query.checkoutAddons.findMany({ where: eq(schema.checkoutAddons.shopId, shopId), orderBy: asc(schema.checkoutAddons.createdAt) }),
     db.query.sizeCharts.findMany({ where: eq(schema.sizeCharts.shopId, shopId), orderBy: asc(schema.sizeCharts.createdAt) }),
     db.query.savedReplies.findMany({ where: eq(schema.savedReplies.shopId, shopId), orderBy: asc(schema.savedReplies.title) }),
+    db.query.customerTagRules.findMany({ where: eq(schema.customerTagRules.shopId, shopId), orderBy: asc(schema.customerTagRules.createdAt) }),
   ]);
   const variants = products.length
     ? await db.query.variants.findMany({ where: inArray(schema.variants.productId, products.map((p) => p.id)), orderBy: asc(schema.variants.position) })
@@ -204,6 +206,12 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       published: c.published,
     })),
     saved_replies: replyRows.map((r) => ({ title: r.title, body: r.body })),
+    // The rules only; the new store tags its own customers.
+    tag_rules: tagRuleRows.flatMap((r) => {
+      const product = r.productId ? handleOf.get(r.productId) : null;
+      if (r.kind === "bought" && !product) return [];
+      return [{ tag: r.tag, kind: r.kind, threshold: r.threshold, ...(product ? { product } : {}) }];
+    }),
     bundles: bundleRows.map((b) => ({ title: b.title, products: b.productIds.map((id) => handleOf.get(id)).filter((h): h is string => !!h), percent_off: b.percentOff, active: b.active })),
     checkout_addons: addonRows.flatMap((a) => {
       const product = handleOf.get(a.productId);
@@ -393,6 +401,10 @@ const importSchema = z.object({
   bundles: z
     .array(z.object({ title: str(80), products: z.array(handle).max(4), percent_off: z.number().int(), active: z.boolean().default(true) }))
     .max(MAX_BUNDLES)
+    .default([]),
+  tag_rules: z
+    .array(z.object({ tag: str(30), kind: z.enum(TAG_RULE_KINDS), threshold: z.number().int(), product: handle.optional() }))
+    .max(MAX_TAG_RULES)
     .default([]),
   size_charts: z
     .array(
@@ -754,6 +766,17 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
         if (!(e instanceof UserError)) throw e;
       }
     }
+    // Tag rules go through the same checks as the Customers page; any that don't fit are left out.
+    let tagRulesAdded = 0;
+    for (const r of data.tag_rules) {
+      try {
+        const input = r.kind === "bought" ? { kind: r.kind, tag: r.tag, productId: (r.product && productIds.get(r.product)) || "" } : { kind: r.kind, tag: r.tag, threshold: r.threshold };
+        await createTagRule(tx as unknown as Db, shopId, input, { apply: false });
+        tagRulesAdded++;
+      } catch (e) {
+        if (!(e instanceof UserError)) throw e;
+      }
+    }
     // Size charts go through the same checks as the Size charts page; any that don't fit are left out.
     let chartsAdded = 0;
     if (data.size_charts.length) {
@@ -844,6 +867,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
       checkoutAddons: addonsAdded,
       sizeCharts: chartsAdded,
       savedReplies: repliesAdded,
+      tagRules: tagRulesAdded,
       theme: !!theme,
       currencyDiffers: typeof data.store.currency === "string" && data.store.currency !== shop.currency,
     };

@@ -155,6 +155,11 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           )}
           <section className="card p-5" aria-label="Note and tags">
             <NotesForm id={customer.id} note={customer.note ?? ""} tags={customer.tags.join(", ")} />
+            {customer.autoTags.length > 0 && (
+              <p className="hint text-sm mt-2">
+                From a <Link className="underline" href="/admin/customers#tag-rules">tag rule</Link>: {customer.autoTags.join(", ")}. It stays while they match the rule.
+              </p>
+            )}
           </section>
         </aside>
       </div>

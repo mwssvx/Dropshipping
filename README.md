@@ -693,3 +693,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **A real clock**: a sale with an end time can "Count down to the end on the store" (Sales page). In its last 7 days, product pages in the sale show "Ends in 1 day 04:12:33" by the price, ticking each second, in the buyer's language (`countdownTo` in `packages/core/src/sales.ts`, `components/SaleCountdown.tsx`).
 2. **A banner for sales on everything**: a store-wide sale that counts down also gets a banner across the store, "Weekend sale: 20% off everything. Ends in …" (the biggest one, when several run). A holiday notice takes the banner's place while the store is on a break.
 3. **Honest by design**: the clock counts to the sale's real end, so prices go back when it reaches zero; it can't be set without an end time, and ending the sale early takes it away. Store export and import keep the setting.
+
+### Tag customers automatically (after launch, part 97)
+
+1. **Rules on the Customers page**: "Customers who spent at least $200 get the tag vip", or placed at least N orders, bought a certain product, or haven't ordered in N days. Each rule shows how many customers have its tag and links to them (`packages/core/src/tag-rules.ts`).
+2. **Kept in step**: a buyer is tagged the moment their order is paid, existing customers are tagged when the rule is added, and the scheduled job takes tags off after refunds or brings in customers who just lapsed. Removing a rule takes its tag off again.
+3. **Your own tags stay yours**: rules only take off tags they added (`customers.auto_tags`), never ones typed on a customer's page; the customer page says which tags came from a rule. Use the tags in the list filter and for email campaign audiences. Store export and import keep the rules.
