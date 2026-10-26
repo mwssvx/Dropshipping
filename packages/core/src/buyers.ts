@@ -149,7 +149,7 @@ export async function reorderLines(db: Db, shopId: string, buyerEmail: string, o
 }
 
 /** Customers for the merchant: who bought, how often, how much and when last. */
-export async function listCustomers(db: Db, shopId: string, opts: { query?: string; tag?: string } = {}) {
+export async function listCustomers(db: Db, shopId: string, opts: { query?: string; tag?: string; limit?: number } = {}) {
   const q = opts.query?.trim().toLowerCase();
   const tag = opts.tag?.trim().toLowerCase();
   const rows = await db
@@ -178,7 +178,7 @@ export async function listCustomers(db: Db, shopId: string, opts: { query?: stri
     // Leaves out addresses that only asked for the newsletter and never confirmed or bought.
     .having(sql`count(${schema.orders.id}) > 0 or bool_or(${schema.customers.acceptsMarketing}) or max(${schema.customers.lastSignInAt}) is not null or max(${schema.customers.name}) is not null or bool_or(${schema.customers.wholesaleStatus} = 'approved') or max(jsonb_array_length(${schema.customers.tags})) > 0`)
     .orderBy(sql`max(${schema.orders.paidAt}) desc nulls last`, desc(schema.customers.createdAt))
-    .limit(500);
+    .limit(opts.limit ?? 500);
   return rows;
 }
 
