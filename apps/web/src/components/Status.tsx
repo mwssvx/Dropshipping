@@ -16,6 +16,8 @@ const FULFILMENT: Record<string, [string, string]> = {
 const PRODUCT: Record<string, [string, string]> = {
   active: ["Active", "pill-success"],
   draft: ["Draft", "pill-neutral"],
+  // A draft that goes on sale by itself later.
+  scheduled: ["Scheduled", "pill-info"],
   archived: ["Archived", "pill-neutral"],
 };
 

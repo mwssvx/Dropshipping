@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX } from "@sf/core";
+import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts } from "@sf/core";
 import { requireShop, storeAddress, suppliers } from "@/lib/server";
 import { duplicateProductAction, updateProductAction } from "../../../actions";
 import { setUpsellAction } from "../../../growth-actions";
@@ -13,6 +13,7 @@ import { PreorderForm } from "./PreorderForm";
 import { PurchaseLimitForm } from "./PurchaseLimitForm";
 import { VideoForm } from "./VideoForm";
 import { BadgeForm } from "./BadgeForm";
+import { PublishLaterPanel } from "./PublishLaterPanel";
 import { SeoForm } from "./SeoForm";
 import { AddressForm } from "./AddressForm";
 import { PhotosPanel } from "./PhotosPanel";
@@ -29,6 +30,7 @@ export default async function EditProductPage({ params, searchParams }: { params
   const { created, imported, saved, emailed, duplicated } = await searchParams;
   const sentCount = Number(emailed) || 0;
   const { shop, db } = await requireShop("products");
+  await publishDueProducts(db, shop.id);
   const found = await getProduct(db, shop.id, id).catch((e) => {
     if (e instanceof NotFoundError) notFound();
     throw e;
@@ -98,6 +100,15 @@ export default async function EditProductPage({ params, searchParams }: { params
         <WriteListingButton productId={product.id} live={product.status === "active"} />
         <StockPanel productId={product.id} waiting={waiting} linked={!!product.sourceUrl && !product.giftCard}
           checkedAt={product.stockCheckedAt ? product.stockCheckedAt.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : null} />
+        {product.status === "draft" && (
+          <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="publish-later-heading">
+            <div>
+              <h2 id="publish-later-heading" className="font-semibold">Put on sale later</h2>
+              <p className="hint">For a launch or a drop you announce ahead: it goes on sale by itself at this time, with the first visitor after it.</p>
+            </div>
+            <PublishLaterPanel productId={product.id} title={product.title} publishAt={product.publishAt?.toISOString() ?? null} />
+          </section>
+        )}
         <ProductForm key={product.updatedAt.getTime()} action={updateProductAction.bind(null, product.id)} currency={shop.currency} submitLabel="Save changes"
           initial={{
             title: product.title,

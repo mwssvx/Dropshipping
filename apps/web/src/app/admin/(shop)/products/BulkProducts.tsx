@@ -5,7 +5,7 @@ import { FormError } from "@/components/FormError";
 import { ProductStatus } from "@/components/Status";
 import { bulkEditAction, undoBulkEditAction, type BulkState } from "../../bulk-actions";
 
-export type BulkRow = { id: string; title: string; imageUrl: string | null; status: "draft" | "active" | "archived"; price: string; margin: number | null };
+export type BulkRow = { id: string; title: string; imageUrl: string | null; status: "draft" | "active" | "archived"; scheduled: boolean; price: string; margin: number | null };
 export type RecentEdit = { id: string; summary: string; when: string; undone: boolean; canUndo: boolean };
 
 const KINDS = [
@@ -150,7 +150,7 @@ export function BulkProducts({ rows, collections, recent }: { rows: BulkRow[]; c
                     {p.title}
                   </Link>
                 </td>
-                <td><ProductStatus value={p.status} /></td>
+                <td><ProductStatus value={p.scheduled ? "scheduled" : p.status} /></td>
                 <td className="text-right num">{p.price}</td>
                 <td className="text-right num">{p.margin === null ? <span className="hint">—</span> : `${p.margin}%`}</td>
               </tr>

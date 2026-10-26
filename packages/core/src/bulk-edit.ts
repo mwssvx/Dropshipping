@@ -137,7 +137,7 @@ export async function applyBulkEdit(db: Db, shop: Shop, productIds: string[], in
   const summary = `${describeBulkAction(action, collection?.title)} on ${products === 1 ? "1 product" : `${products} products`}`;
   return db.transaction(async (tx) => {
     for (const p of snapshot.products) {
-      await tx.update(schema.products).set({ status: (action as { status: "active" | "draft" | "archived" }).status, updatedAt: now }).where(eq(schema.products.id, p.id));
+      await tx.update(schema.products).set({ status: (action as { status: "active" | "draft" | "archived" }).status, publishAt: null, updatedAt: now }).where(eq(schema.products.id, p.id));
     }
     for (const v of snapshot.variants) {
       await tx.update(schema.variants).set({ priceMinor: v.newPriceMinor, compareAtMinor: v.newCompareAtMinor }).where(eq(schema.variants.id, v.id));
