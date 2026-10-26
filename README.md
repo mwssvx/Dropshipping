@@ -633,3 +633,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Money off bigger orders, no code**: a percent or amount code with a minimum order can now apply by itself ("Apply it automatically to orders over the minimum" on the Marketing page). Make a few of them for steps, like 10% off over $50 and 15% off over $100; the cart uses the one that saves the most, as it does for buy X get Y offers (`quoteCart` in `packages/core/src/orders.ts`).
 2. **A nudge to the next step**: the cart says "Spend $12.00 more to get 15% off your order", in the buyer's language and currency, when the next step saves more than what they get now. Product pages list the steps with the other offers.
 3. **Kept simple**: a code the buyer types replaces the steps, wholesale prices don't get them, and money off without a minimum is refused (that's a sale), as is free shipping without a code (that's set under Shipping). Store import keeps automatic steps.
+
+### Buyers cancel their own order (after launch, part 87)
+
+1. **Cancel from the order page**: in the first 12 hours after paying, before it ships, a buyer can open "Cancel this order" on their order page, say why if they like, and cancel. Supplier orders are stopped first, then the whole order is refunded and the buyer gets the refund email (`cancelOrderByBuyer` in `packages/core/src/order-edits.ts`).
+2. **Never half done**: if a supplier won't stop its order (it's already packing), nothing changes and the buyer is told to message the store. If the refund itself fails, the buyer is told the store will refund them, and the team gets a "Refund needed" email with a link to the order.
+3. **The team hears about it**: everyone who handles orders gets an email saying the buyer cancelled and why. Owners and admins can turn it off under "Buyer cancellations" on the Orders page (`shops.buyer_cancel`, on by default).

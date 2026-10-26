@@ -1,0 +1,1 @@
+ALTER TABLE "shops" ADD COLUMN "buyer_cancel" boolean DEFAULT true NOT NULL;

@@ -1,10 +1,11 @@
 import { PixelEvent } from "@/components/PixelEvent";
 import { notFound } from "next/navigation";
-import { buyerAmounts, buyerThread, formatDeliveryDate, formatDeliveryWindow, orderDelivery, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems, formatShipsBy, storePixels } from "@sf/core";
+import { buyerAmounts, buyerCancelOptions, buyerThread, formatDeliveryDate, formatDeliveryWindow, orderDelivery, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems, formatShipsBy, storePixels } from "@sf/core";
 import Link from "next/link";
 import { db, fulfillment, storeAddress } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
-import { editOrderByBuyerAction } from "../../actions";
+import { cancelOrderByBuyerAction, editOrderByBuyerAction } from "../../actions";
+import { CancelOrder } from "./CancelOrder";
 import { ReferralCard } from "@/components/ReferralCard";
 import { loadShop, storeBase, storeT } from "../../data";
 import { ReviewForm } from "./ReviewForm";
@@ -42,6 +43,7 @@ export default async function OrderStatusPage({ params, searchParams }: { params
   const referLink = referCode ? `${await storeAddress(shop)}/refer/${referCode}` : null;
   const shipped = order.fulfillments.filter((f) => f.trackingNumber);
   const edit = order.paymentStatus === "paid" ? await orderEditOptions(await fulfillment(), shop.id, order.id, "buyer") : null;
+  const cancel = order.paymentStatus === "paid" ? await buyerCancelOptions(await fulfillment(), shop.id, order.id) : null;
   const lastEdit = order.edits.at(-1);
   // The after-checkout offer, what the buyer added with it, or the order this one was added to.
   const offer = await postPurchaseOfferFor(await db(), shop, order);
@@ -182,7 +184,9 @@ export default async function OrderStatusPage({ params, searchParams }: { params
       )}
       {lastEdit && (
         <p className="banner banner-info" role="status">
-          {lastEdit.by === "buyer" ? "You changed this order" : `${shop.name} changed this order`} on {day.format(new Date(lastEdit.at))}: {lastEdit.changes.join("; ")}.
+          {lastEdit.by === "buyer" && lastEdit.changes[0]?.startsWith("Cancelled")
+            ? `You cancelled this order on ${day.format(new Date(lastEdit.at))}.${order.paymentStatus === "refunded" ? " The refund is on its way to your card, and we've emailed you." : ""}`
+            : <>{lastEdit.by === "buyer" ? "You changed this order" : `${shop.name} changed this order`} on {day.format(new Date(lastEdit.at))}: {lastEdit.changes.join("; ")}.</>}
         </p>
       )}
       {edit?.canEdit && edit.until && (
@@ -192,6 +196,7 @@ export default async function OrderStatusPage({ params, searchParams }: { params
             note={`You can change it here until ${utc.format(edit.until)} UTC, as long as it hasn't shipped.`} />
         </section>
       )}
+      {cancel?.canCancel && cancel.until && <CancelOrder action={cancelOrderByBuyerAction.bind(null, handle, ref)} until={utc.format(cancel.until)} />}
       <section className="card p-5 flex flex-col gap-3 text-sm">
         {order.lines.map((l, n) => (
           <div key={l.id} className="flex justify-between gap-3">

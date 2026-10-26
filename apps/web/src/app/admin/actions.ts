@@ -17,6 +17,7 @@ import {
   sendPriceDrops,
   sendStockAlerts,
   setRiskHold,
+  setBuyerCancel,
   syncTracking,
   updateProduct,
   UserError,
@@ -253,6 +254,16 @@ export async function setRiskHoldAction(_: FormState, form: FormData): Promise<F
     if (e instanceof UserError) return { error: e.message };
     throw e;
   }
+  revalidatePath("/admin/orders");
+  return { saved: true };
+}
+
+/** Whether buyers can cancel their own orders in the first hours. A refund setting, so not for staff. */
+export async function setBuyerCancelAction(_: FormState, form: FormData): Promise<FormState> {
+  const { shop, db, user } = await requireShop("refunds");
+  const on = form.get("buyerCancel") === "on";
+  await setBuyerCancel(db, shop.id, on);
+  await logged({ shop, user, db }, on ? "Let buyers cancel their own orders" : "Stopped buyers cancelling their own orders", { href: "/admin/orders" });
   revalidatePath("/admin/orders");
   return { saved: true };
 }

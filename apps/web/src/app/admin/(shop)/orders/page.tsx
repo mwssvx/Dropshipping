@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { formatMoney, listOrders, orderTags, RISK_HOLD_LABELS } from "@sf/core";
+import { BUYER_EDIT_HOURS, can, formatMoney, listOrders, orderTags, RISK_HOLD_LABELS } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { FulfilmentStatus, PaymentStatus } from "@/components/Status";
 import { PageHeader } from "../PageHeader";
+import { BuyerCancelForm } from "./BuyerCancelForm";
 import { RiskHoldForm } from "./RiskHoldForm";
 
 export const metadata = { title: "Orders" };
@@ -13,7 +14,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const { show, q, tag } = await searchParams;
   const problemsOnly = show === "problems";
   const heldOnly = show === "held";
-  const { shop, db } = await requireShop("orders");
+  const { shop, db, role } = await requireShop("orders");
   const [orders, problems, held, tags] = await Promise.all([
     listOrders(db, shop.id, { ...(problemsOnly ? { fulfillmentStatus: "problem" as const } : heldOnly ? { held: true } : {}), query: q, tag }),
     listOrders(db, shop.id, { fulfillmentStatus: "problem" }),
@@ -75,6 +76,14 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             <p className="hint w-full">One row per item, with the orders shown above{filtered || show ? " (your filters apply)" : ""}. Leave the dates empty for all of them.</p>
           </form>
         </details>
+        {can(role, "refunds") && (
+          <details className="text-sm">
+            <summary className="cursor-pointer underline w-fit">Buyer cancellations</summary>
+            <div className="mt-3">
+              <BuyerCancelForm value={shop.buyerCancel} hours={BUYER_EDIT_HOURS} />
+            </div>
+          </details>
+        )}
         {heldOnly && (
           <section className="card p-5 flex flex-col gap-3" aria-labelledby="risk-settings">
             <h2 id="risk-settings" className="font-semibold">Risk check</h2>
