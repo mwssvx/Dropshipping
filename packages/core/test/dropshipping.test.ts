@@ -255,7 +255,8 @@ describe("CJ Dropshipping adapter", () => {
     }) as unknown as typeof fetch;
     return { adapter: new CjSupplier({ apiKey: "k", fetch: f, now: () => clock }), calls };
   }
-  const auth = { "/authentication/getAccessToken": { accessToken: "tok", accessTokenExpiryDate: "2026-10-20T00:00:00Z" } };
+  // A token that's good for another two weeks, whenever the tests run.
+  const auth = { "/authentication/getAccessToken": { accessToken: "tok", accessTokenExpiryDate: new Date(Date.now() + 14 * 86_400_000).toISOString() } };
 
   it("reads a product page and keeps one access token", async () => {
     const { adapter, calls } = cj({

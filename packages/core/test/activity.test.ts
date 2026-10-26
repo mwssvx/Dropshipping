@@ -17,7 +17,7 @@ describe("team activity log", () => {
     await logActivity(f.db, { shopId: shop.id, userId: sam.id, email: sam.email }, "Edited the product “Lamp”", { href: "/admin/products/x" }, at(1));
     // Another store's entries never show.
     const other = await createShop(f.db, sam.id, { name: "Sam's Socks", country: "US" });
-    await logActivity(f.db, { shopId: other.id, userId: sam.id, email: sam.email }, "Elsewhere");
+    await logActivity(f.db, { shopId: other.id, userId: sam.id, email: sam.email }, "Elsewhere", {}, at(1));
 
     const { entries, next } = await listActivity(f.db, shop.id);
     expect(entries.map((e) => [e.email, e.summary, e.href])).toEqual([
