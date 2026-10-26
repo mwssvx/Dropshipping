@@ -540,6 +540,13 @@
       "when": 1792998884983,
       "tag": "0076_weekly_summary",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1793000573400,
+      "tag": "0077_partners",
+      "breakpoints": true
     }
   ]
 }
