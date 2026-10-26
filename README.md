@@ -687,3 +687,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **From the review app used on Shopify**: under "Bring your reviews over" on the Move from Shopify page (linked from Reviews), the merchant adds the CSV exported from Shopify's Product Reviews app or from Judge.me. Each review goes on the product with the same web address, with its name, stars, text (the title as its first line), date and the merchant's reply (`packages/core/src/review-import.ts`).
 2. **Kept honest**: reviews that were published stay published, unpublished ones stay hidden, ones waiting to be checked wait here too, and spam stays behind. Reviews written for an order on this store now say "Verified buyer"; imported ones don't, since their orders aren't here. Email addresses, locations and photos aren't brought over.
 3. **Safe to repeat**: adding the same file again adds nothing twice, and reviews for products that aren't here yet are counted and named, so the merchant can move those products and add the file again. The Reviews page says where each imported review came from.
+
+### Sale countdown (after launch, part 96)
+
+1. **A real clock**: a sale with an end time can "Count down to the end on the store" (Sales page). In its last 7 days, product pages in the sale show "Ends in 1 day 04:12:33" by the price, ticking each second, in the buyer's language (`countdownTo` in `packages/core/src/sales.ts`, `components/SaleCountdown.tsx`).
+2. **A banner for sales on everything**: a store-wide sale that counts down also gets a banner across the store, "Weekend sale: 20% off everything. Ends in …" (the biggest one, when several run). A holiday notice takes the banner's place while the store is on a break.
+3. **Honest by design**: the clock counts to the sale's real end, so prices go back when it reaches zero; it can't be set without an end time, and ending the sale early takes it away. Store export and import keep the setting.

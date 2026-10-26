@@ -33,6 +33,7 @@ export async function createSaleAction(_: SaleState, form: FormData): Promise<Sa
       productIds: form.getAll("productIds").map(String),
       startsAt,
       endsAt,
+      countdown: form.get("countdown") === "on",
     });
     started = sale.startsAt <= new Date();
   } catch (e) {

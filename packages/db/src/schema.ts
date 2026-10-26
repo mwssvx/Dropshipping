@@ -1655,6 +1655,8 @@ export const sales = pgTable(
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
     /** Null: runs until the merchant ends it. */
     endsAt: timestamp("ends_at", { withTimezone: true }),
+    // Count down to the end on the store: on the product pages it covers, and in a banner when it covers everything.
+    countdown: boolean("countdown").notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
