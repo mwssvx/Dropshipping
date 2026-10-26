@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { NotFoundError, UserError } from "../errors";
 import type { FulfillmentContext } from "../fulfillment";
+import { unfilledFields } from "../saved-replies";
 
 type Conversation = typeof schema.conversations.$inferSelect;
 type Message = typeof schema.messages.$inferSelect;
@@ -89,6 +90,8 @@ export async function sendBuyerMessage(ctx: FulfillmentContext, messageId: strin
   if (message.status === "discarded") throw new UserError("That draft was discarded.");
   const text = (body ?? message.body).trim();
   if (text.length < 2) throw new UserError("Write a reply first.");
+  const missing = unfilledFields(text);
+  if (missing.length) throw new UserError(`Replace ${missing.join(" and ")} in the reply first: this conversation has nothing to fill it with yet.`, "unfilled_field");
   const order = c.orderId ? ((await db.query.orders.findFirst({ where: eq(schema.orders.id, c.orderId) })) ?? null) : null;
   const shop = (await db.query.shops.findFirst({ where: eq(schema.shops.id, c.shopId) }))!;
   let subject: string;
@@ -129,6 +132,8 @@ export async function merchantReply(ctx: FulfillmentContext, shopId: string, con
   });
   if (!c) throw new NotFoundError("Conversation");
   if (body.trim().length < 2) throw new UserError("Write a reply first.");
+  const missing = unfilledFields(body);
+  if (missing.length) throw new UserError(`Replace ${missing.join(" and ")} in the reply first: this conversation has nothing to fill it with yet.`, "unfilled_field");
   const m = await addMessage(ctx.db, c.id, { author: "merchant", body: body.trim(), status: "draft" });
   // A reply from the merchant replaces any draft the assistant left.
   await discardDrafts(ctx.db, c.id, m.id);

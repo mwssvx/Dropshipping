@@ -16,7 +16,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const tab = (active: boolean) => `px-3 py-1.5 rounded-md text-sm ${active ? "bg-surface border border-border font-semibold" : "text-muted hover:text-ink"}`;
   return (
     <main className="pb-12">
-      <PageHeader title="Inbox" />
+      <PageHeader title="Inbox" actions={<Link href="/admin/inbox/replies" className="btn btn-secondary">Saved replies</Link>} />
       <div className="px-4 sm:px-8 flex flex-col gap-4">
         <p className="hint max-w-2xl">
           Buyers write from their order page or your store&apos;s contact page. Buyer support answers the kinds of question you allow in <Link className="underline" href="/admin/ai">AI settings</Link>, drafts the rest for you to check, and hands you anything about refunds, changes or complaints.

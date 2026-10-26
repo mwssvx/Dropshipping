@@ -15,6 +15,7 @@ import { listShippingZones } from "./shipping";
 import { LANGUAGE_CODES, saveTranslation } from "./languages";
 import { createBundle, MAX_BUNDLES } from "./bundles";
 import { createSizeChart, MAX_SIZE_CHARTS } from "./size-charts";
+import { MAX_SAVED_REPLIES, saveSavedReply } from "./saved-replies";
 import { createSale, MAX_SALES } from "./sales";
 import { createAddon, MAX_ADDONS, setAddonActive } from "./addons";
 import { openPreorder } from "./preorders";
@@ -41,7 +42,7 @@ function backupOf(p: typeof schema.products.$inferSelect, links: (typeof schema.
 export async function exportStore(db: Db, shopId: string, now = new Date()) {
   const shop = await db.query.shops.findFirst({ where: eq(schema.shops.id, shopId) });
   if (!shop) throw new NotFoundError("Store");
-  const [products, collections, links, pages, theme, discounts, supplierRows, posts, redirectRows, translationRows, bundleRows, saleRows, addonRows, chartRows] = await Promise.all([
+  const [products, collections, links, pages, theme, discounts, supplierRows, posts, redirectRows, translationRows, bundleRows, saleRows, addonRows, chartRows, replyRows] = await Promise.all([
     db.query.products.findMany({ where: eq(schema.products.shopId, shopId), orderBy: asc(schema.products.createdAt) }),
     db.query.collections.findMany({ where: eq(schema.collections.shopId, shopId), orderBy: asc(schema.collections.createdAt) }),
     db
@@ -61,6 +62,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
     db.query.sales.findMany({ where: eq(schema.sales.shopId, shopId), orderBy: asc(schema.sales.startsAt) }),
     db.query.checkoutAddons.findMany({ where: eq(schema.checkoutAddons.shopId, shopId), orderBy: asc(schema.checkoutAddons.createdAt) }),
     db.query.sizeCharts.findMany({ where: eq(schema.sizeCharts.shopId, shopId), orderBy: asc(schema.sizeCharts.createdAt) }),
+    db.query.savedReplies.findMany({ where: eq(schema.savedReplies.shopId, shopId), orderBy: asc(schema.savedReplies.title) }),
   ]);
   const variants = products.length
     ? await db.query.variants.findMany({ where: inArray(schema.variants.productId, products.map((p) => p.id)), orderBy: asc(schema.variants.position) })
@@ -199,6 +201,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       collections: c.collectionIds.map((id) => handleByKind.collection.get(id)).filter((h): h is string => !!h),
       published: c.published,
     })),
+    saved_replies: replyRows.map((r) => ({ title: r.title, body: r.body })),
     bundles: bundleRows.map((b) => ({ title: b.title, products: b.productIds.map((id) => handleOf.get(id)).filter((h): h is string => !!h), percent_off: b.percentOff, active: b.active })),
     checkout_addons: addonRows.flatMap((a) => {
       const product = handleOf.get(a.productId);
@@ -401,6 +404,10 @@ const importSchema = z.object({
       }),
     )
     .max(MAX_SIZE_CHARTS)
+    .default([]),
+  saved_replies: z
+    .array(z.object({ title: str(60), body: z.string().max(2000) }))
+    .max(MAX_SAVED_REPLIES)
     .default([]),
   checkout_addons: z
     .array(z.object({ product: handle, percent_off: z.number().int(), pitch: z.string().max(120).nullable(), active: z.boolean().default(true) }))
@@ -757,6 +764,16 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
         }
       }
     }
+    // Saved replies go through the same checks as the Saved replies page; a name the store already uses is left out.
+    let repliesAdded = 0;
+    for (const r of data.saved_replies) {
+      try {
+        await saveSavedReply(tx as unknown as Db, shopId, r);
+        repliesAdded++;
+      } catch (e) {
+        if (!(e instanceof UserError)) throw e;
+      }
+    }
     let addonsAdded = 0;
     for (const a of data.checkout_addons) {
       const productId = productIds.get(a.product);
@@ -818,6 +835,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
       sales: salesAdded,
       checkoutAddons: addonsAdded,
       sizeCharts: chartsAdded,
+      savedReplies: repliesAdded,
       theme: !!theme,
       currencyDiffers: typeof data.store.currency === "string" && data.store.currency !== shop.currency,
     };

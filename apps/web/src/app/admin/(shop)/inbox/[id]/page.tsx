@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getConversation, listPendingActions, listRecentDecisions, NotFoundError } from "@sf/core";
+import { getConversation, listPendingActions, listRecentDecisions, NotFoundError, savedRepliesFor } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { ApprovalCard, DecidedCard } from "@/components/ApprovalCard";
 import { PageHeader } from "../../PageHeader";
@@ -20,9 +20,10 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
     throw e;
   });
   const mine = (a: { input: Record<string, unknown> }) => messages.some((m) => m.id === a.input.message_id);
-  const [pending, decided] = await Promise.all([
+  const [pending, decided, saved] = await Promise.all([
     listPendingActions(db, shop.id).then((r) => r.filter(mine)),
     listRecentDecisions(db, shop.id).then((r) => r.filter(mine)),
+    conversation.email ? savedRepliesFor(db, shop.id, conversation.id) : [],
   ]);
   const shown = messages.filter((m) => m.status === "sent");
   const drafts = messages.filter((m) => m.status === "draft").length;
@@ -46,7 +47,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
             ))}
           </ol>
           <div className="border-t border-border pt-4">
-            <ReplyForm conversationId={conversation.id} primary={pending.length === 0} hasOrder={!!order} />
+            <ReplyForm conversationId={conversation.id} primary={pending.length === 0} hasOrder={!!order} saved={saved} />
           </div>
         </section>
         <aside className="flex flex-col gap-4">
