@@ -49,7 +49,8 @@ test("a merchant sends a customer a code, and they use it", async ({ page, brows
   await expect(section.getByRole("list", { name: "Codes sent" })).toContainText("Until");
 
   // The buyer follows the link in the email: the code is in their cart, and works with their email.
-  await buyer.goto(`${new URL(lamp).origin}${lamp.includes("/s/") ? lamp.slice(new URL(lamp).origin.length).split("/products/")[0] : ""}/discount/${code}?to=/products/sunset-projection-lamp`);
+  const [store, product] = lamp.split("/products/");
+  await buyer.goto(`${store}/discount/${code}?to=/products/${product}`);
   await buyer.getByRole("button", { name: "Add to cart" }).click();
   await expect(buyer.getByText(`Discount (${code})`)).toBeVisible();
   await checkout();
