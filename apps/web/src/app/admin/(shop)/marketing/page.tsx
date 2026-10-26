@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { abandonedCartStats, describeDiscount, formatMoney, listDiscounts, listProducts, POST_PURCHASE_MINUTES, postPurchaseStats, referralStats, SUBSCRIBE_WITHIN_DAYS, subscriptionStats, welcomeOfferStats, winbackDueCount, winbackStats } from "@sf/core";
+import { abandonedCartStats, describeDiscount, listCodeBatches, MAX_BATCH, formatMoney, listDiscounts, listProducts, POST_PURCHASE_MINUTES, postPurchaseStats, referralStats, SUBSCRIBE_WITHIN_DAYS, subscriptionStats, welcomeOfferStats, winbackDueCount, winbackStats } from "@sf/core";
 import { requireShop, testPayments } from "@/lib/server";
 import { sendRemindersNowAction, setDiscountActiveAction, setRemindersAction } from "../../growth-actions";
 import { PageHeader } from "../PageHeader";
 import { DiscountForm } from "./DiscountForm";
+import { CodeBatchForm } from "./CodeBatchForm";
+import { setCodeBatchActiveAction } from "../../code-batch-actions";
 import { WelcomeOfferForm } from "./WelcomeOfferForm";
 import { WinbackForm } from "./WinbackForm";
 import { ReferralForm } from "./ReferralForm";
@@ -17,7 +19,7 @@ const date = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "
 
 export default async function MarketingPage() {
   const { shop, db } = await requireShop("marketing");
-  const [discounts, stats, welcome, referrals, products, afterCheckout, subs, winback, winbackDue] = await Promise.all([
+  const [discounts, stats, welcome, referrals, products, afterCheckout, subs, winback, winbackDue, batches] = await Promise.all([
     listDiscounts(db, shop.id),
     abandonedCartStats(db, shop.id, new Date(Date.now() - 30 * DAY)),
     welcomeOfferStats(db, shop.id),
@@ -27,6 +29,7 @@ export default async function MarketingPage() {
     subscriptionStats(db, shop.id),
     winbackStats(db, shop.id),
     shop.winbackOffer ? winbackDueCount(db, shop, shop.winbackOffer) : null,
+    listCodeBatches(db, shop.id),
   ]);
   const money = (m: number) => formatMoney(m, shop.currency);
   const now = new Date();
@@ -83,6 +86,42 @@ export default async function MarketingPage() {
           <div className="flex flex-col gap-3 border-t border-border pt-4">
             <h3 className="font-medium text-sm">New code</h3>
             <DiscountForm currency={shop.currency} products={products.filter((p) => !p.giftCard && p.status !== "archived").map((p) => ({ id: p.id, title: p.title }))} />
+          </div>
+        </section>
+
+        <section id="one-time-codes" className="card p-5 flex flex-col gap-4" aria-labelledby="batches-heading">
+          <div>
+            <h2 id="batches-heading" className="font-semibold">One-time codes</h2>
+            <p className="hint">Make many codes with the same offer, each good for one order, to print on a card in the parcel, give away at an event or hand to a creator. Download them as a spreadsheet.</p>
+          </div>
+          {batches.length > 0 && (
+            <ul className="divide-y divide-border border-y border-border">
+              {batches.map((b) => {
+                const s = !b.active ? "Turned off" : b.endsAt && b.endsAt <= now ? "Expired" : b.used >= b.count ? "Used up" : "Live";
+                return (
+                  <li key={b.id} className="py-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                    <span className="font-medium">{b.name}</span>
+                    <span className="flex-1 min-w-40">
+                      {describeDiscount(b, shop.currency)}
+                      <span className="hint">
+                        {` · ${b.prefix}-…`}
+                        {b.endsAt && ` · until ${date(b.endsAt)}`}
+                      </span>
+                    </span>
+                    <span className={`pill ${s === "Live" ? "pill-success" : "pill-neutral"}`}>{s}</span>
+                    <span className="hint num w-full sm:w-auto">{b.used} of {b.count} used</span>
+                    <a className="hint hover:text-ink underline" href={`/admin/marketing/batches/${b.id}/codes.csv`} aria-label={`Download the ${b.name} codes`}>Download</a>
+                    <form action={setCodeBatchActiveAction.bind(null, b.id, !b.active)}>
+                      <button className="hint hover:text-ink" aria-label={`${b.active ? "Turn off" : "Turn on"} the ${b.name} codes`}>{b.active ? "Turn off" : "Turn on"}</button>
+                    </form>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <div className="flex flex-col gap-3 border-t border-border pt-4">
+            <h3 className="font-medium text-sm">New batch</h3>
+            <CodeBatchForm currency={shop.currency} max={MAX_BATCH} />
           </div>
         </section>
 

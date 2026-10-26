@@ -575,6 +575,13 @@
       "when": 1793007852735,
       "tag": "0081_product_details",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1793009740674,
+      "tag": "0082_code_batches",
+      "breakpoints": true
     }
   ]
 }
