@@ -45,6 +45,7 @@ export * from "./launch";
 export * from "./team";
 export * from "./buyers";
 export * from "./customers";
+export * from "./tag-rules";
 export * from "./stock";
 export * from "./gallery";
 export * from "./currency";

@@ -104,7 +104,9 @@ export async function updateCustomerNotes(db: Db, shopId: string, customerId: st
   const customer = await findCustomer(db, shopId, customerId);
   const note = parsed.data.note === undefined ? customer.note : parsed.data.note.trim() || null;
   const tags = parsed.data.tags === undefined ? customer.tags : normalizeTags(parsed.data.tags);
-  const [row] = await db.update(schema.customers).set({ note, tags }).where(eq(schema.customers.id, customer.id)).returning();
+  // A rule tag the merchant took off by hand is no longer tracked; the rule adds it back while they match.
+  const autoTags = customer.autoTags.filter((t) => tags.includes(t));
+  const [row] = await db.update(schema.customers).set({ note, tags, autoTags }).where(eq(schema.customers.id, customer.id)).returning();
   return row!;
 }
 

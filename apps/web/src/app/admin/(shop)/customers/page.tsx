@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { can, customerTags, formatMoney, listCustomers } from "@sf/core";
+import { can, customerTags, describeTagRule, formatMoney, listCustomers, listProducts, listTagRules, MAX_TAG_RULES } from "@sf/core";
 import { requireShop } from "@/lib/server";
+import { deleteTagRuleAction } from "../../tag-rule-actions";
 import { PageHeader } from "../PageHeader";
+import { TagRuleForm } from "./TagRuleForm";
 
 export const metadata = { title: "Customers" };
 
@@ -11,7 +13,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   const { shop, db, role } = await requireShop("customers");
   const { q, tag, erased } = await searchParams;
   const customers = await listCustomers(db, shop.id, { query: q, tag });
-  const tags = await customerTags(db, shop.id);
+  const [tags, rules, products] = await Promise.all([customerTags(db, shop.id), listTagRules(db, shop.id), listProducts(db, shop.id)]);
   const filtered = !!(q || tag);
   const seesMoney = can(role, "money");
   const repeat = customers.filter((c) => c.orders > 1).length;
@@ -89,6 +91,36 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             </table>
           </div>
         )}
+        <section aria-labelledby="tag-rules-heading" id="tag-rules" className="card p-4 sm:p-6 flex flex-col gap-4 mt-4">
+          <div>
+            <h2 id="tag-rules-heading" className="font-semibold">Tag customers automatically</h2>
+            <p className="hint text-sm">
+              A rule gives its tag to every customer who matches and takes it off when they stop matching, for example after a refund.
+              Use the tags to filter this list or to pick who gets an email campaign. Tags you type yourself are never taken off.
+            </p>
+          </div>
+          {rules.length > 0 && (
+            <ul className="divide-y divide-border">
+              {rules.map((r) => (
+                <li key={r.id} className="py-2 flex flex-wrap items-center gap-3" aria-label={`Rule for ${r.tag}`}>
+                  <span className="pill pill-info">{r.tag}</span>
+                  <span className="flex-1 min-w-0 text-sm">{describeTagRule(r, shop.currency, r.productTitle)}</span>
+                  <Link className="hint text-sm underline" href={`/admin/customers?tag=${encodeURIComponent(r.tag)}`}>
+                    {r.customers} {r.customers === 1 ? "customer" : "customers"}
+                  </Link>
+                  <form action={deleteTagRuleAction.bind(null, r.id)}>
+                    <button className="hint hover:text-critical text-sm" aria-label={`Remove the rule for ${r.tag}`}>Remove</button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          )}
+          {rules.length < MAX_TAG_RULES ? (
+            <TagRuleForm currency={shop.currency} products={products.map((p) => ({ id: p.id, title: p.title }))} />
+          ) : (
+            <p className="hint text-sm">You have {MAX_TAG_RULES} rules, the most a store can have. Remove one to add another.</p>
+          )}
+        </section>
       </div>
     </main>
   );

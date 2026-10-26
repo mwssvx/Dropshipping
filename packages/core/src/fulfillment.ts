@@ -10,6 +10,7 @@ import { SupplierError, type ProblemCode, type Suppliers } from "./suppliers";
 import { sendPurchaseOrder, supplierLabel } from "./own-suppliers";
 import { issueGiftCardsForOrder } from "./gift-cards";
 import { earnPoints } from "./rewards";
+import { applyTagRulesForOrder } from "./tag-rules";
 import { issueInvoice } from "./invoices";
 import { checkOrderRisk } from "./risk";
 import { describePersonalization } from "./personalization";
@@ -243,6 +244,7 @@ export async function onOrderPaid(ctx: FulfillmentContext, orderId: string) {
   await issueInvoice(ctx.db, orderId);
   await sendOrderEmail(ctx, orderId, "order_confirmation");
   await earnPoints(ctx.db, orderId);
+  await applyTagRulesForOrder(ctx.db, orderId);
   if (await checkOrderRisk(ctx.db, orderId, now(ctx))) return { placed: 0, failed: 0, skipped: "held" as const };
   return routeAndIssue(ctx, orderId);
 }
