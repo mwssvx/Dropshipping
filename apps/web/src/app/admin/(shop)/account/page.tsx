@@ -1,21 +1,23 @@
 import { cookies } from "next/headers";
 import QRCode from "qrcode";
-import { listSignIns, pendingTwoStep, twoStepStatus } from "@sf/core";
+import { can, listSignIns, pendingTwoStep, twoStepStatus } from "@sf/core";
 import { BRAND } from "@/lib/brand";
 import { requireShop, SESSION_COOKIE } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { startTwoStepAction } from "../../account-actions";
 import { ConfirmTwoStepForm, RenewCodesForm, TurnOffForm } from "./TwoStepForms";
 import { SignIns } from "./SignIns";
+import { SummaryForm } from "./SummaryForm";
 
 export const metadata = { title: "Your account" };
 
 export default async function AccountPage({ searchParams }: { searchParams: Promise<{ recovered?: string }> }) {
-  const { user, db } = await requireShop();
+  const { user, db, shop, role } = await requireShop();
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   const [status, pending, signIns] = await Promise.all([twoStepStatus(db, user.id), pendingTwoStep(db, user.id, BRAND), listSignIns(db, user.id, token)]);
   const now = Date.now();
   const recovered = (await searchParams).recovered === "1";
+  const membership = await db.query.shopMembers.findFirst({ where: (m, { and, eq }) => and(eq(m.shopId, shop.id), eq(m.userId, user.id)) });
   const qr = pending ? await QRCode.toString(pending.uri, { type: "svg", margin: 1, errorCorrectionLevel: "M" }) : null;
   const since = status.since?.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 
@@ -76,6 +78,15 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
           )}
         </section>
 
+        {can(role, "money") && (
+          <section className="card p-5 flex flex-col gap-4" aria-labelledby="summary-heading">
+            <div>
+              <h2 id="summary-heading" className="font-semibold">Monday summary</h2>
+              <p className="hint">One email a week with last week&apos;s sales, orders, best sellers and profit, and anything waiting for you. Stores with a quiet week and nothing waiting don&apos;t send one.</p>
+            </div>
+            <SummaryForm shopName={shop.name} on={membership?.weeklySummary ?? true} />
+          </section>
+        )}
         <section className="card p-5 flex flex-col gap-4" aria-labelledby="sign-ins-heading">
           <div className="flex flex-col gap-1">
             <h2 id="sign-ins-heading" className="font-semibold">Where you&apos;re signed in</h2>

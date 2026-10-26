@@ -199,6 +199,8 @@ export const shops = pgTable(
     searchFixes: jsonb("search_fixes").$type<SearchFix[]>().notNull().default([]),
     // "Lowest price in the 30 days before the discount" next to reduced prices: the EU's rule.
     lowestPriceNote: text("lowest_price_note", { enum: ["eu", "everyone", "off"] }).notNull().default("eu"),
+    // The Monday summary email: the week (its Monday, YYYY-MM-DD) it was last sent for.
+    weeklySummaryFor: text("weekly_summary_for"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -215,6 +217,8 @@ export const shopMembers = pgTable(
     shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
     userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     role: text("role", { enum: ["owner", "admin", "staff"] }).notNull().default("owner"),
+    // Gets the Monday summary of this store, for those who can see its money. On unless turned off.
+    weeklySummary: boolean("weekly_summary").notNull().default(true),
     createdAt: createdAt(),
   },
   (t) => [primaryKey({ columns: [t.shopId, t.userId] }), index("shop_members_user_idx").on(t.userId)],
