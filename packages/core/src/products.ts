@@ -58,6 +58,47 @@ export async function createProduct(db: Db, shopId: string, input: ProductInput)
   });
 }
 
+/**
+ * Copies a product as a draft: its photos, options, prices, supplier listing and settings, and the
+ * collections and size charts it's in. Reviews, questions and translations stay with the original.
+ * Products the merchant stocks themselves start at 0 so stock isn't counted twice; supplier
+ * products keep the supplier's numbers until the next stock check.
+ */
+export async function duplicateProduct(db: Db, shopId: string, productId: string) {
+  const { variants: vs, ...original } = await getProduct(db, shopId, productId);
+  const title = `Copy of ${original.title}`.slice(0, 200);
+  const handle = await uniqueHandle(title, async (h) =>
+    !!(await db.query.products.findFirst({
+      where: and(eq(schema.products.shopId, shopId), eq(schema.products.handle, h)),
+      columns: { id: true },
+    })),
+  );
+  const { id: _id, createdAt: _c, updatedAt: _u, stockCheckedAt: _s, ...fields } = original;
+  return db.transaction(async (tx) => {
+    const [copy] = await tx.insert(schema.products).values({ ...fields, title, handle, status: "draft" }).returning();
+    const ids = new Map<string, string>();
+    for (const { id, ...v } of vs) {
+      const [row] = await tx
+        .insert(schema.variants)
+        .values({ ...v, productId: copy!.id, stock: original.supplierId || v.stock === null ? v.stock : 0 })
+        .returning({ id: schema.variants.id });
+      ids.set(id, row!.id);
+    }
+    // The backup supplier's listing is kept per option, so it follows the new option ids.
+    if (original.backup) {
+      const variants = Object.fromEntries(Object.entries(original.backup.variants).flatMap(([k, b]) => (ids.has(k) ? [[ids.get(k)!, b]] : [])));
+      await tx.update(schema.products).set({ backup: { ...original.backup, variants } }).where(eq(schema.products.id, copy!.id));
+    }
+    const inCollections = await tx.query.collectionProducts.findMany({ where: eq(schema.collectionProducts.productId, productId) });
+    if (inCollections.length) await tx.insert(schema.collectionProducts).values(inCollections.map((c) => ({ ...c, productId: copy!.id })));
+    const charts = await tx.query.sizeCharts.findMany({ where: eq(schema.sizeCharts.shopId, shopId) });
+    for (const c of charts.filter((c) => c.productIds.includes(productId))) {
+      await tx.update(schema.sizeCharts).set({ productIds: [...c.productIds, copy!.id] }).where(eq(schema.sizeCharts.id, c.id));
+    }
+    return copy!;
+  });
+}
+
 export async function updateProduct(db: Db, shopId: string, productId: string, input: ProductInput) {
   const { variants, imageUrl, ...data } = parse(input);
   // Photos have their own editor; an image address given here (the API) becomes the cover.
