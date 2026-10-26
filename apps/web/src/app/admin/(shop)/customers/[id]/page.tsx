@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { can, creditFor, customerPoints, formatMoney, getCustomerProfile, NotFoundError, RETURN_REASON_LABELS } from "@sf/core";
+import { can, creditFor, customerPoints, formatMoney, getCustomerProfile, NotFoundError, personalCodesFor, RETURN_REASON_LABELS } from "@sf/core";
 import { FulfilmentStatus, PaymentStatus } from "@/components/Status";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../../PageHeader";
-import { EraseForm, NotesForm } from "./CustomerForms";
+import { EraseForm, NotesForm, PersonalCodeForm } from "./CustomerForms";
 import { AdjustPointsForm } from "../../rewards/RewardsForms";
 
 export const metadata = { title: "Customer" };
@@ -25,6 +25,9 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const seesMoney = can(role, "money");
   const money = (m: number) => formatMoney(m, shop.currency);
   const points = await customerPoints(db, customer.id);
+  const marketing = can(role, "marketing");
+  const codes = marketing ? await personalCodesFor(db, shop.id, customer.email) : [];
+  const off = (c: (typeof codes)[number]) => (c.kind === "percent" ? `${c.value}% off` : `${money(c.value)} off`);
 
   return (
     <main className="pb-12">
@@ -130,6 +133,24 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                   {a.name}<br />{a.line1}{a.line2 ? <>, {a.line2}</> : null}<br />{a.city}{a.region ? `, ${a.region}` : ""} {a.postalCode}<br />{a.country}
                 </address>
               ))}
+            </section>
+          )}
+          {marketing && (
+            <section className="card p-5 flex flex-col gap-3 text-sm" aria-labelledby="code-h">
+              <h2 id="code-h" className="font-semibold">Send a code</h2>
+              <PersonalCodeForm id={customer.id} currency={shop.currency} />
+              {codes.length > 0 && (
+                <ul className="flex flex-col gap-1 border-t border-border pt-3" aria-label="Codes sent">
+                  {codes.map((c) => (
+                    <li key={c.id} className="flex flex-wrap justify-between gap-2">
+                      <span><span className="font-mono">{c.code}</span> · {off(c)}</span>
+                      <span className="hint">
+                        {c.status === "used" ? `Used on #${c.orderNumber}` : c.status === "expired" ? "Expired" : `Until ${date(c.endsAt)}`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </section>
           )}
           <section className="card p-5" aria-label="Note and tags">

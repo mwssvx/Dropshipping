@@ -13,8 +13,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ shop
   const code = decodeURIComponent(raw).trim().toUpperCase();
   if (/^[A-Z0-9_-]{3,30}$/.test(code)) {
     const d = await (await db()).query.discounts.findFirst({ where: (t, { and, eq }) => and(eq(t.shopId, shop.id), eq(t.code, code)) });
-    // Codes made for one buyer's email aren't for sharing.
-    if (d?.active && !d.email) await writeDiscountCode(shop.id, code);
+    // A code made for one buyer's email (a personal code's "Shop now" link) is checked against it at checkout.
+    if (d?.active) await writeDiscountCode(shop.id, code);
   }
   const to = new URL(request.url).searchParams.get("to") ?? "/";
   const path = to.startsWith("/") && !to.startsWith("//") && !to.startsWith("/\\") ? to : "/";
