@@ -1,5 +1,6 @@
 import type { Facet, Sort } from "@sf/core";
 import { storeText, type StoreText } from "@/lib/store-text";
+import { SearchSuggest } from "./SearchSuggest";
 
 export type BrowseParams = { q?: string; sort?: string; min?: string; max?: string; stock?: string; sale?: string; opt?: string | string[] };
 
@@ -42,8 +43,13 @@ export function BrowseBar({ action, params, sort, currency, search, count, facet
     <form action={action} method="get" role="search" aria-label={search ? t.searchStore : t.sortAndFilter} className="flex flex-col gap-4">
       {search && (
         <div className="flex gap-2">
-          <label className="sr-only" htmlFor="q">{t.search}</label>
-          <input className="input flex-1" id="q" name="q" type="search" defaultValue={params.q ?? ""} placeholder={t.searchProducts} autoFocus={!params.q} maxLength={200} />
+          <SearchSuggest
+            suggestUrl={`${action}/suggest`}
+            defaultValue={params.q ?? ""}
+            placeholder={t.searchProducts}
+            autoFocus={!params.q}
+            labels={{ search: t.search, suggestions: t.suggestions, soldOut: t.soldOut, seeAll: t.seeAllResults("%s") }}
+          />
           <button className="btn btn-primary">{t.search}</button>
         </div>
       )}
