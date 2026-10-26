@@ -152,6 +152,11 @@ export default async function CartPage({ params, searchParams }: { params: Promi
             <dd className="col-span-2 hint text-right font-sans">{quote.pricesIncludeTax ? t.taxIncludedNote : t.taxAddedNote}</dd>
             {points > 0 && <dd className="col-span-2 text-right font-sans text-success">{t.rewardsEarn(points.toLocaleString("en-US"))}</dd>}
           </dl>
+          {quote.spendNudge && (
+            <p className="self-end banner banner-info text-sm" role="status">
+              {t.spendNudge(money(convertAmount(quote.spendNudge.moreMinor, fx)), quote.spendNudge.kind === "percent" ? `${quote.spendNudge.value}%` : money(convertAmount(quote.spendNudge.value, fx)))}
+            </p>
+          )}
           {quote.offerNudge && (
             <p className="self-end banner banner-info text-sm" role="status">{quote.offerNudge.label}: {t.offerNudge(quote.offerNudge.missing, quote.offerNudge.free)}</p>
           )}

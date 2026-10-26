@@ -30,8 +30,9 @@ export async function createDiscountAction(_: FormState, form: FormData): Promis
       kind,
       value: kind === "percent" || kind === "bxgy" ? Number.parseInt(raw || "0", 10) : kind === "amount" ? parseMoney(raw || "0") : 0,
       ...(kind === "bxgy"
-        ? { buyQty: count("buyQty"), getQty: count("getQty"), productIds: form.getAll("productIds").map(String), automatic: form.get("automatic") === "on" }
+        ? { buyQty: count("buyQty"), getQty: count("getQty"), productIds: form.getAll("productIds").map(String) }
         : {}),
+      automatic: kind !== "free_shipping" && form.get("automatic") === "on",
       minSubtotalMinor: min ? parseMoney(min) : 0,
       usageLimit: limit ? Number.parseInt(limit, 10) : null,
       oncePerCustomer: form.get("oncePerCustomer") === "on",

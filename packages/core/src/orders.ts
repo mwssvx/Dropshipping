@@ -194,6 +194,8 @@ export async function quoteCart(
   let codeNotUsed: string | null = null;
   /** An automatic buy X get Y offer the cart is one step from: "add 1 more and it's free". */
   let offerNudge = null as { label: string; missing: number; free: boolean } | null;
+  /** The next "Spend more, save more" step: how much more to spend, and what it takes off (a percent or an amount). */
+  let spendNudge = null as { moreMinor: number; kind: "percent" | "amount"; value: number } | null;
   const units: OfferUnit[] = goods.map((i) => ({ productId: i.productId, unitMinor: i.unitPriceMinor, quantity: i.quantity }));
   const use = (d: Discount, applied: { discountMinor: number; shippingMinor: number }) => {
     bundle = null;
@@ -215,12 +217,15 @@ export async function quoteCart(
   } else if (!wholesale && hasGoods) {
     // Offers that need no code: the one saving the most, unless a bundle saves more.
     let best: { d: Discount; applied: { discountMinor: number; shippingMinor: number } } | null = null;
-    for (const d of await automaticOffers(db, shop.id)) {
+    const offers = await automaticOffers(db, shop.id);
+    const tiers: Discount[] = [];
+    for (const d of offers) {
       try {
         await findUsableDiscount(db, shop, d.code, { subtotalMinor: goodsMinor, email: opts.email });
       } catch (e) {
-        if (e instanceof UserError) continue;
-        throw e;
+        if (!(e instanceof UserError)) throw e;
+        if (d.kind !== "bxgy" && goodsMinor < d.minSubtotalMinor) tiers.push(d);
+        continue;
       }
       const applied = applyDiscount(d, goodsMinor, shippingMinor, units);
       if (applied.discountMinor > (best?.applied.discountMinor ?? 0)) best = { d, applied };
@@ -228,6 +233,12 @@ export async function quoteCart(
       if (missing && !offerNudge) offerNudge = { label: describeDiscount(d, shop.currency), missing, free: d.value >= 100 };
     }
     if (best && !(bundle && bundle.discountMinor >= best.applied.discountMinor)) use(best.d, best.applied);
+    // The nearest step up that would save more than what the cart gets now.
+    const now = discount?.discountMinor ?? bundle?.discountMinor ?? 0;
+    const next = tiers
+      .filter((d) => applyDiscount(d, d.minSubtotalMinor, shippingMinor).discountMinor > now)
+      .sort((a, b) => a.minSubtotalMinor - b.minSubtotalMinor)[0];
+    if (next) spendNudge = { moreMinor: next.minSubtotalMinor - goodsMinor, kind: next.kind as "percent" | "amount", value: next.value };
   }
   const discountMinor = discount?.discountMinor ?? bundle?.discountMinor ?? 0;
   const totalMinor = subtotalMinor - discountMinor + shippingMinor;
@@ -247,6 +258,7 @@ export async function quoteCart(
     bundle,
     codeNotUsed,
     offerNudge,
+    spendNudge,
     discountMinor,
     shippingMinor,
     totalMinor,
@@ -518,6 +530,7 @@ function asFollowUp(cart: Awaited<ReturnType<typeof quoteCart>>, percent: number
     giftCard: null,
     wholesale: null,
     offerNudge: null,
+    spendNudge: null,
     freeShipping: null,
     totalMinor: subtotalMinor + (opts.keepShipping ? cart.shippingMinor : 0),
     dueMinor: subtotalMinor + (opts.keepShipping ? cart.shippingMinor : 0),

@@ -60,9 +60,6 @@ export function DiscountForm({ currency, products }: { currency: string; product
               </div>
             </fieldset>
           )}
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="automatic" defaultChecked /> Apply it automatically, no code needed. Product pages show the offer.
-          </label>
         </div>
       )}
       <div className="grid gap-3 sm:grid-cols-3">
@@ -79,6 +76,16 @@ export function DiscountForm({ currency, products }: { currency: string; product
           <input className="input" id="endsAt" name="endsAt" type="date" />
         </div>
       </div>
+      {kind !== "free_shipping" && (
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" name="automatic" defaultChecked={kind === "bxgy"} key={kind} className="mt-1" />
+          <span>
+            {kind === "bxgy"
+              ? "Apply it automatically, no code needed. Product pages show the offer."
+              : "Apply it automatically to orders over the minimum, no code needed. The cart tells buyers how much more to spend, so you can set a few steps (spend more, save more)."}
+          </span>
+        </label>
+      )}
       <div className="grid gap-3 sm:grid-cols-3 items-end">
         <div className="field">
           <label className="label" htmlFor="usageLimit">Total uses</label>

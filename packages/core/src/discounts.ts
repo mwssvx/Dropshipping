@@ -36,7 +36,11 @@ const discountInput = z
       if (!d.getQty || d.getQty < 1 || d.getQty > 20) ctx.addIssue({ code: "custom", message: "Say how many they get, from 1 to 20." });
       if (d.value < 1 || d.value > 100) ctx.addIssue({ code: "custom", message: "The items they get are 1 to 100% off (100 is free)." });
     }
-    if (d.automatic && d.kind !== "bxgy") ctx.addIssue({ code: "custom", message: "Only buy X get Y offers can apply without a code." });
+    if (d.automatic && d.kind === "free_shipping") ctx.addIssue({ code: "custom", message: "Free shipping over an amount is set under Shipping instead." });
+    // Money off without a code needs a minimum order ("Spend more, save more"); money off everything is a sale.
+    if (d.automatic && (d.kind === "percent" || d.kind === "amount") && d.minSubtotalMinor < 1) {
+      ctx.addIssue({ code: "custom", message: "Set a minimum order for money off without a code. For money off everything, start a sale." });
+    }
     if (d.startsAt && d.endsAt && d.endsAt <= d.startsAt) ctx.addIssue({ code: "custom", message: "The end date must be after the start date." });
   });
 
@@ -62,7 +66,7 @@ export async function createDiscount(db: Db, shopId: string, input: DiscountInpu
       buyQty: bxgy ? d.buyQty! : null,
       getQty: bxgy ? d.getQty! : null,
       productIds,
-      automatic: bxgy && d.automatic,
+      automatic: d.kind !== "free_shipping" && d.automatic,
       usageLimit: d.usageLimit ?? null,
       startsAt: d.startsAt ?? null,
       endsAt: d.endsAt ?? null,
@@ -137,7 +141,7 @@ export function bxgyMissing(d: Bxgy, units: OfferUnit[]) {
   return r >= d.buyQty! ? group - r : 0;
 }
 
-/** Buy X get Y offers that apply without a code, running now. */
+/** Offers that apply without a code, running now: buy X get Y, and money off orders over an amount. */
 export async function automaticOffers(db: Db, shopId: string, now = new Date()) {
   const t = schema.discounts;
   return db.query.discounts.findMany({

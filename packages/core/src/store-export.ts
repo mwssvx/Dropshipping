@@ -633,7 +633,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
           buyQty: bxgy ? d.buy_qty! : null,
           getQty: bxgy ? d.get_qty! : null,
           productIds: bxgy ? scope : [],
-          automatic: bxgy && d.automatic,
+          automatic: d.automatic && (bxgy || ((d.kind === "percent" || d.kind === "amount") && d.min_subtotal > 0)),
         })
         .onConflictDoNothing();
     }
