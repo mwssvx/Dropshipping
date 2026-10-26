@@ -139,6 +139,8 @@ export const shops = pgTable(
     abandonedCartEmails: boolean("abandoned_cart_emails").notNull().default(true),
     // Show new reviews straight away instead of waiting for the merchant.
     reviewsAutoPublish: boolean("reviews_auto_publish").notNull().default(false),
+    // Buyers are emailed asking for a review this many days after their order arrives; 0 turns it off.
+    reviewRequestDays: integer("review_request_days").notNull().default(7),
     // Extra currencies buyers can shop in, converted from the store's own currency at today's rate.
     presentmentCurrencies: jsonb("presentment_currencies").$type<string[]>().notNull().default([]),
     // Round converted prices up to end in .99 (shipping and tax are never rounded).
@@ -536,6 +538,8 @@ export const orders = pgTable(
     edits: jsonb("edits").$type<OrderEdit[]>().notNull().default([]),
     // What the buyer typed in "Note for the store" at checkout ("Please leave it with the neighbour").
     buyerNote: text("buyer_note"),
+    // When the buyer was asked to review what they got, once per order.
+    reviewRequestedAt: timestamp("review_requested_at", { withTimezone: true }),
     // The merchant's own note and labels ("follow up", "vip"). Never shown to the buyer.
     staffNote: text("staff_note"),
     tags: jsonb("tags").$type<string[]>().notNull().default([]),
