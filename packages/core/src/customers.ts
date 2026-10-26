@@ -202,7 +202,7 @@ export async function exportCustomerData(db: Db, shop: { id: string; name: strin
       items: lines.filter((l) => l.orderId === o.id).map((l) => ({ title: l.title, quantity: l.quantity, unit_price: l.unitPriceMinor })),
       refunds: refunds.filter((r) => r.orderId === o.id).map((r) => ({ amount: r.amountMinor, reason: r.reason, created_at: r.createdAt.toISOString() })),
     })),
-    reviews: reviews.map((r) => ({ order: numbers.get(r.orderId), name: r.name, rating: r.rating, body: r.body, status: r.status, photos: r.photoIds.map(reviewPhotoUrl), created_at: r.createdAt.toISOString() })),
+    reviews: reviews.map((r) => ({ order: numbers.get(r.orderId!), name: r.name, rating: r.rating, body: r.body, status: r.status, photos: r.photoIds.map(reviewPhotoUrl), created_at: r.createdAt.toISOString() })),
     returns: returns.map((r) => ({ order: numbers.get(r.orderId), status: r.status, reason: r.reason, note: r.note, items: r.items.map((i) => ({ title: i.title, quantity: i.quantity })), created_at: r.createdAt.toISOString() })),
     questions: questions.map((q) => ({ product: q.product, question: q.body, answer: q.answer, shown_on_store: q.status === "published", asked_at: q.createdAt.toISOString() })),
     messages: messages.map((m) => ({ conversation: conversations.find((c) => c.id === m.conversationId)!.subject, from: m.author === "buyer" ? "you" : "store", body: m.body, at: m.createdAt.toISOString() })),

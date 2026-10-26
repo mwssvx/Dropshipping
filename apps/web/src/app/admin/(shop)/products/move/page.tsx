@@ -3,6 +3,7 @@ import { requireShop } from "@/lib/server";
 import { PageHeader } from "../../PageHeader";
 import { ShopifyImportForm } from "./ShopifyImportForm";
 import { ShopifyCustomersForm } from "./ShopifyCustomersForm";
+import { ReviewsImportForm } from "./ReviewsImportForm";
 
 export const metadata = { title: "Move from Shopify" };
 
@@ -38,6 +39,16 @@ export default async function MoveFromShopifyPage() {
           </p>
         </section>
         <ShopifyCustomersForm />
+        <section className="flex flex-col gap-2" aria-labelledby="reviews-heading">
+          <h2 id="reviews-heading" className="font-semibold">Bring your reviews over</h2>
+          <p className="hint text-sm">
+            Export your reviews as a CSV from the app you used on Shopify: Shopify&apos;s Product Reviews app or Judge.me. Each review goes
+            on the product with the same web address, so bring the products over first. The name, stars, text, date and your reply come
+            across, and reviews that were published stay published. Photos don&apos;t come across, and imported reviews aren&apos;t marked
+            &quot;Verified buyer&quot;, since their orders aren&apos;t here. Adding the same file again adds nothing twice.
+          </p>
+        </section>
+        <ReviewsImportForm />
       </div>
     </main>
   );

@@ -1085,7 +1085,8 @@ export const reviews = pgTable(
     id: id(),
     shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
     productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
-    orderId: uuid("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+    // The order it was written for. Reviews brought over from another platform have none.
+    orderId: uuid("order_id").references(() => orders.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     rating: integer("rating").notNull(),
     body: text("body").notNull(),
@@ -1093,10 +1094,14 @@ export const reviews = pgTable(
     reply: text("reply"),
     // Photos the buyer added, as ids in the media table (served at /api/media/<id>).
     photoIds: jsonb("photo_ids").$type<string[]>().notNull().default([]),
+    // Brought over from a review app's export: where from, and a key so the same file adds nothing twice.
+    importedFrom: text("imported_from"),
+    importKey: text("import_key"),
     createdAt: createdAt(),
   },
   (t) => [
     uniqueIndex("reviews_order_product_uq").on(t.orderId, t.productId),
+    uniqueIndex("reviews_shop_import_uq").on(t.shopId, t.importKey),
     index("reviews_product_idx").on(t.productId, t.status),
     check("reviews_rating_range", sql`${t.rating} between 1 and 5`),
   ],
