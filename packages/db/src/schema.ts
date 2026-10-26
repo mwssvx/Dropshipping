@@ -1037,12 +1037,26 @@ export const discounts = pgTable(
     // Welcome and referral codes are made one per person, only work for that email, and stay off
     // the codes list. Partner codes are listed on the Partners page instead, and personal codes (sent
     // to one customer from their page) on that customer's page.
-    source: text("source", { enum: ["merchant", "welcome", "referral", "winback", "partner", "personal"] }).notNull().default("merchant"),
+    source: text("source", { enum: ["merchant", "welcome", "referral", "winback", "partner", "personal", "batch"] }).notNull().default("merchant"),
     email: text("email"),
+    // One-time codes made together (for a giveaway or a card in the parcel) belong to a batch.
+    batchId: uuid("batch_id").references((): AnyPgColumn => codeBatches.id, { onDelete: "cascade" }),
     createdAt: createdAt(),
   },
-  (t) => [uniqueIndex("discounts_shop_code_uq").on(t.shopId, t.code), check("discounts_value_ok", sql`${t.value} >= 0`)],
+  (t) => [uniqueIndex("discounts_shop_code_uq").on(t.shopId, t.code), index("discounts_batch_idx").on(t.batchId), check("discounts_value_ok", sql`${t.value} >= 0`)],
 );
+
+// A batch of one-time codes: many codes with the same offer, each usable once by anyone. The
+// codes themselves are discounts rows with source "batch".
+export const codeBatches = pgTable("code_batches", {
+  id: id(),
+  shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  prefix: text("prefix").notNull(),
+  count: integer("count").notNull(),
+  active: boolean("active").notNull().default(true),
+  createdAt: createdAt(),
+});
 
 // Refer a friend: one row per friend who asked for their code from someone's link. Each email
 // can be referred once per store. The referrer's credit is a gift card, sent once the friend's

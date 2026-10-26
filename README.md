@@ -675,3 +675,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **A facts table**: under Details on a product's page in the admin, the merchant writes short facts one per line, like `Material: Aluminium` or `In the box: Lamp, remote, USB-C cable` (up to 20). The store shows them as a table under the description, and search engines get them as product properties (`packages/core/src/product-details.ts`).
 2. **Checked as it's saved**: a line without a label and a value says which line it is, and the box keeps what was typed. An empty box removes the table.
 3. **Follows the product**: duplicating a product copies its details, store export and import carry them, and they're translated with the title and description, by the merchant or the AI translator, so buyers read them in their language.
+
+### One-time codes (after launch, part 94)
+
+1. **Many codes at once**: under One-time codes on the Marketing page, the merchant makes up to 1,000 codes with one offer (percent off, an amount off or free shipping, with a minimum order and a last day if they like), named for what they're for, like "Parcel cards". Each code is the merchant's start and eight random letters and numbers, like `THANKS-7KQ2M9XA`, without 0/O or 1/I so it's easy to type from a printed card (`packages/core/src/code-batches.ts`).
+2. **Each works once**: the first paid order to use a code uses it up, whoever it is, and the others keep working. Turning the batch off stops all its codes at once.
+3. **A spreadsheet to print or hand out**: each batch downloads as a CSV with every code and the order that used it, if one has. The list shows how many have been used. Batch codes stay off the regular codes list and out of the store export.
