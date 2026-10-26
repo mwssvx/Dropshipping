@@ -651,3 +651,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **From their page**: a customer's page has "Send a code". The merchant picks a percent or amount off, how many days it works (1 to 90) and an optional message, like an apology for a late parcel, and it's emailed straight away (`sendPersonalCode` in `packages/core/src/personal-codes.ts`).
 2. **Theirs alone**: the code works once, only with that customer's email, and stays off the Marketing codes list. The email's "Shop now" link puts it in their cart; share links now take any active code, since checkout checks the email either way.
 3. **What happened to it**: the customer's page lists the codes sent to them, and whether each was used (on which order), expired or is still open. Sending one is in the activity log, and erasing the customer turns their codes off.
+
+### Sold out at the supplier (after launch, part 90)
+
+1. **Told once**: after the daily stock check, when every option of a product on sale has run out at its supplier (and at its backup supplier, if it has one), the people who look after products get one email listing it, with a link to the product (`notifySoldOut` in `packages/core/src/supplier-sold-out.ts`). They're told again only if it comes back and runs out again. Products taking pre-orders still sell, so they're left out, and so are products added by hand.
+2. **Where it shows**: Home and the phone app's Today screen list it under what needs attention, and so does the Monday summary. The Products page has a "Sold out at the supplier" list that says which ones have a backup supplier that's out too.
+3. **What to do**: add a backup supplier so orders go there instead, or take the product off sale. The store sells it again by itself when the supplier restocks.

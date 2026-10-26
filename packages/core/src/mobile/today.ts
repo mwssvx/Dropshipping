@@ -3,11 +3,12 @@ import { schema, type Db } from "@sf/db";
 import { countNeedsYou } from "../ai/conversations";
 import { listPendingActions } from "../ai/runtime";
 import { listRequirements } from "../payouts";
+import { soldOutAtSupplier } from "../supplier-sold-out";
 import { openNotices } from "../trust";
 import type { Shop } from "../ai/context";
 import { can, type Role } from "../team";
 
-export type AttentionItem = { kind: "hold" | "notice" | "problems" | "risk" | "to_send" | "inbox"; title: string; body: string; url: string; tone: "critical" | "warning" | "info" };
+export type AttentionItem = { kind: "hold" | "notice" | "problems" | "risk" | "to_send" | "inbox" | "sold_out"; title: string; body: string; url: string; tone: "critical" | "warning" | "info" };
 
 const DAY = 86_400_000;
 
@@ -16,7 +17,7 @@ export async function todaySummary(db: Db, shop: Shop, now = new Date(), role: R
   const startOfDay = new Date(now);
   startOfDay.setHours(0, 0, 0, 0);
   const weekAgo = new Date(now.getTime() - 7 * DAY);
-  const [recent, open, requirements, notices, pending, inbox] = await Promise.all([
+  const [recent, open, requirements, notices, pending, inbox, soldOut] = await Promise.all([
     db.query.orders.findMany({
       where: and(eq(schema.orders.shopId, shop.id), inArray(schema.orders.paymentStatus, ["paid", "partially_refunded", "refunded"]), gte(schema.orders.paidAt, weekAgo)),
     }),
@@ -28,6 +29,7 @@ export async function todaySummary(db: Db, shop: Shop, now = new Date(), role: R
     openNotices(db, shop.id),
     listPendingActions(db, shop.id),
     countNeedsYou(db, shop.id),
+    can(role, "products") ? soldOutAtSupplier(db, shop.id, now) : [],
   ]);
   const net = (o: (typeof recent)[number]) => o.totalMinor - o.refundedMinor;
   const today = recent.filter((o) => o.paidAt! >= startOfDay);
@@ -48,10 +50,18 @@ export async function todaySummary(db: Db, shop: Shop, now = new Date(), role: R
   const toSend = open.length - problems - held;
   if (toSend) attention.push({ kind: "to_send", tone: "info", title: `${toSend} ${toSend === 1 ? "order" : "orders"} on the way to the supplier`, body: "These are sent automatically.", url: "/orders?show=to_send" });
   if (inbox) attention.push({ kind: "inbox", tone: "warning", title: `${inbox} buyer ${inbox === 1 ? "question needs" : "questions need"} you`, body: "Open the inbox to answer them.", url: "/inbox" });
+  if (soldOut.length)
+    attention.push({
+      kind: "sold_out",
+      tone: "warning",
+      title: soldOut.length === 1 ? `${soldOut[0]!.title} sold out at the supplier` : `${soldOut.length} products sold out at the supplier`,
+      body: "Buyers can't order them until the supplier restocks. Add a backup supplier, or take them off sale.",
+      url: "/products#supplier-sold-out",
+    });
 
   // Staff see order counts and order problems, not sales totals, payouts or AI proposals.
   const seesMoney = can(role, "money");
-  const ATTENTION_AREA = { hold: "money", notice: "trust", problems: "orders", risk: "orders", to_send: "orders", inbox: "inbox" } as const;
+  const ATTENTION_AREA = { hold: "money", notice: "trust", problems: "orders", risk: "orders", to_send: "orders", inbox: "inbox", sold_out: "products" } as const;
   return {
     currency: shop.currency,
     salesTodayMinor: seesMoney ? today.reduce((s, o) => s + net(o), 0) : null,

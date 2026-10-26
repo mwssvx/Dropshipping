@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatMoney, listCollections, listProducts, recentBulkEdits } from "@sf/core";
+import { formatMoney, listCollections, listProducts, recentBulkEdits, soldOutAtSupplier } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { BulkProducts, type BulkRow } from "./BulkProducts";
@@ -11,7 +11,7 @@ export const metadata = { title: "Products" };
 
 export default async function ProductsPage() {
   const { shop, db } = await requireShop("products");
-  const [products, collections, recent] = await Promise.all([listProducts(db, shop.id), listCollections(db, shop.id), recentBulkEdits(db, shop.id)]);
+  const [products, collections, recent, soldOut] = await Promise.all([listProducts(db, shop.id), listCollections(db, shop.id), recentBulkEdits(db, shop.id), soldOutAtSupplier(db, shop.id)]);
   const rows: BulkRow[] = products.map((p) => {
     const v = p.variants[0];
     return {
@@ -32,6 +32,26 @@ export default async function ProductsPage() {
         <Link href="/admin/products/import" className="btn btn-primary">Import from supplier</Link>
       </>} />
       <div className="px-4 sm:px-8">
+        {soldOut.length > 0 && (
+          <section id="supplier-sold-out" className="card p-5 mb-6 flex flex-col gap-3 max-w-3xl scroll-mt-20" aria-labelledby="supplier-sold-out-heading">
+            <div>
+              <h2 id="supplier-sold-out-heading" className="font-semibold">Sold out at the supplier</h2>
+              <p className="hint text-sm">
+                Every option of {soldOut.length === 1 ? "this product" : "these products"} ran out at the supplier, so buyers can&apos;t order{" "}
+                {soldOut.length === 1 ? "it" : "them"}. Add a backup supplier on the product page and orders go there instead, or take{" "}
+                {soldOut.length === 1 ? "it" : "them"} off sale. The store sells {soldOut.length === 1 ? "it" : "them"} again by itself when the supplier restocks.
+              </p>
+            </div>
+            <ul className="flex flex-col divide-y divide-border" aria-label="Sold out at the supplier">
+              {soldOut.map((p) => (
+                <li key={p.id} className="py-2 flex items-center justify-between gap-3">
+                  <Link href={`/admin/products/${p.id}`} className="underline">{p.title}</Link>
+                  <span className="hint text-sm">{p.hasBackup ? "Backup supplier is out too" : "No backup supplier"}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         {products.length === 0 ? (
           <div className="card p-10 flex flex-col items-center text-center gap-3">
             <h2 className="font-semibold text-lg">Add your first product</h2>

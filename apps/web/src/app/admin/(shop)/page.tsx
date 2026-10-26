@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { can, formatMoney, listOrders, listProducts, listRequirements, twoStepStatus } from "@sf/core";
+import { can, formatMoney, listOrders, listProducts, listRequirements, soldOutAtSupplier, twoStepStatus } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "./PageHeader";
 
@@ -8,7 +8,13 @@ export const metadata = { title: "Home" };
 export default async function AdminHome({ searchParams }: { searchParams: Promise<{ denied?: string }> }) {
   const { shop, db, role, user } = await requireShop("home");
   const { denied } = await searchParams;
-  const [orders, products, requirements, twoStep] = await Promise.all([listOrders(db, shop.id), listProducts(db, shop.id), listRequirements(db, shop.id), twoStepStatus(db, user.id)]);
+  const [orders, products, requirements, twoStep, soldOut] = await Promise.all([
+    listOrders(db, shop.id),
+    listProducts(db, shop.id),
+    listRequirements(db, shop.id),
+    twoStepStatus(db, user.id),
+    can(role, "products") ? soldOutAtSupplier(db, shop.id) : [],
+  ]);
   const seesMoney = can(role, "money");
   const holds = seesMoney ? requirements.filter((r) => r.holdsPayouts) : [];
   const paid = orders.filter((o) => o.paymentStatus === "paid");
@@ -54,7 +60,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
           </section>
           <section className="card">
             <h2 className="font-semibold px-4 pt-4">Needs your attention</h2>
-            {toSend.length || problems.length || holds.length || held.length ? (
+            {toSend.length || problems.length || holds.length || held.length || soldOut.length ? (
               <ul className="p-2">
                 {holds.length > 0 && (
                   <li>
@@ -76,6 +82,14 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
                   <li>
                     <Link href="/admin/orders?show=held" className="flex items-center justify-between gap-3 px-2 py-3 rounded-md hover:bg-sunken">
                       <span><span className="pill pill-warning mr-2">On hold</span>{held.length} {held.length === 1 ? "order looked" : "orders looked"} risky and {held.length === 1 ? "waits" : "wait"} for you before going to the supplier</span>
+                      <span className="hint">Check →</span>
+                    </Link>
+                  </li>
+                )}
+                {soldOut.length > 0 && (
+                  <li>
+                    <Link href="/admin/products#supplier-sold-out" className="flex items-center justify-between gap-3 px-2 py-3 rounded-md hover:bg-sunken">
+                      <span><span className="pill pill-warning mr-2">Sold out</span>{soldOut.length === 1 ? `${soldOut[0]!.title} is` : `${soldOut.length} products are`} sold out at the supplier, so buyers can&apos;t order {soldOut.length === 1 ? "it" : "them"}</span>
                       <span className="hint">Check →</span>
                     </Link>
                   </li>
