@@ -1030,8 +1030,9 @@ export const discounts = pgTable(
     endsAt: timestamp("ends_at", { withTimezone: true }),
     active: boolean("active").notNull().default(true),
     // Welcome and referral codes are made one per person, only work for that email, and stay off
-    // the codes list. Partner codes are listed on the Partners page instead.
-    source: text("source", { enum: ["merchant", "welcome", "referral", "winback", "partner"] }).notNull().default("merchant"),
+    // the codes list. Partner codes are listed on the Partners page instead, and personal codes (sent
+    // to one customer from their page) on that customer's page.
+    source: text("source", { enum: ["merchant", "welcome", "referral", "winback", "partner", "personal"] }).notNull().default("merchant"),
     email: text("email"),
     createdAt: createdAt(),
   },

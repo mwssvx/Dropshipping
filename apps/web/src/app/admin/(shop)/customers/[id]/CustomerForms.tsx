@@ -1,8 +1,8 @@
 "use client";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
-import { customerNotesAction, eraseCustomerAction, type NotesState } from "../../../customer-actions";
+import { customerNotesAction, eraseCustomerAction, sendPersonalCodeAction, type CodeState, type NotesState } from "../../../customer-actions";
 
 export function NotesForm({ id, note, tags }: { id: string; note: string; tags: string }) {
   const [state, action] = useActionState(customerNotesAction.bind(null, id), {} as NotesState);
@@ -36,6 +36,42 @@ export function EraseForm({ id, email }: { id: string; email: string }) {
         <input className="input" id="confirm" name="confirm" type="email" autoComplete="off" placeholder={email} required />
       </div>
       <SubmitButton className="btn btn-secondary text-critical self-start" pendingText="Erasing…">Erase their data</SubmitButton>
+    </form>
+  );
+}
+
+/** A one-time code for this customer, emailed with a message: to say sorry, or thanks. */
+export function PersonalCodeForm({ id, currency }: { id: string; currency: string }) {
+  const [state, action] = useActionState(sendPersonalCodeAction.bind(null, id), {} as CodeState);
+  const [kind, setKind] = useState("percent");
+  const symbol = new Intl.NumberFormat("en-US", { style: "currency", currency }).formatToParts(0).find((p) => p.type === "currency")?.value ?? "";
+  return (
+    <form action={action} key={state.sent ?? "code"} className="flex flex-col gap-3">
+      <FormError message={state.error} />
+      {state.sent && <p className="text-success" role="status">Sent {state.sent}.</p>}
+      <div className="flex gap-2">
+        <div className="field">
+          <label className="label" htmlFor="codeKind">Off</label>
+          <select className="input" id="codeKind" name="kind" value={kind} onChange={(e) => setKind(e.target.value)}>
+            <option value="percent">Percent</option>
+            <option value="amount">Amount ({symbol})</option>
+          </select>
+        </div>
+        <div className="field w-24">
+          <label className="label" htmlFor="codeValue">{kind === "percent" ? "Percent" : "Amount"}</label>
+          <input className="input num" id="codeValue" name="value" inputMode="decimal" defaultValue={kind === "percent" ? "10" : ""} key={kind} required />
+        </div>
+        <div className="field w-20">
+          <label className="label" htmlFor="codeDays">Days</label>
+          <input className="input num" id="codeDays" name="days" type="number" min={1} max={90} defaultValue={30} required />
+        </div>
+      </div>
+      <div className="field">
+        <label className="label" htmlFor="codeNote">Message (optional)</label>
+        <textarea className="input" id="codeNote" name="note" rows={3} maxLength={500} placeholder="Sorry your parcel took so long. Here's something for next time." />
+      </div>
+      <SubmitButton className="btn btn-secondary self-start" pendingText="Sending…">Email them a code</SubmitButton>
+      <span className="hint">It works once, only with their email.</span>
     </form>
   );
 }

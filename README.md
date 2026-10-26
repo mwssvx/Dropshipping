@@ -645,3 +645,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Asked once it has arrived**: a few days after an order is delivered (7 by default), the daily job emails the buyer "How was …?" with the items they haven't reviewed yet and a link to the review form on their order page (`sendReviewRequests` in `packages/core/src/review-requests.ts`, columns `shops.review_request_days` and `orders.review_requested_at`).
 2. **Only where it fits**: once per order, never for gifts (the buyer didn't receive it), free replacements, refunded orders, orders already reviewed, or buyers who unsubscribed from the store's emails. Each email has a one-click unsubscribe. Orders that arrived more than 30 days before they'd be due are never asked, so turning it on doesn't email old buyers.
 3. **Merchant control**: the Reviews page sets the wait (1 to 30 days) or turns it off, and shows how many requests went out in the last 30 days and how many of those orders got a review.
+
+### Send a customer a code (after launch, part 89)
+
+1. **From their page**: a customer's page has "Send a code". The merchant picks a percent or amount off, how many days it works (1 to 90) and an optional message, like an apology for a late parcel, and it's emailed straight away (`sendPersonalCode` in `packages/core/src/personal-codes.ts`).
+2. **Theirs alone**: the code works once, only with that customer's email, and stays off the Marketing codes list. The email's "Shop now" link puts it in their cart; share links now take any active code, since checkout checks the email either way.
+3. **What happened to it**: the customer's page lists the codes sent to them, and whether each was used (on which order), expired or is still open. Sending one is in the activity log, and erasing the customer turns their codes off.

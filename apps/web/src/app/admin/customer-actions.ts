@@ -1,8 +1,8 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eraseCustomer, updateCustomerNotes, UserError } from "@sf/core";
-import { requireShop } from "@/lib/server";
+import { eraseCustomer, parseMoney, sendPersonalCode, updateCustomerNotes, UserError } from "@sf/core";
+import { campaigns, logged, requireShop } from "@/lib/server";
 
 export type NotesState = { error?: string; saved?: boolean; note?: string; tags?: string };
 
@@ -33,4 +33,33 @@ export async function eraseCustomerAction(id: string, _: { error?: string }, for
   revalidatePath("/admin/customers", "layout");
   revalidatePath("/admin/orders", "layout");
   redirect(`/admin/customers?erased=${orders}`);
+}
+
+export type CodeState = { error?: string; sent?: string };
+
+/** Sends one customer a one-time code with a message, from their page. */
+export async function sendPersonalCodeAction(id: string, _: CodeState, form: FormData): Promise<CodeState> {
+  const { shop, db, user } = await requireShop("marketing");
+  const kind = form.get("kind") === "amount" ? "amount" : "percent";
+  const raw = String(form.get("value") ?? "").trim();
+  let value: number;
+  try {
+    value = kind === "amount" ? parseMoney(raw) : Number.parseInt(raw, 10);
+  } catch {
+    return { error: "Enter the amount, like 10.00." };
+  }
+  try {
+    const code = await sendPersonalCode(await campaigns(), shop, id, {
+      kind,
+      value: Number.isNaN(value) ? 0 : value,
+      days: Number.parseInt(String(form.get("days") ?? ""), 10) || 0,
+      note: String(form.get("note") ?? ""),
+    });
+    await logged({ shop, user, db }, `Sent the code ${code.code} to ${code.email}`, { href: `/admin/customers/${id}` });
+    revalidatePath(`/admin/customers/${id}`);
+    return { sent: code.code };
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
 }
