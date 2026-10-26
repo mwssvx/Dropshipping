@@ -2,12 +2,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { importStore, UserError } from "@sf/core";
-import { requireShop } from "@/lib/server";
+import { logged, requireShop } from "@/lib/server";
 
 export type ImportState = { error?: string };
 
 export async function importStoreAction(_: ImportState, form: FormData): Promise<ImportState> {
-  const { shop, db } = await requireShop("export");
+  const { shop, db, user } = await requireShop("export");
   const file = form.get("file");
   if (!(file instanceof File) || !file.size) return { error: "Choose the store file you downloaded." };
   if (file.size > 10 * 1024 * 1024) return { error: "That file is over 10 MB." };
@@ -20,6 +20,7 @@ export async function importStoreAction(_: ImportState, form: FormData): Promise
   let currencyDiffers = false;
   try {
     currencyDiffers = (await importStore(db, shop.id, data)).currencyDiffers;
+    await logged({ shop, user, db }, `Loaded the store file “${file.name}”`, { href: "/admin/export" });
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
     throw e;

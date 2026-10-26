@@ -19,7 +19,7 @@ import {
   UserError,
   type ThemeDoc,
 } from "@sf/core";
-import { domains, requireShop } from "@/lib/server";
+import { domains, logged, requireShop } from "@/lib/server";
 import type { FormState } from "./actions";
 
 /** Every storefront page of this store, on every address, shows the change. */
@@ -45,12 +45,13 @@ export async function saveThemeAction(doc: unknown) {
 }
 
 export async function publishThemeAction(doc: unknown) {
-  const { shop, db } = await requireShop("theme");
+  const { shop, db, user } = await requireShop("theme");
   const r = await userErrors(async () => {
     await saveThemeDraft(db, shop, doc);
     return publishTheme(db, shop);
   });
   if ("error" in r) return r;
+  await logged({ shop, user, db }, "Published changes to the store's look", { href: "/admin/theme" });
   refreshStore(shop.handle);
   return { publishedAt: r.ok.publishedAt.toISOString() };
 }
@@ -136,10 +137,11 @@ export async function deletePageAction(id: string) {
 // Domains -------------------------------------------------------------------------------------
 
 export async function addDomainAction(_: FormState, form: FormData): Promise<FormState> {
-  const { shop } = await requireShop("domains");
+  const { shop, user, db } = await requireShop("domains");
   const ctx = await domains();
   const r = await userErrors(async () => {
     const d = await addDomain(ctx, shop.id, String(form.get("hostname") ?? ""));
+    await logged({ shop, user, db }, `Added the domain ${d.hostname}`, { href: "/admin/domains" });
     // Records the merchant set up ahead of time are picked up straight away.
     return checkDomain(ctx, shop.id, d.id);
   });
@@ -156,14 +158,20 @@ export async function checkDomainAction(id: string, _: FormState, _form: FormDat
   return r.ok.verifiedAt && !r.ok.lastError ? { saved: true } : { error: r.ok.lastError ?? "Not connected yet." };
 }
 
+const domainName = async (db: Awaited<ReturnType<typeof requireShop>>["db"], shopId: string, id: string) =>
+  (await db.query.domains.findFirst({ where: (d, { and, eq }) => and(eq(d.id, id), eq(d.shopId, shopId)), columns: { hostname: true } }))?.hostname;
+
 export async function makePrimaryDomainAction(id: string) {
-  const { shop, db } = await requireShop("domains");
+  const { shop, db, user } = await requireShop("domains");
   await setPrimaryDomain(db, shop.id, id);
+  await logged({ shop, user, db }, `Made ${(await domainName(db, shop.id, id)) ?? "a domain"} the store's main address`, { href: "/admin/domains" });
   revalidatePath("/admin/domains");
 }
 
 export async function removeDomainAction(id: string) {
-  const { shop } = await requireShop("domains");
+  const { shop, user, db } = await requireShop("domains");
+  const hostname = await domainName(db, shop.id, id);
   await removeDomain(await domains(), shop.id, id);
+  if (hostname) await logged({ shop, user, db }, `Removed the domain ${hostname}`, { href: "/admin/domains" });
   revalidatePath("/admin/domains");
 }

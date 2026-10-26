@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { createDiscount, moderateReview, parseMoney, sendAbandonedCartEmails, setDiscountActive, setGrowthSettings, setPostPurchaseOffer, setReferralProgram, setSubscriptionOffer, setUpsell, setWelcomeOffer, setWinbackOffer, UserError } from "@sf/core";
-import { fulfillment, requireShop, testPayments } from "@/lib/server";
+import { fulfillment, logged, requireShop, testPayments } from "@/lib/server";
 import type { FormState } from "./actions";
 
 const HOUR = 3_600_000;
@@ -15,7 +15,7 @@ function optionalDate(v: FormDataEntryValue | null, endOfDay = false) {
 }
 
 export async function createDiscountAction(_: FormState, form: FormData): Promise<FormState> {
-  const { shop, db } = await requireShop("marketing");
+  const { shop, db, user } = await requireShop("marketing");
   try {
     const kind = String(form.get("kind") ?? "percent") as "percent" | "amount" | "free_shipping" | "bxgy";
     const count = (name: string) => {
@@ -25,7 +25,7 @@ export async function createDiscountAction(_: FormState, form: FormData): Promis
     const raw = String(form.get("value") ?? "").trim();
     const min = String(form.get("minSubtotal") ?? "").trim();
     const limit = String(form.get("usageLimit") ?? "").trim();
-    await createDiscount(db, shop.id, {
+    const created = await createDiscount(db, shop.id, {
       code: String(form.get("code") ?? ""),
       kind,
       value: kind === "percent" || kind === "bxgy" ? Number.parseInt(raw || "0", 10) : kind === "amount" ? parseMoney(raw || "0") : 0,
@@ -38,6 +38,7 @@ export async function createDiscountAction(_: FormState, form: FormData): Promis
       startsAt: optionalDate(form.get("startsAt")),
       endsAt: optionalDate(form.get("endsAt"), true),
     });
+    await logged({ shop, user, db }, `Created the discount code ${created.code}`, { href: "/admin/marketing" });
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
     throw e;
@@ -132,8 +133,10 @@ export async function setReferralProgramAction(_: FormState, form: FormData): Pr
 }
 
 export async function setDiscountActiveAction(id: string, active: boolean) {
-  const { shop, db } = await requireShop("marketing");
+  const { shop, db, user } = await requireShop("marketing");
   await setDiscountActive(db, shop.id, id, active);
+  const d = await db.query.discounts.findFirst({ where: (t, { and, eq }) => and(eq(t.id, id), eq(t.shopId, shop.id)), columns: { code: true } });
+  if (d) await logged({ shop, user, db }, `${active ? "Turned on" : "Turned off"} the discount code ${d.code}`, { href: "/admin/marketing" });
   revalidatePath("/admin/marketing");
 }
 

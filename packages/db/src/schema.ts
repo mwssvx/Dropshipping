@@ -1204,6 +1204,25 @@ export const passwordResets = pgTable(
   (t) => [index("password_resets_user_idx").on(t.userId)],
 );
 
+/**
+ * What people on a store's team did: refunds, product and price changes, team and API changes and
+ * other things an owner would want to look back on. The email is kept as it was, so entries still
+ * read right after someone leaves the team.
+ */
+export const activity = pgTable(
+  "activity",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    email: text("email").notNull(),
+    summary: text("summary").notNull(),
+    href: text("href"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("activity_shop_idx").on(t.shopId, t.createdAt), index("activity_user_idx").on(t.shopId, t.userId, t.createdAt)],
+);
+
 /** A right password for someone with two-step sign-in on, waiting for their code (10 minutes). */
 export const signInChallenges = pgTable(
   "sign_in_challenges",

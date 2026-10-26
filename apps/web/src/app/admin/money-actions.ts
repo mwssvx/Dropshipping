@@ -4,7 +4,9 @@ import { redirect } from "next/navigation";
 import {
   addTaxRegistration,
   changePlan,
+  formatMoney,
   parseMoney,
+  PLANS,
   refreshPayoutAccount,
   refundOrder,
   removeTaxRegistration,
@@ -15,9 +17,10 @@ import {
   startPayoutSetup,
   submitRequirementDocument,
   UserError,
+  type PlanId,
   type RequirementKind,
 } from "@sf/core";
-import { adminUrl, notifyLater, payments, refunds, requireShop, tax, testPayments } from "@/lib/server";
+import { adminUrl, logged, notifyLater, payments, refunds, requireShop, tax, testPayments } from "@/lib/server";
 import type { FormState } from "./actions";
 
 export type RefundState = FormState & { message?: string; warning?: string };
@@ -29,6 +32,7 @@ export async function setupPayoutsAction() {
     returnUrl: await adminUrl("/admin/money/return"),
     refreshUrl: await adminUrl("/admin/money/setup"),
   });
+  await logged({ shop, user, db }, "Started setting up payouts", { href: "/admin/money" });
   // Test mode connects at once and hands back our own return address. Going there from a server
   // action would leave the browser on the return route, where the page's forms can't post, so
   // finish here instead.
@@ -86,13 +90,16 @@ export async function changePlanAction(_: FormState, form: FormData): Promise<Fo
     if (e instanceof UserError) return { error: e.message };
     throw e;
   }
+  // A plan that needs a card is logged once the payment goes through elsewhere, not here.
   if (url) redirect(url);
+  const plan = String(form.get("plan") ?? "");
+  await logged({ shop, user, db }, `Changed the plan to ${plan in PLANS ? PLANS[plan as PlanId].name : plan}`, { href: "/admin/plan" });
   revalidatePath("/admin", "layout");
   return { saved: true };
 }
 
 export async function refundAction(orderId: string, _: RefundState, form: FormData): Promise<RefundState> {
-  const { shop } = await requireShop("refunds");
+  const { shop, user, db } = await requireShop("refunds");
   try {
     const raw = String(form.get("amount") ?? "").trim();
     let amountMinor: number | undefined;
@@ -104,6 +111,7 @@ export async function refundAction(orderId: string, _: RefundState, form: FormDa
       }
     }
     const result = await refundOrder(await refunds(), shop.id, orderId, { amountMinor, reason: String(form.get("reason") ?? "") });
+    await logged({ shop, user, db }, `Refunded ${formatMoney(result.refund.amountMinor, shop.currency)} on order {order}`, { orderId });
     notifyLater(shop.id);
     revalidatePath(`/admin/orders/${orderId}`);
     revalidatePath("/admin/orders");
