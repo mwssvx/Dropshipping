@@ -1,9 +1,9 @@
-import { publishDueProducts, sendReviewRequests, pruneActivity, sendWeeklySummaries, pruneAuthRecords, pruneBuyerRecords, pruneStockAlerts, sendPriceDrops, sendStockAlerts, syncSupplierStock, pruneInvites, pruneEvents, refreshAllVerified, runWebhooks, routeStuckOrders, sendCampaignBatches, runFakePayouts, notifyNewDisputes, runDueSubscriptions, sendWinbackEmails, notifyCostChanges, notifyLatePreorders, runHealthChecks, runScheduledAgents, sendAbandonedCartEmails, sendAllNotifications, sendReferralRewards, syncTracking } from "@sf/core";
+import { notifySoldOut, publishDueProducts, sendReviewRequests, pruneActivity, sendWeeklySummaries, pruneAuthRecords, pruneBuyerRecords, pruneStockAlerts, sendPriceDrops, sendStockAlerts, syncSupplierStock, pruneInvites, pruneEvents, refreshAllVerified, runWebhooks, routeStuckOrders, sendCampaignBatches, runFakePayouts, notifyNewDisputes, runDueSubscriptions, sendWinbackEmails, notifyCostChanges, notifyLatePreorders, runHealthChecks, runScheduledAgents, sendAbandonedCartEmails, sendAllNotifications, sendReferralRewards, syncTracking } from "@sf/core";
 import { agents, campaigns, adminNotices, fulfillment, pushSender, stock, subscriptions, testPayments, webhooks } from "@/lib/server";
 
 /**
  * Scheduled job: place any paid orders that were missed, then pull tracking from suppliers, and
- * stock and costs for products (buyers waiting on something back in stock get their email, and
+ * stock and costs for products (the team hears when a product sells out at the supplier, buyers waiting on something back in stock get their email, and
  * buyers whose saved items got cheaper hear about it). Pre-orders back in stock are placed. Buyers whose referred friend's order
  * arrived get their store credit, and subscription deliveries that are due are placed and charged.
  * Also checks store health and the verified badge, and in test mode stands in for the payment
@@ -26,6 +26,8 @@ export async function GET(request: Request) {
   const stockSync = await syncSupplierStock(ctx);
   // Supplier price rises that leave thin margins, or that raised prices on their own.
   const priceRises = await notifyCostChanges(await adminNotices());
+  // Products whose every option just ran out at the supplier.
+  const soldOut = await notifySoldOut(await adminNotices());
   // Pre-orders whose stock just came back go to the supplier now; ones past their date get flagged.
   const preorders = { released: (await routeStuckOrders(ctx)).routed, late: (await notifyLatePreorders(await adminNotices())).sent };
   // Subscribe and save: "coming up" emails, then deliveries that are due, after stock is fresh.
@@ -55,5 +57,5 @@ export async function GET(request: Request) {
   await pruneBuyerRecords(ctx.db);
   await pruneStockAlerts(ctx.db);
   await pruneActivity(ctx.db);
-  return Response.json({ published, routed, tracking, referrals, stock: stockSync, priceRises, preorders, subscriptions: repeats, restocked, priceDrops, payouts, disputes, health, verified, reminders, reviewRequests, campaigns: campaignEmails, winback, summaries, ai, push, webhooks: hooks, pruned });
+  return Response.json({ published, routed, tracking, referrals, stock: stockSync, priceRises, soldOut, preorders, subscriptions: repeats, restocked, priceDrops, payouts, disputes, health, verified, reminders, reviewRequests, campaigns: campaignEmails, winback, summaries, ai, push, webhooks: hooks, pruned });
 }

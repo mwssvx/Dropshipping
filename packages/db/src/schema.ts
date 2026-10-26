@@ -296,6 +296,8 @@ export const products = pgTable(
     stockCheckedAt: timestamp("stock_checked_at", { withTimezone: true }),
     // A second supplier for this product. Orders go there when the main supplier is out of stock.
     backup: jsonb("backup").$type<ProductBackup>(),
+    // When the team was told every option sold out at the supplier. Cleared once it's back.
+    soldOutNotifiedAt: timestamp("sold_out_notified_at", { withTimezone: true }),
     // A draft goes on sale by itself at this time. Cleared when it does, or when its status changes.
     publishAt: timestamp("publish_at", { withTimezone: true }),
     createdAt: createdAt(),
