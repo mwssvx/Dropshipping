@@ -285,6 +285,8 @@ export const products = pgTable(
     purchaseLimit: jsonb("purchase_limit").$type<PurchaseLimit>(),
     // A video for the product page: a YouTube or Vimeo link, or an https video file.
     videoUrl: text("video_url"),
+    // Facts shown as a table on the product page, like Material: Aluminium or Size: 20 × 10 cm.
+    details: jsonb("details").$type<ProductDetail[]>().notNull().default([]),
     // A short label of the merchant's own on product cards, like "Bestseller".
     badge: text("badge"),
     // How the product shows in search results; the title and description are used when empty.
@@ -390,6 +392,7 @@ export type Presentment = {
 export type TaxBreakdownLine = { jurisdiction: string; label: string; rateBps: number; amountMinor: number };
 
 export type QuantityBreak = { minQty: number; percentOff: number };
+export type ProductDetail = { label: string; value: string };
 
 /** `shipsBy` is a YYYY-MM-DD date; `limit` caps how many can be pre-ordered in all. */
 export type Preorder = { shipsBy: string; limit: number | null };

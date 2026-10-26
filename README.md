@@ -669,3 +669,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Suggestions**: on the store's search page, typing two letters or more shows up to six matching products under the box, with a photo and the price in the buyer's currency (sales included), or "Sold out". They come from the same search as the results page, so the merchant's search fixes and translations apply (`apps/web/src/app/s/[shop]/search/suggest/route.ts`).
 2. **Keyboard and screen readers**: the box is a combobox. The arrow keys move through the suggestions, Enter opens the picked product, the last row runs the full search, and Escape closes the list (a second Escape clears the box). Without JavaScript it's the plain search form it was.
 3. **Reports stay honest**: suggestions don't count in the store's search report; only searches the buyer actually runs do.
+
+### Product details (after launch, part 93)
+
+1. **A facts table**: under Details on a product's page in the admin, the merchant writes short facts one per line, like `Material: Aluminium` or `In the box: Lamp, remote, USB-C cable` (up to 20). The store shows them as a table under the description, and search engines get them as product properties (`packages/core/src/product-details.ts`).
+2. **Checked as it's saved**: a line without a label and a value says which line it is, and the box keeps what was typed. An empty box removes the table.
+3. **Follows the product**: duplicating a product copies its details, store export and import carry them, and they're translated with the title and description, by the merchant or the AI translator, so buyers read them in their language.
