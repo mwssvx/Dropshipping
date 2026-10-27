@@ -4,6 +4,7 @@ import { schema, type Address, type Db } from "@sf/db";
 import { z } from "zod";
 import { BLOCKED_MESSAGE, blockedMatch } from "./blocklist";
 import { tipAmount } from "./tips";
+import { blockedItemMessage } from "./country-limits";
 import { applyDisputeEvent } from "./disputes";
 import { NotFoundError, UserError } from "./errors";
 import type { PaymentEvent, PaymentProvider } from "./payments";
@@ -167,6 +168,8 @@ export async function quoteCart(
       purchaseLimit: row.product.purchaseLimit,
       /** Buyers must be this old to buy it, or null. */
       minAge: row.product.minAge,
+      /** Countries it can't be shipped to. */
+      blockedCountries: giftCard ? [] : row.product.blockedCountries,
     };
   });
   const subtotalMinor = items.reduce((s, i) => s + i.lineMinor, 0);
@@ -453,6 +456,9 @@ export async function startCheckout(
   if (unfinished) {
     throw new UserError(`Add ${unfinished.missingPersonalization.join(" and ")} for ${unfinished.title} before checking out.`, "personalization_missing");
   }
+  // Some things can't go to some countries (batteries, knives); say so before anyone pays.
+  const cantGo = blockedItemMessage(quoted.items, address.country);
+  if (cantGo) throw new UserError(cantGo, "product_country");
   // Repeat deliveries keep going; the buyer signed up for them.
   // Age-restricted items need the buyer to say they're old enough, on the store's own checkout.
   // Repeat deliveries and after-checkout offers follow an order where they already did.

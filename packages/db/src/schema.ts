@@ -310,6 +310,8 @@ export const products = pgTable(
     originCountry: text("origin_country"),
     // Buyers must say they're at least this old to check out with it (alcohol, vapes, knives).
     minAge: integer("min_age"),
+    // Countries it can't be shipped to (batteries, knives, a supplier that doesn't go there).
+    blockedCountries: jsonb("blocked_countries").$type<string[]>().notNull().default([]),
     // How many days the product usually lasts, for the one "running low?" email; null means no reminder.
     reorderDays: integer("reorder_days"),
     // A video for the product page: a YouTube or Vimeo link, or an https video file.

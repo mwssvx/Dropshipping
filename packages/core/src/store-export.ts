@@ -158,6 +158,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       origin_country: p.originCountry,
       min_age: p.minAge,
       reorder_days: p.reorderDays,
+      blocked_countries: p.blockedCountries,
       details: p.details.length ? p.details : undefined,
       badge: p.badge,
       gift_card: p.giftCard,
@@ -386,6 +387,7 @@ const importSchema = z.object({
         hs_code: z.string().max(20).nullable().optional(),
         min_age: z.number().int().nullable().optional(),
         reorder_days: z.number().int().nullable().optional(),
+        blocked_countries: z.array(z.string().length(2)).max(60).optional(),
         origin_country: z.string().max(10).nullable().optional(),
         purchase_limit: z
           .object({ min: z.number().int().min(2).max(99).nullable(), max: z.number().int().min(1).max(99).nullable(), per_customer: z.number().int().min(1).max(999).nullable() })
@@ -602,6 +604,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
           originCountry: countryCode(x.origin_country),
           minAge: x.min_age != null && x.min_age >= 13 && x.min_age <= 25 ? x.min_age : null,
           reorderDays: x.reorder_days != null && x.reorder_days >= 7 && x.reorder_days <= 180 ? x.reorder_days : null,
+          blockedCountries: x.blocked_countries ?? [],
           // Read like the merchant's own text, so lines that wouldn't save here are dropped.
           details: x.details ? parseDetails(detailsText(x.details)) : [],
           badge: x.badge?.trim() || null,
