@@ -846,3 +846,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Tips (after launch, part 125)
 
 1. **Tips at checkout**: from Checkout add-ons, the store can ask for a tip with up to three percentages (10, 15 and 20 to start) and a thank-you line. Checkout shows each with what it comes to in the buyer's currency, and "No tip" is always first and picked. A tip is on the goods after any discount, no tax is added to it and the per-sale fee doesn't touch it. It shows on the receipt email, the order and payment pages, the invoice, the order page in admin, the orders spreadsheet and the API. Payment links, repeat deliveries and after-checkout offers never ask (`packages/core/src/tips.ts`, migration 0107).
+
+### Reorder reminders (after launch, part 126)
+
+1. **Running low?**: a product that runs out (coffee, vitamins, refills) can say how long it usually lasts, from 7 to 180 days. That many days after an order arrives (or after payment, when the courier never said), the buyer gets one email with a link back to the product. Never for gifts, replacements or repeat deliveries, never once they've bought it again, never to buyers who unsubscribed, and never for orders more than 30 days past due, so turning it on doesn't email old buyers. The daily job sends them (`packages/core/src/reorder-reminders.ts`, migration 0108).
