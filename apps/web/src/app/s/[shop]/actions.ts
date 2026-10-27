@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, cancelOrderByBuyer, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer, answerSurvey } from "@sf/core";
+import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, cancelOrderByBuyer, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, MAX_SAVED, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer, answerSurvey } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
 import { agents, campaigns, db, fulfillment, payments, platformUrl, refunds, subscriptions, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
@@ -91,6 +91,29 @@ export async function updateCartAction(handle: string, form: FormData) {
   const cart = (await readCart(shop.id)).map((l) => (cartLineKey(l) === key ? { ...l, quantity } : l));
   await writeCart(shop.id, cart);
   redirect(`${await storeBase(handle)}/cart`);
+}
+
+/** Moves a cart line to the buyer's saved items, so it's out of this order but easy to find again. */
+export async function saveForLaterAction(handle: string, key: string, productId: string) {
+  const shop = await loadShop(handle);
+  const buyer = await currentBuyer(shop.id);
+  let full = false;
+  if (buyer) {
+    try {
+      await saveItem(await db(), shop.id, buyer.id, productId);
+    } catch (e) {
+      if (!(e instanceof UserError)) throw e;
+      full = true;
+    }
+  } else {
+    const ids = (await readGuestSaved(shop.id)).filter((id) => id !== productId);
+    if (ids.length >= MAX_SAVED) full = true;
+    else await writeGuestSaved(shop.id, [...ids, productId]);
+  }
+  // A full list keeps the item in the cart rather than losing it.
+  if (!full) await writeCart(shop.id, (await readCart(shop.id)).filter((l) => cartLineKey(l) !== key));
+  revalidatePath(`/s/${handle}`, "layout");
+  redirect(`${await storeBase(handle)}/cart?saved=${full ? "full" : "moved"}`);
 }
 
 export type CodeState = { error?: string };

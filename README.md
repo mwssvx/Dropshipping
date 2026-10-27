@@ -890,3 +890,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Add to cart bar on phones (after launch, part 136)
 
 1. **Always in reach**: on phones, once a buyer scrolls past a product's Add to cart button into its photos, details or reviews, a bar at the bottom of the screen shows the product and an Add to cart button. It submits the same form, so the option and quantity picked above are what goes in the cart. It's hidden on wider screens and from screen readers and the keyboard, which reach the real button. Shopify themes sell this as an app (`apps/web/src/components/StickyBuyBar.tsx`, no migration).
+
+### Save for later in the cart (after launch, part 137)
+
+1. **Not this time**: every cart line has "Save for later", which moves it out of the cart and onto the buyer's saved items (kept in the browser for guests, on their account once signed in), so they can pay for the rest without losing it. The cart says "Moved to your saved items." with a link to them; if the saved list is full, the item stays in the cart (`saveForLaterAction` in `apps/web/src/app/s/[shop]/actions.ts`, no migration).
