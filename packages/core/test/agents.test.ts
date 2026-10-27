@@ -3,6 +3,9 @@ import { eq } from "drizzle-orm";
 import { schema } from "@sf/db";
 import {
   aiBudget,
+  AGENT_MODELS,
+  agentModelsFromEnv,
+  AnthropicModel,
   askAssistant,
   assistantMessages,
   buyerThread,
@@ -268,5 +271,41 @@ describe("merchant assistant", () => {
     const chat = await assistantMessages(f.db, shop.id);
     expect(chat.map((m) => m.author)).toEqual(["merchant", "agent", "merchant", "agent", "merchant", "agent", "staff"]);
     expect(chat.at(-1)!.body).toContain("released the hold");
+  });
+});
+
+describe("models per agent", () => {
+  it("puts each agent on its own model, with env overrides", () => {
+    expect(agentModelsFromEnv({})).toEqual(AGENT_MODELS);
+    expect(agentModelsFromEnv({ AI_MODEL: "claude-sonnet-5-5" }).listing).toBe("claude-sonnet-5-5");
+    const one = agentModelsFromEnv({ AI_MODEL: "claude-sonnet-5-5", AI_MODEL_WRITER: "claude-opus-5-5" });
+    expect([one.writer, one.translator]).toEqual(["claude-opus-5-5", "claude-sonnet-5-5"]);
+  });
+
+  it("prices Haiku far below Opus", () => {
+    const u = { inputTokens: 1000, outputTokens: 200, cacheReadTokens: 0, cacheWriteTokens: 0 };
+    expect(costMicros("claude-haiku-5-5", u)).toBe(200);
+    expect(costMicros("claude-opus-5-5", u) / costMicros("claude-haiku-5-5", u)).toBe(40);
+  });
+
+  it("records and prices each run on its agent's model", async () => {
+    const f = await makeFixture();
+    const demo = new DemoModel();
+    const r = await writeListing({ ...f.ctx, model: demo }, await f.shop(), f.products.stand.id);
+    const run = await f.db.query.agentRuns.findFirst({ where: eq(schema.agentRuns.id, r.runId) });
+    expect(run!.model).toBe("claude-haiku-5-5");
+    expect(demo.modelFor("assistant")).toBe("claude-opus-5-5");
+  });
+
+  it("only asks for server-side fallbacks on models that have them", async () => {
+    const calls: Record<string, unknown>[] = [];
+    const client = { beta: { messages: { create: async (body: Record<string, unknown>) => (calls.push(body), { content: [], stop_reason: "end_turn", model: body.model, usage: { input_tokens: 1, output_tokens: 1 } }) } } };
+    const m = new AnthropicModel(undefined, { client: client as never, models: AGENT_MODELS });
+    const req = { system: "s", tools: [], messages: [], effort: "low" as const, maxTokens: 10 };
+    await m.create({ ...req, agent: "listing", model: m.modelFor("listing") });
+    await m.create({ ...req, agent: "assistant", model: m.modelFor("assistant") });
+    expect(calls[0]).toMatchObject({ model: "claude-haiku-5-5" });
+    expect(calls[0]).not.toHaveProperty("fallbacks");
+    expect(calls[1]).toMatchObject({ model: "claude-opus-5-5", fallbacks: "default" });
   });
 });

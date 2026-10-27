@@ -11,6 +11,8 @@ export type { BetaContentBlock, BetaMessageParam, BetaTool };
 
 export type ModelRequest = {
   agent: AgentName;
+  /** Which Claude model answers; picked per agent by the client's modelFor. */
+  model: string;
   system: string;
   tools: BetaTool[];
   messages: BetaMessageParam[];
@@ -30,14 +32,52 @@ export type ModelResponse = {
 };
 
 export interface ModelClient {
-  /** Model id recorded on each run, and used to price it. */
+  /** The fallback model, for agents with no model of their own. */
   readonly model: string;
+  /** The model this agent runs on. Recorded on each run, and used to price it. */
+  modelFor(agent: AgentName): string;
   /** False for the built-in demo brain, so the admin can say answers are canned. */
   readonly live: boolean;
   create(req: ModelRequest): Promise<ModelResponse>;
 }
 
 export const DEFAULT_MODEL = "claude-opus-5-5";
+
+/**
+ * Each agent runs on the cheapest model that does its job well. Short, checked writing jobs
+ * (listings, translations, size charts, answer drafts, margins) run on Haiku; the ones that write
+ * to buyers or untangle orders on Sonnet; the open-ended Assistant on Opus.
+ */
+export const AGENT_MODELS: Record<AgentName, string> = {
+  listing: "claude-haiku-5-5",
+  translator: "claude-haiku-5-5",
+  sizer: "claude-haiku-5-5",
+  answerer: "claude-haiku-5-5",
+  margin: "claude-haiku-5-5",
+  writer: "claude-sonnet-5-5",
+  buyer_support: "claude-sonnet-5-5",
+  fulfilment: "claude-sonnet-5-5",
+  assistant: "claude-opus-5-5",
+};
+
+/**
+ * Models per agent from the environment: AI_MODEL puts every agent on one model, and
+ * AI_MODEL_<AGENT> (like AI_MODEL_WRITER) sets one agent.
+ */
+export function agentModelsFromEnv(env: Record<string, string | undefined>): Record<AgentName, string> {
+  const all = env.AI_MODEL?.trim();
+  return Object.fromEntries(
+    (Object.keys(AGENT_MODELS) as AgentName[]).map((a) => [a, env[`AI_MODEL_${a.toUpperCase()}`]?.trim() || all || AGENT_MODELS[a]]),
+  ) as Record<AgentName, string>;
+}
+
+/** Display names for the AI settings page. */
+export const MODEL_LABEL: Record<string, string> = {
+  "claude-opus-5-5": "Claude Opus 5.5",
+  "claude-sonnet-5-5": "Claude Sonnet 5.5",
+  "claude-haiku-5-5": "Claude Haiku 5.5",
+  "claude-opus-4-8": "Claude Opus 4.8",
+};
 
 /** US dollars per million tokens. Cache writes are 1.25x input for the default 5-minute cache. */
 const PRICES: Record<string, { input: number; output: number; cacheRead: number; cacheWrite: number }> = {
@@ -53,29 +93,37 @@ export function costMicros(model: string, u: ModelUsage): number {
   return Math.ceil(u.inputTokens * p.input + u.outputTokens * p.output + u.cacheReadTokens * p.cacheRead + u.cacheWriteTokens * p.cacheWrite);
 }
 
+/** Haiku has no server-side fallback; the API rejects the parameter there. */
+const hasFallbacks = (model: string) => !model.startsWith("claude-haiku");
+
 /**
- * Claude through the Messages API. Thinking is adaptive (always on for this model); effort sets
+ * Claude through the Messages API. Thinking is adaptive (always on for these models); effort sets
  * how much. The tools and system prompt are fixed per agent, so the request prefix is cached
  * between the turns of a run. If the model declines a request, the API retries it on a fallback
- * model instead of failing.
+ * model instead of failing (Opus and Sonnet).
  */
 export class AnthropicModel implements ModelClient {
   readonly live = true;
   private readonly client: Anthropic;
+  private readonly models: Partial<Record<AgentName, string>>;
 
   constructor(
     readonly model = DEFAULT_MODEL,
-    opts: { apiKey?: string; client?: Anthropic } = {},
+    opts: { apiKey?: string; client?: Anthropic; models?: Partial<Record<AgentName, string>> } = {},
   ) {
     this.client = opts.client ?? new Anthropic(opts.apiKey ? { apiKey: opts.apiKey } : {});
+    this.models = opts.models ?? {};
+  }
+
+  modelFor(agent: AgentName) {
+    return this.models[agent] ?? this.model;
   }
 
   async create(req: ModelRequest): Promise<ModelResponse> {
     const res = await this.client.beta.messages.create({
-      model: this.model,
+      model: req.model,
       max_tokens: req.maxTokens,
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
+      ...(hasFallbacks(req.model) ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
       cache_control: { type: "ephemeral" },
       output_config: { effort: req.effort },
       system: req.system,
@@ -112,13 +160,17 @@ export class ScriptedModel implements ModelClient {
     private readonly usagePerCall: ModelUsage = { inputTokens: 1000, outputTokens: 200, cacheReadTokens: 0, cacheWriteTokens: 0 },
   ) {}
 
+  modelFor() {
+    return this.model;
+  }
+
   async create(req: ModelRequest): Promise<ModelResponse> {
     this.requests.push(structuredClone(req));
     const step = this.steps[this.i++];
     const out = step === undefined ? [text("Done.")] : typeof step === "function" ? step(req) : step;
     const content = Array.isArray(out) ? out : out.content;
     const stopReason = Array.isArray(out) ? (content.some((b) => b.type === "tool_use") ? "tool_use" : "end_turn") : out.stopReason;
-    return { content, stopReason, usage: this.usagePerCall, model: this.model };
+    return { content, stopReason, usage: this.usagePerCall, model: req.model };
   }
 }
 
