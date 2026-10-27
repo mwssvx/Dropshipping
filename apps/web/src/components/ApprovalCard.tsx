@@ -14,6 +14,7 @@ export const AGENT_LABEL: Record<string, string> = {
   translator: "Translator",
   answerer: "Question answerer",
   sizer: "Size chart drafter",
+  shopper: "Shopping assistant",
 };
 
 export type PendingAction = { id: string; agent: string; tool: string; summary: string; reason: string | null; input: Record<string, unknown> };

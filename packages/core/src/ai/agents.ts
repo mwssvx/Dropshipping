@@ -117,6 +117,17 @@ Make one row per size the product comes in, in order from smallest to largest, w
 Use the unit the description uses (cm when it doesn't say). Add a short "How to measure" line to the note when it helps.
 ${RULES}`,
   },
+  shopper: {
+    agent: "shopper",
+    effort: "low",
+    maxTokens: 2048,
+    system: (shop) => `You are the shopping assistant on ${shop.name}, an online store. Shoppers on the store's pages ask you about its products, delivery and returns.
+Look things up before answering: search_products to find products, read_product for one product's details, sizes and delivery time, read_store_policies for shipping prices, returns and payment.
+Answer in two to four short sentences, warm and plain, in the language the shopper writes in. When you mention a product, link it as [its title](/products/its-handle) using the handle from your tools, and recommend at most three.
+Only talk about this store and what it sells. If the store doesn't sell what they want, say so; don't suggest other shops. If the data doesn't answer the question (materials, measurements, certifications and so on the listing doesn't mention), say you don't know and that they can ask the store on its contact page.
+Never promise discounts, delivery dates or anything about an existing order: for orders, point them to the link in their order email. You can't see orders, accounts or payments, and you can't change anything.
+${RULES}`,
+  },
 } satisfies Record<string, AgentSpec>;
 
 /** Ask the size chart drafter for a chart from a product's description. Returns the hidden draft's id, or null. */
@@ -209,6 +220,103 @@ export async function askAssistant(ctx: AgentContext, shop: Shop, text: string):
       : result.text || (result.error ? `Sorry, something went wrong: ${result.error}` : "Done.");
   const reply = await addMessage(ctx.db, c.id, { author: "agent", body: answer });
   return { ...result, replyId: reply.id };
+}
+
+/** Questions one shopper may ask in one chat, so a single visitor can't spend the store's budget. */
+export const SHOPPER_MAX_PER_CHAT = 20;
+/** Shopping-assistant answers per store per hour, across all shoppers. */
+export const SHOPPER_MAX_PER_HOUR = 150;
+/** The shopping assistant may use at most this share of the month's AI budget; the rest stays for the merchant's helpers. */
+export const SHOPPER_BUDGET_SHARE = 0.5;
+
+const SHOPPER_BUSY = "Sorry, I can't answer questions right now. You can reach the store on its contact page.";
+
+/** A shopper's chat with the shopping assistant, if it's theirs (the id is their proof). */
+async function shopperConversation(db: Db, shopId: string, id: string | null | undefined) {
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) return null;
+  return (
+    (await db.query.conversations.findFirst({
+      where: and(eq(schema.conversations.id, id), eq(schema.conversations.shopId, shopId), eq(schema.conversations.kind, "shopper")),
+    })) ?? null
+  );
+}
+
+/** What the shopper sees of their chat: their questions and the assistant's answers, oldest first. */
+export async function shopperThread(db: Db, shopId: string, conversationId: string | null | undefined) {
+  const c = await shopperConversation(db, shopId, conversationId);
+  if (!c) return [];
+  const rows = await db.query.messages.findMany({ where: eq(schema.messages.conversationId, c.id), orderBy: desc(schema.messages.createdAt), limit: 40 });
+  return rows.reverse().map((m) => ({ id: m.id, from: m.author === "buyer" ? ("shopper" as const) : ("assistant" as const), body: m.body }));
+}
+
+/** The latest shopper chats with their questions, so the merchant sees what shoppers want to know. */
+export async function listShopperChats(db: Db, shopId: string, limit = 10) {
+  const chats = await db.query.conversations.findMany({
+    where: and(eq(schema.conversations.shopId, shopId), eq(schema.conversations.kind, "shopper")),
+    orderBy: desc(schema.conversations.updatedAt),
+    limit,
+  });
+  if (!chats.length) return [];
+  const questions = await db.query.messages.findMany({
+    where: and(inArray(schema.messages.conversationId, chats.map((c) => c.id)), eq(schema.messages.author, "buyer")),
+    orderBy: schema.messages.createdAt,
+  });
+  return chats.map((c) => ({ id: c.id, updatedAt: c.updatedAt, questions: questions.filter((m) => m.conversationId === c.id).map((m) => m.body) }));
+}
+
+/**
+ * A shopper asks the storefront's shopping assistant. The answer is saved in their chat (a new one
+ * when they don't have one yet), and comes back with the chat's id for the next question.
+ */
+export async function askShopAssistant(
+  ctx: AgentContext,
+  shop: Shop,
+  input: { conversationId?: string | null; question: string; productHandle?: string | null },
+): Promise<{ conversationId: string; reply: string; answered: boolean }> {
+  const { db } = ctx;
+  if (!shop.aiShopper || shop.status !== "active") throw new UserError("The shopping assistant isn't available in this store.");
+  const question = input.question.trim();
+  if (question.length < 2) throw new UserError("Type a question first.");
+  if (question.length > 500) throw new UserError("Please keep your question under 500 characters.");
+
+  const c =
+    (await shopperConversation(db, shop.id, input.conversationId)) ??
+    (await db.insert(schema.conversations).values({ shopId: shop.id, kind: "shopper", subject: question.slice(0, 80) }).returning())[0]!;
+  const history = await db.query.messages.findMany({ where: eq(schema.messages.conversationId, c.id), orderBy: desc(schema.messages.createdAt), limit: 2 * SHOPPER_MAX_PER_CHAT });
+  const asked = history.filter((m) => m.author === "buyer").length;
+  await addMessage(db, c.id, { author: "buyer", body: question });
+  const answer = async (reply: string, answered: boolean) => {
+    await addMessage(db, c.id, { author: "agent", body: reply });
+    return { conversationId: c.id, reply, answered };
+  };
+
+  if (asked >= SHOPPER_MAX_PER_CHAT) return answer("That's all the questions I can take in one chat. For anything else, you can reach the store on its contact page.", false);
+  const [{ n }] = (await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(schema.agentRuns)
+    .where(and(eq(schema.agentRuns.shopId, shop.id), eq(schema.agentRuns.agent, "shopper"), gte(schema.agentRuns.createdAt, new Date(Date.now() - 3_600_000))))) as [{ n: number }];
+  if (Number(n) >= SHOPPER_MAX_PER_HOUR) return answer(SHOPPER_BUSY, false);
+  const budget = await aiBudget(db, shop);
+  if (!budget.left || (budget.byAgent.shopper?.micros ?? 0) >= budget.limitMinor * 10_000 * SHOPPER_BUDGET_SHARE) return answer(SHOPPER_BUSY, false);
+
+  // Earlier questions and answers as plain text: the tool calls behind them aren't sent again.
+  const messages: BetaMessageParam[] = [];
+  for (const m of history.reverse().slice(-10)) {
+    const role = m.author === "buyer" ? "user" : "assistant";
+    const prev = messages.at(-1);
+    if (prev?.role === role) prev.content = `${prev.content as string}\n\n${m.body}`;
+    else messages.push({ role, content: m.body });
+  }
+  if (messages[0]?.role === "assistant") messages.shift();
+  const page = input.productHandle && /^[a-z0-9-]{1,200}$/.test(input.productHandle) ? `(The shopper is on the page of the product with handle "${input.productHandle}".)\n\n` : "";
+  const now = `${page}${question}`;
+  const prev = messages.at(-1);
+  if (prev?.role === "user") prev.content = `${prev.content as string}\n\n${now}`;
+  else messages.push({ role: "user", content: now });
+
+  const result = await runAgent(ctx, AGENT_SPECS.shopper, shop, { trigger: "buyer", conversationId: c.id, messages });
+  if (result.status !== "done" || !result.text) return answer(SHOPPER_BUSY, false);
+  return answer(result.text, true);
 }
 
 /** A buyer asked a question on their order page. The agent answers, drafts, or hands it over. */

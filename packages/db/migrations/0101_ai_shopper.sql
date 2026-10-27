@@ -1,0 +1,1 @@
+ALTER TABLE "shops" ADD COLUMN "ai_shopper" boolean DEFAULT false NOT NULL;

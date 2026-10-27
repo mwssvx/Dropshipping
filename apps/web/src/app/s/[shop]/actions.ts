@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, cancelOrderByBuyer, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer } from "@sf/core";
+import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, cancelOrderByBuyer, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer, askShopAssistant, shopperThread } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
 import { agents, campaigns, db, fulfillment, payments, platformUrl, refunds, subscriptions, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
@@ -515,4 +515,27 @@ export async function changeSubscriptionAction(handle: string, token: string, _:
   revalidatePath(`/s/${handle}/subscriptions/${token}`);
   const done = { interval: "Saved. Your next delivery date has moved to match.", skip: "Skipped. Your next delivery date is below.", pause: "Paused. Nothing will be sent or charged until you resume.", resume: "Resumed. Your next delivery date is below.", cancel: "Cancelled. You won't be charged again." }[change.type];
   return { done };
+}
+
+export type ShopAssistantState = { reply?: string; chatId?: string; error?: string };
+
+/**
+ * A shopper asks the store's shopping assistant. The browser keeps the chat's id and sends it
+ * back with each question; no cookie, so asking doesn't refresh the page.
+ */
+export async function askShopAssistantAction(handle: string, chatId: string | null, question: string, productHandle: string | null): Promise<ShopAssistantState> {
+  const shop = await loadShop(handle);
+  try {
+    const r = await askShopAssistant(await agents(), shop, { conversationId: chatId, question, productHandle });
+    return { reply: r.reply, chatId: r.conversationId };
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+}
+
+/** The shopper's chat so far, when they open the assistant on another page. */
+export async function shopAssistantChatAction(handle: string, chatId: string) {
+  const shop = await loadShop(handle);
+  return (await shopperThread(await db(), shop.id, chatId)).map((m) => ({ from: m.from, body: m.body }));
 }

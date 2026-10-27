@@ -117,3 +117,4 @@ export * from "./inventory";
 export * from "./customs";
 export * from "./barcode";
 export * from "./pick-list";
+export * from "./shopper-links";

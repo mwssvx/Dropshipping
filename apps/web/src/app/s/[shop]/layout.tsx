@@ -6,7 +6,8 @@ import { SaleCountdown } from "@/components/SaleCountdown";
 import { AdPixels } from "@/components/AdPixels";
 import { db, storeAddress } from "@/lib/server";
 import { buyerCountry, buyerFx } from "@/lib/currency";
-import { setCurrencyAction } from "./actions";
+import { askShopAssistantAction, setCurrencyAction, shopAssistantChatAction } from "./actions";
+import { ShopAssistant } from "@/components/ShopAssistant";
 import { themeLayoutAttrs, themeStyle } from "@/theme/style";
 import { closureDate, loadShop, loadTheme, storeBase, storeLang, storePath, storeRoot, storeT } from "./data";
 
@@ -69,6 +70,15 @@ export default async function StoreLayout({ children, params }: { children: Reac
     <StoreShell doc={theme} shopName={shop.name} currency={shop.currency} base={base} cartCount={count} closed={shop.status !== "active"} notice={notice} verified={!!shop.verifiedAt && shop.status === "active"} picker={picker} t={t} languages={langs.length ? { root, current: lang ?? "en", options: [{ code: "en", name: "English" }, ...langs.map((l) => ({ code: l, name: LANGUAGES[l].name }))] } : undefined}>
       <Track shopId={shop.id} kind="page_view" />
       {children}
+      {shop.aiShopper && shop.status === "active" && (
+        <ShopAssistant
+          base={base}
+          storageKey={`sf_chat_${shop.id}`}
+          ask={askShopAssistantAction.bind(null, param)}
+          load={shopAssistantChatAction.bind(null, param)}
+          t={{ open: t.assistantOpen, title: t.assistantTitle, intro: t.assistantIntro, placeholder: t.assistantPlaceholder, send: t.assistantSend, close: t.assistantClose, thinking: t.assistantThinking, error: t.assistantError, note: t.assistantNote }}
+        />
+      )}
       {pixels && <AdPixels ids={pixels} ask={ask} text={{ message: t.cookieMessage, accept: t.cookieAccept, decline: t.cookieDecline, settings: t.cookieSettings }} />}
     </StoreShell>
   );

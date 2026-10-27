@@ -135,6 +135,8 @@ export const shops = pgTable(
     aiAutoReplyTopics: jsonb("ai_auto_reply_topics").$type<string[]>().notNull().default([]),
     // Let the margin agent pause a product that loses money without asking first.
     aiAutoPause: boolean("ai_auto_pause").notNull().default(false),
+    // Show the AI shopping assistant on the storefront, for buyers to ask about products.
+    aiShopper: boolean("ai_shopper").notNull().default(false),
     // Remind buyers who started checkout but didn't pay (one email, an hour later).
     abandonedCartEmails: boolean("abandoned_cart_emails").notNull().default(true),
     // A phone number at checkout, for the courier: not asked, optional, or required.
@@ -933,7 +935,7 @@ export const appeals = pgTable(
 
 // AI agents. Every run is recorded with its token use and cost, and every tool call it makes is an
 // agent action: reads run straight away, changes may wait for the merchant's approval.
-export const AGENTS = ["listing", "assistant", "buyer_support", "fulfilment", "margin", "writer", "translator", "answerer", "sizer"] as const;
+export const AGENTS = ["listing", "assistant", "buyer_support", "fulfilment", "margin", "writer", "translator", "answerer", "sizer", "shopper"] as const;
 export type AgentName = (typeof AGENTS)[number];
 
 export const agentRuns = pgTable(
@@ -991,7 +993,7 @@ export const conversations = pgTable(
   {
     id: id(),
     shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["buyer", "assistant", "ticket"] }).notNull(),
+    kind: text("kind", { enum: ["buyer", "assistant", "ticket", "shopper"] }).notNull(),
     orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
     email: text("email"),
     subject: text("subject").notNull(),

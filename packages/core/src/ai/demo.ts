@@ -427,6 +427,48 @@ function assistant(s: State, req: ModelRequest): BetaContentBlock[] {
   }
 }
 
+/* ───────────── Shopping assistant ───────────── */
+
+const STOP_WORDS = new Set("a an and any are as at be can could do does for from have i in is it me my of on or please show something that the there this to want what which with you your yours looking need find buy get got tell about sell store shop".split(" "));
+
+function shopper(s: State): BetaContentBlock[] {
+  const handle = s.prompt.match(/with handle "([a-z0-9-]+)"/)?.[1] ?? null;
+  const ask = s.prompt.replace(/^\(The shopper is on the page[^)]*\)\s*/, "").toLowerCase();
+  const policyQuestion = /\b(return|refund|exchange|shipping cost|ship to|pay|payment)/.test(ask);
+  if (policyQuestion) {
+    const pol = s.has("read_store_policies");
+    if (!pol) return [toolCall("read_store_policies", {})];
+    const page = (pol.result.pages ?? []).find((p: { title: string }) => /return|refund|ship/i.test(p.title));
+    if (!page) return [text("The store hasn't published its policy on that yet. You can ask them on the contact page.")];
+    return [text(`Here's what the store's “${page.title}” page says: ${page.text.slice(0, 240).trim()}${page.text.length > 240 ? "…" : ""}`)];
+  }
+  const aboutThis = handle && /\b(this|it|its|size|sizes|deliver|delivery|arrive|stock|price|cost|colou?r|option)/.test(ask);
+  if (aboutThis) {
+    const p = s.has("read_product");
+    if (!p) return [toolCall("read_product", { handle })];
+    if (p.isError) return [text("I couldn't find that product. Try searching the store.")];
+    const options: { name: string; price: string; in_stock: boolean; delivery_days: string | null }[] = p.result.options ?? [];
+    const parts: string[] = [];
+    if (/\b(deliver|delivery|arrive|how long|when)/.test(ask)) {
+      const days = options.find((o) => o.delivery_days)?.delivery_days;
+      parts.push(days ? `It usually arrives ${days.replace("-", " to ")} days after you order.` : "The listing doesn't say how long delivery takes; the store can tell you on its contact page.");
+    }
+    if (/\b(size|sizes|colou?r|option|come in)/.test(ask)) parts.push(options.length > 1 ? `It comes in ${options.map((o) => o.name).join(", ")}.` : "It comes in one version.");
+    if (/\b(stock|available|sold out)/.test(ask)) parts.push(options.some((o) => o.in_stock) ? "It's in stock right now." : "It's sold out at the moment.");
+    if (/\b(price|cost|how much)/.test(ask) && options[0]) parts.push(`It's ${options[0].price}.`);
+    return [text(parts.length ? `[${p.result.title}](/products/${p.result.handle}): ${parts.join(" ")}` : `I don't know that from the listing for [${p.result.title}](/products/${p.result.handle}). You can ask the store on its contact page.`)];
+  }
+  const found = s.has("search_products");
+  if (!found) {
+    const words = ask.match(/[a-z0-9]+/g)?.filter((w) => w.length > 2 && !STOP_WORDS.has(w)) ?? [];
+    return [toolCall("search_products", { query: words.slice(0, 4).join(" ") })];
+  }
+  const products: { title: string; handle: string; price: string | null; in_stock: boolean }[] = found.result.products ?? [];
+  if (!products.length) return [text("Sorry, this store doesn't seem to have that. Try different words, or ask the store on its contact page.")];
+  const list = products.slice(0, 3).map((p) => `[${p.title}](/products/${p.handle})${p.price ? ` (${p.price})` : ""}${p.in_stock ? "" : " (sold out)"}`);
+  return [text(`Here's what I found: ${list.join(", ")}.`)];
+}
+
 const BRAINS: Record<ModelRequest["agent"], (s: State, req: ModelRequest) => BetaContentBlock[]> = {
   listing,
   writer,
@@ -437,4 +479,5 @@ const BRAINS: Record<ModelRequest["agent"], (s: State, req: ModelRequest) => Bet
   fulfilment,
   margin,
   assistant,
+  shopper,
 };

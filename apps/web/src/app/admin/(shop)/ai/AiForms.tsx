@@ -4,7 +4,7 @@ import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import { marginCheckAction, saveAiSettingsAction } from "../../ai-actions";
 
-export function AiSettingsForm(props: { budget: string; planMax: string; topics: { key: string; label: string; on: boolean }[]; autoPause: boolean }) {
+export function AiSettingsForm(props: { budget: string; planMax: string; topics: { key: string; label: string; on: boolean }[]; autoPause: boolean; shopper: boolean }) {
   const [state, action] = useActionState(saveAiSettingsAction, {});
   return (
     <form action={action} className="flex flex-col gap-5">
@@ -31,6 +31,13 @@ export function AiSettingsForm(props: { budget: string; planMax: string; topics:
         <span>
           <span className="font-medium">Let margin watch take money-losing products off sale on its own</span>
           <span className="hint block">Price changes over 10% always wait for you.</span>
+        </span>
+      </label>
+      <label className="flex items-start gap-3 text-sm">
+        <input type="checkbox" name="shopper" defaultChecked={props.shopper} className="mt-1 size-4" />
+        <span>
+          <span className="font-medium">Show the shopping assistant on your store</span>
+          <span className="hint block">Shoppers can ask it about your products, sizes, delivery and returns. It only reads what your store already shows, can&apos;t see orders or change anything, and uses at most half of your monthly AI budget.</span>
         </span>
       </label>
       <div><SubmitButton>Save</SubmitButton></div>
