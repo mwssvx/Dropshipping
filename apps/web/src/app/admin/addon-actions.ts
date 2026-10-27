@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { createAddon, deleteAddon, setAddonActive, setTipping, UserError } from "@sf/core";
+import { createAddon, deleteAddon, parseMoney, setAddonActive, setFreeGift, setTipping, UserError } from "@sf/core";
 import { logged, requireShop } from "@/lib/server";
 
 export type AddonState = { error?: string; message?: string; key?: number };
@@ -60,4 +60,31 @@ export async function setTippingAction(_: TippingState, form: FormData): Promise
   await logged({ shop, user, db }, saved ? "Asked for tips at checkout" : "Stopped asking for tips", { href: "/admin/addons#tips-heading" });
   refresh(shop.handle);
   return { saved };
+}
+
+export type FreeGiftState = { error?: string; saved?: boolean };
+
+/** Sets the free gift and the order amount it needs, or turns it off. */
+export async function setFreeGiftAction(_: FreeGiftState, form: FormData): Promise<FreeGiftState> {
+  const { shop, db, user } = await requireShop("marketing");
+  const on = form.get("enabled") === "on";
+  try {
+    if (on) {
+      let minSubtotalMinor = 0;
+      try {
+        minSubtotalMinor = parseMoney(String(form.get("min") ?? "").trim());
+      } catch {
+        return { error: "Enter the order amount, like 75.00." };
+      }
+      await setFreeGift(db, shop.id, { variantId: String(form.get("variantId") ?? ""), minSubtotalMinor });
+    } else {
+      await setFreeGift(db, shop.id, null);
+    }
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  await logged({ shop, user, db }, on ? "Set a free gift for bigger orders" : "Turned off the free gift", { href: "/admin/addons#gift-heading" });
+  refresh(shop.handle);
+  return { saved: on };
 }

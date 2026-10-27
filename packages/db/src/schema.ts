@@ -161,6 +161,8 @@ export const shops = pgTable(
     localDeliveryArea: jsonb("local_delivery_area").$type<LocalDeliveryArea | null>(),
     // Gift wrapping buyers can add to a gift at checkout, or null when the store doesn't wrap.
     giftWrap: jsonb("gift_wrap").$type<GiftWrap | null>(),
+    // One option given free with orders over an amount ("Free tote over $75"), or null when there's none.
+    freeGift: jsonb("free_gift").$type<FreeGift | null>(),
     // Orders in by this hour (store time) start that shipping day, or null when there's no cutoff.
     shipCutoff: jsonb("ship_cutoff").$type<ShipCutoff | null>(),
     // The tip percentages buyers can pick at checkout, or null when the store doesn't ask.
@@ -519,6 +521,7 @@ export type LocalPickup = { address: string; instructions: string | null };
 /** Where the store delivers itself and what it charges. Postal codes match by how they start. */
 /** The store's gift wrapping: its price and what buyers get ("Kraft paper and a ribbon"). */
 export type GiftWrap = { priceMinor: number; note: string | null };
+export type FreeGift = { variantId: string; minSubtotalMinor: number };
 
 /** Same-day cutoff: the hour (1 to 23) in the store's time zone, and whether it ships at weekends. */
 export type ShipCutoff = { hour: number; timeZone: string; weekends: boolean };

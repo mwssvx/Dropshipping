@@ -882,3 +882,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Big catalogs (after launch, part 134)
 
 1. **Thousands of products stay quick**: the product list, the store, and the store, product, order, packing slip, tracking and profit exports join each product's options (and each order's items) in one pass instead of scanning every row for every product. With 4,000 products and 12,000 options the product list went from about 1.6 s to 0.5 s. Options for a whole store are picked by the store instead of a list of ids, so stores over 65,535 options no longer hit Postgres's limit on query values (`packages/core/src/group.ts`, no migration).
+
+### Free gift (after launch, part 135)
+
+1. **Spend more, get a gift**: under Checkout add-ons, a store can give one product away with orders over an amount ("a tote bag over $75"). The cart says "Spend $30.00 more and get Tote bag free.", and once the order gets there the gift shows in the cart and at checkout and comes with the order as a free line, so it's sent with everything else and its stock and cost count. The amount is what the buyer pays for goods after discounts. It isn't offered when the gift is sold out, off sale or can't ship to the buyer's country, and wholesale orders, after-checkout offers and repeat deliveries don't get one. On Shopify this is a paid app (`packages/core/src/free-gift.ts`, migration `0112_free_gift`).

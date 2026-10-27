@@ -2,7 +2,7 @@
 // codes, bundles, settings, translations) as one JSON file that loads into a new store, plus products as CSV.
 // Orders and customers stay out of the JSON file: they belong to the payments account.
 import { and, asc, eq, inArray } from "drizzle-orm";
-import { schema, SOLD_OUT_DISPLAY, TAG_RULE_KINDS, type Db } from "@sf/db";
+import { schema, SOLD_OUT_DISPLAY, TAG_RULE_KINDS, type Db, type FreeGift } from "@sf/db";
 import { z } from "zod";
 import { collectionRulesSchema } from "./collection-rules";
 import { MAX_WEIGHT_GRAMS } from "./weight";
@@ -10,6 +10,7 @@ import { countryCode } from "./customs";
 import { parseBarcode } from "./barcode";
 import { NotFoundError, UserError } from "./errors";
 import { CURRENCIES } from "./currency";
+import { setFreeGift } from "./free-gift";
 import { csvCell } from "./payouts";
 import { keptPhotoTexts, photoColumns, PHOTO_TEXT_MAX } from "./gallery";
 import { addRedirect } from "./redirects";
@@ -35,6 +36,16 @@ function supplierOf(link: typeof schema.suppliers.$inferSelect | undefined, prod
   return link.provider === "email"
     ? { provider: link.provider, product_ref: null, name: link.name, email: link.contactEmail }
     : { provider: link.provider, product_ref: productRef };
+}
+
+/** The store's free gift as a product handle and option name, or null. */
+function freeGiftRef(gift: FreeGift | null, products: (typeof schema.products.$inferSelect)[], variants: Map<string, (typeof schema.variants.$inferSelect)[]>) {
+  if (!gift) return null;
+  for (const p of products) {
+    const option = variants.get(p.id)?.find((v) => v.id === gift.variantId);
+    if (option) return { product: p.handle, option: option.title, min_subtotal_minor: gift.minSubtotalMinor };
+  }
+  return null;
 }
 
 /** The backup supplier's listing, with its options keyed by our option titles. `variants` are the product's own. */
@@ -242,6 +253,8 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       const product = handleOf.get(a.productId);
       return product ? [{ product, percent_off: a.percentOff, pitch: a.pitch, active: a.active }] : [];
     }),
+    // The free gift by product handle and option name, since ids change in the new store.
+    free_gift: freeGiftRef(shop.freeGift, products, variants),
     // Sales that haven't ended; collections and products by handle.
     sales: saleRows
       .filter((x) => !x.endsAt || x.endsAt > new Date())
@@ -479,6 +492,7 @@ const importSchema = z.object({
     .array(z.object({ product: handle, percent_off: z.number().int(), pitch: z.string().max(120).nullable(), active: z.boolean().default(true) }))
     .max(MAX_ADDONS)
     .default([]),
+  free_gift: z.object({ product: handle, option: z.string().max(255), min_subtotal_minor: z.number().int() }).nullable().optional(),
   sales: z
     .array(
       z.object({
@@ -894,6 +908,19 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
         addonsAdded++;
       } catch (e) {
         if (!(e instanceof UserError)) throw e;
+      }
+    }
+    if (data.free_gift) {
+      const productId = productIds.get(data.free_gift.product);
+      const option = productId
+        ? await tx.query.variants.findFirst({ where: and(eq(schema.variants.productId, productId), eq(schema.variants.title, data.free_gift.option)), columns: { id: true } })
+        : undefined;
+      if (option) {
+        try {
+          await setFreeGift(tx as unknown as Db, shopId, { variantId: option.id, minSubtotalMinor: data.free_gift.min_subtotal_minor });
+        } catch (e) {
+          if (!(e instanceof UserError)) throw e;
+        }
       }
     }
     // Sales too; any that don't fit (or ended since the file was made) are left out.

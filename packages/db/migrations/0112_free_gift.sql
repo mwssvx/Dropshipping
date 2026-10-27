@@ -1,0 +1,1 @@
+ALTER TABLE "shops" ADD COLUMN "free_gift" jsonb;

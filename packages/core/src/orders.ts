@@ -23,6 +23,7 @@ import { findGiftCard } from "./gift-cards";
 import { bundleSavings, bundlesInCart } from "./bundles";
 import { salePrice, salesFor } from "./sales";
 import { addonsByProduct, type CheckoutAddon } from "./addons";
+import { FREE_GIFT_NOTE, freeGiftFor } from "./free-gift";
 import { countryName, fitsWeight, listShippingZones, priceRate, zoneFor } from "./shipping";
 import { formatWeight } from "./weight";
 import { normalizeTags } from "./customers";
@@ -284,6 +285,7 @@ export async function quoteCart(
   }
   const discountMinor = discount?.discountMinor ?? bundle?.discountMinor ?? 0;
   const totalMinor = subtotalMinor - discountMinor + shippingMinor;
+  const freeGift = wholesale || !hasGoods ? null : await freeGiftFor(db, shop, goodsMinor - discountMinor, opts.country ?? null);
   let giftCard: { id: string; last4: string; balanceMinor: number; appliedMinor: number } | null = null;
   if (opts.giftCardCode?.trim()) {
     if (!hasGoods || items.some((i) => i.giftCard)) throw new UserError("Gift cards can't be bought with a gift card.", "gift_card_invalid");
@@ -301,6 +303,8 @@ export async function quoteCart(
     codeNotUsed,
     offerNudge,
     spendNudge,
+    /** The store's free gift: added to the order once `unlocked`, else how much more it takes. */
+    freeGift,
     discountMinor,
     shippingMinor,
     totalMinor,
@@ -629,6 +633,18 @@ export async function startCheckout(
         preorder: !!i.preorderShipsBy,
       })),
     );
+    // The free gift goes out with the order at no charge, so its stock and cost count like any line.
+    const freeGift = quote.freeGift?.unlocked ? quote.freeGift : null;
+    if (freeGift) {
+      await tx.insert(schema.orderLines).values({
+        orderId: order!.id,
+        variantId: freeGift.variantId,
+        title: `${freeGift.title} (${FREE_GIFT_NOTE})`,
+        quantity: 1,
+        unitPriceMinor: 0,
+        unitCostMinor: freeGift.unitCostMinor,
+      });
+    }
     return order!;
   });
 
@@ -656,6 +672,7 @@ function asFollowUp(cart: Awaited<ReturnType<typeof quoteCart>>, percent: number
     wholesale: null,
     offerNudge: null,
     spendNudge: null,
+    freeGift: null,
     freeShipping: null,
     totalMinor: subtotalMinor + (opts.keepShipping ? cart.shippingMinor : 0),
     dueMinor: subtotalMinor + (opts.keepShipping ? cart.shippingMinor : 0),
