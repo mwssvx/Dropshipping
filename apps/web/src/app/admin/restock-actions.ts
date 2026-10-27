@@ -1,8 +1,8 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { cancelRestockOrder, createRestockOrder, parseMoney, receiveRestock, UserError } from "@sf/core";
-import { requireShop } from "@/lib/server";
+import { cancelRestockOrder, createRestockOrder, emailRestockOrder, parseMoney, receiveRestock, UserError } from "@sf/core";
+import { mailer, requireShop } from "@/lib/server";
 
 export type RestockState = { error?: string; message?: string };
 
@@ -32,6 +32,7 @@ export async function createRestockAction(_: RestockState, form: FormData): Prom
     const lines = variantIds.map((variantId) => ({ variantId, quantity: count(form.get(`qty.${variantId}`)), unitCostMinor: cost(form.get(`cost.${variantId}`)) }));
     const order = await createRestockOrder(db, shop.id, {
       supplierName: String(form.get("supplierName") ?? ""),
+      supplierEmail: String(form.get("supplierEmail") ?? ""),
       expectedOn: String(form.get("expectedOn") ?? ""),
       note: String(form.get("note") ?? ""),
       lines: lines.filter((l) => l.quantity > 0),
@@ -72,4 +73,17 @@ export async function cancelRestockAction(id: string, _: RestockState, _form: Fo
   revalidatePath("/admin/restock");
   revalidatePath(`/admin/restock/${id}`);
   return { message: "Cancelled. Anything that already arrived stays in your stock." };
+}
+
+/** Emails the order to the supplier; their reply comes back to whoever sent it. */
+export async function emailRestockAction(id: string, _: RestockState, form: FormData): Promise<RestockState> {
+  const { user, shop, db } = await requireShop("products");
+  try {
+    const { to } = await emailRestockOrder(db, mailer(), shop, id, { to: String(form.get("to") ?? ""), replyTo: user.email });
+    revalidatePath(`/admin/restock/${id}`);
+    return { message: `Sent to ${to}. Their reply comes to ${user.email}.` };
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
 }

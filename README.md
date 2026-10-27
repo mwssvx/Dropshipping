@@ -822,3 +822,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Suggested restock (after launch, part 119)
 
 1. **Order from what sold**: "Suggest a restock" on the Inventory page opens a new restock order filled in with enough of each option to last the next 30, 60 or 90 days at the pace of the last 30, less what's on the shelf and already on the way. Options that didn't sell are left empty. The merchant changes anything before saving (`restockSuggestions` in `packages/core/src/inventory.ts`).
+
+### Emailing a restock order (after launch, part 120)
+
+1. **Send it to the supplier**: a restock order can carry the supplier's email. "Email this order" on the order sends them a purchase order with what's still to come, SKUs, agreed costs and the total, when it's wanted, the store's mailing address and the note. The reply goes to whoever sent it. It can't go out twice within a few minutes by accident, and the page shows when it was last sent (`emailRestockOrder` in `packages/core/src/restock.ts`, migration 0103).

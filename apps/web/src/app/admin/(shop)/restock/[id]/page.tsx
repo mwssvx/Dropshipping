@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { formatMoney, getRestockOrder, NotFoundError } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../../PageHeader";
-import { CancelRestockButton, ReceiveForm } from "../RestockForms";
+import { CancelRestockButton, EmailRestockForm, ReceiveForm } from "../RestockForms";
 
 export const metadata = { title: "Restock order" };
 
@@ -62,6 +62,16 @@ export default async function RestockOrderPage({ params, searchParams }: { param
         </section>
         {order.status === "open" && (
           <>
+            <section className="card p-5 flex flex-col gap-3" aria-labelledby="send-heading">
+              <div>
+                <h2 id="send-heading" className="font-semibold">Send it to {order.supplierName}</h2>
+                <p className="hint">
+                  Emails them what&apos;s still to come, with SKUs, costs, when you want it and your mailing address. Their reply comes to your email.
+                  {order.emailedAt && <> Last sent {day(order.emailedAt)}{order.supplierEmail ? ` to ${order.supplierEmail}` : ""}.</>}
+                </p>
+              </div>
+              <EmailRestockForm restockId={order.id} email={order.supplierEmail} />
+            </section>
             <section className="card p-5 flex flex-col gap-3" aria-labelledby="receive-heading">
               <div>
                 <h2 id="receive-heading" className="font-semibold">It arrived</h2>

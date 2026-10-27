@@ -715,6 +715,13 @@
       "when": 1793105162232,
       "tag": "0102_shelf_locations",
       "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1793107060993,
+      "tag": "0103_restock_email",
+      "breakpoints": true
     }
   ]
 }

@@ -1635,6 +1635,10 @@ export const restockOrders = pgTable(
     // #1, #2… per store.
     number: integer("number").notNull(),
     supplierName: text("supplier_name").notNull(),
+    // Where the order is emailed, when the merchant sends it from here.
+    supplierEmail: text("supplier_email"),
+    // When it was last emailed to the supplier.
+    emailedAt: timestamp("emailed_at", { withTimezone: true }),
     note: text("note"),
     expectedOn: date("expected_on", { mode: "string" }),
     status: text("status", { enum: ["open", "received", "cancelled"] }).notNull().default("open"),

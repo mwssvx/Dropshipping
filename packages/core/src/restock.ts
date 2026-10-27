@@ -5,8 +5,11 @@
 // What's still on the way shows on the product page.
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
+import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
 import { receiveStock } from "./own-stock";
+import { formatMoney } from "./money";
+import type { Mailer } from "./email";
 
 export const MAX_RESTOCK_LINES = 200;
 export const MAX_RESTOCK_QUANTITY = 100_000;
@@ -32,11 +35,12 @@ const lineTitle = (product: string, option: string) => (option === "Default" ? p
 export async function createRestockOrder(
   db: Db,
   shopId: string,
-  input: { supplierName: string; expectedOn?: string | null; note?: string | null; lines: RestockLineInput[] },
+  input: { supplierName: string; supplierEmail?: string | null; expectedOn?: string | null; note?: string | null; lines: RestockLineInput[] },
 ) {
   const supplierName = input.supplierName.trim();
   if (!supplierName) throw new UserError("Say who you're ordering from.");
   if (supplierName.length > 100) throw new UserError("Keep the supplier's name under 100 characters.");
+  const supplierEmail = parseSupplierEmail(input.supplierEmail);
   const note = (input.note ?? "").trim() || null;
   if (note && note.length > 1000) throw new UserError("Keep the note under 1,000 characters.");
   const expectedOn = (input.expectedOn ?? "").trim() || null;
@@ -58,7 +62,7 @@ export async function createRestockOrder(
     const [last] = await tx.select({ n: sql<number>`coalesce(max(${schema.restockOrders.number}), 0)` }).from(schema.restockOrders).where(eq(schema.restockOrders.shopId, shopId));
     const [order] = await tx
       .insert(schema.restockOrders)
-      .values({ shopId, number: Number(last?.n ?? 0) + 1, supplierName, note, expectedOn })
+      .values({ shopId, number: Number(last?.n ?? 0) + 1, supplierName, supplierEmail, note, expectedOn })
       .returning();
     await tx.insert(schema.restockLines).values(
       lines.map((l, position) => ({
@@ -177,4 +181,75 @@ export async function incomingStock(db: Db, shopId: string, productId: string) {
   return rows
     .filter((r) => r.quantity > r.receivedQuantity)
     .map((r) => ({ variantId: r.variantId!, quantity: r.quantity - r.receivedQuantity, restock: { id: r.restockId, number: r.number, expectedOn: r.expectedOn } }));
+}
+
+const email = z.string().trim().toLowerCase().email().max(200);
+
+function parseSupplierEmail(raw: string | null | undefined) {
+  const s = (raw ?? "").trim();
+  if (!s) return null;
+  const parsed = email.safeParse(s);
+  if (!parsed.success) throw new UserError("Enter the supplier's email like orders@supplier.com, or leave it empty.");
+  return parsed.data;
+}
+
+/** Not twice within this long, so a double click doesn't send it twice. */
+const RESEND_AFTER_MS = 5 * 60_000;
+
+/**
+ * Emails an open restock order to the supplier as a purchase order: the lines with SKUs,
+ * quantities and agreed costs, when it's wanted, and where to send it. Replies go to the merchant.
+ * A new email address given here is kept on the order.
+ */
+export async function emailRestockOrder(
+  db: Db,
+  mailer: Mailer,
+  shop: { id: string; name: string; currency: string; mailingAddress: string | null },
+  id: string,
+  opts: { to?: string | null; replyTo: string; now?: Date },
+) {
+  const now = opts.now ?? new Date();
+  const order = await getRestockOrder(db, shop.id, id);
+  if (order.status !== "open") throw new UserError("Only an order still on the way can be sent.");
+  const to = parseSupplierEmail(opts.to) ?? order.supplierEmail;
+  if (!to) throw new UserError("Add the supplier's email to send it.");
+  if (order.emailedAt && to === order.supplierEmail && now.getTime() - order.emailedAt.getTime() < RESEND_AFTER_MS) throw new UserError("It was just sent. Give it a few minutes before sending it again.");
+  const variantIds = order.lines.map((l) => l.variantId).filter((v): v is string => !!v);
+  const skus = new Map(
+    (variantIds.length ? await db.query.variants.findMany({ where: inArray(schema.variants.id, variantIds), columns: { id: true, sku: true } }) : []).map((v) => [v.id, v.sku]),
+  );
+  const money = (m: number) => formatMoney(m, shop.currency);
+  const wanted = order.lines.filter((l) => l.quantity > l.receivedQuantity);
+  const lines = wanted.map((l) => {
+    const sku = l.variantId ? skus.get(l.variantId) : null;
+    const qty = l.quantity - l.receivedQuantity;
+    const price = l.unitCostMinor === null ? "" : ` at ${money(l.unitCostMinor)} each = ${money(l.unitCostMinor * qty)}`;
+    return `- ${qty} x ${l.title}${sku ? ` (SKU ${sku})` : ""}${price}`;
+  });
+  const priced = wanted.filter((l) => l.unitCostMinor !== null);
+  const total = priced.reduce((s, l) => s + l.unitCostMinor! * (l.quantity - l.receivedQuantity), 0);
+  const expected = order.expectedOn ? new Date(`${order.expectedOn}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }) : null;
+  await mailer.send({
+    to,
+    replyTo: opts.replyTo,
+    subject: `Purchase order #${order.number} from ${shop.name}`,
+    text: [
+      `Hello ${order.supplierName},`,
+      ``,
+      `${shop.name} would like to order:`,
+      ``,
+      ...lines,
+      ...(priced.length ? [``, `Total: ${money(total)}${priced.length < wanted.length ? " (for the lines with a price)" : ""}`] : []),
+      ...(expected ? [``, `We'd like it by ${expected}.`] : []),
+      ...(shop.mailingAddress ? [``, `Please send it to:`, shop.mailingAddress] : []),
+      ...(order.note ? [``, order.note] : []),
+      ``,
+      `Please reply to this email to confirm, or with any questions.`,
+      ``,
+      `Thank you,`,
+      shop.name,
+    ].join("\n"),
+  });
+  await db.update(schema.restockOrders).set({ supplierEmail: to, emailedAt: now }).where(eq(schema.restockOrders.id, order.id));
+  return { to };
 }
