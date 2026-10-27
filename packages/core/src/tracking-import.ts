@@ -146,37 +146,43 @@ export async function importTracking(ctx: FulfillmentContext, shopId: string, te
   return result;
 }
 
-/**
- * Paid orders that haven't shipped yet, as a file to fill in: the order, who it's for and what's
- * in it, then empty Carrier, Tracking number and Tracking link columns. Oldest first.
- */
-export async function trackingTemplateCsv(db: Db, shopId: string) {
-  const orders = await db.query.orders.findMany({
-    where: and(
-      eq(schema.orders.shopId, shopId),
-      inArray(schema.orders.paymentStatus, ["paid", "partially_refunded"]),
-      inArray(schema.orders.fulfillmentStatus, ["unfulfilled", "sent_to_supplier", "partially_shipped", "problem"]),
-    ),
-    orderBy: (o, { asc }) => [asc(o.number)],
-  });
-  const waiting = orders.filter((o) => !o.heldAt);
-  const ids = waiting.map((o) => o.id);
-  const lines = ids.length ? await db.query.orderLines.findMany({ where: inArray(schema.orderLines.orderId, ids) }) : [];
+/** Paid orders that haven't shipped yet and aren't on hold, oldest first. */
+export async function ordersWaitingForTracking(db: Db, shopId: string) {
+  const orders = (
+    await db.query.orders.findMany({
+      where: and(
+        eq(schema.orders.shopId, shopId),
+        inArray(schema.orders.paymentStatus, ["paid", "partially_refunded"]),
+        inArray(schema.orders.fulfillmentStatus, ["unfulfilled", "sent_to_supplier", "partially_shipped", "problem"]),
+      ),
+      orderBy: (o, { asc }) => [asc(o.number)],
+    })
+  ).filter((o) => !o.heldAt);
+  const ids = orders.map((o) => o.id);
   const tracked = ids.length
     ? await db.query.fulfillments.findMany({ where: and(inArray(schema.fulfillments.orderId, ids), isNotNull(schema.fulfillments.trackingNumber)) })
     : [];
+  // A partly shipped order still has parcels to go, so it stays in the list.
+  return orders.filter((o) => o.fulfillmentStatus === "partially_shipped" || !tracked.some((f) => f.orderId === o.id));
+}
+
+/**
+ * The orders waiting for tracking as a file to fill in: the order, who it's for and what's in it,
+ * then empty Carrier, Tracking number and Tracking link columns.
+ */
+export async function trackingTemplateCsv(db: Db, shopId: string) {
+  const waiting = await ordersWaitingForTracking(db, shopId);
+  const ids = waiting.map((o) => o.id);
+  const lines = ids.length ? await db.query.orderLines.findMany({ where: inArray(schema.orderLines.orderId, ids) }) : [];
   const header = ["Order", "Name", "Country", "Items", "Carrier", "Tracking number", "Tracking link"];
-  const rows = waiting
-    // A partly shipped order still has parcels to go, so it stays in the list.
-    .filter((o) => o.fulfillmentStatus === "partially_shipped" || !tracked.some((f) => f.orderId === o.id))
-    .map((o) => [
-      o.number,
-      o.shippingAddress.name,
-      o.shippingAddress.country,
-      lines.filter((l) => l.orderId === o.id).map((l) => `${l.quantity} × ${l.title}`).join("; "),
-      null,
-      null,
-      null,
-    ]);
+  const rows = waiting.map((o) => [
+    o.number,
+    o.shippingAddress.name,
+    o.shippingAddress.country,
+    lines.filter((l) => l.orderId === o.id).map((l) => `${l.quantity} × ${l.title}`).join("; "),
+    null,
+    null,
+    null,
+  ]);
   return [header, ...rows].map((r) => r.map((c) => csvCell(c ?? null)).join(",")).join("\n") + "\n";
 }

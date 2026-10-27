@@ -735,3 +735,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **One upload for many orders**: on the Orders page, under "Add tracking from a spreadsheet", the merchant uploads a CSV with Order, Carrier and Tracking number columns, and optionally Tracking link (`importTracking` in `packages/core/src/tracking-import.ts`). It also reads the orders spreadsheet with a Carrier column added, and the usual column names from other tools.
 2. **Start from the waiting list**: "Download the orders waiting for tracking" gives every paid order that hasn't shipped (not held), with who it's for and what's in it, and empty columns to fill in (`/admin/orders/tracking.csv`).
 3. **Marked shipped**: a parcel the supplier hasn't shipped gets the tracking; a failed one becomes the merchant's own; an order nobody sent gets a new parcel. The buyer gets the shipping email once. Uploading the same file again changes nothing. Rows that can't be used (no such order, refunded, unpaid, on hold, already shipped with other tracking, a bad tracking number or link) are listed with their line and why. The activity log records how many orders it shipped.
+
+### Packing slips (after launch, part 104)
+
+1. **For packing by hand**: from the Orders page, "Packing slips" shows one slip per order waiting for tracking, each printing on its own sheet (`packingSlips` in `packages/core/src/packing-slips.ts`). Each order page links to its own slip.
+2. **What goes in the box, no prices**: the store's name and mailing address, the order number and date, the ship-to address with the courier phone, each item with its SKU, personalisation and pre-order mark, and a tick box. A gift order prints who it's from and their message. The buyer's note shows on screen but isn't printed.
+3. **The store's note**: a note at the foot of every slip, like a thank-you or a code for next time (`shops.packing_slip_note`, up to 500 characters). Store export and import keep it.

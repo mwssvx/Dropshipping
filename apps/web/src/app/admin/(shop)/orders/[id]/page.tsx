@@ -319,6 +319,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
               {a.line1}{a.line2 ? <>, {a.line2}</> : null}<br />{a.city}{a.region ? `, ${a.region}` : ""} {a.postalCode}<br />{a.country}
               {a.phone && <><br /><a className="underline" href={`tel:${a.phone.replace(/[^\d+]/g, "")}`}>{a.phone}</a></>}
             </address>
+            {order.paymentStatus !== "pending" && order.paymentStatus !== "failed" && <Link href={`/admin/orders/${order.id}/packing-slip`} className="underline">Packing slip</Link>}
           </div>
           {order.risk && !held && (
             <section aria-labelledby="risk-heading">

@@ -115,4 +115,9 @@
   .invoice-sheet, .invoice-sheet * { visibility: visible; }
   .invoice-sheet { position: absolute; left: 0; top: 0; width: 100%; border: 0; }
   .invoice-sheet .no-print { display: none; }
+  body:has(.print-sheets) * { visibility: hidden; }
+  .print-sheets, .print-sheets * { visibility: visible; }
+  .print-sheets { position: absolute; left: 0; top: 0; width: 100%; gap: 0; }
+  .print-sheets > * { break-after: page; border: 0; box-shadow: none; }
+  .print-sheets .no-print { display: none; }
 }
