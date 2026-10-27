@@ -18,6 +18,7 @@ import { savedIds } from "@/lib/saved";
 import { loadShop, localProducts, storeBase, storeLang, storeT, missing } from "../../data";
 import { Price } from "@/components/Price";
 import { PixelEvent } from "@/components/PixelEvent";
+import { StickyBuyBar } from "@/components/StickyBuyBar";
 
 async function load(shopHandle: string, handle: string, count = true) {
   const shop = await loadShop(shopHandle);
@@ -217,7 +218,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           </section>
         )}
         {v && orderable.length > 0 && (
-          <form action={addToCartAction.bind(null, shopHandle)} className="flex flex-col gap-4" data-pixel-prices={tracking ? JSON.stringify(pixelPrices) : undefined} data-pixel-currency={tracking ? shop.currency : undefined}>
+          <form id="buy" action={addToCartAction.bind(null, shopHandle)} className="flex flex-col gap-4" data-pixel-prices={tracking ? JSON.stringify(pixelPrices) : undefined} data-pixel-currency={tracking ? shop.currency : undefined}>
             {byOption ? (
               <OptionPicker
                 options={defs}
@@ -279,6 +280,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
             <SubmitButton className="btn btn-primary btn-lg" pendingText={t.adding}>{preorder && buyable.length === 0 ? t.preorder : t.addToCart}</SubmitButton>
           </form>
         )}
+        {v && orderable.length > 0 && <StickyBuyBar formId="buy" title={product.title} imageUrl={product.imageUrl} label={preorder && buyable.length === 0 ? t.preorder : t.addToCart} />}
         {v && orderable.length === 0 && <p className="banner banner-info">{t.soldOutForNow}</p>}
         {cantShipHere && <p className="banner banner-warning" role="note">{t.cantShipTo(new Intl.DisplayNames([lang], { type: "region" }).of(cantShipHere) ?? cantShipHere)}</p>}
         {shipping && (

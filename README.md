@@ -886,3 +886,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Free gift (after launch, part 135)
 
 1. **Spend more, get a gift**: under Checkout add-ons, a store can give one product away with orders over an amount ("a tote bag over $75"). The cart says "Spend $30.00 more and get Tote bag free.", and once the order gets there the gift shows in the cart and at checkout and comes with the order as a free line, so it's sent with everything else and its stock and cost count. The amount is what the buyer pays for goods after discounts. It isn't offered when the gift is sold out, off sale or can't ship to the buyer's country, and wholesale orders, after-checkout offers and repeat deliveries don't get one. On Shopify this is a paid app (`packages/core/src/free-gift.ts`, migration `0112_free_gift`).
+
+### Add to cart bar on phones (after launch, part 136)
+
+1. **Always in reach**: on phones, once a buyer scrolls past a product's Add to cart button into its photos, details or reviews, a bar at the bottom of the screen shows the product and an Add to cart button. It submits the same form, so the option and quantity picked above are what goes in the cart. It's hidden on wider screens and from screen readers and the keyboard, which reach the real button. Shopify themes sell this as an app (`apps/web/src/components/StickyBuyBar.tsx`, no migration).
