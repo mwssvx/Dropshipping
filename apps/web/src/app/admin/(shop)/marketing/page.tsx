@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { abandonedCartStats, describeDiscount, listCodeBatches, MAX_BATCH, formatMoney, listDiscounts, listProducts, POST_PURCHASE_MINUTES, postPurchaseStats, referralStats, SUBSCRIBE_WITHIN_DAYS, subscriptionStats, welcomeOfferStats, winbackDueCount, winbackStats } from "@sf/core";
+import { abandonedCartStats, describeDiscount, listCodeBatches, MAX_BATCH, formatMoney, listDiscounts, productChoices, POST_PURCHASE_MINUTES, postPurchaseStats, referralStats, SUBSCRIBE_WITHIN_DAYS, subscriptionStats, welcomeOfferStats, winbackDueCount, winbackStats } from "@sf/core";
 import { requireShop, testPayments } from "@/lib/server";
 import { sendOffersNowAction, sendRemindersNowAction, setDiscountActiveAction, setRemindersAction } from "../../growth-actions";
 import { ReminderOfferForm } from "./ReminderOfferForm";
@@ -25,7 +25,7 @@ export default async function MarketingPage() {
     abandonedCartStats(db, shop.id, new Date(Date.now() - 30 * DAY)),
     welcomeOfferStats(db, shop.id),
     referralStats(db, shop.id),
-    listProducts(db, shop.id),
+    productChoices(db, shop.id),
     postPurchaseStats(db, shop.id),
     subscriptionStats(db, shop.id),
     winbackStats(db, shop.id),

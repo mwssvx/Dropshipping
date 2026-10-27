@@ -1,4 +1,4 @@
-import { countryName, describeRate, EVERYWHERE_ELSE, formatDeliveryWindow, formatMoney, listProducts, listShippingZones, productDelivery, rateDays, rateWeight, SHIPPING_COUNTRIES, CUTOFF_TIME_ZONES, defaultCutoffZone } from "@sf/core";
+import { countryName, describeRate, EVERYWHERE_ELSE, formatDeliveryWindow, formatMoney, listShippingZones, sampleProduct, productDelivery, rateDays, rateWeight, SHIPPING_COUNTRIES, CUTOFF_TIME_ZONES, defaultCutoffZone } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { setCheckoutPhoneAction } from "../../shipping-actions";
@@ -23,7 +23,7 @@ export default async function ShippingPage() {
   const { shop, db } = await requireShop("shipping");
   const { zones, isDefault } = await listShippingZones(db, shop.id);
   // An example from the store's own catalog, so the merchant sees what buyers see.
-  const example = (await listProducts(db, shop.id)).find((p) => p.status === "active" && !p.giftCard);
+  const example = await sampleProduct(db, shop.id);
   const preview = example ? await productDelivery(db, shop, example.id) : null;
   const money = (m: number) => formatMoney(m, shop.currency);
   const symbol = money(0).replace(/[\d.,\s]/g, "");

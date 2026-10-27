@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { can, CUSTOMER_PAGE_SIZE, customerTags, customerTotals, describeTagRule, formatMoney, listCustomers, listProducts, listTagRules, MAX_TAG_RULES } from "@sf/core";
+import { can, CUSTOMER_PAGE_SIZE, customerTags, customerTotals, describeTagRule, formatMoney, listCustomers, listTagRules, productChoices, MAX_TAG_RULES } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { deleteTagRuleAction } from "../../tag-rule-actions";
 import { PageHeader } from "../PageHeader";
@@ -18,7 +18,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
     customerTotals(db, shop.id, { query: q, tag }),
     customerTags(db, shop.id),
     listTagRules(db, shop.id),
-    listProducts(db, shop.id),
+    productChoices(db, shop.id),
   ]);
   const filtered = !!(q || tag);
   const seesMoney = can(role, "money");

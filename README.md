@@ -918,3 +918,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Search and pages for the product list (after launch, part 143)
 
 1. **Find a product in a big catalog**: the admin product list has a search box (title, or an exact SKU) and On sale, Drafts and Archived filters, and shows 100 products at a time with Previous and Next. Bulk edits work on the products on the page (`productPage` in `packages/core/src/products.ts`).
+
+### Light product pickers (after launch, part 144)
+
+1. **Pages that only need a list of names**: the discount, after-checkout offer, tag rule, profit, theme menu, blog and price-change pages used to load every product with all its options and photos just to fill a dropdown, and the shipping and currency pages did the same to show one example. They now load only ids, titles and status (`productChoices`), or one example product (`sampleProduct`), so they stay quick with a big catalog.

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatMoney, listCostChanges, listProducts } from "@sf/core";
+import { formatMoney, listCostChanges, productChoices } from "@sf/core";
 import { requireShop, testPayments } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { ChangeActions, PriceWatchSettings, SimulateRise } from "./PriceWatchForms";
@@ -11,7 +11,7 @@ const date = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", 
 
 export default async function PriceChangesPage() {
   const { shop, db } = await requireShop("products");
-  const [changes, products] = await Promise.all([listCostChanges(db, shop), testPayments() ? listProducts(db, shop.id) : []]);
+  const [changes, products] = await Promise.all([listCostChanges(db, shop), testPayments() ? productChoices(db, shop.id) : []]);
   const money = (m: number) => formatMoney(m, shop.currency);
   const open = changes.filter((c) => c.status === "open");
   const done = changes.filter((c) => c.status !== "open");

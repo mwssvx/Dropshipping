@@ -1,4 +1,4 @@
-import { convertPrice, CURRENCIES, CURRENCY_NAMES, crossRate, formatMoney, listProducts } from "@sf/core";
+import { convertPrice, CURRENCIES, CURRENCY_NAMES, crossRate, formatMoney, sampleProduct } from "@sf/core";
 import { fxRates, requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { CurrenciesForm } from "./CurrenciesForm";
@@ -7,9 +7,8 @@ export const metadata = { title: "Currencies" };
 
 export default async function CurrenciesPage() {
   const { shop, db } = await requireShop("currencies");
-  const [{ rates, asOf }, products] = await Promise.all([fxRates().rates(), listProducts(db, shop.id)]);
+  const [{ rates, asOf }, sample] = await Promise.all([fxRates().rates(), sampleProduct(db, shop.id)]);
   const others = CURRENCIES.filter((c) => c !== shop.currency);
-  const sample = products.find((p) => p.status === "active" && p.variants[0]) ?? products.find((p) => p.variants[0]);
   const samplePrice = sample?.variants[0]?.priceMinor ?? 2499;
 
   return (
