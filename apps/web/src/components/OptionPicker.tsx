@@ -21,6 +21,7 @@ export function OptionPicker({
   prices,
   soldOutLabel,
   lowStock = {},
+  swatches = {},
 }: {
   options: { name: string; values: string[] }[];
   variants: PickerVariant[];
@@ -29,6 +30,8 @@ export function OptionPicker({
   soldOutLabel: string;
   /** "Only 2 left", by variant, for options with few left. */
   lowStock?: Record<string, string>;
+  /** The colour each value shows as, by option name (only the colour option has them). */
+  swatches?: Record<string, Record<string, string>>;
 }) {
   const [chosenId, setChosenId] = useState(initialId);
   const chosen = variants.find((v) => v.id === chosenId) ?? variants[0]!;
@@ -72,6 +75,9 @@ export function OptionPicker({
                     className="sr-only peer"
                     aria-describedby={!anyInStock ? `soldout-${o.name}-${value}` : undefined}
                   />
+                  {swatches[o.name]?.[value] && (
+                    <span aria-hidden="true" data-swatch={swatches[o.name]![value]} className="size-4 rounded-full border border-black/20 shrink-0" style={{ background: swatches[o.name]![value] }} />
+                  )}
                   <span>{value}</span>
                   {!anyInStock && <span id={`soldout-${o.name}-${value}`} className="sr-only">{soldOutLabel}</span>}
                 </label>
