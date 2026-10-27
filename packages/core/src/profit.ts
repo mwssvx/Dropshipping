@@ -6,6 +6,7 @@ import { AD_CHANNELS, schema, type Db } from "@sf/db";
 import { z } from "zod";
 import { DISPUTE_FEE_MINOR } from "./disputes";
 import { NotFoundError, UserError } from "./errors";
+import { groupBy } from "./group";
 
 type Shop = typeof schema.shops.$inferSelect;
 export type AdChannel = (typeof AD_CHANNELS)[number];
@@ -149,8 +150,9 @@ export async function profitReport(db: Db, shop: Shop, days: ProfitRange, now = 
   };
 
   let giftCardSalesMinor = 0;
+  const linesOf = groupBy(lines, (l) => l.orderId);
   for (const order of orders) {
-    const own = lines.filter((l) => l.orderId === order.id);
+    const own = linesOf.get(order.id) ?? [];
     const gross = own.reduce((s, l) => s + l.unitPriceMinor * l.quantity, 0);
     if (!gross) {
       // A free replacement sells nothing, but the goods it sends again still cost money.

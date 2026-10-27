@@ -878,3 +878,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Shipping cost on product pages (after launch, part 133)
 
 1. **No surprise at checkout**: under the price, product pages say what shipping costs to the buyer's country ("Shipping to United States: $4.99 · Free on orders of $50.00 or more"), or "Free shipping to United States" when the item alone gets there. It's the cheapest of the store's rates for that country that takes the item's weight, in the buyer's currency, and it's left out where the store doesn't ship, for gift cards, and when the item can't go to that country (`productShipping` in `packages/core/src/delivery.ts`, no migration).
+
+### Big catalogs (after launch, part 134)
+
+1. **Thousands of products stay quick**: the product list, the store, and the store, product, order, packing slip, tracking and profit exports join each product's options (and each order's items) in one pass instead of scanning every row for every product. With 4,000 products and 12,000 options the product list went from about 1.6 s to 0.5 s. Options for a whole store are picked by the store instead of a list of ids, so stores over 65,535 options no longer hit Postgres's limit on query values (`packages/core/src/group.ts`, no migration).

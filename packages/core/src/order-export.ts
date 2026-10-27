@@ -4,6 +4,7 @@ import { inArray } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { listOrders } from "./orders";
 import { csvCell } from "./payouts";
+import { groupBy } from "./group";
 
 type Filter = Parameters<typeof listOrders>[2];
 
@@ -17,6 +18,8 @@ export async function ordersCsv(db: Db, shopId: string, filter: Filter = {}) {
         db.query.fulfillments.findMany({ where: inArray(schema.fulfillments.orderId, ids) }),
       ])
     : [[], []];
+  const linesOf = groupBy(lines, (l) => l.orderId);
+  const parcelsOf = groupBy(parcels, (f) => f.orderId);
   const major = (m: number) => (m / 100).toFixed(2);
   const header = [
     "Order", "Placed", "Paid", "Email", "Name", "Address", "Address 2", "City", "Region", "Postal code", "Country",
@@ -25,13 +28,13 @@ export async function ordersCsv(db: Db, shopId: string, filter: Filter = {}) {
   ];
   const rows = orders.flatMap((o) => {
     const a = o.shippingAddress;
-    const tracking = parcels.filter((f) => f.orderId === o.id && f.trackingNumber).map((f) => (f.carrier ? `${f.carrier} ${f.trackingNumber}` : f.trackingNumber)).join("; ");
+    const tracking = (parcelsOf.get(o.id) ?? []).filter((f) => f.trackingNumber).map((f) => (f.carrier ? `${f.carrier} ${f.trackingNumber}` : f.trackingNumber)).join("; ");
     const order = [
       o.number, o.createdAt.toISOString(), o.paidAt?.toISOString() ?? null, o.email, a.name, a.line1, a.line2 ?? null, a.city, a.region ?? null, a.postalCode, a.country,
       o.paymentStatus, o.fulfillmentStatus, o.currency, major(o.subtotalMinor), major(o.discountMinor), o.discountCode, major(o.shippingMinor), major(o.protectionMinor), major(o.giftWrapMinor), major(o.tipMinor), major(o.taxMinor), major(o.totalMinor), major(o.refundedMinor),
     ];
     const extra = [tracking || null, o.tags.join(", ") || null, o.buyerNote, o.staffNote];
-    const mine = lines.filter((l) => l.orderId === o.id);
+    const mine = linesOf.get(o.id) ?? [];
     if (!mine.length) return [[...order, null, null, null, null, null, ...extra]];
     return mine.map((l) => [
       ...order,
