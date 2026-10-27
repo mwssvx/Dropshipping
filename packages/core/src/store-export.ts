@@ -6,6 +6,7 @@ import { schema, SOLD_OUT_DISPLAY, TAG_RULE_KINDS, type Db } from "@sf/db";
 import { z } from "zod";
 import { collectionRulesSchema } from "./collection-rules";
 import { MAX_WEIGHT_GRAMS } from "./weight";
+import { countryCode } from "./customs";
 import { NotFoundError, UserError } from "./errors";
 import { CURRENCIES } from "./currency";
 import { csvCell } from "./payouts";
@@ -149,6 +150,8 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       search_listing: p.seoTitle || p.seoDescription ? { title: p.seoTitle, description: p.seoDescription } : null,
       purchase_limit: p.purchaseLimit ? { min: p.purchaseLimit.min, max: p.purchaseLimit.max, per_customer: p.purchaseLimit.perCustomer } : null,
       video_url: p.videoUrl,
+      hs_code: p.hsCode,
+      origin_country: p.originCountry,
       details: p.details.length ? p.details : undefined,
       badge: p.badge,
       gift_card: p.giftCard,
@@ -369,6 +372,8 @@ const importSchema = z.object({
         video_url: z.string().max(2000).nullable().optional(),
         details: z.array(z.object({ label: z.string().max(200), value: z.string().max(1000) })).max(100).optional(),
         badge: z.string().max(20).nullable().optional(),
+        hs_code: z.string().max(20).nullable().optional(),
+        origin_country: z.string().max(10).nullable().optional(),
         purchase_limit: z
           .object({ min: z.number().int().min(2).max(99).nullable(), max: z.number().int().min(1).max(99).nullable(), per_customer: z.number().int().min(1).max(999).nullable() })
           .nullable()
@@ -577,6 +582,9 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
           seoDescription: x.search_listing?.description || null,
           purchaseLimit: x.purchase_limit ? { min: x.purchase_limit.min, max: x.purchase_limit.max, perCustomer: x.purchase_limit.per_customer } : null,
           videoUrl: parseVideo(x.video_url) ? x.video_url!.trim() : null,
+          // Kept only when they'd save here.
+          hsCode: /^\d{6,10}$/.test(x.hs_code ?? "") ? x.hs_code! : null,
+          originCountry: countryCode(x.origin_country),
           // Read like the merchant's own text, so lines that wouldn't save here are dropped.
           details: x.details ? parseDetails(detailsText(x.details)) : [],
           badge: x.badge?.trim() || null,

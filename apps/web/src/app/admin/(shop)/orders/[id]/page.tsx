@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { can, countryName, disputeEvidence, disputeReason, disputesForOrder, formatMoney, getOrder, orderEditOptions, listRefunds, replaceableLines, replacementBlocked, replacementsOf, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode, formatShipsBy, preorderWaitingOn } from "@sf/core";
+import { can, countryName, crossesBorder, disputeEvidence, disputeReason, disputesForOrder, formatMoney, getOrder, orderEditOptions, listRefunds, replaceableLines, replacementBlocked, replacementsOf, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode, formatShipsBy, preorderWaitingOn } from "@sf/core";
 import { fulfillment, requireShop, storeAddress, suppliers, testPayments } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
 import { editOrderAction } from "../../../actions";
@@ -348,7 +348,12 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
               {a.line1}{a.line2 ? <>, {a.line2}</> : null}<br />{a.city}{a.region ? `, ${a.region}` : ""} {a.postalCode}<br />{a.country}
               {a.phone && <><br /><a className="underline" href={`tel:${a.phone.replace(/[^\d+]/g, "")}`}>{a.phone}</a></>}
             </address>
-            {order.paymentStatus !== "pending" && order.paymentStatus !== "failed" && <Link href={`/admin/orders/${order.id}/packing-slip`} className="underline">Packing slip</Link>}
+            {order.paymentStatus !== "pending" && order.paymentStatus !== "failed" && (
+              <p className="flex flex-wrap gap-x-4">
+                <Link href={`/admin/orders/${order.id}/packing-slip`} className="underline">Packing slip</Link>
+                {!order.pickup && !order.localDelivery && crossesBorder(order, shop) && <Link href={`/admin/orders/${order.id}/customs`} className="underline">Customs form</Link>}
+              </p>
+            )}
           </div>
           {order.risk && !held && (
             <section aria-labelledby="risk-heading">

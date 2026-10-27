@@ -299,6 +299,9 @@ export const products = pgTable(
     preorder: jsonb("preorder").$type<Preorder>(),
     // Least and most a buyer can order, e.g. a limited drop capped at 2 per customer.
     purchaseLimit: jsonb("purchase_limit").$type<PurchaseLimit>(),
+    // For customs forms on orders that cross a border: the tariff code and where it was made.
+    hsCode: text("hs_code"),
+    originCountry: text("origin_country"),
     // A video for the product page: a YouTube or Vimeo link, or an https video file.
     videoUrl: text("video_url"),
     // Facts shown as a table on the product page, like Material: Aluminium or Size: 20 × 10 cm.
