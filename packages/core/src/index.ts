@@ -115,6 +115,7 @@ export * from "./tips";
 export * from "./reorder-reminders";
 export * from "./ship-cutoff";
 export * from "./country-limits";
+export * from "./gift-card-balance";
 export * from "./weight";
 export * from "./restock";
 export * from "./inventory";
