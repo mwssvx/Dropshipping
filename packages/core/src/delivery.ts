@@ -82,10 +82,10 @@ export async function productDelivery(db: Db, shop: Shop, productId: string, opt
 
 /**
  * When a paid order should arrive, with the rate the buyer picked. Once it has shipped, the window
- * counts from the latest shipment instead. Null when it's delivered, refunded or has nothing to ship.
+ * counts from the latest shipment instead. Null when it's delivered, refunded, picked up in person or has nothing to ship.
  */
 export async function orderDelivery(db: Db, shop: Shop, order: Order) {
-  if (!shop.deliveryEstimates || !order.paidAt || order.paymentStatus === "refunded" || order.fulfillmentStatus === "delivered") return null;
+  if (!shop.deliveryEstimates || !order.paidAt || order.pickup || order.paymentStatus === "refunded" || order.fulfillmentStatus === "delivered") return null;
   const lines = await db
     .select({ shipDaysMin: schema.variants.shipDaysMin, shipDaysMax: schema.variants.shipDaysMax, giftCard: schema.products.giftCard })
     .from(schema.orderLines)

@@ -26,6 +26,7 @@ import { cartLineKey, cleanPersonalization, missingPersonalization, personalizat
 import { openPreorder, preorderDeadline, preordersSold } from "./preorders";
 import { boughtBefore, describeLimitProblem, limitProblem } from "./purchase-limits";
 import { onHoliday } from "./store-closure";
+import { canPickUp, PICKUP_METHOD, PICKUP_RATE_ID } from "./local-pickup";
 
 type Shop = typeof schema.shops.$inferSelect;
 type Order = typeof schema.orders.$inferSelect;
@@ -167,6 +168,12 @@ export async function quoteCart(
   let shippingMinor = 0;
   let shipping: { rateId: string; name: string; minDays: number | null; maxDays: number | null } | null = null;
   let freeShippingOverMinor: number | null = null;
+  // Picking up is free, in the store's own country, when nothing in the cart comes from a supplier.
+  const pickupHere =
+    hasGoods &&
+    (opts.country ?? shop.country) === shop.country &&
+    canPickUp(shop, rows.filter((r) => !r.product.giftCard && wanted.some((l) => l.variantId === r.variant.id)).map((r) => r.product));
+  const pickingUp = pickupHere && opts.shippingRateId === PICKUP_RATE_ID;
   if (hasGoods) {
     const { zones } = await listShippingZones(db, shop.id);
     const hinted = opts.countryHint && zoneFor(zones, opts.countryHint)?.rates.length ? opts.countryHint : null;
@@ -176,9 +183,13 @@ export async function quoteCart(
       const over = rates.map((r) => r.freeOverMinor).filter((m): m is number => m !== null);
       if (over.length) freeShippingOverMinor = Math.min(...over);
     }
-    if (!rates.length && opts.country) throw new UserError(`${shop.name} doesn't ship to ${countryName(opts.country)} yet.`, "no_shipping");
-    // The rate the buyer picked, or the cheapest for this cart.
-    const rate = rates.find((r) => r.id === opts.shippingRateId) ?? [...rates].sort((a, b) => priceRate(a, goodsMinor) - priceRate(b, goodsMinor))[0];
+    if (pickingUp) {
+      shipping = { rateId: PICKUP_RATE_ID, name: PICKUP_METHOD, minDays: null, maxDays: null };
+      freeShippingOverMinor = null;
+    }
+    if (!rates.length && opts.country && !pickingUp) throw new UserError(`${shop.name} doesn't ship to ${countryName(opts.country)} yet.`, "no_shipping");
+    // The rate the buyer picked, or the cheapest for this cart. Picking up is only ever chosen.
+    const rate = pickingUp ? undefined : (rates.find((r) => r.id === opts.shippingRateId) ?? [...rates].sort((a, b) => priceRate(a, goodsMinor) - priceRate(b, goodsMinor))[0]);
     if (rate) {
       shippingMinor = priceRate(rate, goodsMinor);
       shipping = { rateId: rate.id, name: rate.name, minDays: rate.minDays, maxDays: rate.maxDays };
@@ -268,6 +279,10 @@ export async function quoteCart(
     goodsMinor,
     /** The rate used. Null when nothing needs shipping, or the cart's estimate country has no zone. */
     shipping,
+    /** The buyer can pick this cart up from the store instead (see local-pickup.ts). */
+    canPickUp: pickupHere,
+    /** They chose to. */
+    pickingUp,
     giftCard,
     /** What's left to pay by card after the gift card. Before tax, until checkout. */
     dueMinor: totalMinor - (giftCard?.appliedMinor ?? 0),
@@ -428,8 +443,9 @@ export async function startCheckout(
     registrations: (await listTaxRegistrations(db, shop.id)).map((r) => r.jurisdiction),
   });
   // Protection is the buyer's own choice at checkout; repeat deliveries and offers never add it.
+  // Nothing travels on an order picked up, so there's nothing to protect.
   const protectionMinor =
-    shop.deliveryProtection && input.protection && !followUp && !repeat ? protectionFee(shop.deliveryProtection, cart.goodsMinor - cart.discountMinor) : 0;
+    shop.deliveryProtection && input.protection && !followUp && !repeat && !cart.pickingUp ? protectionFee(shop.deliveryProtection, cart.goodsMinor - cart.discountMinor) : 0;
   const quote = {
     ...cart,
     protectionMinor,
@@ -506,6 +522,7 @@ export async function startCheckout(
         giftCardId: cart.giftCard?.id ?? null,
         giftCardMinor,
         shippingMethod: cart.shipping?.name ?? null,
+        pickup: cart.pickingUp,
         // Only something that ships can be a gift; gift cards are emailed to the buyer.
         gift: gift && cart.items.some((i) => !i.giftCard) ? gift : null,
         buyerNote: parsed.data.note,

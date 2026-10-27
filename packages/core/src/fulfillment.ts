@@ -651,7 +651,25 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
         ...(order.parentOrderId ? [``, `You added this after checkout, so it's charged to the same card. It may arrive separately from order #${parentNumber}.`] : []),
         ...(order.source === "subscription" ? [``, `This is a delivery from your subscription, charged to your saved card. The link in your subscription emails lets you skip, change or cancel the next one.`] : []),
         ``,
-        `We'll email you again when it ships. Track your order any time: ${link}`,
+        order.pickup
+          ? `You're picking it up from ${shop.name}. We'll email you when it's ready, with the address. See your order any time: ${link}`
+          : `We'll email you again when it ships. Track your order any time: ${link}`,
+      ].join("\n"),
+    };
+  }
+  if (kind === "pickup_ready") {
+    const pickup = shop.localPickup;
+    return {
+      subject: `Order #${order.number} is ready to pick up`,
+      text: [
+        `Hi ${first},`,
+        ``,
+        `Your order from ${shop.name} is ready. Pick it up from:`,
+        ``,
+        ...(pickup?.address ?? "").split("\n").map((l) => `  ${l}`),
+        ...(pickup?.instructions ? [``, pickup.instructions] : []),
+        ``,
+        `Bring your order number, #${order.number}. Order status: ${link}`,
       ].join("\n"),
     };
   }
@@ -666,11 +684,11 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
     };
   }
   return {
-    subject: `Order #${order.number} was delivered`,
+    subject: `Order #${order.number} was ${order.pickup ? "picked up" : "delivered"}`,
     text: [
       `Hi ${first},`,
       ``,
-      `Your order from ${shop.name} was delivered. We hope you love it.`,
+      order.pickup ? `Thanks for picking up your order from ${shop.name}. We hope you love it.` : `Your order from ${shop.name} was delivered. We hope you love it.`,
       ``,
       `If anything's wrong, reply to this email. If you like it, a short review helps other buyers: ${link}#review`,
       ``,

@@ -58,7 +58,13 @@ export default async function OrderStatusPage({ params, searchParams }: { params
   const subscription = paid ? await subscriptionForOrder(await db(), order.id) : null;
   const partOf = order.subscriptionId ? await (await db()).query.subscriptions.findFirst({ where: (s, { eq }) => eq(s.id, order.subscriptionId!), columns: { token: true, status: true } }) : null;
   const arrives = paid ? await orderDelivery(await db(), shop, order) : null;
-  const steps = [
+  const pickupText = paid && order.pickup ? await storeT(handle) : null;
+  const steps = order.pickup ? [
+    { label: "Order confirmed", done: paid },
+    { label: "Being prepared", done: paid },
+    { label: "Ready to pick up", done: !!order.pickupReadyAt },
+    { label: "Picked up", done: order.fulfillmentStatus === "delivered" },
+  ] : [
     { label: "Order confirmed", done: paid },
     { label: "Being prepared", done: order.fulfillments.some((f) => f.placedAt || f.shippedAt) },
     { label: "On its way", done: ["shipped", "delivered"].includes(order.fulfillmentStatus) },
@@ -182,7 +188,22 @@ export default async function OrderStatusPage({ params, searchParams }: { params
           Your delivery is protected. If it&apos;s lost or arrives damaged, <a className="underline" href="#questions">tell {shop.name} below</a> and they&apos;ll send it again for free.
         </p>
       )}
-      {paid && shipped.length === 0 && !order.preorderShipsBy && (
+      {pickupText && order.paymentStatus !== "refunded" && (
+        <section className="banner banner-info text-sm flex flex-col gap-1" role="status" aria-label={pickupText.pickUp}>
+          {order.fulfillmentStatus === "delivered" ? (
+            <p>{pickupText.pickedUp}</p>
+          ) : order.pickupReadyAt && shop.localPickup ? (
+            <>
+              <p className="font-semibold">{pickupText.pickupReady}</p>
+              <p className="whitespace-pre-line">{shop.localPickup.address}</p>
+              {shop.localPickup.instructions && <p className="whitespace-pre-line">{shop.localPickup.instructions}</p>}
+            </>
+          ) : (
+            <p>{pickupText.pickupWaiting}</p>
+          )}
+        </section>
+      )}
+      {paid && shipped.length === 0 && !order.preorderShipsBy && !order.pickup && (
         <p className="hint text-sm">
           {order.lines.length === 1 ? "Your item usually ships" : "Your items usually ship"} within a few days. We&apos;ll email tracking to {order.email} as soon as it&apos;s on its way.
         </p>

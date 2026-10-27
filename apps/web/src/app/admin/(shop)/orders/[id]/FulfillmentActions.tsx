@@ -2,7 +2,7 @@
 import { useActionState, useState } from "react";
 import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
-import { addTrackingAction, checkTrackingAction, retryOrderAction } from "../../../actions";
+import { addTrackingAction, checkTrackingAction, pickedUpAction, readyForPickupAction, retryOrderAction } from "../../../actions";
 
 export function RetryButton({ orderId }: { orderId: string }) {
   const [state, action] = useActionState(retryOrderAction.bind(null, orderId), {});
@@ -58,5 +58,26 @@ export function ManualTrackingForm({ orderId, primary }: { orderId: string; prim
         <button type="button" className="btn btn-secondary" onClick={() => setOpen(false)}>Cancel</button>
       </div>
     </form>
+  );
+}
+
+/** For an order the buyer picks up: tell them it's ready, then mark it picked up. */
+export function PickupButtons({ orderId, ready }: { orderId: string; ready: boolean }) {
+  const [readyState, readyAction] = useActionState(readyForPickupAction.bind(null, orderId), {});
+  const [doneState, doneAction] = useActionState(pickedUpAction.bind(null, orderId), {});
+  return (
+    <div className="flex flex-col gap-2">
+      <FormError message={readyState.error ?? doneState.error} />
+      <div className="flex gap-2 flex-wrap">
+        {!ready && (
+          <form action={readyAction}>
+            <SubmitButton pendingText="Emailing…">Ready for pickup</SubmitButton>
+          </form>
+        )}
+        <form action={doneAction}>
+          <SubmitButton className={`btn ${ready ? "btn-primary" : "btn-secondary"}`} pendingText="Saving…">Picked up</SubmitButton>
+        </form>
+      </div>
+    </div>
   );
 }
