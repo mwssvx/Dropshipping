@@ -58,6 +58,7 @@ export * from "./campaigns";
 export * from "./own-suppliers";
 export * from "./wholesale";
 export * from "./gift-cards";
+export * from "./digital";
 export * from "./shipping";
 export * from "./returns";
 export * from "./replacements";

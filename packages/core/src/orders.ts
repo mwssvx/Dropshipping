@@ -159,6 +159,8 @@ export async function quoteCart(
       /** Set when the line is the checkout add-on at its price. */
       addonId: withOthers?.id ?? null,
       giftCard,
+      /** A download: no shipping. */
+      digital: row.product.digital,
       personalization: personalizationValues(row.product.personalization, custom),
       /** Set (YYYY-MM-DD) when this line is a pre-order: sold out now, promised to ship by then. */
       preorderShipsBy: preorder?.shipsBy ?? null,
@@ -171,31 +173,33 @@ export async function quoteCart(
       /** Buyers must be this old to buy it, or null. */
       minAge: row.product.minAge,
       /** Countries it can't be shipped to. */
-      blockedCountries: giftCard ? [] : row.product.blockedCountries,
+      blockedCountries: giftCard || row.product.digital ? [] : row.product.blockedCountries,
     };
   });
   const subtotalMinor = items.reduce((s, i) => s + i.lineMinor, 0);
   // Discounts and shipping only count goods: gift cards are sent by email at face value.
   const goodsMinor = items.filter((i) => !i.giftCard).reduce((s, i) => s + i.lineMinor, 0);
   const hasGoods = items.some((i) => !i.giftCard);
+  // Gift cards and downloads arrive by email: only the rest needs shipping.
+  const ships = items.some((i) => !i.giftCard && !i.digital);
   // What the parcel weighs, for rates that go by weight. Options without a weight count as nothing.
   const weightGrams = items
-    .filter((i) => !i.giftCard)
+    .filter((i) => !i.giftCard && !i.digital)
     .reduce((s, i) => s + (rows.find((r) => r.variant.id === i.variantId)?.variant.weightGrams ?? 0) * i.quantity, 0);
   let shippingMinor = 0;
   let shipping: { rateId: string; name: string; minDays: number | null; maxDays: number | null } | null = null;
   let freeShippingOverMinor: number | null = null;
   // Picking up (free) and the store's own delivery are in its own country, when nothing in the
   // cart comes from a supplier. Local delivery also needs the buyer's postal code in its area.
-  const onShelf = rows.filter((r) => !r.product.giftCard && wanted.some((l) => l.variantId === r.variant.id)).map((r) => r.product);
-  const nearby = hasGoods && (opts.country ?? shop.country) === shop.country;
+  const onShelf = rows.filter((r) => !r.product.giftCard && !r.product.digital && wanted.some((l) => l.variantId === r.variant.id)).map((r) => r.product);
+  const nearby = ships && (opts.country ?? shop.country) === shop.country;
   const pickupHere = nearby && canPickUp(shop, onShelf);
   const pickingUp = pickupHere && opts.shippingRateId === PICKUP_RATE_ID;
   const area = shop.localDeliveryArea;
-  const ownStock = hasGoods && ownStockOnly(onShelf);
+  const ownStock = ships && ownStockOnly(onShelf);
   const deliveryHere = nearby && !!area && ownStock && inDeliveryArea(area, opts.postalCode);
   const deliveringLocally = deliveryHere && opts.shippingRateId === LOCAL_DELIVERY_RATE_ID;
-  if (hasGoods) {
+  if (ships) {
     const { zones } = await listShippingZones(db, shop.id);
     const hinted = opts.countryHint && zoneFor(zones, opts.countryHint)?.rates.length ? opts.countryHint : null;
     const zoneRates = zoneFor(zones, opts.country ?? hinted ?? shop.country)?.rates ?? [];
@@ -286,7 +290,7 @@ export async function quoteCart(
   }
   const discountMinor = discount?.discountMinor ?? bundle?.discountMinor ?? 0;
   const totalMinor = subtotalMinor - discountMinor + shippingMinor;
-  const freeGift = wholesale || !hasGoods ? null : await freeGiftFor(db, shop, goodsMinor - discountMinor, opts.country ?? null);
+  const freeGift = wholesale || !ships ? null : await freeGiftFor(db, shop, goodsMinor - discountMinor, opts.country ?? null);
   let giftCard: { id: string; last4: string; balanceMinor: number; appliedMinor: number } | null = null;
   if (opts.giftCardCode?.trim()) {
     if (!hasGoods || items.some((i) => i.giftCard)) throw new UserError("Gift cards can't be bought with a gift card.", "gift_card_invalid");
@@ -318,6 +322,8 @@ export async function quoteCart(
     minAge: items.reduce<number | null>((m, i) => (i.minAge !== null && (m === null || i.minAge > m) ? i.minAge : m), null),
     /** The rate used. Null when nothing needs shipping, or the cart's estimate country has no zone. */
     shipping,
+    /** Something in the cart ships. False for gift cards and downloads alone. */
+    needsShipping: ships,
     /** The buyer can pick this cart up from the store instead (see local-pickup.ts). */
     canPickUp: pickupHere,
     /** They chose to. */
@@ -515,9 +521,9 @@ export async function startCheckout(
   // Protection is the buyer's own choice at checkout; repeat deliveries and offers never add it.
   // Nothing goes by courier on an order picked up or delivered by the store, so there's nothing to protect.
   const protectionMinor =
-    shop.deliveryProtection && input.protection && !followUp && !repeat && !cart.pickingUp && !cart.deliveringLocally ? protectionFee(shop.deliveryProtection, cart.goodsMinor - cart.discountMinor) : 0;
+    shop.deliveryProtection && input.protection && cart.needsShipping && !followUp && !repeat && !cart.pickingUp && !cart.deliveringLocally ? protectionFee(shop.deliveryProtection, cart.goodsMinor - cart.discountMinor) : 0;
   // Wrapping is for gifts with something to wrap, at the store's price; never on repeats or offers.
-  const giftWrapMinor = shop.giftWrap && input.giftWrap && gift && cart.items.some((i) => !i.giftCard) && !followUp && !repeat ? shop.giftWrap.priceMinor : 0;
+  const giftWrapMinor = shop.giftWrap && input.giftWrap && gift && cart.needsShipping && !followUp && !repeat ? shop.giftWrap.priceMinor : 0;
   // A tip is only asked for on the store's own checkout, at one of its own percentages.
   const tipping = input.storefront && !followUp && !repeat && input.tipPercent ? shop.tipping : null;
   if (tipping && !tipping.percents.includes(input.tipPercent!)) throw new UserError("Pick one of the tip amounts shown.", "tip_invalid");
@@ -606,7 +612,7 @@ export async function startCheckout(
         pickup: cart.pickingUp,
         localDelivery: cart.deliveringLocally,
         // Only something that ships can be a gift; gift cards are emailed to the buyer.
-        gift: gift && cart.items.some((i) => !i.giftCard) ? gift : null,
+        gift: gift && cart.needsShipping ? gift : null,
         buyerNote: parsed.data.note,
         taxExemptId,
         ...(followUp ? { source: "post_purchase" as const, parentOrderId: followUp.parentOrderId } : {}),

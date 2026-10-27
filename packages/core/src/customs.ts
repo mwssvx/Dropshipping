@@ -46,14 +46,14 @@ export async function customsDeclaration(db: Db, shopId: string, orderId: string
   const variantIds = [...new Set(lines.map((l) => l.variantId).filter((v): v is string => !!v))];
   const rows = variantIds.length
     ? await db
-        .select({ id: schema.variants.id, weightGrams: schema.variants.weightGrams, hsCode: schema.products.hsCode, originCountry: schema.products.originCountry, giftCard: schema.products.giftCard })
+        .select({ id: schema.variants.id, weightGrams: schema.variants.weightGrams, hsCode: schema.products.hsCode, originCountry: schema.products.originCountry, giftCard: schema.products.giftCard, digital: schema.products.digital })
         .from(schema.variants)
         .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
         .where(inArray(schema.variants.id, variantIds))
     : [];
   const byVariant = new Map(rows.map((r) => [r.id, r]));
   const items: CustomsItem[] = lines
-    .filter((l) => !(l.variantId && byVariant.get(l.variantId)?.giftCard))
+    .filter((l) => !(l.variantId && (byVariant.get(l.variantId)?.giftCard || byVariant.get(l.variantId)?.digital)))
     .map((l) => {
       const v = l.variantId ? byVariant.get(l.variantId) : undefined;
       return {

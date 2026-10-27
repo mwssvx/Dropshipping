@@ -331,6 +331,8 @@ export const products = pgTable(
     seoDescription: text("seo_description"),
     // A gift card sold on the store: each one bought issues a code worth its variant's price.
     giftCard: boolean("gift_card").notNull().default(false),
+    // Sold as a file the buyer downloads (in digital_files): no shipping and no supplier.
+    digital: boolean("digital").notNull().default(false),
     // When stock and cost were last read from the supplier; the daily sync starts with the oldest.
     stockCheckedAt: timestamp("stock_checked_at", { withTimezone: true }),
     // A second supplier for this product. Orders go there when the main supplier is out of stock.
@@ -694,6 +696,8 @@ export const orderLines = pgTable(
     personalization: jsonb("personalization").$type<PersonalizationValue[]>(),
     // Bought as a pre-order: it goes to the supplier once the option is back in stock.
     preorder: boolean("preorder").notNull().default(false),
+    // Times the buyer downloaded this line's file, for a digital product.
+    downloads: integer("downloads").notNull().default(0),
   },
   (t) => [index("order_lines_order_idx").on(t.orderId), check("order_lines_qty_pos", sql`${t.quantity} > 0`)],
 );
@@ -1117,6 +1121,19 @@ export const media = pgTable(
   },
   (t) => [index("media_shop_idx").on(t.shopId)],
 );
+
+// The file a digital product delivers, one per product. Kept apart from media, which is served
+// to anyone with the id: these only go out through a paid order's download link.
+export const digitalFiles = pgTable("digital_files", {
+  id: id(),
+  shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+  productId: uuid("product_id").notNull().unique().references(() => products.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  contentType: text("content_type").notNull(),
+  bytes: integer("bytes").notNull(),
+  data: bytea("data").notNull(),
+  createdAt: createdAt(),
+});
 
 // Discount codes buyers type at checkout.
 export const discounts = pgTable(

@@ -78,8 +78,8 @@ const cheapest = (rates: Rate[]) => [...rates].sort((a, b) => a.priceMinor - b.p
  */
 export async function productDelivery(db: Db, shop: Shop, productId: string, opts: { country?: string | null; now?: Date } = {}) {
   if (!shop.deliveryEstimates) return null;
-  const product = await db.query.products.findFirst({ where: and(eq(schema.products.id, productId), eq(schema.products.shopId, shop.id)), columns: { giftCard: true } });
-  if (!product || product.giftCard) return null;
+  const product = await db.query.products.findFirst({ where: and(eq(schema.products.id, productId), eq(schema.products.shopId, shop.id)), columns: { giftCard: true, digital: true } });
+  if (!product || product.giftCard || product.digital) return null;
   const { country, rates } = await ratesFor(db, shop, opts.country ?? null);
   if (!rates.length) return null;
   const variants = await db.query.variants.findMany({ where: eq(schema.variants.productId, productId), columns: { shipDaysMin: true, shipDaysMax: true } });
@@ -99,12 +99,12 @@ export async function productDelivery(db: Db, shop: Shop, productId: string, opt
 export async function orderDelivery(db: Db, shop: Shop, order: Order) {
   if (!shop.deliveryEstimates || !order.paidAt || order.pickup || order.localDelivery || order.paymentStatus === "refunded" || order.fulfillmentStatus === "delivered") return null;
   const lines = await db
-    .select({ shipDaysMin: schema.variants.shipDaysMin, shipDaysMax: schema.variants.shipDaysMax, giftCard: schema.products.giftCard })
+    .select({ shipDaysMin: schema.variants.shipDaysMin, shipDaysMax: schema.variants.shipDaysMax, giftCard: schema.products.giftCard, digital: schema.products.digital })
     .from(schema.orderLines)
     .innerJoin(schema.variants, eq(schema.variants.id, schema.orderLines.variantId))
     .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
     .where(eq(schema.orderLines.orderId, order.id));
-  const goods = lines.filter((l) => !l.giftCard);
+  const goods = lines.filter((l) => !l.giftCard && !l.digital);
   if (!goods.length) return null;
   const { rates } = await ratesFor(db, shop, order.shippingAddress.country);
   const rate = rates.find((r) => r.name === order.shippingMethod) ?? cheapest(rates);

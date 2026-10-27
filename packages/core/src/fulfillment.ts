@@ -9,6 +9,7 @@ import { buyerAmounts } from "./currency";
 import { SupplierError, type ProblemCode, type Suppliers } from "./suppliers";
 import { sendPurchaseOrder, supplierLabel } from "./own-suppliers";
 import { issueGiftCardsForOrder } from "./gift-cards";
+import { DOWNLOADS_PER_ITEM, nothingToShip, orderDownloads } from "./digital";
 import { earnPoints } from "./rewards";
 import { applyTagRulesForOrder } from "./tag-rules";
 import { issueInvoice } from "./invoices";
@@ -274,8 +275,9 @@ export async function routeAndIssue(ctx: FulfillmentContext, orderId: string) {
   });
   const gifts = await issueGiftCardsForOrder({ db: ctx.db, mailer: ctx.mailer, storeAddress }, orderId);
   const routed = await routeOrder(ctx, orderId);
-  // An order of only gift cards is done once the codes are out.
-  if (gifts.onlyGiftCards) {
+  // An order of only gift cards and downloads is done once the codes and links are out (the
+  // links go in the order confirmation).
+  if (gifts.onlyGiftCards || (await nothingToShip(ctx.db, orderId))) {
     await ctx.db.update(schema.orders).set({ fulfillmentStatus: "delivered", updatedAt: now(ctx) }).where(eq(schema.orders.id, orderId));
   }
   return routed;
@@ -620,7 +622,9 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
     const parentNumber = order.parentOrderId ? (await ctx.db.query.orders.findFirst({ where: eq(schema.orders.id, order.parentOrderId), columns: { number: true } }))?.number : null;
     const invoice = await ctx.db.query.invoices.findFirst({ where: and(eq(schema.invoices.orderId, order.id), eq(schema.invoices.kind, "invoice")) });
     const paid = buyerAmounts(order, lines);
-    const arrives = await orderDelivery(ctx.db, shop, order);
+    const downloads = await orderDownloads(ctx.db, order.id);
+    const onlyDownloads = downloads.length > 0 && (await nothingToShip(ctx.db, order.id));
+    const arrives = onlyDownloads ? null : await orderDelivery(ctx.db, shop, order);
     return {
       subject: `Order #${order.number} confirmed`,
       text: [
@@ -636,6 +640,9 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
           : []),
         ...(paid.giftWrapMinor ? [`Includes gift wrapping: ${formatMoney(paid.giftWrapMinor, paid.currency)}`] : []),
         ...(paid.tipMinor ? [`Includes a tip: ${formatMoney(paid.tipMinor, paid.currency)}`] : []),
+        ...(downloads.length
+          ? [``, `Your download${downloads.length > 1 ? "s" : ""} (each link works ${DOWNLOADS_PER_ITEM} times for every one you bought):`, ...downloads.map((d) => `  ${d.title}: ${link}/download/${d.lineId}`)]
+          : []),
         ...(invoice ? [``, `Your invoice ${invoice.number}: ${link}/invoice`] : []),
         ...(paid.protectionMinor
           ? [``, `Delivery protection (${formatMoney(paid.protectionMinor, paid.currency)}): if it's lost or arrives damaged, tell ${shop.name} from your order page and they'll send it again for free.`]
@@ -653,7 +660,9 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
         ...(order.parentOrderId ? [``, `You added this after checkout, so it's charged to the same card. It may arrive separately from order #${parentNumber}.`] : []),
         ...(order.source === "subscription" ? [``, `This is a delivery from your subscription, charged to your saved card. The link in your subscription emails lets you skip, change or cancel the next one.`] : []),
         ``,
-        order.pickup
+        onlyDownloads
+          ? `There's nothing to ship. Your downloads are also on your order page: ${link}`
+          : order.pickup
           ? `You're picking it up from ${shop.name}. We'll email you when it's ready, with the address. See your order any time: ${link}`
           : order.localDelivery
             ? `${shop.name} is delivering it to you themselves${shop.localDeliveryArea?.note ? ` (${shop.localDeliveryArea.note})` : ""}. See your order any time: ${link}`

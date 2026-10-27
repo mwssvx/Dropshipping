@@ -1,6 +1,6 @@
 import { PixelEvent } from "@/components/PixelEvent";
 import { notFound } from "next/navigation";
-import { buyerAmounts, buyerCancelOptions, buyerThread, formatDeliveryDate, formatDeliveryWindow, orderDelivery, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems, formatShipsBy, storePixels, surveyFor } from "@sf/core";
+import { buyerAmounts, buyerCancelOptions, buyerThread, formatDeliveryDate, formatDeliveryWindow, orderDelivery, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems, formatShipsBy, storePixels, surveyFor, orderDownloads, formatFileSize } from "@sf/core";
 import Link from "next/link";
 import { db, fulfillment, storeAddress } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
@@ -20,9 +20,9 @@ const utc = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", h
 
 export const metadata = { title: "Order status", robots: { index: false } };
 
-export default async function OrderStatusPage({ params, searchParams }: { params: Promise<{ shop: string; ref: string }>; searchParams: Promise<{ subscribed?: string; answered?: string }> }) {
+export default async function OrderStatusPage({ params, searchParams }: { params: Promise<{ shop: string; ref: string }>; searchParams: Promise<{ subscribed?: string; answered?: string; download?: string }> }) {
   const { shop: handle, ref } = await params;
-  const { subscribed: justSubscribed, answered } = await searchParams;
+  const { subscribed: justSubscribed, answered, download } = await searchParams;
   const shop = await loadShop(handle);
   const order = await getOrderByPaymentIntent(await db(), shop.id, ref).catch((e) => {
     if (e instanceof NotFoundError) notFound();
@@ -60,6 +60,11 @@ export default async function OrderStatusPage({ params, searchParams }: { params
   const partOf = order.subscriptionId ? await (await db()).query.subscriptions.findFirst({ where: (s, { eq }) => eq(s.id, order.subscriptionId!), columns: { token: true, status: true } }) : null;
   const survey = surveyFor(shop, order);
   const arrives = paid ? await orderDelivery(await db(), shop, order) : null;
+  // Files bought as digital downloads, with how many times each link still works.
+  const downloads = paid ? await orderDownloads(await db(), order.id) : [];
+  const downloadProblem = download === "limit" ? "That download has been used the most times it can be. Ask the store below if you need it again."
+    : download === "refunded" ? "This item was refunded, so its download is closed."
+    : download === "unpaid" ? "Downloads open once the order is paid." : null;
   const pickupText = paid && (order.pickup || order.localDelivery) ? await storeT(handle) : null;
   const steps = order.pickup ? [
     { label: "Order confirmed", done: paid },
@@ -176,6 +181,25 @@ export default async function OrderStatusPage({ params, searchParams }: { params
         ))}
       </ol>
       {arrives && <p className="text-sm">Expected delivery: <strong>{formatDeliveryWindow(arrives)}</strong></p>}
+      {downloads.length > 0 && (
+        <section id="downloads" className="card p-5 flex flex-col gap-2 text-sm" aria-labelledby="downloads-heading">
+          <h2 id="downloads-heading" className="font-semibold">Your downloads</h2>
+          {downloadProblem && <p className="banner banner-warning" role="alert">{downloadProblem}</p>}
+          <ul className="flex flex-col gap-2">
+            {downloads.map((d) => (
+              <li key={d.lineId} className="flex flex-wrap items-baseline justify-between gap-2">
+                <span>
+                  {d.title}: {order.paymentStatus === "refunded" || d.left === 0
+                    ? <span className="hint">{d.fileName}</span>
+                    : <a className="underline" href={`${base}/orders/${ref}/download/${d.lineId}`} download>{d.fileName}</a>}
+                  <span className="hint"> · {formatFileSize(d.bytes)}</span>
+                </span>
+                <span className="hint num">{order.paymentStatus === "refunded" ? "Refunded" : d.left === 1 ? "1 download left" : `${d.left} downloads left`}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {shipped.length > 0 && (
         <section className="card p-5 flex flex-col gap-2 text-sm" aria-labelledby="tracking">
           <h2 id="tracking" className="font-semibold">Tracking</h2>
