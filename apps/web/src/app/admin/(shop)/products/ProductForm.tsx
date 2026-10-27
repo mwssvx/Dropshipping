@@ -243,7 +243,7 @@ function VariantRow({ index, initial, currency, showTitle, generated, onPrices }
         {margin === null
           ? "Add your cost to see profit and margin."
           : <>Profit {fmt.format((p ?? 0) - (c ?? 0))} per sale · <span className={margin < 20 ? "text-critical font-semibold" : "text-success font-semibold"}>{margin}% margin</span></>}
-        {initial.fromSupplier && <> · Stock and cost follow the supplier daily</>}
+        {initial.fromSupplier ? <> · Stock and cost follow the supplier daily</> : <> · Stock goes down as orders are paid, and back if one is cancelled before it ships</>}
       </p>
     </fieldset>
   );

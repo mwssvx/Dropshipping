@@ -741,3 +741,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **For packing by hand**: from the Orders page, "Packing slips" shows one slip per order waiting for tracking, each printing on its own sheet (`packingSlips` in `packages/core/src/packing-slips.ts`). Each order page links to its own slip.
 2. **What goes in the box, no prices**: the store's name and mailing address, the order number and date, the ship-to address with the courier phone, each item with its SKU, personalisation and pre-order mark, and a tick box. A gift order prints who it's from and their message. The buyer's note shows on screen but isn't printed.
 3. **The store's note**: a note at the foot of every slip, like a thank-you or a code for next time (`shops.packing_slip_note`, up to 500 characters). Store export and import keep it.
+
+### Own stock counts down as it sells (after launch, part 105)
+
+1. **Products added by hand**: their stock is the store's own (imported products keep following the supplier's count every day). It comes off when an order is paid, once (`takeOrderStock` in `packages/core/src/own-stock.ts`, `orders.stock_taken_at`), and never below 0. Options left "Not tracked" and pre-ordered lines don't change.
+2. **Back on the shelf**: a full refund or a buyer's own cancellation before anything has shipped puts the items back (`returnOrderStock`). Back-in-stock emails go out as usual once it's above 0.
+3. **Swaps follow**: when a buyer or the merchant changes an item to another option before it ships, the old option gets its stock back and the new one takes it (`moveLineStock`). The product form says how own stock behaves.

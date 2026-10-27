@@ -6,6 +6,7 @@ import { cancelPurchaseOrder, supplierLabel } from "./own-suppliers";
 import type { PaymentProvider } from "./payments";
 import { takeBackPoints } from "./rewards";
 import { issueCreditNote } from "./invoices";
+import { returnOrderStock } from "./own-stock";
 
 export type RefundContext = FulfillmentContext & { payments: PaymentProvider };
 
@@ -125,6 +126,11 @@ export async function refundOrder(
   await takeBackPoints(db, order, refund, full);
   await issueCreditNote(db, refund.id);
   const cancelled = full ? await cancelUnshipped(ctx, order.id) : { cancelled: 0, notCancelled: [] };
+  if (full && !cancelled.notCancelled.length) {
+    // Nothing went out, so the items are still on the shelf.
+    const parcels = await db.query.fulfillments.findMany({ where: eq(schema.fulfillments.orderId, order.id) });
+    if (!parcels.some((f) => ["placing", "placed", "shipped", "delivered"].includes(f.status))) await returnOrderStock(db, order.id);
+  }
   const email = await sendOrderEmail(ctx, order.id, "refund", refund.id);
   return { refund, full, ...cancelled, email: email.status };
 }
