@@ -3,7 +3,8 @@
 // One item per option, grouped by product. Running sales go in as the sale price with their dates.
 // Gift cards and products without a photo or price are left out, and the Sales channels page says
 // why, so the merchant can fix them.
-import { schema, type Db } from "@sf/db";
+import { schema, type Contents, type Db } from "@sf/db";
+import { unitPrice, type UnitReference } from "./unit-price";
 import { productPhotos } from "./gallery";
 import { localizeProducts, shopLanguages, type Language } from "./languages";
 import { listActiveProducts } from "./products";
@@ -32,6 +33,8 @@ export type FeedItem = {
   sku: string | null;
   color: string | null;
   size: string | null;
+  /** What one holds and the amount its price per unit is for, as Google writes them ("250g", "100g"). */
+  unitPricing: { measure: string; base: string } | null;
 };
 
 /** Plain text from a description that may hold HTML, on one line. */
@@ -105,10 +108,20 @@ export async function productFeed(db: Db, shop: Shop, opts: { origin: string; la
         sku: v.sku,
         color: optionNamed(v.options, ["color", "colour", "farbe", "couleur"]),
         size: optionNamed(v.options, ["size", "größe", "taille", "talla"]),
+        unitPricing: googleUnitPricing(v.contents),
       });
     }
   }
   return { items, issues, language };
+}
+
+const GOOGLE_UNITS: Record<Contents["unit"], string> = { g: "g", kg: "kg", ml: "ml", cl: "cl", l: "l", cm: "cm", m: "m", m2: "sqm", item: "ct" };
+const GOOGLE_BASE: Record<UnitReference, string> = { "100 g": "100g", kg: "1kg", "100 ml": "100ml", l: "1l", m: "1m", "m²": "1sqm", item: "1ct" };
+
+/** Google's unit pricing fields for what a variant holds, matching the price per unit on the store. */
+function googleUnitPricing(contents: Contents | null) {
+  const unit = contents ? unitPrice(100, contents) : null;
+  return contents && unit ? { measure: `${contents.amount}${GOOGLE_UNITS[contents.unit]}`, base: GOOGLE_BASE[unit.per] } : null;
 }
 
 const price = (minor: number, currency: string) => `${(minor / 100).toFixed(2)} ${currency}`;
@@ -138,6 +151,7 @@ export function googleFeedXml(shop: Pick<Shop, "name">, origin: string, items: F
       i.sku ? tag("g:mpn", i.sku) : tag("g:identifier_exists", "no"),
       tag("g:color", i.color),
       tag("g:size", i.size),
+      i.unitPricing ? tag("g:unit_pricing_measure", i.unitPricing.measure) + tag("g:unit_pricing_base_measure", i.unitPricing.base) : "",
       "</item>",
     ]
       .filter(Boolean)

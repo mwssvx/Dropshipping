@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts, detailsText, MAX_DETAILS, stockHistory, incomingStock, countryName, SHIPPING_COUNTRIES, productSwatches, digitalFileFor, formatFileSize, MAX_DIGITAL_FILE_BYTES, DOWNLOADS_PER_ITEM, type StockMovement } from "@sf/core";
+import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts, detailsText, MAX_DETAILS, stockHistory, incomingStock, countryName, SHIPPING_COUNTRIES, productSwatches, digitalFileFor, formatFileSize, MAX_DIGITAL_FILE_BYTES, DOWNLOADS_PER_ITEM, CONTENT_UNITS, CONTENT_UNIT_LABELS, unitPrice, formatUnitPrice, type StockMovement } from "@sf/core";
 import { requireShop, storeAddress, suppliers } from "@/lib/server";
 import { duplicateProductAction, updateProductAction } from "../../../actions";
 import { setUpsellAction } from "../../../growth-actions";
@@ -28,6 +28,7 @@ import { BackupPanel, type BackupView } from "./BackupPanel";
 import { StockPanel } from "./StockPanel";
 import { WriteListingButton } from "./WriteListingButton";
 import { DigitalFileForm } from "./DigitalFileForm";
+import { UnitPriceForm } from "./UnitPriceForm";
 
 const dateIn = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
 const toPrice = (m: number | null | undefined) => (m == null ? "" : (m / 100).toFixed(2));
@@ -204,6 +205,19 @@ export default async function EditProductPage({ params, searchParams }: { params
               <p className="hint">Short facts buyers look for, like material, size, weight or what&apos;s in the box. They show as a table under the description, and search engines read them too.</p>
             </div>
             <DetailsForm productId={product.id} text={detailsText(product.details)} max={MAX_DETAILS} />
+          </section>
+        )}
+        {!product.giftCard && (
+          <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="unit-price-heading">
+            <div>
+              <h2 id="unit-price-heading" className="font-semibold">Price per unit</h2>
+              <p className="hint">For things sold by weight, volume or length, like coffee, oil or fabric. Say what one holds and the store shows the price per kg, litre or metre (per 100 g or 100 ml for small packs) under the price, as the EU requires. Leave it blank for anything else.</p>
+            </div>
+            <UnitPriceForm productId={product.id} units={CONTENT_UNITS.map((u) => [u, CONTENT_UNIT_LABELS[u]])}
+              rows={product.variants.map((v) => {
+                const unit = unitPrice(v.priceMinor, v.contents);
+                return { id: v.id, title: v.title, amount: v.contents ? String(v.contents.amount) : "", unit: v.contents?.unit ?? "g", example: unit ? formatUnitPrice(formatMoney(unit.priceMinor, shop.currency), unit.per) : null };
+              })} />
           </section>
         )}
         <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="badge-heading">

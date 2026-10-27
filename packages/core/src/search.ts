@@ -191,6 +191,7 @@ export const compactProducts = (products: ActiveProduct[]) =>
       handle: p.handle,
       imageUrl: p.imageUrl,
       priceMinor: cheapest?.priceMinor ?? 0,
+      contents: cheapest?.contents ?? null,
       compareAtMinor: cheapest?.compareAtMinor ?? null,
       badge: p.badge,
       createdAt: p.createdAt,

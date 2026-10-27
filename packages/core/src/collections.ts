@@ -172,6 +172,7 @@ export async function storefrontCatalog(db: Db, shopId: string) {
     imageUrl: p.imageUrl,
     priceMinor: p.variants[0]?.priceMinor ?? 0,
     compareAtMinor: p.variants[0]?.compareAtMinor ?? null,
+    contents: p.variants[0]?.contents ?? null,
     badge: p.badge,
     createdAt: p.createdAt,
     soldOut: soldOut.has(p.id),
