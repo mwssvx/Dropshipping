@@ -765,3 +765,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **The store's own drop-off**: under Shipping, a store lists the postal codes it delivers to by how they start ("787" covers 78701 to 78799), its price, an optional free-over amount and a note like "Next morning" (`shops.local_delivery_area`, `setLocalDelivery` in `packages/core/src/local-delivery.ts`).
 2. **At checkout once the postal code is in the area**: buyers in the store's country see "Local delivery" next to the courier rates as soon as their postal code matches and everything in the cart is the store's own stock. It's never picked for them, and delivery protection isn't offered with it (`orders.local_delivery`).
 3. **Delivered by hand**: the order page says the store is delivering it and has a Delivered button that marks it delivered and emails the buyer (`markDeliveredByStore`). These orders stay out of the tracking spreadsheet and get no courier estimate. Store export and import keep the area.
+
+### Gift wrapping (after launch, part 109)
+
+1. **The store's own price**: under Shipping, a store offers gift wrapping for a price it sets (0 for free) with a line on what buyers get, like "Kraft paper and a ribbon" (`shops.gift_wrap`, `setGiftWrap` in `packages/core/src/gift-wrap.ts`). Other platforms sell this as an app.
+2. **Only on gifts, only if asked**: once a buyer ticks "This order is a gift", checkout offers "Gift wrap it for …", never ticked for them. The order total follows as they tick it (`orders.gift_wrap_minor`, part of `orders_total_matches`). Repeat deliveries and after-checkout offers never add it.
+3. **Everywhere the money shows**: the receipt email, order pages, payment page, invoice, order export (a Gift wrap column), API and app show it. The admin order page marks the gift "Wrap it" and the packing slip says so on screen.

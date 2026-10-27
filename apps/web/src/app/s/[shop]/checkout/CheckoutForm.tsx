@@ -1,12 +1,13 @@
 "use client";
 import { startTransition, useActionState, useState } from "react";
+import { formatMoney } from "@sf/core/money";
 import { FormError } from "@/components/FormError";
 import { checkoutAction } from "../actions";
 
 /** A shipping rate priced for this cart, in the buyer's currency. */
-export type RateChoice = { id: string; name: string; days: string | null; priceLabel: string; totalLabel: string; priceMinor: number; protectedTotalLabel?: string; pickup?: boolean; postalPrefixes?: string[] };
-/** Delivery protection the buyer can add, priced for this cart in their currency. */
-export type ProtectionChoice = { checkbox: string; note: string; summary: string; priceLabel: string };
+export type RateChoice = { id: string; name: string; days: string | null; priceLabel: string; priceMinor: number; totalMinor: number; pickup?: boolean; postalPrefixes?: string[] };
+/** Delivery protection or gift wrapping the buyer can add, priced for this cart in their currency. */
+export type ExtraChoice = { checkbox: string; note: string | null; summary: string; priceLabel: string; priceMinor: number };
 export type ZoneChoice = { countries: string[]; rates: RateChoice[] };
 
 const zoneFor = (zones: ZoneChoice[], country: string) => zones.find((z) => z.countries.includes(country)) ?? zones.find((z) => z.countries.includes("*"));
@@ -56,7 +57,11 @@ type Props = {
   /** Total with no shipping, for carts with nothing to ship. */
   totalWithoutShipping: string;
   /** Null when the store doesn't offer delivery protection, or nothing ships. */
-  protection?: ProtectionChoice | null;
+  protection?: ExtraChoice | null;
+  /** Null when the store doesn't gift wrap, or nothing ships. */
+  giftWrap?: ExtraChoice | null;
+  /** The buyer's currency, for the total as it changes. */
+  currency: string;
 };
 
 /** Checkout form and order summary side by side; the summary follows the shipping the buyer picks. */
@@ -71,11 +76,15 @@ export function Checkout({ summary, footer, taxLabel, totalLabel, totalWithoutSh
   const [protect, setProtect] = useState(false);
   // Nothing goes by courier when it's picked up or the store delivers it, so there's nothing to protect.
   const protecting = protect && !!form.protection && !rate?.pickup && !rate?.postalPrefixes;
+  const [gift, setGift] = useState(form.initial?.gift === "on");
+  const [wrap, setWrap] = useState(false);
+  const wrapping = gift && wrap && !!form.giftWrap;
+  const total = rate ? rate.totalMinor + (protecting ? form.protection!.priceMinor : 0) + (wrapping ? form.giftWrap!.priceMinor : 0) : null;
   return (
     <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10 grid gap-10 md:grid-cols-[1fr_340px] items-start">
       <div className="flex flex-col gap-6 min-w-0">
         <h1 className="text-3xl font-bold tracking-tight">{t.checkout}</h1>
-        <CheckoutForm {...form} country={country} onCountry={setCountry} onPostal={setPostal} rates={rates} rate={rate} onRate={setRateId} protect={protect} onProtect={setProtect} />
+        <CheckoutForm {...form} country={country} onCountry={setCountry} onPostal={setPostal} rates={rates} rate={rate} onRate={setRateId} protect={protect} onProtect={setProtect} gift={gift} onGift={setGift} wrap={wrap} onWrap={setWrap} />
       </div>
       <aside className="card p-5 flex flex-col gap-4 md:sticky md:top-6 bg-sunken border-0">
         <h2 className="font-semibold">{t.orderSummary}</h2>
@@ -93,9 +102,15 @@ export function Checkout({ summary, footer, taxLabel, totalLabel, totalWithoutSh
               <dd className="text-right">{form.protection!.priceLabel}</dd>
             </>
           )}
+          {wrapping && (
+            <>
+              <dt className="hint">{form.giftWrap!.summary}</dt>
+              <dd className="text-right">{form.giftWrap!.priceLabel}</dd>
+            </>
+          )}
           <dt className="hint">{t.tax}</dt><dd className="text-right hint">{taxLabel}</dd>
           <dt className="font-semibold text-base">{totalLabel}</dt>
-          <dd className="font-semibold text-base text-right">{form.zones ? ((protecting ? rate?.protectedTotalLabel : rate?.totalLabel) ?? "–") : totalWithoutShipping}</dd>
+          <dd className="font-semibold text-base text-right">{form.zones ? (total !== null ? formatMoney(total, form.currency) : "–") : totalWithoutShipping}</dd>
         </dl>
         {footer}
       </aside>
@@ -104,8 +119,8 @@ export function Checkout({ summary, footer, taxLabel, totalLabel, totalWithoutSh
 }
 
 function CheckoutForm({
-  handle, text: t, initial, askPhone, paidByGiftCard, countries, zones, country, onCountry, onPostal, rates, rate, onRate, protection, protect, onProtect,
-}: Omit<Props, "summary" | "footer" | "taxLabel" | "totalLabel" | "totalWithoutShipping" | "defaultCountry"> & {
+  handle, text: t, initial, askPhone, paidByGiftCard, countries, zones, country, onCountry, onPostal, rates, rate, onRate, protection, protect, onProtect, giftWrap, gift, onGift, wrap, onWrap,
+}: Omit<Props, "summary" | "footer" | "taxLabel" | "totalLabel" | "totalWithoutShipping" | "defaultCountry" | "currency"> & {
   country: string;
   onCountry: (c: string) => void;
   onPostal: (code: string) => void;
@@ -114,6 +129,10 @@ function CheckoutForm({
   onRate: (id: string) => void;
   protect: boolean;
   onProtect: (on: boolean) => void;
+  gift: boolean;
+  onGift: (on: boolean) => void;
+  wrap: boolean;
+  onWrap: (on: boolean) => void;
 }) {
   const [state, action, pending] = useActionState(checkoutAction.bind(null, handle), {});
   const v = state.values ?? initial;
@@ -185,7 +204,7 @@ function CheckoutForm({
           </span>
         </label>
       )}
-      {zones && <GiftFields t={t} values={v} />}
+      {zones && <GiftFields t={t} values={v} gift={gift} onGift={onGift} wrapChoice={giftWrap ?? null} wrap={wrap} onWrap={onWrap} />}
       <div className="field">
         <label className="label" htmlFor="note">{t.orderNote}</label>
         <textarea className="input" id="note" name="note" rows={2} maxLength={500} defaultValue={v?.note} />
@@ -198,12 +217,13 @@ function CheckoutForm({
 }
 
 /** "This order is a gift": who it's from, a message, and the recipient's email for a heads-up. */
-function GiftFields({ t, values }: { t: CheckoutText; values?: Record<string, string> }) {
-  const [gift, setGift] = useState(values?.gift === "on");
+function GiftFields({ t, values, gift, onGift, wrapChoice, wrap, onWrap }: {
+  t: CheckoutText; values?: Record<string, string>; gift: boolean; onGift: (on: boolean) => void; wrapChoice: ExtraChoice | null; wrap: boolean; onWrap: (on: boolean) => void;
+}) {
   return (
     <fieldset className="flex flex-col gap-4">
       <label className="flex items-center gap-2">
-        <input type="checkbox" name="gift" checked={gift} onChange={(e) => setGift(e.target.checked)} />
+        <input type="checkbox" name="gift" checked={gift} onChange={(e) => onGift(e.target.checked)} />
         <span className="font-semibold">{t.giftCheckbox}</span>
       </label>
       {gift && (
@@ -215,6 +235,15 @@ function GiftFields({ t, values }: { t: CheckoutText; values?: Record<string, st
           </div>
           <Field id="giftRecipientEmail" label={t.giftRecipientEmail} type="email" values={values} />
           <p className="hint text-sm">{t.giftNote}</p>
+          {wrapChoice && (
+            <label className="card p-3 flex items-start gap-3 cursor-pointer">
+              <input type="checkbox" name="giftWrap" className="mt-1" checked={wrap} onChange={(e) => onWrap(e.target.checked)} />
+              <span className="flex-1">
+                <span className="font-medium">{wrapChoice.checkbox}</span>
+                {wrapChoice.note && <span className="block hint text-sm">{wrapChoice.note}</span>}
+              </span>
+            </label>
+          )}
         </>
       )}
     </fieldset>

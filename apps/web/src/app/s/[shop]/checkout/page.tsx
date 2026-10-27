@@ -56,10 +56,8 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
           const price = quote.discount?.freeShipping ? 0 : priceRate(r, quote.goodsMinor);
           const p = presentQuote({ ...quote, shippingMinor: price, taxMinor: 0 }, fx);
           const days = r.minDays !== null && r.maxDays !== null ? t.arrivesIn(r.minDays, r.maxDays) : null;
-          const protectedTotal = protectionMinor ? presentQuote({ ...quote, shippingMinor: price, taxMinor: 0, protectionMinor }, fx).totalMinor : null;
           return {
-            id: r.id, name: r.name, days, priceMinor: p.shippingMinor, priceLabel: p.shippingMinor ? money(p.shippingMinor) : t.free, totalLabel: money(p.totalMinor),
-            ...(protectedTotal !== null ? { protectedTotalLabel: money(protectedTotal) } : {}),
+            id: r.id, name: r.name, days, priceMinor: p.shippingMinor, priceLabel: p.shippingMinor ? money(p.shippingMinor) : t.free, totalMinor: p.totalMinor,
           };
         }),
       }))
@@ -75,7 +73,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
   if (choices && quote.canPickUp && shop.localPickup) {
     const pickup: RateChoice = {
       id: PICKUP_RATE_ID, name: t.pickUp, days: t.pickupFrom(shop.localPickup.address.split("\n")[0]!), priceMinor: 0, priceLabel: t.free,
-      totalLabel: money(presentQuote({ ...quote, shippingMinor: 0, taxMinor: 0 }, fx).totalMinor), pickup: true,
+      totalMinor: presentQuote({ ...quote, shippingMinor: 0, taxMinor: 0 }, fx).totalMinor, pickup: true,
     };
     homeZone(choices).rates.push(pickup);
   }
@@ -86,7 +84,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
     const p = presentQuote({ ...quote, shippingMinor: price, taxMinor: 0 }, fx);
     homeZone(choices).rates.push({
       id: LOCAL_DELIVERY_RATE_ID, name: t.localDelivery, days: area.note ?? t.deliveredBy(shop.name), priceMinor: p.shippingMinor,
-      priceLabel: p.shippingMinor ? money(p.shippingMinor) : t.free, totalLabel: money(p.totalMinor), postalPrefixes: area.postalPrefixes,
+      priceLabel: p.shippingMinor ? money(p.shippingMinor) : t.free, totalMinor: p.totalMinor, postalPrefixes: area.postalPrefixes,
     });
   }
   const lang = await storeLang(handle);
@@ -120,7 +118,12 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
         taxLabel={exempt ? t.taxExempt : quote.pricesIncludeTax ? t.taxIncluded : t.taxNextStep}
         totalLabel={exempt || quote.pricesIncludeTax ? t.total : t.totalBeforeTax}
         totalWithoutShipping={money(withoutShipping.totalMinor)}
-        protection={protectionMinor ? { checkbox: t.protectDelivery(money(convertAmount(protectionMinor, fx))), note: t.protectionNote, summary: t.protection, priceLabel: money(convertAmount(protectionMinor, fx)) } : null}
+        currency={fx.currency}
+        protection={protectionMinor ? { checkbox: t.protectDelivery(money(convertAmount(protectionMinor, fx))), note: t.protectionNote, summary: t.protection, priceLabel: money(convertAmount(protectionMinor, fx)), priceMinor: convertAmount(protectionMinor, fx) } : null}
+        giftWrap={hasGoods && shop.giftWrap ? {
+          checkbox: shop.giftWrap.priceMinor ? t.giftWrapFor(money(convertAmount(shop.giftWrap.priceMinor, fx))) : t.giftWrapFree, note: shop.giftWrap.note, summary: t.giftWrap,
+          priceLabel: shop.giftWrap.priceMinor ? money(convertAmount(shop.giftWrap.priceMinor, fx)) : t.free, priceMinor: convertAmount(shop.giftWrap.priceMinor, fx),
+        } : null}
         summary={
           <>
             <ul className="flex flex-col gap-2 text-sm">

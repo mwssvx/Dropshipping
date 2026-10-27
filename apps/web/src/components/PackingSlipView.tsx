@@ -62,6 +62,7 @@ export function PackingSlipView({ slip, store }: { slip: PackingSlip; store: Sto
           {slip.gift.message && <p className="whitespace-pre-line mt-1">{slip.gift.message}</p>}
         </section>
       )}
+      {slip.giftWrap && <p className="no-print font-semibold">Gift wrap this order. The buyer paid for wrapping (not printed).</p>}
       {slip.buyerNote && (
         <p className="no-print text-muted"><span className="font-semibold text-ink">Buyer&apos;s note (not printed):</span> {slip.buyerNote}</p>
       )}

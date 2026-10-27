@@ -159,6 +159,8 @@ export const shops = pgTable(
     localPickup: jsonb("local_pickup").$type<LocalPickup | null>(),
     // The store delivers its own stock itself to these postal codes, for a fee, or null when it doesn't.
     localDeliveryArea: jsonb("local_delivery_area").$type<LocalDeliveryArea | null>(),
+    // Gift wrapping buyers can add to a gift at checkout, or null when the store doesn't wrap.
+    giftWrap: jsonb("gift_wrap").$type<GiftWrap | null>(),
     // Wholesale: approved business buyers pay this much less, on orders of at least the minimum.
     wholesaleEnabled: boolean("wholesale_enabled").notNull().default(false),
     wholesalePercentOff: integer("wholesale_percent_off").notNull().default(20),
@@ -409,6 +411,8 @@ export type Presentment = {
   shippingMinor: number;
   /** Delivery protection; missing on orders from before it existed. */
   protectionMinor?: number;
+  /** Gift wrapping; missing when there's none. */
+  giftWrapMinor?: number;
   taxMinor: number;
   totalMinor: number;
 };
@@ -486,6 +490,9 @@ export type DeliveryProtection = { percent: number; minMinor: number };
 export type LocalPickup = { address: string; instructions: string | null };
 
 /** Where the store delivers itself and what it charges. Postal codes match by how they start. */
+/** The store's gift wrapping: its price and what buyers get ("Kraft paper and a ribbon"). */
+export type GiftWrap = { priceMinor: number; note: string | null };
+
 export type LocalDeliveryArea = { postalPrefixes: string[]; priceMinor: number; freeOverMinor: number | null; note: string | null };
 
 export type Address = {
@@ -592,6 +599,8 @@ export const orders = pgTable(
     taxExemptId: text("tax_exempt_id"),
     // What the buyer paid for delivery protection: if it's lost or damaged, it's sent again free.
     protectionMinor: money("protection_minor").notNull().default(0),
+    // What the buyer paid to have the gift wrapped.
+    giftWrapMinor: money("gift_wrap_minor").notNull().default(0),
     // When the buyer was asked to review what they got, once per order.
     reviewRequestedAt: timestamp("review_requested_at", { withTimezone: true }),
     // The merchant's own note and labels ("follow up", "vip"). Never shown to the buyer.
@@ -608,7 +617,7 @@ export const orders = pgTable(
     index("orders_shop_created_idx").on(t.shopId, t.createdAt),
     check(
       "orders_total_matches",
-      sql`${t.totalMinor} = ${t.subtotalMinor} - ${t.discountMinor} + ${t.shippingMinor} + ${t.protectionMinor} + case when ${t.taxIncluded} then 0 else ${t.taxMinor} end`,
+      sql`${t.totalMinor} = ${t.subtotalMinor} - ${t.discountMinor} + ${t.shippingMinor} + ${t.protectionMinor} + ${t.giftWrapMinor} + case when ${t.taxIncluded} then 0 else ${t.taxMinor} end`,
     ),
     check("orders_discount_within_subtotal", sql`${t.discountMinor} >= 0 and ${t.discountMinor} <= ${t.subtotalMinor}`),
     index("orders_discount_idx").on(t.discountId),

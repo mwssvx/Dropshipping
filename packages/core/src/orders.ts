@@ -396,6 +396,8 @@ export async function startCheckout(
     taxExemptFor?: string | null;
     /** The buyer ticked delivery protection, where the store offers it. */
     protection?: boolean;
+    /** The buyer asked for the gift to be wrapped, where the store wraps. */
+    giftWrap?: boolean;
   },
   taxCalculator: TaxCalculator = new BuiltInTaxCalculator(),
 ) {
@@ -465,13 +467,16 @@ export async function startCheckout(
   // Nothing goes by courier on an order picked up or delivered by the store, so there's nothing to protect.
   const protectionMinor =
     shop.deliveryProtection && input.protection && !followUp && !repeat && !cart.pickingUp && !cart.deliveringLocally ? protectionFee(shop.deliveryProtection, cart.goodsMinor - cart.discountMinor) : 0;
+  // Wrapping is for gifts with something to wrap, at the store's price; never on repeats or offers.
+  const giftWrapMinor = shop.giftWrap && input.giftWrap && gift && cart.items.some((i) => !i.giftCard) && !followUp && !repeat ? shop.giftWrap.priceMinor : 0;
   const quote = {
     ...cart,
     protectionMinor,
+    giftWrapMinor,
     taxMinor: tax.taxMinor,
     taxIncluded: tax.included,
     taxBreakdown: tax.breakdown,
-    totalMinor: cart.subtotalMinor - cart.discountMinor + cart.shippingMinor + protectionMinor + (tax.included ? 0 : tax.taxMinor),
+    totalMinor: cart.subtotalMinor - cart.discountMinor + cart.shippingMinor + protectionMinor + giftWrapMinor + (tax.included ? 0 : tax.taxMinor),
   };
   const giftCardMinor = cart.giftCard ? Math.min(cart.giftCard.balanceMinor, quote.totalMinor) : 0;
   const dueMinor = quote.totalMinor - giftCardMinor;
@@ -528,6 +533,7 @@ export async function startCheckout(
         bundleTitle: quote.bundle?.title ?? null,
         shippingMinor: quote.shippingMinor,
         protectionMinor,
+        giftWrapMinor,
         taxMinor: quote.taxMinor,
         taxIncluded: quote.taxIncluded,
         taxBreakdown: quote.taxBreakdown,

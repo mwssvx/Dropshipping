@@ -96,7 +96,7 @@ export function currencyForCountry(shop: ShopFx, country: string | null | undefi
  * so the total is exactly what the buyer saw.
  */
 export function presentQuote(
-  quote: { items: { variantId: string; unitPriceMinor: number; quantity: number }[]; discountMinor: number; shippingMinor: number; taxMinor: number; pricesIncludeTax: boolean; protectionMinor?: number },
+  quote: { items: { variantId: string; unitPriceMinor: number; quantity: number }[]; discountMinor: number; shippingMinor: number; taxMinor: number; pricesIncludeTax: boolean; protectionMinor?: number; giftWrapMinor?: number },
   fx: DisplayFx,
 ): Presentment {
   const units = Object.fromEntries(quote.items.map((i) => [i.variantId, convertPrice(i.unitPriceMinor, fx)]));
@@ -105,6 +105,7 @@ export function presentQuote(
   const shippingMinor = convertAmount(quote.shippingMinor, fx);
   const taxMinor = convertAmount(quote.taxMinor, fx);
   const protectionMinor = quote.protectionMinor ? convertAmount(quote.protectionMinor, fx) : 0;
+  const giftWrapMinor = quote.giftWrapMinor ? convertAmount(quote.giftWrapMinor, fx) : 0;
   return {
     currency: fx.currency,
     rate: fx.rate,
@@ -113,8 +114,9 @@ export function presentQuote(
     discountMinor,
     shippingMinor,
     ...(protectionMinor ? { protectionMinor } : {}),
+    ...(giftWrapMinor ? { giftWrapMinor } : {}),
     taxMinor,
-    totalMinor: subtotalMinor - discountMinor + shippingMinor + protectionMinor + (quote.pricesIncludeTax ? 0 : taxMinor),
+    totalMinor: subtotalMinor - discountMinor + shippingMinor + protectionMinor + giftWrapMinor + (quote.pricesIncludeTax ? 0 : taxMinor),
   };
 }
 
@@ -130,6 +132,7 @@ type OrderAmounts = {
   discountMinor: number;
   shippingMinor: number;
   protectionMinor?: number;
+  giftWrapMinor?: number;
   taxMinor: number;
   totalMinor: number;
   refundedMinor: number;
@@ -152,6 +155,7 @@ export function buyerAmounts(order: OrderAmounts, lines: { variantId: string | n
       discountMinor: order.discountMinor,
       shippingMinor: order.shippingMinor,
       protectionMinor: order.protectionMinor ?? 0,
+      giftWrapMinor: order.giftWrapMinor ?? 0,
       taxMinor: order.taxMinor,
       totalMinor: order.totalMinor,
       refundedMinor: order.refundedMinor,
@@ -168,6 +172,7 @@ export function buyerAmounts(order: OrderAmounts, lines: { variantId: string | n
     discountMinor: p.discountMinor,
     shippingMinor: p.shippingMinor,
     protectionMinor: p.protectionMinor ?? 0,
+    giftWrapMinor: p.giftWrapMinor ?? 0,
     taxMinor: p.taxMinor,
     totalMinor: p.totalMinor,
     giftCardMinor: 0,
