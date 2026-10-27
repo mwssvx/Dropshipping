@@ -113,3 +113,4 @@ export * from "./local-delivery";
 export * from "./gift-wrap";
 export * from "./weight";
 export * from "./restock";
+export * from "./inventory";
