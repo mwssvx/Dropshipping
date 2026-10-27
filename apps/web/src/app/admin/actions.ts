@@ -99,6 +99,7 @@ function readProduct(form: FormData): ProductInput {
     const weightGrams = readWeight(form.get(`weight.${i}`));
     const sku = readText(form.get(`sku.${i}`));
     const barcode = readText(form.get(`barcode.${i}`));
+    const location = readText(form.get(`location.${i}`));
     try {
       const rawOptions = form.get(`options.${i}`);
       let options: Record<string, string> | undefined;
@@ -117,6 +118,7 @@ function readProduct(form: FormData): ProductInput {
         weightGrams,
         sku,
         barcode,
+        location,
       };
     } catch {
       throw new UserError("Enter prices like 24.99.");

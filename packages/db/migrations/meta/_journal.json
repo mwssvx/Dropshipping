@@ -708,6 +708,13 @@
       "when": 1793103124461,
       "tag": "0100_barcodes",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1793105162232,
+      "tag": "0102_shelf_locations",
+      "breakpoints": true
     }
   ]
 }

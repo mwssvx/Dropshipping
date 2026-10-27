@@ -34,5 +34,5 @@ test("the inventory page totals the store's own stock and downloads it", async (
   await page.getByRole("link", { name: "Download spreadsheet" }).click();
   const file = await (await download).path();
   const { readFile } = await import("node:fs/promises");
-  expect(await readFile(file!, "utf8")).toContain("Beeswax Candle,,3,0,4.00,12.00,12.00,36.00,0,");
+  expect(await readFile(file!, "utf8")).toContain("Beeswax Candle,,,3,0,4.00,12.00,12.00,36.00,0,");
 });

@@ -3,7 +3,7 @@ import { startTransition, useActionState, useRef, useState } from "react";
 import { FormError } from "@/components/FormError";
 import { stockCountAction, type CountState } from "../../../inventory-actions";
 
-type Option = { variantId: string; title: string; sku: string | null; barcode: string | null; stock: number | null };
+type Option = { variantId: string; title: string; sku: string | null; barcode: string | null; location: string | null; stock: number | null };
 
 export function StockCountForm({ options }: { options: Option[] }) {
   const [state, action, pending] = useActionState(stockCountAction, {} as CountState);
@@ -63,7 +63,7 @@ export function StockCountForm({ options }: { options: Option[] }) {
           <tbody className="divide-y divide-border">
             {options.map((o) => (
               <tr key={o.variantId}>
-                <td className="p-3">{o.title}{(o.sku || o.barcode) && <span className="hint"> · {[o.sku, o.barcode].filter(Boolean).join(" · ")}</span>}</td>
+                <td className="p-3">{o.location && <span className="font-semibold">{o.location} · </span>}{o.title}{(o.sku || o.barcode) && <span className="hint"> · {[o.sku, o.barcode].filter(Boolean).join(" · ")}</span>}</td>
                 <td className="p-3 num text-right">{o.stock ?? "Not counted"}</td>
                 <td className="p-3"><input className="input num w-24" name={`count.${o.variantId}`} inputMode="numeric" aria-label={`Counted ${o.title}`} /></td>
               </tr>

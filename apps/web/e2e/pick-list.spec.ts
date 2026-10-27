@@ -17,6 +17,7 @@ test("a pick list adds up what the waiting orders need", async ({ page, browser 
   await page.getByLabel("Price", { exact: true }).fill("8.00");
   await page.getByLabel("Stock", { exact: true }).fill("10");
   await page.getByLabel("SKU", { exact: true }).fill("TEA-G");
+  await page.getByLabel("Shelf location").fill("B4");
   await page.getByRole("button", { name: "Save product" }).click();
   await expect(page.getByText("Product added.")).toBeVisible();
   const tea = (await page.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!;
@@ -46,8 +47,9 @@ test("a pick list adds up what the waiting orders need", async ({ page, browser 
   await expect(list).toContainText("2 orders · 2 items");
   const row = list.getByRole("row", { name: /Green Tea/ });
   await expect(row).toContainText("TEA-G");
+  await expect(row.getByRole("cell").nth(1)).toHaveText("B4");
   await expect(row).toContainText("#1001, #1002");
-  await expect(row.getByRole("cell").nth(3)).toHaveText("2");
-  await expect(row.getByRole("cell").nth(4)).toHaveText("8");
+  await expect(row.getByRole("cell").nth(4)).toHaveText("2");
+  await expect(row.getByRole("cell").nth(5)).toHaveText("8");
   await expect(page.getByRole("button", { name: "Print pick list" })).toBeVisible();
 });

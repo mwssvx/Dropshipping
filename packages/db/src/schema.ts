@@ -347,6 +347,8 @@ export const variants = pgTable(
     weightGrams: integer("weight_grams"),
     // The UPC, EAN or the store's own code a scanner reads off the item. Unique in the store.
     barcode: text("barcode"),
+    // Where it sits in the store's own stock room ("A3", "Back shelf"), for the pick list and stock count.
+    location: text("location"),
     // When the team was told this option of the store's own stock is running low. Cleared once it's restocked.
     lowStockNotifiedAt: timestamp("low_stock_notified_at", { withTimezone: true }),
     shipDaysMin: integer("ship_days_min"),

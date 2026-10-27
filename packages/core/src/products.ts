@@ -28,6 +28,13 @@ const variantInput = z.object({
     .regex(/^[\x20-\x7e]*$/, new BarcodeError().message)
     .nullish()
     .transform((v) => (v === "" ? null : v)),
+  /** Where it sits on the shelf, like A3. */
+  location: z
+    .string()
+    .trim()
+    .max(40, "Keep the shelf location under 40 characters.")
+    .nullish()
+    .transform((v) => (v === "" ? null : v)),
   stock: z.number().int().nullish(),
   /** What one weighs packed, in grams, for shipping rates that go by weight. */
   weightGrams: z.number().int().min(1, "Leave the weight empty, or enter more than 0.").max(MAX_WEIGHT_GRAMS, "Keep the weight under 1,000 kg.").nullish(),

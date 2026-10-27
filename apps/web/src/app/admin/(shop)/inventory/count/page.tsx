@@ -8,7 +8,8 @@ export const metadata = { title: "Count stock" };
 
 export default async function StockCountPage() {
   const { shop, db } = await requireShop("products");
-  const choices = await restockChoices(db, shop.id);
+  // In shelf order, so the count walks the room once.
+  const choices = (await restockChoices(db, shop.id)).sort((a, b) => (a.location ?? "\uffff").localeCompare(b.location ?? "\uffff", "en", { numeric: true }));
   return (
     <main className="pb-12">
       <PageHeader title="Count stock" back={<Link href="/admin/inventory" className="hint hover:text-ink">← Inventory</Link>} />
@@ -19,7 +20,7 @@ export default async function StockCountPage() {
         {choices.length === 0 ? (
           <p className="hint">Nothing to count: these are for products you keep in stock yourself.</p>
         ) : (
-          <StockCountForm options={choices.map((c) => ({ variantId: c.variantId, title: c.title, sku: c.sku, barcode: c.barcode, stock: c.stock }))} />
+          <StockCountForm options={choices.map((c) => ({ variantId: c.variantId, title: c.title, sku: c.sku, barcode: c.barcode, location: c.location, stock: c.stock }))} />
         )}
       </div>
     </main>
