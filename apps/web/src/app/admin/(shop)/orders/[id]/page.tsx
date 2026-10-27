@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { can, countryName, crossesBorder, disputeEvidence, disputeReason, disputesForOrder, formatMoney, getOrder, orderEditOptions, listRefunds, replaceableLines, replacementBlocked, replacementsOf, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode, formatShipsBy, preorderWaitingOn } from "@sf/core";
+import { can, countryName, crossesBorder, disputeEvidence, disputeReason, disputesForOrder, formatMoney, getOrder, orderEditOptions, listRefunds, replaceableLines, replacementBlocked, replacementsOf, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode, formatShipsBy, preorderWaitingOn, isOrderBuyerBlocked } from "@sf/core";
+import { BlockBuyerForm } from "./BlockBuyerForm";
 import { fulfillment, requireShop, storeAddress, suppliers, testPayments } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
 import { editOrderAction } from "../../../actions";
@@ -84,6 +85,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
   const feeKept = order.platformFeeMinor - refunds.reduce((s, r) => s + r.platformFeeRefundedMinor, 0);
   const net = order.totalMinor - order.refundedMinor - feeKept - order.processingFeeMinor;
   const held = !!order.heldAt && refundable;
+  const blocked = await isOrderBuyerBlocked(db, shop.id, order);
   const waitingFor = order.preorderShipsBy && order.fulfillmentStatus === "unfulfilled" && order.paymentStatus === "paid" ? await preorderWaitingOn(db, order.id) : [];
   const RISK_LABEL = { low: "Low risk", medium: "Medium risk", high: "High risk" } as const;
   // Chargebacks: the latest one, and the evidence we'd send while it waits for an answer.
@@ -340,6 +342,11 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
             <p>{order.gift?.from ?? a.name}</p>
             <p className="hint break-all">{order.email}</p>
             {order.customerId && <Link href={`/admin/customers/${order.customerId}`} className="underline">View customer</Link>}
+            {blocked ? (
+              <p className="mt-2 flex flex-wrap gap-2 items-center"><span className="pill pill-critical">Blocked from checking out</span><Link href="/admin/blocked" className="underline">See blocked buyers</Link></p>
+            ) : (
+              can(role, "customers") && <div className="mt-2 flex flex-col"><BlockBuyerForm orderId={order.id} /></div>
+            )}
           </div>
           <div>
             <h2 className="font-semibold mb-1">{order.pickup ? "Buyer's address (picking up)" : order.localDelivery ? "Deliver to" : "Ship to"}</h2>

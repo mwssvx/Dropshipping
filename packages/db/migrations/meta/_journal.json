@@ -736,6 +736,13 @@
       "when": 1793108828361,
       "tag": "0105_buyer_survey",
       "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1793111878207,
+      "tag": "0106_blocked_buyers",
+      "breakpoints": true
     }
   ]
 }

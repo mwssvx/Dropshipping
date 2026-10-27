@@ -21,7 +21,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
 
   return (
     <main className="pb-12">
-      <PageHeader title="Customers" />
+      <PageHeader title="Customers" actions={<Link className="btn btn-secondary" href="/admin/blocked">Blocked buyers</Link>} />
       <div className="px-4 sm:px-8 flex flex-col gap-4">
         {erased !== undefined && (
           <p className="banner banner-success" role="status">
