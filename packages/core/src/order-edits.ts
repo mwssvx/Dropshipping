@@ -3,11 +3,12 @@
 // address", "can I have a medium instead"), and one a merchant otherwise handles by cancelling
 // with the supplier by hand. The supplier order is cancelled and placed again with the change.
 import { and, eq, inArray } from "drizzle-orm";
-import { schema, type Address, type OrderEdit } from "@sf/db";
+import { schema, type Address, type Db, type OrderEdit } from "@sf/db";
 import { NotFoundError, UserError } from "./errors";
 import { refreshOrderFulfillment, routeOrder, sendOrderEmail, type FulfillmentContext } from "./fulfillment";
 import { addressSchema } from "./orders";
 import { cancelUnshipped, refundOrder, type RefundContext } from "./refunds";
+import { moveLineStock } from "./own-stock";
 import { assessOrderRisk, shouldHold } from "./risk";
 import { countryName } from "./shipping";
 import { can } from "./team";
@@ -175,6 +176,8 @@ export async function editOrder(
   await db.transaction(async (tx) => {
     for (const s of swaps) {
       await tx.update(schema.orderLines).set({ variantId: s.variantId, title: s.title, unitCostMinor: s.unitCostMinor }).where(eq(schema.orderLines.id, s.lineId));
+      const line = lines.find((l) => l.id === s.lineId)!;
+      await moveLineStock(tx as unknown as Db, order, line, line.variantId, s.variantId);
     }
     await tx
       .update(schema.orders)

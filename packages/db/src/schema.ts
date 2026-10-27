@@ -557,6 +557,8 @@ export const orders = pgTable(
     // sends it (heldAt cleared, riskReviewedAt set) or refunds it.
     risk: jsonb("risk").$type<OrderRisk>(),
     heldAt: timestamp("held_at", { withTimezone: true }),
+    // When the items came off the store's own stock (products added by hand); cleared when they're put back.
+    stockTakenAt: timestamp("stock_taken_at", { withTimezone: true }),
     riskReviewedAt: timestamp("risk_reviewed_at", { withTimezone: true }),
     // Has pre-ordered items: waits for stock before going to the supplier, promised by this date.
     preorderShipsBy: timestamp("preorder_ships_by", { withTimezone: true }),

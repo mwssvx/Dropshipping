@@ -13,6 +13,7 @@ import { earnPoints } from "./rewards";
 import { applyTagRulesForOrder } from "./tag-rules";
 import { issueInvoice } from "./invoices";
 import { checkOrderRisk } from "./risk";
+import { takeOrderStock } from "./own-stock";
 import { describePersonalization } from "./personalization";
 import { formatShipsBy, preorderWaitingOn } from "./preorders";
 
@@ -242,6 +243,7 @@ export async function refreshOrderFulfillment(db: Db, orderId: string, at = new 
 /** Called once when a payment webhook first marks an order paid. */
 export async function onOrderPaid(ctx: FulfillmentContext, orderId: string) {
   await issueInvoice(ctx.db, orderId);
+  await takeOrderStock(ctx.db, orderId, now(ctx));
   await sendOrderEmail(ctx, orderId, "order_confirmation");
   await earnPoints(ctx.db, orderId);
   await applyTagRulesForOrder(ctx.db, orderId);
