@@ -8,6 +8,8 @@ import { checkoutAction } from "../actions";
 export type RateChoice = { id: string; name: string; days: string | null; priceLabel: string; priceMinor: number; totalMinor: number; pickup?: boolean; postalPrefixes?: string[] };
 /** Delivery protection or gift wrapping the buyer can add, priced for this cart in their currency. */
 export type ExtraChoice = { checkbox: string; note: string | null; summary: string; priceLabel: string; priceMinor: number };
+/** Tips the buyer can add: each percentage with what it comes to in their currency. */
+export type TipChoice = { heading: string; none: string; summary: string; note: string | null; options: { percent: number; label: string; priceMinor: number; priceLabel: string }[] };
 export type ZoneChoice = { countries: string[]; rates: RateChoice[] };
 
 const zoneFor = (zones: ZoneChoice[], country: string) => zones.find((z) => z.countries.includes(country)) ?? zones.find((z) => z.countries.includes("*"));
@@ -62,6 +64,8 @@ type Props = {
   giftWrap?: ExtraChoice | null;
   /** The "I'm old enough" box and its note, when something in the cart has a minimum age. */
   ageCheck?: { checkbox: string; note: string } | null;
+  /** Null when the store doesn't ask for tips, or nothing ships. */
+  tips?: TipChoice | null;
   /** The buyer's currency, for the total as it changes. */
   currency: string;
 };
@@ -81,12 +85,14 @@ export function Checkout({ summary, footer, taxLabel, totalLabel, totalWithoutSh
   const [gift, setGift] = useState(form.initial?.gift === "on");
   const [wrap, setWrap] = useState(false);
   const wrapping = gift && wrap && !!form.giftWrap;
-  const total = rate ? rate.totalMinor + (protecting ? form.protection!.priceMinor : 0) + (wrapping ? form.giftWrap!.priceMinor : 0) : null;
+  const [tipPercent, setTipPercent] = useState(0);
+  const tip = form.tips?.options.find((o) => o.percent === tipPercent) ?? null;
+  const total = rate ? rate.totalMinor + (protecting ? form.protection!.priceMinor : 0) + (wrapping ? form.giftWrap!.priceMinor : 0) + (tip?.priceMinor ?? 0) : null;
   return (
     <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10 grid gap-10 md:grid-cols-[1fr_340px] items-start">
       <div className="flex flex-col gap-6 min-w-0">
         <h1 className="text-3xl font-bold tracking-tight">{t.checkout}</h1>
-        <CheckoutForm {...form} country={country} onCountry={setCountry} onPostal={setPostal} rates={rates} rate={rate} onRate={setRateId} protect={protect} onProtect={setProtect} gift={gift} onGift={setGift} wrap={wrap} onWrap={setWrap} />
+        <CheckoutForm {...form} country={country} onCountry={setCountry} onPostal={setPostal} rates={rates} rate={rate} onRate={setRateId} protect={protect} onProtect={setProtect} gift={gift} onGift={setGift} wrap={wrap} onWrap={setWrap} tipPercent={tipPercent} onTip={setTipPercent} />
       </div>
       <aside className="card p-5 flex flex-col gap-4 md:sticky md:top-6 bg-sunken border-0">
         <h2 className="font-semibold">{t.orderSummary}</h2>
@@ -110,6 +116,12 @@ export function Checkout({ summary, footer, taxLabel, totalLabel, totalWithoutSh
               <dd className="text-right">{form.giftWrap!.priceLabel}</dd>
             </>
           )}
+          {tip && (
+            <>
+              <dt className="hint">{form.tips!.summary}</dt>
+              <dd className="text-right">{tip.priceLabel}</dd>
+            </>
+          )}
           <dt className="hint">{t.tax}</dt><dd className="text-right hint">{taxLabel}</dd>
           <dt className="font-semibold text-base">{totalLabel}</dt>
           <dd className="font-semibold text-base text-right">{form.zones ? (total !== null ? formatMoney(total, form.currency) : "–") : totalWithoutShipping}</dd>
@@ -121,7 +133,7 @@ export function Checkout({ summary, footer, taxLabel, totalLabel, totalWithoutSh
 }
 
 function CheckoutForm({
-  handle, text: t, initial, askPhone, paidByGiftCard, countries, zones, country, onCountry, onPostal, rates, rate, onRate, protection, protect, onProtect, giftWrap, ageCheck, gift, onGift, wrap, onWrap,
+  handle, text: t, initial, askPhone, paidByGiftCard, countries, zones, country, onCountry, onPostal, rates, rate, onRate, protection, protect, onProtect, giftWrap, ageCheck, gift, onGift, wrap, onWrap, tips, tipPercent, onTip,
 }: Omit<Props, "summary" | "footer" | "taxLabel" | "totalLabel" | "totalWithoutShipping" | "defaultCountry" | "currency"> & {
   country: string;
   onCountry: (c: string) => void;
@@ -135,6 +147,8 @@ function CheckoutForm({
   onGift: (on: boolean) => void;
   wrap: boolean;
   onWrap: (on: boolean) => void;
+  tipPercent: number;
+  onTip: (percent: number) => void;
 }) {
   const [state, action, pending] = useActionState(checkoutAction.bind(null, handle), {});
   const v = state.values ?? initial;
@@ -207,6 +221,20 @@ function CheckoutForm({
         </label>
       )}
       {zones && <GiftFields t={t} values={v} gift={gift} onGift={onGift} wrapChoice={giftWrap ?? null} wrap={wrap} onWrap={onWrap} />}
+      {zones && tips && (
+        <fieldset className="flex flex-col gap-2">
+          <legend className="font-semibold mb-2">{tips.heading}</legend>
+          {tips.note && <p className="hint text-sm -mt-1">{tips.note}</p>}
+          <div className="flex flex-wrap gap-2">
+            {[{ percent: 0, label: tips.none, priceLabel: "" }, ...tips.options].map((o) => (
+              <label key={o.percent} className={`card px-3 py-2 flex items-center gap-2 cursor-pointer ${tipPercent === o.percent ? "border-accent" : ""}`}>
+                <input type="radio" name="tipPercent" value={o.percent || ""} checked={tipPercent === o.percent} onChange={() => onTip(o.percent)} />
+                <span>{o.label}{o.priceLabel && <span className="hint num"> · {o.priceLabel}</span>}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
       {ageCheck && (
         <label className="card p-3 flex items-start gap-3 cursor-pointer">
           <input type="checkbox" name="ageConfirmed" className="mt-1" required defaultChecked={v?.ageConfirmed === "on"} />

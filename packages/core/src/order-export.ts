@@ -20,7 +20,7 @@ export async function ordersCsv(db: Db, shopId: string, filter: Filter = {}) {
   const major = (m: number) => (m / 100).toFixed(2);
   const header = [
     "Order", "Placed", "Paid", "Email", "Name", "Address", "Address 2", "City", "Region", "Postal code", "Country",
-    "Payment", "Fulfilment", "Currency", "Subtotal", "Discount", "Discount code", "Shipping", "Delivery protection", "Gift wrap", "Tax", "Total", "Refunded",
+    "Payment", "Fulfilment", "Currency", "Subtotal", "Discount", "Discount code", "Shipping", "Delivery protection", "Gift wrap", "Tip", "Tax", "Total", "Refunded",
     "Item", "Quantity", "Unit price", "Pre-order", "Personalisation", "Tracking", "Tags", "Buyer note", "Your note",
   ];
   const rows = orders.flatMap((o) => {
@@ -28,7 +28,7 @@ export async function ordersCsv(db: Db, shopId: string, filter: Filter = {}) {
     const tracking = parcels.filter((f) => f.orderId === o.id && f.trackingNumber).map((f) => (f.carrier ? `${f.carrier} ${f.trackingNumber}` : f.trackingNumber)).join("; ");
     const order = [
       o.number, o.createdAt.toISOString(), o.paidAt?.toISOString() ?? null, o.email, a.name, a.line1, a.line2 ?? null, a.city, a.region ?? null, a.postalCode, a.country,
-      o.paymentStatus, o.fulfillmentStatus, o.currency, major(o.subtotalMinor), major(o.discountMinor), o.discountCode, major(o.shippingMinor), major(o.protectionMinor), major(o.giftWrapMinor), major(o.taxMinor), major(o.totalMinor), major(o.refundedMinor),
+      o.paymentStatus, o.fulfillmentStatus, o.currency, major(o.subtotalMinor), major(o.discountMinor), o.discountCode, major(o.shippingMinor), major(o.protectionMinor), major(o.giftWrapMinor), major(o.tipMinor), major(o.taxMinor), major(o.totalMinor), major(o.refundedMinor),
     ];
     const extra = [tracking || null, o.tags.join(", ") || null, o.buyerNote, o.staffNote];
     const mine = lines.filter((l) => l.orderId === o.id);

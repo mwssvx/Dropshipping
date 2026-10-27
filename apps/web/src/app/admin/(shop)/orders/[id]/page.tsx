@@ -215,6 +215,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
               <dt className="hint">Shipping{order.shippingMethod ? ` (${order.shippingMethod})` : ""}</dt><dd>{order.shippingMinor ? money(order.shippingMinor) : "Free"}</dd>
               {order.protectionMinor > 0 && <><dt className="hint">Delivery protection</dt><dd>{money(order.protectionMinor)}</dd></>}
               {order.giftWrapMinor > 0 && <><dt className="hint">Gift wrapping</dt><dd>{money(order.giftWrapMinor)}</dd></>}
+              {order.tipMinor > 0 && <><dt className="hint">Tip from the buyer</dt><dd>{money(order.tipMinor)}</dd></>}
               {order.taxExemptId ? (
                 <><dt className="hint">Tax (exempt, {order.taxExemptId})</dt><dd>{money(0)}</dd></>
               ) : (

@@ -201,6 +201,7 @@ export async function exportCustomerData(db: Db, shop: { id: string; name: strin
       shipping: o.shippingMinor,
       protection: o.protectionMinor,
       gift_wrap: o.giftWrapMinor,
+      tip: o.tipMinor,
       tax: o.taxMinor,
       total: o.totalMinor,
       refunded: o.refundedMinor,

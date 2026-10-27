@@ -72,6 +72,7 @@ export function publicOrder(o: Order & { lines?: Line[]; fulfillments?: Fulfillm
     shipping: o.shippingMinor,
     protection: o.protectionMinor,
     gift_wrap: o.giftWrapMinor,
+    tip: o.tipMinor,
     tax: o.taxMinor,
     tax_included: o.taxIncluded,
     total: o.totalMinor,

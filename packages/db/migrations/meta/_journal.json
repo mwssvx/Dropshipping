@@ -743,6 +743,13 @@
       "when": 1793111878207,
       "tag": "0106_blocked_buyers",
       "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1793114415852,
+      "tag": "0107_tips",
+      "breakpoints": true
     }
   ]
 }

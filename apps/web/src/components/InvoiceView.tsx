@@ -78,6 +78,7 @@ export function InvoiceView({ doc }: { doc: InvoiceDocument }) {
             <Row label={doc.shipping.label} value={doc.shipping.amountMinor ? money(doc.shipping.amountMinor) : "Free"} />
             {doc.protectionMinor > 0 && <Row label="Delivery protection" value={money(doc.protectionMinor)} />}
             {doc.giftWrapMinor > 0 && <Row label="Gift wrapping" value={money(doc.giftWrapMinor)} />}
+            {doc.tipMinor > 0 && <Row label="Tip" value={money(doc.tipMinor)} />}
             {!doc.taxIncluded && doc.tax.map((t) => <Row key={t.label} label={t.label} value={money(t.amountMinor)} />)}
             {doc.taxExemptId && <Row label="Tax (exempt)" value={money(0)} />}
             <Row label="Total" value={money(doc.totalMinor)} strong />

@@ -161,6 +161,8 @@ export const shops = pgTable(
     localDeliveryArea: jsonb("local_delivery_area").$type<LocalDeliveryArea | null>(),
     // Gift wrapping buyers can add to a gift at checkout, or null when the store doesn't wrap.
     giftWrap: jsonb("gift_wrap").$type<GiftWrap | null>(),
+    // The tip percentages buyers can pick at checkout, or null when the store doesn't ask.
+    tipping: jsonb("tipping").$type<Tipping | null>(),
     // "How did you hear about us?" asked on the order page after paying. Null when it's off.
     survey: jsonb("survey").$type<BuyerSurvey | null>(),
     // Wholesale: approved business buyers pay this much less, on orders of at least the minimum.
@@ -427,6 +429,8 @@ export type Presentment = {
   protectionMinor?: number;
   /** Gift wrapping; missing when there's none. */
   giftWrapMinor?: number;
+  /** The buyer's tip; missing when there's none. */
+  tipMinor?: number;
   taxMinor: number;
   totalMinor: number;
 };
@@ -506,6 +510,9 @@ export type LocalPickup = { address: string; instructions: string | null };
 /** Where the store delivers itself and what it charges. Postal codes match by how they start. */
 /** The store's gift wrapping: its price and what buyers get ("Kraft paper and a ribbon"). */
 export type GiftWrap = { priceMinor: number; note: string | null };
+
+/** Tips at checkout: the percentages offered, smallest first, and a thank-you line. */
+export type Tipping = { percents: number[]; note: string | null };
 
 /** The question buyers answer after paying, its choices, and whether they can type their own. */
 export type BuyerSurvey = { question: string; options: string[]; other: boolean };
@@ -618,6 +625,8 @@ export const orders = pgTable(
     protectionMinor: money("protection_minor").notNull().default(0),
     // What the buyer paid to have the gift wrapped.
     giftWrapMinor: money("gift_wrap_minor").notNull().default(0),
+    // The buyer's tip for the store, on top of the goods. Not taxed, and no per-sale fee on it.
+    tipMinor: money("tip_minor").notNull().default(0),
     // The age the buyer confirmed at checkout for age-restricted items, so the courier or the
     // merchant knows to check ID. Null when nothing in it was restricted.
     ageConfirmed: integer("age_confirmed"),
@@ -640,7 +649,7 @@ export const orders = pgTable(
     index("orders_shop_created_idx").on(t.shopId, t.createdAt),
     check(
       "orders_total_matches",
-      sql`${t.totalMinor} = ${t.subtotalMinor} - ${t.discountMinor} + ${t.shippingMinor} + ${t.protectionMinor} + ${t.giftWrapMinor} + case when ${t.taxIncluded} then 0 else ${t.taxMinor} end`,
+      sql`${t.totalMinor} = ${t.subtotalMinor} - ${t.discountMinor} + ${t.shippingMinor} + ${t.protectionMinor} + ${t.giftWrapMinor} + ${t.tipMinor} + case when ${t.taxIncluded} then 0 else ${t.taxMinor} end`,
     ),
     check("orders_discount_within_subtotal", sql`${t.discountMinor} >= 0 and ${t.discountMinor} <= ${t.subtotalMinor}`),
     index("orders_discount_idx").on(t.discountId),

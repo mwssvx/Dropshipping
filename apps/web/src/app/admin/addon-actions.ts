@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { createAddon, deleteAddon, setAddonActive, UserError } from "@sf/core";
-import { requireShop } from "@/lib/server";
+import { createAddon, deleteAddon, setAddonActive, setTipping, UserError } from "@sf/core";
+import { logged, requireShop } from "@/lib/server";
 
 export type AddonState = { error?: string; message?: string; key?: number };
 
@@ -36,4 +36,28 @@ export async function deleteAddonAction(id: string) {
     if (!(e instanceof UserError)) throw e;
   });
   refresh(shop.handle);
+}
+
+export type TippingState = { error?: string; saved?: { percents: number[] } | null };
+
+/** Turns tips at checkout on with the percentages buyers can pick, or off. */
+export async function setTippingAction(_: TippingState, form: FormData): Promise<TippingState> {
+  const { shop, db, user } = await requireShop("marketing");
+  const on = form.get("enabled") === "on";
+  let saved: TippingState["saved"] = null;
+  try {
+    if (on) {
+      const percents = form.getAll("percent").map((v) => String(v).trim().replace(/%$/, "")).filter(Boolean).map(Number);
+      if (percents.some((p) => !Number.isFinite(p))) return { error: "Enter each tip as a whole percentage, like 10." };
+      saved = await setTipping(db, shop.id, { percents, note: String(form.get("note") ?? "") });
+    } else {
+      await setTipping(db, shop.id, null);
+    }
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  await logged({ shop, user, db }, saved ? "Asked for tips at checkout" : "Stopped asking for tips", { href: "/admin/addons#tips-heading" });
+  refresh(shop.handle);
+  return { saved };
 }
