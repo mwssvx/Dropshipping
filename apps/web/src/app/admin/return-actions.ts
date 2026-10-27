@@ -27,7 +27,7 @@ export async function returnSettingsAction(_: FormState, form: FormData): Promis
   );
 }
 
-/** One form, four buttons: the pressed button's value says what the merchant decided. */
+/** One form, several buttons: the pressed button's value says what the merchant decided. */
 export async function decideReturnAction(id: string, _: FormState, form: FormData): Promise<FormState> {
   const { shop, user, db } = await requireShop("returns");
   return attempt(async () => {
@@ -44,7 +44,7 @@ export async function decideReturnAction(id: string, _: FormState, form: FormDat
     if (action === "approve") decision = { action, message };
     else if (action === "decline") decision = { action, message };
     else if (action === "refund" || action === "credit") decision = { action, amountMinor: amount(), message };
-    else if (action === "replace") decision = { action, message };
+    else if (action === "replace" || action === "exchange") decision = { action, message };
     else throw new UserError("Pick what to do with this return.");
     await decideReturn({ ...(await refunds()), storeAddress }, shop, id, decision);
     const request = await db.query.returnRequests.findFirst({ where: (r, { and, eq }) => and(eq(r.id, id), eq(r.shopId, shop.id)), columns: { orderId: true } });
@@ -55,6 +55,7 @@ export async function decideReturnAction(id: string, _: FormState, form: FormDat
       refund: `Refunded ${money} for the return on order {order}`,
       credit: `Gave ${money} store credit for the return on order {order}`,
       replace: "Sent a replacement for the return on order {order}",
+      exchange: "Sent an exchange for the return on order {order}",
     }[decision.action];
     await logged({ shop, user, db }, said, request ? { orderId: request.orderId } : { href: "/admin/returns" });
     if (action === "refund") notifyLater(shop.id);

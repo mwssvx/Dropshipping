@@ -32,7 +32,7 @@ function Choice({ value, children, className }: { value: string; children: React
   return <button type="submit" name="decision" value={value} className={className} disabled={pending} aria-busy={pending}>{children}</button>;
 }
 
-export function DecideForm({ id, approved, amount, max }: { id: string; approved: boolean; amount: string; max: string }) {
+export function DecideForm({ id, approved, exchange, amount, max }: { id: string; approved: boolean; exchange: boolean; amount: string; max: string }) {
   const [state, action] = useActionState(decideReturnAction.bind(null, id), {} as FormState);
   return (
     <form action={action} className="flex flex-col gap-3 border-t border-border pt-3">
@@ -50,8 +50,9 @@ export function DecideForm({ id, approved, amount, max }: { id: string; approved
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
+        {exchange && <Choice value="exchange" className="btn btn-primary">Send the exchange</Choice>}
         {!approved && <Choice value="approve" className="btn btn-secondary">Approve</Choice>}
-        <Choice value="refund" className="btn btn-primary">Refund</Choice>
+        <Choice value="refund" className={exchange ? "btn btn-secondary" : "btn btn-primary"}>Refund</Choice>
         <Choice value="credit" className="btn btn-secondary">Give store credit</Choice>
         <Choice value="replace" className="btn btn-secondary">Send a replacement</Choice>
         <Choice value="decline" className="btn btn-secondary text-critical">Decline</Choice>

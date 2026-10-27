@@ -292,17 +292,18 @@ export default async function OrderStatusPage({ params, searchParams }: { params
                   refunded: `refunded ${returns.latest.resolvedMinor ? formatMoney(returns.latest.resolvedMinor, order.currency) : ""}.`,
                   credited: `${returns.latest.resolvedMinor ? formatMoney(returns.latest.resolvedMinor, order.currency) : ""} in store credit, sent by email.`,
                   replaced: `${shop.name} is sending a replacement. There's nothing to send back.`,
+                  exchanged: `${shop.name} is sending ${returns.latest.items.map((i) => i.exchangeTitle ?? i.title).join(", ")} in exchange.`,
                   declined: `${shop.name} couldn't accept this return.`,
                 }[returns.latest.status]}
               </p>
-              {returns.latest.merchantMessage && (returns.latest.status === "approved" || returns.latest.status === "declined") && (
+              {returns.latest.merchantMessage && (returns.latest.status === "approved" || returns.latest.status === "declined" || returns.latest.status === "exchanged") && (
                 <p className="border-l-2 border-border pl-3 whitespace-pre-line">{returns.latest.merchantMessage}</p>
               )}
             </div>
           )}
           {returns.blocked && !returns.open && <p className="text-sm hint">{returns.blocked}</p>}
           {returns.canRequest && (
-            <ReturnForm handle={handle} orderRef={ref} lines={returns.lines.map((l) => ({ id: l.id, title: l.title, quantity: l.quantity }))}
+            <ReturnForm handle={handle} orderRef={ref} lines={returns.lines.map((l) => ({ id: l.id, title: l.title, quantity: l.quantity, swaps: returns.exchanges[l.id] ?? [] }))}
               reasons={Object.entries(RETURN_REASON_LABELS)} closes={returns.closesAt ? day.format(returns.closesAt) : null} />
           )}
         </section>

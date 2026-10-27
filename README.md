@@ -870,3 +870,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Colour dots on product cards (after launch, part 131)
 
 1. **At a glance**: product cards on the home page, collections, search and blog posts show up to five colour dots under the price, with "+2" when there are more, so buyers see a product comes in several colours before opening it. Screen readers hear "6 colours" instead. It uses the same colours as the product page (`cardSwatches` in `packages/core/src/swatches.ts`, no migration).
+
+### Exchanges (after launch, part 132)
+
+1. **Swap it instead**: when a buyer asks for a return from their order page, each item that has other options at the same price in stock offers "Swap for …" instead of a refund (another size or colour of the same product). The merchant sees "Wants instead" on the return and presses "Send the exchange": the new option goes out as a free order linked to the first, the buyer is emailed with what to send back, and nothing is refunded. On Shopify this takes a paid returns app (`packages/core/src/returns.ts`, no migration).

@@ -419,7 +419,7 @@ export async function returnAction(handle: string, ref: string, _: ReturnState, 
     await requestReturn(await db(), shop, order, {
       reason: String(form.get("reason") ?? "") as never,
       note: String(form.get("note") ?? ""),
-      items: form.getAll("lineId").map((id) => ({ lineId: String(id), quantity: Number(form.get(`qty-${id}`) ?? 0) || 0 })),
+      items: form.getAll("lineId").map((id) => ({ lineId: String(id), quantity: Number(form.get(`qty-${id}`) ?? 0) || 0, exchangeVariantId: String(form.get(`swap-${id}`) ?? "") || undefined })),
     });
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };

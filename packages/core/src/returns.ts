@@ -1,6 +1,8 @@
 // Returns. A buyer asks from their order page, within the store's return window, saying which
 // items and why. The merchant approves it with instructions (send it back, or keep it), refunds
-// it, gives store credit, or declines it, and the buyer is emailed each step.
+// it, gives store credit, or declines it, and the buyer is emailed each step. For "it doesn't fit",
+// the buyer can ask for another size or colour of the same product at the same price instead, and
+// the merchant sends it as a free order.
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { RETURN_REASONS, schema, type Db, type ReturnItem } from "@sf/db";
 import { z } from "zod";
@@ -48,6 +50,31 @@ async function returnableLines(db: Db, orderId: string) {
   return rows.filter((r) => !r.giftCard).map((r) => r.line);
 }
 
+/**
+ * What each line could be swapped for: the product's other options that cost the same as the one
+ * bought does now and are in stock. Lines with nothing to swap for are left out.
+ */
+async function exchangeChoices(db: Db, lines: (typeof schema.orderLines.$inferSelect)[]) {
+  const bought = lines.filter((l) => l.variantId);
+  if (!bought.length) return {};
+  const rows = await db
+    .select({ variant: schema.variants, product: { id: schema.products.id, title: schema.products.title, status: schema.products.status } })
+    .from(schema.variants)
+    .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
+    .where(inArray(schema.variants.productId, db.select({ id: schema.variants.productId }).from(schema.variants).where(inArray(schema.variants.id, bought.map((l) => l.variantId!)))))
+    .orderBy(asc(schema.variants.position));
+  const choices: Record<string, { variantId: string; title: string }[]> = {};
+  for (const line of bought) {
+    const own = rows.find((r) => r.variant.id === line.variantId);
+    if (!own || own.product.status !== "active") continue;
+    const others = rows.filter(
+      (r) => r.variant.productId === own.variant.productId && r.variant.id !== own.variant.id && r.variant.priceMinor === own.variant.priceMinor && (r.variant.stock === null || r.variant.stock >= line.quantity),
+    );
+    if (others.length) choices[line.id] = others.map((r) => ({ variantId: r.variant.id, title: r.variant.title === "Default" ? r.product.title : `${r.product.title} – ${r.variant.title}` }));
+  }
+  return choices;
+}
+
 /** For the buyer's order page: whether they can ask, why not, and any request already made. */
 export async function returnOptions(db: Db, shop: Shop, order: Order, now = new Date()) {
   const [requests, lines, start] = await Promise.all([
@@ -55,6 +82,7 @@ export async function returnOptions(db: Db, shop: Shop, order: Order, now = new 
     returnableLines(db, order.id),
     windowStart(db, order),
   ]);
+  const exchanges = await exchangeChoices(db, lines);
   const open = requests.find((r) => r.status === "requested" || r.status === "approved") ?? null;
   const closesAt = start ? new Date(start.getTime() + shop.returnWindowDays * DAY) : null;
   let blocked: string | null = null;
@@ -62,13 +90,13 @@ export async function returnOptions(db: Db, shop: Shop, order: Order, now = new 
   else if (!["paid", "partially_refunded"].includes(order.paymentStatus)) blocked = order.paymentStatus === "refunded" ? "This order has been refunded." : "This order isn't paid.";
   else if (!lines.length) blocked = "Nothing in this order can be returned.";
   else if (closesAt && closesAt < now) blocked = `Returns closed ${shop.returnWindowDays} days after delivery.`;
-  return { canRequest: !blocked && !open, blocked, open, latest: requests[0] ?? null, closesAt, lines };
+  return { canRequest: !blocked && !open, blocked, open, latest: requests[0] ?? null, closesAt, lines, exchanges };
 }
 
 const requestSchema = z.object({
   reason: z.enum(RETURN_REASONS, { error: "Pick a reason." }),
   note: z.string().trim().max(1000, "Keep the note under 1,000 characters.").optional(),
-  items: z.array(z.object({ lineId: z.string().uuid(), quantity: z.number().int().min(0).max(99) })),
+  items: z.array(z.object({ lineId: z.string().uuid(), quantity: z.number().int().min(0).max(99), exchangeVariantId: z.string().optional() })),
 });
 
 /** What the chosen items cost the buyer: their share of the discount off, their share of tax on. */
@@ -93,8 +121,14 @@ export async function requestReturn(db: Db, shop: Shop, order: Order, input: z.i
     const line = options.lines.find((l) => l.id === i.lineId);
     if (!line) throw new UserError("That item isn't in this order.");
     if (i.quantity > line.quantity) throw new UserError(`You bought ${line.quantity} of ${line.title}.`);
+    if (i.exchangeVariantId && !options.exchanges[i.lineId]?.some((c) => c.variantId === i.exchangeVariantId)) throw new UserError(`That option of ${line.title} can't be swapped for right now.`);
   }
-  const items: ReturnItem[] = wanted.map((i) => ({ lineId: i.lineId, quantity: i.quantity, title: options.lines.find((l) => l.id === i.lineId)!.title }));
+  const swapping = wanted.filter((i) => i.exchangeVariantId);
+  if (swapping.length && swapping.length < wanted.length) throw new UserError("Swap every item you're sending back, or none of them. You can ask about the others once this is answered.");
+  const items: ReturnItem[] = wanted.map((i) => {
+    const swap = i.exchangeVariantId ? options.exchanges[i.lineId]!.find((c) => c.variantId === i.exchangeVariantId)! : null;
+    return { lineId: i.lineId, quantity: i.quantity, title: options.lines.find((l) => l.id === i.lineId)!.title, ...(swap ? { exchangeVariantId: swap.variantId, exchangeTitle: swap.title } : {}) };
+  });
   const [row] = await db
     .insert(schema.returnRequests)
     .values({
@@ -146,6 +180,7 @@ export type ReturnDecision =
   | { action: "refund"; amountMinor: number; message?: string }
   | { action: "credit"; amountMinor: number; message?: string }
   | { action: "replace"; message?: string }
+  | { action: "exchange"; message?: string }
   | { action: "decline"; message: string };
 
 /** The merchant answers a return. Refund and store credit close it; approve waits for the item. */
@@ -169,6 +204,16 @@ export async function decideReturn(ctx: ReturnContext, shop: Shop, requestId: st
     const replacement = await sendReplacement(ctx, shop, order.id, { items: request.items.map((i) => ({ lineId: i.lineId, quantity: i.quantity })), note: message ?? undefined });
     update = { status: "replaced", replacementOrderId: replacement.id, resolvedAt: new Date() };
     email = `${shop.name} is sending you a replacement as order #${replacement.number}. There's nothing to send back. You'll get an email with tracking when it ships.`;
+  } else if (decision.action === "exchange") {
+    // The other size or colour goes out as a free order; the first one comes back as usual.
+    if (!request.items.some((i) => i.exchangeVariantId)) throw new UserError("The buyer didn't ask for an exchange. Send a replacement or refund it instead.");
+    const replacement = await sendReplacement(ctx, shop, order.id, {
+      items: request.items.map((i) => ({ lineId: i.lineId, quantity: i.quantity, variantId: i.exchangeVariantId })),
+      note: message ?? undefined,
+    });
+    const instructions = message ?? shop.returnInstructions ?? DEFAULT_RETURN_INSTRUCTIONS;
+    update = { status: "exchanged", replacementOrderId: replacement.id, merchantMessage: instructions, resolvedAt: new Date() };
+    email = `${shop.name} is sending you ${request.items.map((i) => i.exchangeTitle ?? i.title).join(", ")} in exchange, as order #${replacement.number}. You'll get an email with tracking when it ships.\n\nWhat to send back: ${instructions}`;
   } else if (decision.action === "approve") {
     const instructions = message ?? shop.returnInstructions ?? DEFAULT_RETURN_INSTRUCTIONS;
     update = { status: "approved", merchantMessage: instructions };

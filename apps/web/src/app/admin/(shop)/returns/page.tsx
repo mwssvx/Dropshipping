@@ -13,6 +13,7 @@ const STATUS = {
   refunded: ["Refunded", "pill-success"],
   credited: ["Store credit", "pill-success"],
   replaced: ["Replacement sent", "pill-success"],
+  exchanged: ["Exchange sent", "pill-success"],
   declined: ["Declined", "pill-neutral"],
 } as const;
 
@@ -53,12 +54,15 @@ export default async function ReturnsPage() {
                     </div>
                     <div className="text-sm flex flex-col gap-1">
                       <p><span className="hint">Items:</span> {r.items.map((i) => `${i.title} × ${i.quantity}`).join(", ")}</p>
+                      {r.items.some((i) => i.exchangeTitle) && (
+                        <p><span className="hint">Wants instead:</span> {r.items.filter((i) => i.exchangeTitle).map((i) => `${i.exchangeTitle} × ${i.quantity}`).join(", ")}</p>
+                      )}
                       <p><span className="hint">Why:</span> {RETURN_REASON_LABELS[r.reason]}</p>
                       {r.note && <p className="border-l-2 border-border pl-3 whitespace-pre-line">{r.note}</p>}
                       <p className="hint num">They paid {formatMoney(r.suggestedMinor, r.currency)} for these items.</p>
                       {r.status === "approved" && r.merchantMessage && <p className="hint">You told them: {r.merchantMessage}</p>}
                     </div>
-                    <DecideForm id={r.id} approved={r.status === "approved"} amount={decimal(Math.min(r.suggestedMinor, left))} max={formatMoney(left, r.currency)} />
+                    <DecideForm id={r.id} approved={r.status === "approved"} exchange={r.items.some((i) => i.exchangeVariantId)} amount={decimal(Math.min(r.suggestedMinor, left))} max={formatMoney(left, r.currency)} />
                   </li>
                 );
               })}
@@ -80,7 +84,7 @@ export default async function ReturnsPage() {
                   </span>
                   <span className="flex items-center gap-2">
                     {r.resolvedMinor ? <span className="num">{formatMoney(r.resolvedMinor, r.currency)}</span> : null}
-                    {r.replacementOrderId && <Link href={`/admin/orders/${r.replacementOrderId}`} className="underline">Replacement</Link>}
+                    {r.replacementOrderId && <Link href={`/admin/orders/${r.replacementOrderId}`} className="underline">{r.status === "exchanged" ? "Exchange" : "Replacement"}</Link>}
                     <span className={`pill ${STATUS[r.status][1]}`}>{STATUS[r.status][0]}</span>
                     {r.resolvedAt && <span className="hint">{date.format(r.resolvedAt)}</span>}
                   </span>
