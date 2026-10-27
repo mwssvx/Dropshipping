@@ -785,6 +785,13 @@
       "when": 1793124286543,
       "tag": "0112_free_gift",
       "breakpoints": true
+    },
+    {
+      "idx": 112,
+      "version": "7",
+      "when": 1793126419745,
+      "tag": "0113_min_order",
+      "breakpoints": true
     }
   ]
 }

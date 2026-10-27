@@ -1,0 +1,1 @@
+ALTER TABLE "shops" ADD COLUMN "min_order_minor" bigint DEFAULT 0 NOT NULL;

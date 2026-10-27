@@ -161,6 +161,8 @@ export const shops = pgTable(
     localDeliveryArea: jsonb("local_delivery_area").$type<LocalDeliveryArea | null>(),
     // Gift wrapping buyers can add to a gift at checkout, or null when the store doesn't wrap.
     giftWrap: jsonb("gift_wrap").$type<GiftWrap | null>(),
+    // The smallest order the store takes, in goods after discounts; 0 means any amount.
+    minOrderMinor: money("min_order_minor").notNull().default(0),
     // One option given free with orders over an amount ("Free tote over $75"), or null when there's none.
     freeGift: jsonb("free_gift").$type<FreeGift | null>(),
     // Orders in by this hour (store time) start that shipping day, or null when there's no cutoff.

@@ -212,9 +212,14 @@ export default async function CartPage({ params, searchParams }: { params: Promi
             </form>
           )}
           {(!(quote.discount || quote.codeNotUsed) || !quote.giftCard) && <CodeForm handle={handle} text={{ label: t.codeLabel, apply: t.apply, checking: t.checking }} />}
+          {quote.minimumOrder && quote.minimumOrder.shortByMinor > 0 && (
+            <p className="self-end banner banner-warning" role="status">
+              {t.minOrderShort(money(convertAmount(quote.minimumOrder.minMinor, fx)), money(convertAmount(quote.minimumOrder.shortByMinor, fx)))}
+            </p>
+          )}
           {onHoliday(shop) ? (
             <p className="self-end banner banner-info" role="status">{t.holidayNoCheckout}</p>
-          ) : quote.wholesale && quote.wholesale.shortByMinor > 0 ? (
+          ) : (quote.wholesale && quote.wholesale.shortByMinor > 0) || (quote.minimumOrder && quote.minimumOrder.shortByMinor > 0) ? (
             <Link href={base || "/"} className="btn btn-secondary btn-lg self-end">{t.keepShopping}</Link>
           ) : (
             <Link href={`${base}/checkout`} className="btn btn-primary btn-lg self-end">{t.checkOut}</Link>
