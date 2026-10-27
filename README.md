@@ -934,3 +934,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Finding a gift card (after launch, part 147)
 
 1. **Look a card up**: when a buyer says their gift card isn't working, the merchant types the code they read out (spaces, dashes and case don't matter), its last 4 characters, the email it went to, or the order it was bought on into the new search on the Gift cards page. Filters show only active, used up or turned off cards, and the list shows 50 a page instead of stopping at the newest 200 (`listGiftCards` in `packages/core/src/gift-cards.ts`). The full code is still never stored: a typed code is matched by its hash.
+
+### Subscriptions in pages (after launch, part 148)
+
+1. **Find a subscriber**: the Subscriptions page used to load every subscription a store ever had. It now shows 50 a page, with filters for Active, Paused and Cancelled, a **Card problems** filter (an active subscription whose last charge failed, or one paused after three failed charges) with a count, and a search by the subscriber's email (`listSubscriptions` and `countSubscriptions` in `packages/core/src/subscriptions.ts`).

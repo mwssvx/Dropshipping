@@ -270,8 +270,41 @@ export async function changeSubscription(db: Db, shop: Shop, token: string, chan
 }
 
 /** All of a store's subscriptions, newest first, with the deliveries and sales each has brought. */
-export async function listSubscriptions(db: Db, shopId: string) {
-  const subs = await db.query.subscriptions.findMany({ where: eq(schema.subscriptions.shopId, shopId), orderBy: desc(schema.subscriptions.createdAt) });
+export const SUBSCRIPTION_PAGE_SIZE = 50;
+/** "failing" is an active subscription whose last charge failed, or one paused after three failures. */
+export type SubscriptionFilter = { status?: "active" | "paused" | "cancelled" | "failing"; query?: string };
+
+function subscriptionWhere(shopId: string, filter: SubscriptionFilter) {
+  const s = schema.subscriptions;
+  const q = filter.query?.trim().toLowerCase().slice(0, 100);
+  return and(
+    eq(s.shopId, shopId),
+    filter.status === "failing"
+      ? or(and(eq(s.status, "active"), gt(s.failures, 0)), and(eq(s.status, "paused"), eq(s.pausedBy, "payment")))
+      : filter.status
+        ? eq(s.status, filter.status)
+        : undefined,
+    q ? sql`lower(${s.email}) like ${`%${q.replace(/[\\%_]/g, "\\$&")}%`}` : undefined,
+  );
+}
+
+/** How many subscriptions match, for "Page N of M". */
+export async function countSubscriptions(db: Db, shopId: string, filter: SubscriptionFilter = {}) {
+  const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.subscriptions).where(subscriptionWhere(shopId, filter));
+  return row?.n ?? 0;
+}
+
+/** Newest first, a page at a time, with each one's deliveries and sales so far. */
+export async function listSubscriptions(db: Db, shopId: string, filter: SubscriptionFilter & { page?: number; size?: number } = {}) {
+  const size = filter.size ?? SUBSCRIPTION_PAGE_SIZE;
+  const page = Math.max(1, Math.floor(filter.page ?? 1));
+  const subs = await db
+    .select()
+    .from(schema.subscriptions)
+    .where(subscriptionWhere(shopId, filter))
+    .orderBy(desc(schema.subscriptions.createdAt), desc(schema.subscriptions.id))
+    .limit(size)
+    .offset((page - 1) * size);
   const totals = subs.length
     ? await db
         .select({ id: schema.orders.subscriptionId, orders: sql<number>`count(*)`.mapWith(Number), salesMinor: sql<number>`coalesce(sum(${schema.orders.totalMinor} - ${schema.orders.refundedMinor}), 0)`.mapWith(Number) })
