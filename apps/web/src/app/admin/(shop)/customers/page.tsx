@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { can, customerTags, describeTagRule, formatMoney, listCustomers, listProducts, listTagRules, MAX_TAG_RULES } from "@sf/core";
+import { can, CUSTOMER_PAGE_SIZE, customerTags, customerTotals, describeTagRule, formatMoney, listCustomers, listProducts, listTagRules, MAX_TAG_RULES } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { deleteTagRuleAction } from "../../tag-rule-actions";
 import { PageHeader } from "../PageHeader";
@@ -9,15 +9,25 @@ export const metadata = { title: "Customers" };
 
 const date = (d: Date | null) => (d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "No orders yet");
 
-export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string; tag?: string; erased?: string }> }) {
+export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string; tag?: string; erased?: string; page?: string }> }) {
   const { shop, db, role } = await requireShop("customers");
-  const { q, tag, erased } = await searchParams;
-  const customers = await listCustomers(db, shop.id, { query: q, tag });
-  const [tags, rules, products] = await Promise.all([customerTags(db, shop.id), listTagRules(db, shop.id), listProducts(db, shop.id)]);
+  const { q, tag, erased, page: pageParam } = await searchParams;
+  const page = Math.max(1, Math.min(10_000, Math.floor(Number(pageParam)) || 1));
+  const [customers, totals, tags, rules, products] = await Promise.all([
+    listCustomers(db, shop.id, { query: q, tag, limit: CUSTOMER_PAGE_SIZE, offset: (page - 1) * CUSTOMER_PAGE_SIZE }),
+    customerTotals(db, shop.id, { query: q, tag }),
+    customerTags(db, shop.id),
+    listTagRules(db, shop.id),
+    listProducts(db, shop.id),
+  ]);
   const filtered = !!(q || tag);
   const seesMoney = can(role, "money");
-  const repeat = customers.filter((c) => c.orders > 1).length;
-  const accounts = customers.filter((c) => c.lastSignInAt).length;
+  const pages = Math.ceil(totals.customers / CUSTOMER_PAGE_SIZE);
+  const pageHref = (n: number) => {
+    const params = new URLSearchParams({ ...(q ? { q } : {}), ...(tag ? { tag } : {}), ...(n > 1 ? { page: String(n) } : {}) });
+    return params.size ? `/admin/customers?${params}` : "/admin/customers";
+  };
+  const first = (page - 1) * CUSTOMER_PAGE_SIZE + 1;
 
   return (
     <main className="pb-12">
@@ -28,9 +38,9 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             Their data is erased.{Number(erased) > 0 && ` ${erased} ${erased === "1" ? "order keeps" : "orders keep"} only the amounts and country for your records.`}
           </p>
         )}
-        {!filtered && customers.length > 0 && (
+        {!filtered && totals.customers > 0 && (
           <p className="hint">
-            {customers.length} {customers.length === 1 ? "customer" : "customers"} · {repeat} bought more than once · {accounts} signed in to their account
+            {totals.customers.toLocaleString("en-US")} {totals.customers === 1 ? "customer" : "customers"} · {totals.repeat.toLocaleString("en-US")} bought more than once · {totals.accounts.toLocaleString("en-US")} signed in to their account
           </p>
         )}
         <form className="flex gap-2 max-w-md" role="search">
@@ -50,14 +60,16 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             ))}
           </nav>
         )}
-        {customers.length > 0 && (
+        {totals.customers > 0 && (
           <p className="text-sm">
             <a className="underline" href={`/admin/customers/export.csv${filtered ? `?${new URLSearchParams({ ...(q ? { q } : {}), ...(tag ? { tag } : {}) })}` : ""}`} download>
               Download {filtered ? "these customers" : "all customers"} as a spreadsheet
             </a>
           </p>
         )}
-        {customers.length === 0 ? (
+        {customers.length === 0 && page > 1 ? (
+          <div className="card p-6 hint">There are no more customers. <Link href={pageHref(1)} className="underline">Back to the first page</Link></div>
+        ) : customers.length === 0 ? (
           <div className="card p-6 hint">{q ? `No customers match "${q}".` : tag ? `Nobody is tagged "${tag}".` : "Customers show up here after their first checkout."}</div>
         ) : (
           <div className="card overflow-x-auto">
@@ -90,6 +102,13 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
               </tbody>
             </table>
           </div>
+        )}
+        {pages > 1 && customers.length > 0 && (
+          <nav aria-label="Pages" className="flex items-center gap-3 text-sm">
+            {page > 1 && <Link href={pageHref(page - 1)} className="btn btn-secondary">← Previous</Link>}
+            <span className="hint num">{first.toLocaleString("en-US")} to {(first + customers.length - 1).toLocaleString("en-US")} of {totals.customers.toLocaleString("en-US")}</span>
+            {page < pages && <Link href={pageHref(page + 1)} className="btn btn-secondary ml-auto">Next →</Link>}
+          </nav>
         )}
         <section aria-labelledby="tag-rules-heading" id="tag-rules" className="card p-4 sm:p-6 flex flex-col gap-4 mt-4">
           <div>
