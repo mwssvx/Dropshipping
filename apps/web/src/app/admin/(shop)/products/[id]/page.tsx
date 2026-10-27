@@ -13,6 +13,7 @@ import { PreorderForm } from "./PreorderForm";
 import { PurchaseLimitForm } from "./PurchaseLimitForm";
 import { CustomsForm } from "./CustomsForm";
 import { MinAgeForm } from "./MinAgeForm";
+import { ReorderDaysForm } from "./ReorderDaysForm";
 import { VideoForm } from "./VideoForm";
 import { DetailsForm } from "./DetailsForm";
 import { BadgeForm } from "./BadgeForm";
@@ -338,6 +339,19 @@ export default async function EditProductPage({ params, searchParams }: { params
             </div>
             {product.minAge && <p className="text-sm" role="note">Buyers must confirm they're {product.minAge} or older.</p>}
             <MinAgeForm productId={product.id} minAge={product.minAge} />
+          </section>
+        )}
+        {!product.giftCard && (
+          <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="reorder-heading">
+            <div>
+              <h2 id="reorder-heading" className="font-semibold">Reorder reminder</h2>
+              <p className="hint">
+                For things that run out, like coffee, vitamins or refills. That many days after an order arrives, the buyer gets one email
+                asking if they&apos;re running low, with a link back here. Not if they&apos;ve already bought it again.
+              </p>
+            </div>
+            {product.reorderDays && <p className="text-sm" role="note">Buyers are reminded {product.reorderDays} days after it arrives.</p>}
+            <ReorderDaysForm productId={product.id} days={product.reorderDays} />
           </section>
         )}
         <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="upsell-heading">

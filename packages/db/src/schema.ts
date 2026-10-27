@@ -308,6 +308,8 @@ export const products = pgTable(
     originCountry: text("origin_country"),
     // Buyers must say they're at least this old to check out with it (alcohol, vapes, knives).
     minAge: integer("min_age"),
+    // How many days the product usually lasts, for the one "running low?" email; null means no reminder.
+    reorderDays: integer("reorder_days"),
     // A video for the product page: a YouTube or Vimeo link, or an https video file.
     videoUrl: text("video_url"),
     // Facts shown as a table on the product page, like Material: Aluminium or Size: 20 × 10 cm.
@@ -334,6 +336,7 @@ export const products = pgTable(
     uniqueIndex("products_shop_handle_uq").on(t.shopId, t.handle),
     index("products_shop_status_idx").on(t.shopId, t.status),
     check("products_min_age_ok", sql`${t.minAge} is null or ${t.minAge} between 13 and 25`),
+    check("products_reorder_days_ok", sql`${t.reorderDays} is null or ${t.reorderDays} between 7 and 180`),
   ],
 );
 
@@ -635,6 +638,8 @@ export const orders = pgTable(
     surveyOther: text("survey_other"),
     // When the buyer was asked to review what they got, once per order.
     reviewRequestedAt: timestamp("review_requested_at", { withTimezone: true }),
+    // When the buyer was reminded to reorder, once per order.
+    reorderRemindedAt: timestamp("reorder_reminded_at", { withTimezone: true }),
     // The merchant's own note and labels ("follow up", "vip"). Never shown to the buyer.
     staffNote: text("staff_note"),
     tags: jsonb("tags").$type<string[]>().notNull().default([]),

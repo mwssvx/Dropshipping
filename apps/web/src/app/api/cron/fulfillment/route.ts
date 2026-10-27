@@ -1,4 +1,4 @@
-import { applyAllTagRules, notifyLowStock, notifySoldOut, publishDueProducts, sendReviewRequests, pruneActivity, sendWeeklySummaries, pruneAuthRecords, pruneBuyerRecords, pruneStockAlerts, sendPriceDrops, sendStockAlerts, syncSupplierStock, pruneInvites, pruneEvents, refreshAllVerified, runWebhooks, routeStuckOrders, sendCampaignBatches, runFakePayouts, notifyNewDisputes, runDueSubscriptions, sendWinbackEmails, notifyCostChanges, notifyLatePreorders, runHealthChecks, runScheduledAgents, sendAbandonedCartEmails, sendAllNotifications, sendReferralRewards, syncTracking } from "@sf/core";
+import { applyAllTagRules, notifyLowStock, notifySoldOut, publishDueProducts, sendReviewRequests, sendReorderReminders, pruneActivity, sendWeeklySummaries, pruneAuthRecords, pruneBuyerRecords, pruneStockAlerts, sendPriceDrops, sendStockAlerts, syncSupplierStock, pruneInvites, pruneEvents, refreshAllVerified, runWebhooks, routeStuckOrders, sendCampaignBatches, runFakePayouts, notifyNewDisputes, runDueSubscriptions, sendWinbackEmails, notifyCostChanges, notifyLatePreorders, runHealthChecks, runScheduledAgents, sendAbandonedCartEmails, sendAllNotifications, sendReferralRewards, syncTracking } from "@sf/core";
 import { agents, campaigns, adminNotices, fulfillment, pushSender, stock, subscriptions, testPayments, webhooks } from "@/lib/server";
 
 /**
@@ -47,6 +47,8 @@ export async function GET(request: Request) {
   const reminders = await sendAbandonedCartEmails(ctx);
   // A few days after an order arrives, the buyer is asked how it was.
   const reviewRequests = await sendReviewRequests(ctx);
+  // When something that runs out is about due, the buyer gets one "running low?" email.
+  const reorderReminders = await sendReorderReminders(ctx);
   const campaignEmails = await sendCampaignBatches(await campaigns());
   // Win-back codes for subscribers who haven't ordered in a while.
   const winback = await sendWinbackEmails(await campaigns());
@@ -61,5 +63,5 @@ export async function GET(request: Request) {
   await pruneBuyerRecords(ctx.db);
   await pruneStockAlerts(ctx.db);
   await pruneActivity(ctx.db);
-  return Response.json({ published, routed, tracking, referrals, stock: stockSync, priceRises, soldOut, runningLow, preorders, subscriptions: repeats, restocked, priceDrops, payouts, disputes, health, verified, tagRules, reminders, reviewRequests, campaigns: campaignEmails, winback, summaries, ai, push, webhooks: hooks, pruned });
+  return Response.json({ published, routed, tracking, referrals, stock: stockSync, priceRises, soldOut, runningLow, preorders, subscriptions: repeats, restocked, priceDrops, payouts, disputes, health, verified, tagRules, reminders, reviewRequests, reorderReminders, campaigns: campaignEmails, winback, summaries, ai, push, webhooks: hooks, pruned });
 }
