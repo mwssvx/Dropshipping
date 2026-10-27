@@ -15,6 +15,7 @@ export default async function PackingSlipsPage() {
     <main className="px-4 sm:px-8 py-6 pb-12 flex flex-col gap-4 max-w-4xl">
       <div className="flex flex-wrap items-center gap-3 justify-between">
         <Link href="/admin/orders" className="hint hover:text-ink">← Orders</Link>
+        {slips.length > 0 && <Link href="/admin/orders/pick-list" className="btn btn-secondary ml-auto">Pick list</Link>}
         {slips.length > 0 && <PrintButton>{slips.length === 1 ? "Print 1 packing slip" : `Print ${slips.length} packing slips`}</PrintButton>}
       </div>
       <h1 className="text-2xl font-bold tracking-tight">Packing slips</h1>
