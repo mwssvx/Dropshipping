@@ -788,3 +788,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **What you ordered**: for the stock a store keeps itself, the merchant writes down a restock order: who it's from, when it should arrive, and how many of each option at what cost (Restock in the menu; `restock_orders`, `restock_lines`, `createRestockOrder` in `packages/core/src/restock.ts`). Supplier products restock on their own, so they can't be added.
 2. **On the way**: each product shows what's still coming for it from open restock orders (`incomingStock`).
 3. **When it arrives**: the merchant receives the parcel, all at once or a part at a time (`receiveRestock`). It goes on the stock count (an option that wasn't counted starts counting), the cost paid becomes the option's cost, and the stock history says which restock it arrived on. The order is done once everything is in; cancelling keeps what already arrived.
+
+### Inventory (after launch, part 113)
+
+1. **One list of the stock you keep**: Inventory in the menu shows every counted option of the store's own products, with what's on the shelf, what's on the way from restock orders, and what it's worth at cost and at its price (`inventoryReport` in `packages/core/src/inventory.ts`). Supplier products follow the supplier, so they aren't listed.
+2. **How long it lasts**: sales over the last 30 days, less what came back, give a rough "lasts about N days". The soonest to run out come first, and options at or under the running-low number are marked.
+3. **As a spreadsheet**: "Download spreadsheet" gives the same list as a CSV (`inventoryCsv`).
