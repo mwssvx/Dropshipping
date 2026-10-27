@@ -673,6 +673,13 @@
       "when": 1793093016109,
       "tag": "0095_gift_wrap",
       "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1793097095112,
+      "tag": "0096_stock_history",
+      "breakpoints": true
     }
   ]
 }

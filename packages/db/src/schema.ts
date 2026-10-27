@@ -1590,6 +1590,26 @@ export const stockAlerts = pgTable(
   (t) => [uniqueIndex("stock_alerts_variant_email_uq").on(t.variantId, t.email), index("stock_alerts_shop_idx").on(t.shopId, t.notifiedAt)],
 );
 
+// Every change to the store's own stock count and why: a sale, a cancellation putting it back, a
+// swap to another option, or the merchant typing a new count. Imported products follow the supplier.
+export const stockMovements = pgTable(
+  "stock_movements",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    variantId: uuid("variant_id").notNull().references(() => variants.id, { onDelete: "cascade" }),
+    orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
+    reason: text("reason", { enum: ["start", "edit", "sale", "returned", "swap_out", "swap_in"] }).notNull(),
+    change: integer("change").notNull(),
+    // The count after it; null when the option stopped being counted.
+    stockAfter: integer("stock_after"),
+    // In the order they happened: changes saved together share a createdAt.
+    seq: bigint("seq", { mode: "number" }).generatedAlwaysAsIdentity(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("stock_movements_variant_idx").on(t.variantId, t.seq)],
+);
+
 // Old store links that should keep working: a renamed product, or a page from a store moved here.
 export const redirects = pgTable(
   "redirects",

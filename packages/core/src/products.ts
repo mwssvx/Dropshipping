@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
+import { recordStockEdits } from "./own-stock";
 import { uniqueHandle } from "./handles";
 import { editProductPhotos, inheritedPhoto, photoColumns } from "./gallery";
 import { publishDueProducts } from "./publish-later";
@@ -55,6 +56,7 @@ export async function createProduct(db: Db, shopId: string, input: ProductInput)
   return db.transaction(async (tx) => {
     const [product] = await tx.insert(schema.products).values({ ...data, ...photoColumns(imageUrl ? [imageUrl] : []), shopId, handle }).returning();
     await tx.insert(schema.variants).values(variants.map(({ id: _id, ...v }, i) => ({ ...v, productId: product!.id, position: i })));
+    await recordStockEdits(tx as unknown as Db, product!.id, new Map());
     return product!;
   });
 }
@@ -133,6 +135,7 @@ export async function updateProduct(db: Db, shopId: string, productId: string, i
     }
     const extra = existing.filter((e) => !kept.has(e.id)).map((e) => e.id);
     if (extra.length) await tx.delete(schema.variants).where(inArray(schema.variants.id, extra));
+    await recordStockEdits(tx as unknown as Db, productId, new Map(existing.map((e) => [e.id, e.stock])));
     return product;
   });
 }
@@ -214,6 +217,7 @@ export async function patchProduct(db: Db, shopId: string, productId: string, in
       const set = { ...(v.priceMinor !== undefined ? { priceMinor: v.priceMinor } : {}), ...(v.stock !== undefined ? { stock: v.stock } : {}) };
       if (Object.keys(set).length) await tx.update(schema.variants).set(set).where(eq(schema.variants.id, v.id));
     }
+    await recordStockEdits(tx as unknown as Db, productId, new Map(current.variants.map((c) => [c.id, c.stock])));
   });
   return getProduct(db, shopId, productId);
 }
