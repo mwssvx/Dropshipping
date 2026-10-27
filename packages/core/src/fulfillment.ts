@@ -633,6 +633,9 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
           ? [`Paid with gift card: ${formatMoney(paid.giftCardMinor, paid.currency)}`, ...(paid.chargedMinor ? [`Paid by card: ${formatMoney(paid.chargedMinor, paid.currency)}`] : [])]
           : []),
         ...(invoice ? [``, `Your invoice ${invoice.number}: ${link}/invoice`] : []),
+        ...(paid.protectionMinor
+          ? [``, `Delivery protection (${formatMoney(paid.protectionMinor, paid.currency)}): if it's lost or arrives damaged, tell ${shop.name} from your order page and they'll send it again for free.`]
+          : []),
         ...(order.preorderShipsBy ? [``, `Pre-order: it ships by ${formatShipsBy(order.preorderShipsBy)}. We'll email tracking as soon as it's on its way.`] : []),
         ...(arrives ? [``, `Expected delivery: ${formatDeliveryWindow(arrives)}.`] : []),
         ...(order.gift

@@ -4,7 +4,9 @@ import { FormError } from "@/components/FormError";
 import { checkoutAction } from "../actions";
 
 /** A shipping rate priced for this cart, in the buyer's currency. */
-export type RateChoice = { id: string; name: string; days: string | null; priceLabel: string; totalLabel: string; priceMinor: number };
+export type RateChoice = { id: string; name: string; days: string | null; priceLabel: string; totalLabel: string; priceMinor: number; protectedTotalLabel?: string };
+/** Delivery protection the buyer can add, priced for this cart in their currency. */
+export type ProtectionChoice = { checkbox: string; note: string; summary: string; priceLabel: string };
 export type ZoneChoice = { countries: string[]; rates: RateChoice[] };
 
 const zoneFor = (zones: ZoneChoice[], country: string) => zones.find((z) => z.countries.includes(country)) ?? zones.find((z) => z.countries.includes("*"));
@@ -46,6 +48,8 @@ type Props = {
   totalLabel: string;
   /** Total with no shipping, for carts with nothing to ship. */
   totalWithoutShipping: string;
+  /** Null when the store doesn't offer delivery protection, or nothing ships. */
+  protection?: ProtectionChoice | null;
 };
 
 /** Checkout form and order summary side by side; the summary follows the shipping the buyer picks. */
@@ -56,11 +60,13 @@ export function Checkout({ summary, footer, taxLabel, totalLabel, totalWithoutSh
   const rates = form.zones ? (zoneFor(form.zones, country)?.rates ?? []) : [];
   const [rateId, setRateId] = useState<string | null>(null);
   const rate = rates.find((r) => r.id === rateId) ?? cheapest(rates);
+  const [protect, setProtect] = useState(false);
+  const protecting = protect && !!form.protection;
   return (
     <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10 grid gap-10 md:grid-cols-[1fr_340px] items-start">
       <div className="flex flex-col gap-6 min-w-0">
         <h1 className="text-3xl font-bold tracking-tight">{t.checkout}</h1>
-        <CheckoutForm {...form} country={country} onCountry={setCountry} rates={rates} rate={rate} onRate={setRateId} />
+        <CheckoutForm {...form} country={country} onCountry={setCountry} rates={rates} rate={rate} onRate={setRateId} protect={protect} onProtect={setProtect} />
       </div>
       <aside className="card p-5 flex flex-col gap-4 md:sticky md:top-6 bg-sunken border-0">
         <h2 className="font-semibold">{t.orderSummary}</h2>
@@ -72,9 +78,15 @@ export function Checkout({ summary, footer, taxLabel, totalLabel, totalWithoutSh
               <dd className="text-right">{rate ? rate.priceLabel : t.notAvailable}</dd>
             </>
           )}
+          {protecting && (
+            <>
+              <dt className="hint">{form.protection!.summary}</dt>
+              <dd className="text-right">{form.protection!.priceLabel}</dd>
+            </>
+          )}
           <dt className="hint">{t.tax}</dt><dd className="text-right hint">{taxLabel}</dd>
           <dt className="font-semibold text-base">{totalLabel}</dt>
-          <dd className="font-semibold text-base text-right">{form.zones ? (rate?.totalLabel ?? "–") : totalWithoutShipping}</dd>
+          <dd className="font-semibold text-base text-right">{form.zones ? ((protecting ? rate?.protectedTotalLabel : rate?.totalLabel) ?? "–") : totalWithoutShipping}</dd>
         </dl>
         {footer}
       </aside>
@@ -83,13 +95,15 @@ export function Checkout({ summary, footer, taxLabel, totalLabel, totalWithoutSh
 }
 
 function CheckoutForm({
-  handle, text: t, initial, askPhone, paidByGiftCard, countries, zones, country, onCountry, rates, rate, onRate,
+  handle, text: t, initial, askPhone, paidByGiftCard, countries, zones, country, onCountry, rates, rate, onRate, protection, protect, onProtect,
 }: Omit<Props, "summary" | "footer" | "taxLabel" | "totalLabel" | "totalWithoutShipping" | "defaultCountry"> & {
   country: string;
   onCountry: (c: string) => void;
   rates: RateChoice[];
   rate: RateChoice | undefined;
   onRate: (id: string) => void;
+  protect: boolean;
+  onProtect: (on: boolean) => void;
 }) {
   const [state, action, pending] = useActionState(checkoutAction.bind(null, handle), {});
   const v = state.values ?? initial;
@@ -151,6 +165,15 @@ function CheckoutForm({
             ))
           )}
         </fieldset>
+      )}
+      {zones && protection && (
+        <label className="card p-3 flex items-start gap-3 cursor-pointer">
+          <input type="checkbox" name="protection" className="mt-1" checked={protect} onChange={(e) => onProtect(e.target.checked)} />
+          <span className="flex-1">
+            <span className="font-medium">{protection.checkbox}</span>
+            <span className="block hint text-sm">{protection.note}</span>
+          </span>
+        </label>
       )}
       {zones && <GiftFields t={t} values={v} />}
       <div className="field">

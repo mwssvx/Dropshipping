@@ -214,6 +214,7 @@ const routes: Record<string, Handler> = {
       bundleTitle: o.bundleTitle,
       taxMinor: o.taxMinor,
       taxExemptId: o.taxExemptId,
+      protectionMinor: o.protectionMinor,
       buyerNote: o.buyerNote,
       staffNote: o.staffNote,
       tags: o.tags,

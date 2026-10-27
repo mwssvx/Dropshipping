@@ -177,6 +177,11 @@ export default async function OrderStatusPage({ params, searchParams }: { params
           ))}
         </section>
       )}
+      {paid && order.protectionMinor > 0 && order.paymentStatus !== "refunded" && (
+        <p className="banner banner-info text-sm">
+          Your delivery is protected. If it&apos;s lost or arrives damaged, <a className="underline" href="#questions">tell {shop.name} below</a> and they&apos;ll send it again for free.
+        </p>
+      )}
       {paid && shipped.length === 0 && !order.preorderShipsBy && (
         <p className="hint text-sm">
           {order.lines.length === 1 ? "Your item usually ships" : "Your items usually ship"} within a few days. We&apos;ll email tracking to {order.email} as soon as it&apos;s on its way.
@@ -212,6 +217,7 @@ export default async function OrderStatusPage({ params, searchParams }: { params
           <div className="flex justify-between gap-3 hint"><span>{order.discountCode ? `Discount (${order.discountCode})` : `Bundle (${order.bundleTitle})`}</span><span className="num">−{money(due.discountMinor)}</span></div>
         )}
         <div className="flex justify-between gap-3 hint"><span>Shipping{order.shippingMethod ? ` (${order.shippingMethod})` : ""}</span><span className="num">{due.shippingMinor ? money(due.shippingMinor) : "Free"}</span></div>
+        {due.protectionMinor > 0 && <div className="flex justify-between gap-3 hint"><span>Delivery protection</span><span className="num">{money(due.protectionMinor)}</span></div>}
         {order.taxExemptId && <div className="flex justify-between gap-3 hint"><span>Tax exempt</span><span className="num">{order.taxExemptId}</span></div>}
         {order.taxMinor > 0 && (
           <div className="flex justify-between gap-3 hint"><span>{order.taxBreakdown.map((t) => t.label).join(", ") || "Tax"}{order.taxIncluded ? " (included)" : ""}</span><span className="num">{money(due.taxMinor)}</span></div>

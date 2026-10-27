@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseMoney, setCheckoutPhone, setDeliveryEstimates, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
+import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseMoney, setCheckoutPhone, setDeliveryEstimates, setDeliveryProtection, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
 import { logged, requireShop } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -96,4 +96,34 @@ export async function setCheckoutPhoneAction(form: FormData) {
   const said = { off: "doesn't ask for a phone number", optional: "asks for an optional phone number", required: "needs a phone number" }[mode] ?? "asks for a phone number";
   await logged({ shop, user, db }, `Checkout now ${said}`, { href: "/admin/shipping#phone-heading" });
   revalidatePath("/admin/shipping");
+}
+
+export type ProtectionState = { error?: string; saved?: { percent: number; minMinor: number } | null };
+
+/** Turns delivery protection at checkout on with its price, or off. */
+export async function setDeliveryProtectionAction(_: ProtectionState, form: FormData): Promise<ProtectionState> {
+  const { shop, db, user } = await requireShop("shipping");
+  const on = form.get("enabled") === "on";
+  let saved: ProtectionState["saved"] = null;
+  try {
+    if (on) {
+      const percent = Number(String(form.get("percent") ?? "").trim().replace(",", "."));
+      const min = String(form.get("min") ?? "").trim();
+      let minMinor = 0;
+      try {
+        minMinor = min ? parseMoney(min) : 0;
+      } catch {
+        return { error: "Enter the lowest price as an amount, like 1.50." };
+      }
+      saved = await setDeliveryProtection(db, shop.id, { percent, minMinor });
+    } else {
+      await setDeliveryProtection(db, shop.id, null);
+    }
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  await logged({ shop, user, db }, saved ? `Offered delivery protection at checkout for ${saved.percent}% of the order` : "Stopped offering delivery protection", { href: "/admin/shipping#protection-heading" });
+  revalidatePath("/admin/shipping");
+  return { saved };
 }

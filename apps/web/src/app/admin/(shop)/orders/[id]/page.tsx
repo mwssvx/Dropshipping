@@ -211,6 +211,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
               {order.discountMinor > 0 && <><dt className="hint">{order.discountCode ? `Discount (${order.discountCode})` : `Bundle (${order.bundleTitle})`}</dt><dd>−{money(order.discountMinor)}</dd></>}
               {!order.discountMinor && order.discountCode && <><dt className="hint">Code</dt><dd>{order.discountCode} (free shipping)</dd></>}
               <dt className="hint">Shipping{order.shippingMethod ? ` (${order.shippingMethod})` : ""}</dt><dd>{order.shippingMinor ? money(order.shippingMinor) : "Free"}</dd>
+              {order.protectionMinor > 0 && <><dt className="hint">Delivery protection</dt><dd>{money(order.protectionMinor)}</dd></>}
               {order.taxExemptId ? (
                 <><dt className="hint">Tax (exempt, {order.taxExemptId})</dt><dd>{money(0)}</dd></>
               ) : (
@@ -373,6 +374,11 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
             </ul>
             <p className="hint">The buyer can open these from their order page too.</p>
           </section>
+        )}
+        {order.protectionMinor > 0 && (
+          <p className="card p-5 text-sm">
+            <span className="pill pill-success">Protected delivery</span> The buyer paid {money(order.protectionMinor)} to protect it. If it&apos;s lost or arrives damaged, send it again for free{replaceable.length > 0 ? " below" : " once it has shipped"}.
+          </p>
         )}
         {replaceable.length > 0 && (
           <div className="card p-5 flex flex-col gap-3 text-sm">

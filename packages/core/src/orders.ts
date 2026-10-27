@@ -10,6 +10,7 @@ import { applyMoneyEvent } from "./payouts";
 import { estimateProcessingFee, platformFeeFor } from "./plans";
 import { BuiltInTaxCalculator, listTaxRegistrations, type TaxCalculator, type TaxResult } from "./tax";
 import { taxExemptionFor } from "./tax-exempt";
+import { protectionFee } from "./delivery-protection";
 import { presentQuote } from "./currency";
 import { creditableCampaign } from "./campaigns";
 import { convertAmount, formatMoney, type DisplayFx } from "./money";
@@ -360,6 +361,8 @@ export async function startCheckout(
      * (a payment link they built), never from a form the buyer fills in.
      */
     taxExemptFor?: string | null;
+    /** The buyer ticked delivery protection, where the store offers it. */
+    protection?: boolean;
   },
   taxCalculator: TaxCalculator = new BuiltInTaxCalculator(),
 ) {
@@ -424,12 +427,16 @@ export async function startCheckout(
     accountId: shop.paymentsAccountId,
     registrations: (await listTaxRegistrations(db, shop.id)).map((r) => r.jurisdiction),
   });
+  // Protection is the buyer's own choice at checkout; repeat deliveries and offers never add it.
+  const protectionMinor =
+    shop.deliveryProtection && input.protection && !followUp && !repeat ? protectionFee(shop.deliveryProtection, cart.goodsMinor - cart.discountMinor) : 0;
   const quote = {
     ...cart,
+    protectionMinor,
     taxMinor: tax.taxMinor,
     taxIncluded: tax.included,
     taxBreakdown: tax.breakdown,
-    totalMinor: cart.subtotalMinor - cart.discountMinor + cart.shippingMinor + (tax.included ? 0 : tax.taxMinor),
+    totalMinor: cart.subtotalMinor - cart.discountMinor + cart.shippingMinor + protectionMinor + (tax.included ? 0 : tax.taxMinor),
   };
   const giftCardMinor = cart.giftCard ? Math.min(cart.giftCard.balanceMinor, quote.totalMinor) : 0;
   const dueMinor = quote.totalMinor - giftCardMinor;
@@ -485,6 +492,7 @@ export async function startCheckout(
         discountCode: quote.discount?.code ?? null,
         bundleTitle: quote.bundle?.title ?? null,
         shippingMinor: quote.shippingMinor,
+        protectionMinor,
         taxMinor: quote.taxMinor,
         taxIncluded: quote.taxIncluded,
         taxBreakdown: quote.taxBreakdown,

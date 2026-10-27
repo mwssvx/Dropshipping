@@ -141,6 +141,8 @@ export const shops = pgTable(
     checkoutPhone: text("checkout_phone", { enum: ["off", "optional", "required"] }).notNull().default("optional"),
     // A second checkout reminder, a day after the first, with a one-time code. Null means off.
     abandonedCartOffer: jsonb("abandoned_cart_offer").$type<AbandonedCartOffer | null>(),
+    // Delivery protection buyers can add at checkout, or null when the store doesn't offer it.
+    deliveryProtection: jsonb("delivery_protection").$type<DeliveryProtection | null>(),
     // Show new reviews straight away instead of waiting for the merchant.
     reviewsAutoPublish: boolean("reviews_auto_publish").notNull().default(false),
     // Buyers are emailed asking for a review this many days after their order arrives; 0 turns it off.
@@ -395,6 +397,8 @@ export type Presentment = {
   subtotalMinor: number;
   discountMinor: number;
   shippingMinor: number;
+  /** Delivery protection; missing on orders from before it existed. */
+  protectionMinor?: number;
   taxMinor: number;
   totalMinor: number;
 };
@@ -465,6 +469,8 @@ export type ProductBackup = {
 
 /** The second checkout reminder: a percentage off, in a code that works once, for that buyer, for 48 hours. */
 export type AbandonedCartOffer = { percentOff: number };
+/** A share of the goods, at least a set amount: what a buyer pays to have a lost or damaged parcel sent again. */
+export type DeliveryProtection = { percent: number; minMinor: number };
 
 export type Address = {
   name: string;
@@ -560,6 +566,8 @@ export const orders = pgTable(
     buyerNote: text("buyer_note"),
     // Placed by a tax-exempt buyer, so no tax was charged: their exemption number, for the records.
     taxExemptId: text("tax_exempt_id"),
+    // What the buyer paid for delivery protection: if it's lost or damaged, it's sent again free.
+    protectionMinor: money("protection_minor").notNull().default(0),
     // When the buyer was asked to review what they got, once per order.
     reviewRequestedAt: timestamp("review_requested_at", { withTimezone: true }),
     // The merchant's own note and labels ("follow up", "vip"). Never shown to the buyer.
@@ -576,7 +584,7 @@ export const orders = pgTable(
     index("orders_shop_created_idx").on(t.shopId, t.createdAt),
     check(
       "orders_total_matches",
-      sql`${t.totalMinor} = ${t.subtotalMinor} - ${t.discountMinor} + ${t.shippingMinor} + case when ${t.taxIncluded} then 0 else ${t.taxMinor} end`,
+      sql`${t.totalMinor} = ${t.subtotalMinor} - ${t.discountMinor} + ${t.shippingMinor} + ${t.protectionMinor} + case when ${t.taxIncluded} then 0 else ${t.taxMinor} end`,
     ),
     check("orders_discount_within_subtotal", sql`${t.discountMinor} >= 0 and ${t.discountMinor} <= ${t.subtotalMinor}`),
     index("orders_discount_idx").on(t.discountId),

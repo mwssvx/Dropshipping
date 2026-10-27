@@ -723,3 +723,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **For resellers and charities**: on a customer's page, under "Tax exemption", the merchant enters their exemption certificate or resale number. Only roles that can change tax settings see it (`setTaxExemption` in `packages/core/src/tax-exempt.ts`).
 2. **Signed in, no tax**: that buyer pays no tax when they check out signed in to their store account. Typing their email as a guest isn't enough. After-checkout offers and repeat deliveries follow the order they came from, and a payment link the merchant builds for them is exempt too. Where prices include tax, they pay the price shown and the order records no tax.
 3. **For the records**: the number is kept on each order, shown on the order page, the buyer's pay page and the invoice, and included in the customer's data download.
+
+### Delivery protection (after launch, part 102)
+
+1. **Offered by the store**: on the Shipping page, under "Delivery protection", a store charges a share of the items (0.5% to 10%, after discounts) with a lowest price (`setDeliveryProtection` in `packages/core/src/delivery-protection.ts`).
+2. **Chosen by the buyer**: checkout shows "Protect my delivery for $X" with what it covers. It's never ticked for them, and the summary total follows the box. It's priced in the buyer's currency when they shop in another one. After-checkout offers and repeat deliveries don't add it.
+3. **Kept with the order**: `orders.protection_minor` is part of the total (and its check). It's shown on the pay page, the buyer's order page (with how to report a lost or damaged parcel), the confirmation email, the admin order page (next to Send a replacement), the invoice, the orders spreadsheet, the API and the app. Store export and import keep the setting.
