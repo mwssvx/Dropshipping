@@ -930,3 +930,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Every review, in pages (after launch, part 146)
 
 1. **Reviews for a busy store**: the Reviews page used to show the newest 200 of each kind and nothing older, which a store that brought its reviews over could pass on day one. It now shows 50 a page with Newer and Older links, the number in each tab (Waiting, Published, Hidden), a star filter (for finding the 1- and 2-star reviews to answer), and a search over the reviewer's name, what they wrote and the product (`reviewPage` and `reviewCounts` in `packages/core/src/reviews.ts`).
+
+### Finding a gift card (after launch, part 147)
+
+1. **Look a card up**: when a buyer says their gift card isn't working, the merchant types the code they read out (spaces, dashes and case don't matter), its last 4 characters, the email it went to, or the order it was bought on into the new search on the Gift cards page. Filters show only active, used up or turned off cards, and the list shows 50 a page instead of stopping at the newest 200 (`listGiftCards` in `packages/core/src/gift-cards.ts`). The full code is still never stored: a typed code is matched by its hash.

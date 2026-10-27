@@ -3,7 +3,7 @@
 // of a refund. Buyers enter the code in the cart's code box. Only a hash of each code is stored:
 // the code is emailed once, and a lost code is replaced by sending a new one.
 import { createHash, randomInt } from "node:crypto";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
 import type { Mailer } from "./email";
@@ -163,19 +163,53 @@ export async function setGiftCardDisabled(db: Db, shopId: string, cardId: string
   if (!row) throw new NotFoundError("Gift card");
 }
 
-export async function listGiftCards(db: Db, shopId: string) {
-  const cards = await db
-    .select({ card: schema.giftCards, orderNumber: schema.orders.number })
-    .from(schema.giftCards)
-    .leftJoin(schema.orders, eq(schema.orders.id, schema.giftCards.sourceOrderId))
-    .where(eq(schema.giftCards.shopId, shopId))
-    .orderBy(desc(schema.giftCards.createdAt))
-    .limit(200);
-  const [{ outstanding }] = (await db
-    .select({ outstanding: sql<number>`coalesce(sum(${schema.giftCards.balanceMinor}), 0)::bigint` })
-    .from(schema.giftCards)
-    .where(and(eq(schema.giftCards.shopId, shopId), sql`${schema.giftCards.disabledAt} is null`))) as [{ outstanding: number }];
-  return { cards: cards.map((c) => ({ ...c.card, orderNumber: c.orderNumber })), outstandingMinor: Number(outstanding) };
+export const GIFT_CARD_PAGE_SIZE = 50;
+export type GiftCardStatus = "active" | "used" | "off";
+
+/**
+ * The admin list of gift cards, newest first, 50 a page. The search finds a card by its full code
+ * (when a buyer reads it out), its last 4 characters, the email it went to, or the order it was
+ * bought on. Also returns what's still unspent on every active card.
+ */
+export async function listGiftCards(db: Db, shopId: string, opts: { query?: string; status?: GiftCardStatus; page?: number; size?: number } = {}) {
+  const g = schema.giftCards;
+  const size = opts.size ?? GIFT_CARD_PAGE_SIZE;
+  const page = Math.max(1, Math.floor(opts.page ?? 1));
+  const q = opts.query?.trim().slice(0, 100) ?? "";
+  const code = normalizeGiftCardCode(q);
+  const last4 = q.toUpperCase().replace(/[\s-]/g, "");
+  const orderNumber = /^#?\d{1,9}$/.test(q) ? Number(q.replace("#", "")) : null;
+  const where = and(
+    eq(g.shopId, shopId),
+    opts.status === "active" ? and(isNull(g.disabledAt), gt(g.balanceMinor, 0)) : undefined,
+    opts.status === "used" ? and(isNull(g.disabledAt), eq(g.balanceMinor, 0)) : undefined,
+    opts.status === "off" ? isNotNull(g.disabledAt) : undefined,
+    q
+      ? or(
+          code ? eq(g.codeHash, hash(code)) : undefined,
+          last4.length === 4 ? eq(g.last4, last4) : undefined,
+          sql`lower(${g.email}) like ${`%${q.toLowerCase().replace(/[\\%_]/g, "\\$&")}%`}`,
+          orderNumber !== null ? sql`${g.sourceOrderId} in (select id from orders where shop_id = ${shopId} and number = ${orderNumber})` : undefined,
+        )
+      : undefined,
+  );
+  const [cards, [total], [unspent]] = await Promise.all([
+    db
+      .select({ card: g, orderNumber: schema.orders.number })
+      .from(g)
+      .leftJoin(schema.orders, eq(schema.orders.id, g.sourceOrderId))
+      .where(where)
+      // Cards from one order share a time; the later line comes first, as it would by time.
+      .orderBy(desc(g.createdAt), sql`${g.sourceIndex} desc nulls last`, desc(g.id))
+      .limit(size)
+      .offset((page - 1) * size),
+    db.select({ n: sql<number>`count(*)::int` }).from(g).where(where),
+    db
+      .select({ outstanding: sql<number>`coalesce(sum(${g.balanceMinor}), 0)::bigint` })
+      .from(g)
+      .where(and(eq(g.shopId, shopId), isNull(g.disabledAt))),
+  ]);
+  return { cards: cards.map((c) => ({ ...c.card, orderNumber: c.orderNumber })), total: total!.n, outstandingMinor: Number(unspent?.outstanding ?? 0) };
 }
 
 /** The store's gift card product, if it sells them. */

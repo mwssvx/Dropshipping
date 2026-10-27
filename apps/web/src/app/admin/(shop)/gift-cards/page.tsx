@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatMoney, giftCardProduct, listGiftCards } from "@sf/core";
+import { formatMoney, GIFT_CARD_PAGE_SIZE, giftCardProduct, listGiftCards, type GiftCardStatus } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { CardActions, IssueForm, SellForm } from "./GiftCardForms";
@@ -8,9 +8,30 @@ export const metadata = { title: "Gift cards" };
 
 const date = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" });
 
-export default async function GiftCardsPage() {
+const FILTERS: { key?: GiftCardStatus; label: string }[] = [
+  { label: "All" },
+  { key: "active", label: "Active" },
+  { key: "used", label: "Used up" },
+  { key: "off", label: "Turned off" },
+];
+
+export default async function GiftCardsPage({ searchParams }: { searchParams: Promise<{ q?: string; show?: string; page?: string }> }) {
   const { shop, db } = await requireShop("gift_cards");
-  const [{ cards, outstandingMinor }, product] = await Promise.all([listGiftCards(db, shop.id), giftCardProduct(db, shop.id)]);
+  const params = await searchParams;
+  const q = params.q?.trim().slice(0, 100) || undefined;
+  const status = FILTERS.find((f) => f.key && f.key === params.show)?.key;
+  const page = /^\d{1,5}$/.test(params.page ?? "") ? Math.max(1, Number(params.page)) : 1;
+  const [{ cards, total, outstandingMinor }, product] = await Promise.all([listGiftCards(db, shop.id, { query: q, status, page }), giftCardProduct(db, shop.id)]);
+  const pages = Math.max(1, Math.ceil(total / GIFT_CARD_PAGE_SIZE));
+  const href = (change: { show?: GiftCardStatus | null; page?: number }) => {
+    const next = new URLSearchParams();
+    const show = change.show === undefined ? status : change.show;
+    if (show) next.set("show", show);
+    if (q) next.set("q", q);
+    if (change.page && change.page > 1) next.set("page", String(change.page));
+    const qs = next.toString();
+    return `/admin/gift-cards${qs ? `?${qs}` : ""}#gc-list`;
+  };
   const money = (m: number) => formatMoney(m, shop.currency);
   const symbol = money(0).replace(/[\d.,\s]/g, "");
   return (
@@ -47,8 +68,27 @@ export default async function GiftCardsPage() {
             <h2 id="gc-list" className="font-semibold">Gift cards</h2>
             <span className="text-sm hint num">Unspent on active cards: {money(outstandingMinor)}</span>
           </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <form action="/admin/gift-cards#gc-list" className="flex gap-2 flex-1 min-w-60" role="search">
+              {status && <input type="hidden" name="show" value={status} />}
+              <label htmlFor="gc-q" className="sr-only">Find a gift card</label>
+              <input id="gc-q" name="q" type="search" defaultValue={q} placeholder="Code, last 4, email or order #" className="input flex-1" />
+              <button className="btn btn-secondary">Find</button>
+            </form>
+            <nav className="flex flex-wrap gap-1 text-sm" aria-label="Gift card filter">
+              {FILTERS.map((f) => (
+                <Link key={f.label} href={href({ show: f.key ?? null, page: 1 })} aria-current={f.key === status ? "page" : undefined}
+                  className={`px-2 py-1 rounded-md ${f.key === status ? "bg-sunken font-semibold" : "hint"}`}>{f.label}</Link>
+              ))}
+            </nav>
+          </div>
+          {q && (
+            <p className="hint text-sm">
+              {total} {total === 1 ? "card matches" : "cards match"} &ldquo;{q}&rdquo;. <Link href={`/admin/gift-cards${status ? `?show=${status}` : ""}#gc-list`} className="underline">Clear</Link>
+            </p>
+          )}
           {cards.length === 0 ? (
-            <p className="hint">None yet.</p>
+            <p className="hint">{q ? "No gift card matches. A full code, the last 4 characters, the email it went to or the order number all work." : status ? "None here." : "None yet."}</p>
           ) : (
             <ul className="card divide-y divide-border">
               {cards.map((c) => {
@@ -70,6 +110,13 @@ export default async function GiftCardsPage() {
                 );
               })}
             </ul>
+          )}
+          {pages > 1 && (
+            <nav aria-label="Pages" className="flex items-center gap-3 text-sm">
+              {page > 1 && <Link href={href({ page: page - 1 })} className="btn btn-secondary">← Newer</Link>}
+              <span className="hint num">Page {Math.min(page, pages)} of {pages}</span>
+              {page < pages && <Link href={href({ page: page + 1 })} className="btn btn-secondary ml-auto">Older →</Link>}
+            </nav>
           )}
         </section>
       </div>
