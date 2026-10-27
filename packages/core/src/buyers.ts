@@ -148,11 +148,13 @@ export async function reorderLines(db: Db, shopId: string, buyerEmail: string, o
   return { lines, missing: items.length - lines.length };
 }
 
-/** Customers for the merchant: who bought, how often, how much and when last. */
-export async function listCustomers(db: Db, shopId: string, opts: { query?: string; tag?: string; limit?: number } = {}) {
+const PAID_SQL = sql`('paid', 'partially_refunded', 'refunded')`;
+
+/** One row per customer the merchant should see, with what they've bought. */
+function customerRows(db: Db, shopId: string, opts: { query?: string; tag?: string }) {
   const q = opts.query?.trim().toLowerCase();
   const tag = opts.tag?.trim().toLowerCase();
-  const rows = await db
+  return db
     .select({
       id: schema.customers.id,
       email: schema.customers.email,
@@ -161,9 +163,9 @@ export async function listCustomers(db: Db, shopId: string, opts: { query?: stri
       lastSignInAt: schema.customers.lastSignInAt,
       acceptsMarketing: schema.customers.acceptsMarketing,
       tags: schema.customers.tags,
-      orders: sql<number>`count(${schema.orders.id}) filter (where ${schema.orders.paymentStatus} in ('paid', 'partially_refunded', 'refunded'))`.mapWith(Number),
-      spentMinor: sql<number>`coalesce(sum(${schema.orders.totalMinor} - ${schema.orders.refundedMinor}) filter (where ${schema.orders.paymentStatus} in ('paid', 'partially_refunded', 'refunded')), 0)`.mapWith(Number),
-      lastOrderAt: sql<Date | null>`max(${schema.orders.paidAt})`.mapWith((v) => (v ? new Date(v) : null)),
+      orders: sql<number>`count(${schema.orders.id}) filter (where ${schema.orders.paymentStatus} in ${PAID_SQL})`.mapWith(Number).as("orders"),
+      spentMinor: sql<number>`coalesce(sum(${schema.orders.totalMinor} - ${schema.orders.refundedMinor}) filter (where ${schema.orders.paymentStatus} in ${PAID_SQL}), 0)`.mapWith(Number).as("spent_minor"),
+      lastOrderAt: sql<Date | null>`max(${schema.orders.paidAt})`.mapWith((v) => (v ? new Date(v) : null)).as("last_order_at"),
     })
     .from(schema.customers)
     .leftJoin(schema.orders, and(eq(schema.orders.shopId, schema.customers.shopId), eq(schema.orders.email, schema.customers.email)))
@@ -176,10 +178,31 @@ export async function listCustomers(db: Db, shopId: string, opts: { query?: stri
     )
     .groupBy(schema.customers.id)
     // Leaves out addresses that only asked for the newsletter and never confirmed or bought.
-    .having(sql`count(${schema.orders.id}) > 0 or bool_or(${schema.customers.acceptsMarketing}) or max(${schema.customers.lastSignInAt}) is not null or max(${schema.customers.name}) is not null or bool_or(${schema.customers.wholesaleStatus} = 'approved') or max(jsonb_array_length(${schema.customers.tags})) > 0`)
-    .orderBy(sql`max(${schema.orders.paidAt}) desc nulls last`, desc(schema.customers.createdAt))
-    .limit(opts.limit ?? 500);
-  return rows;
+    .having(sql`count(${schema.orders.id}) > 0 or bool_or(${schema.customers.acceptsMarketing}) or max(${schema.customers.lastSignInAt}) is not null or max(${schema.customers.name}) is not null or bool_or(${schema.customers.wholesaleStatus} = 'approved') or max(jsonb_array_length(${schema.customers.tags})) > 0`);
+}
+
+/** Customers on one page of the customer list. */
+export const CUSTOMER_PAGE_SIZE = 100;
+
+/** Customers for the merchant: who bought, how often, how much and when last. Latest buyers first. */
+export async function listCustomers(db: Db, shopId: string, opts: { query?: string; tag?: string; limit?: number; offset?: number } = {}) {
+  return customerRows(db, shopId, opts)
+    .orderBy(sql`max(${schema.orders.paidAt}) desc nulls last`, desc(schema.customers.createdAt), schema.customers.id)
+    .limit(opts.limit ?? 500)
+    .offset(opts.offset ?? 0);
+}
+
+/** How many customers match, how many bought more than once and how many signed in, over all of them, not one page. */
+export async function customerTotals(db: Db, shopId: string, opts: { query?: string; tag?: string } = {}) {
+  const rows = customerRows(db, shopId, opts).as("c");
+  const [row] = await db
+    .select({
+      customers: sql<number>`count(*)::int`,
+      repeat: sql<number>`count(*) filter (where ${rows.orders} > 1)::int`,
+      accounts: sql<number>`count(*) filter (where ${rows.lastSignInAt} is not null)::int`,
+    })
+    .from(rows);
+  return row!;
 }
 
 /** Old codes and expired buyer sessions are dropped by the scheduled job. */

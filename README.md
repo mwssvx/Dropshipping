@@ -910,3 +910,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Fast home page for busy stores (after launch, part 141)
 
 1. **Counts, not lists**: the admin home page used to load every order and product the store ever had to work out today's sales, what's waiting to send and the setup steps. It now asks the database for the counts (`homeCounts` in `packages/core/src/home.ts`), so it opens as fast with 50,000 orders as with 5. The phone app's All orders list loads only the latest 200 the same way.
+
+### Every customer, in pages (after launch, part 142)
+
+1. **No more cut-off at 500**: the customer list used to show the latest 500 customers and count only those in its "N customers · N bought more than once" line, so a bigger store saw the wrong numbers and couldn't reach older customers except by searching. It now shows 100 at a time with Previous and Next, and the counts cover everyone who matches (`customerTotals` and `listCustomers(…, { offset })` in `packages/core/src/buyers.ts`).
