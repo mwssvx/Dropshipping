@@ -27,7 +27,7 @@ import { FREE_GIFT_NOTE, freeGiftFor } from "./free-gift";
 import { minimumOrder } from "./min-order";
 import { countryName, fitsWeight, listShippingZones, priceRate, zoneFor } from "./shipping";
 import { formatWeight } from "./weight";
-import { normalizeTags } from "./customers";
+import { MAX_TAGS, normalizeTags } from "./customers";
 import { cartLineKey, cleanPersonalization, missingPersonalization, personalizationValues } from "./personalization";
 import { openPreorder, preorderDeadline, preordersSold } from "./preorders";
 import { boughtBefore, describeLimitProblem, limitProblem } from "./purchase-limits";
@@ -793,6 +793,36 @@ export async function updateOrderNotes(db: Db, shopId: string, orderId: string, 
   const tags = parsed.data.tags === undefined ? order.tags : normalizeTags(parsed.data.tags, "An order");
   const [row] = await db.update(schema.orders).set({ staffNote, tags, updatedAt: new Date() }).where(eq(schema.orders.id, order.id)).returning();
   return row!;
+}
+
+/** The most orders one bulk change takes. */
+export const MAX_BULK_ORDERS = 250;
+
+/**
+ * Adds a tag to, or takes it off, the orders picked on the order list. Returns how many changed;
+ * orders that already had it (or didn't), orders with no room for another tag and ids from another
+ * store are skipped.
+ */
+export async function tagOrders(db: Db, shopId: string, orderIds: string[], change: { add: string } | { remove: string }) {
+  const [tag] = normalizeTags("add" in change ? change.add : change.remove, "An order");
+  if (!tag) throw new UserError("Enter a tag.");
+  const ids = [...new Set(orderIds)].filter((id) => z.string().uuid().safeParse(id).success);
+  if (!ids.length) throw new UserError("Pick at least one order.");
+  if (ids.length > MAX_BULK_ORDERS) throw new UserError(`Pick up to ${MAX_BULK_ORDERS} orders at a time.`);
+  const orders = await db.query.orders.findMany({ where: and(eq(schema.orders.shopId, shopId), inArray(schema.orders.id, ids)), columns: { id: true, tags: true } });
+  let changed = 0;
+  let full = 0;
+  for (const o of orders) {
+    if ("add" in change && !o.tags.includes(tag) && o.tags.length >= MAX_TAGS) {
+      full++;
+      continue;
+    }
+    const tags = "add" in change ? (o.tags.includes(tag) ? null : [...o.tags, tag]) : o.tags.includes(tag) ? o.tags.filter((t) => t !== tag) : null;
+    if (!tags) continue;
+    await db.update(schema.orders).set({ tags, updatedAt: new Date() }).where(eq(schema.orders.id, o.id));
+    changed++;
+  }
+  return { tag, changed, full };
 }
 
 /** Every tag on the store's orders, most used first, to filter the order list. */

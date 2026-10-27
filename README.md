@@ -898,3 +898,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Smallest order (after launch, part 138)
 
 1. **No more $4 orders**: under Shipping, a store can set the least a buyer can spend ("Orders start at $15.00"). A smaller cart says "Orders start at $15.00: add $5.00 more to check out." and offers Keep shopping instead of Check out, and checkout itself won't start below it. It counts what the buyer pays for goods after discounts. Gift cards on their own, wholesale orders (they have their own minimum) and payment links the merchant sends aren't held to it (`packages/core/src/min-order.ts`, migration `0113_min_order`).
+
+### Work on many orders at once (after launch, part 139)
+
+1. **Tick, then act**: the order list has a box on each row and one to pick everything shown. With orders picked, the bar above the list adds a tag to all of them, takes one off, or opens just their packing slips to print together. Orders that already have the tag, or already have ten, are left alone and the banner says so. The filters stay as they were after a change (`tagOrders` in `packages/core/src/orders.ts`, `packingSlips(…, { orderIds })`).

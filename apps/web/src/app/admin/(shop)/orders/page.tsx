@@ -6,13 +6,15 @@ import { PageHeader } from "../PageHeader";
 import { BuyerCancelForm } from "./BuyerCancelForm";
 import { RiskHoldForm } from "./RiskHoldForm";
 import { TrackingImportForm } from "./TrackingImportForm";
+import { SelectAll } from "./SelectAll";
+import { bulkOrdersAction } from "../../bulk-order-actions";
 
 export const metadata = { title: "Orders" };
 
 const dateFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
-export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ show?: string; q?: string; tag?: string }> }) {
-  const { show, q, tag } = await searchParams;
+export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ show?: string; q?: string; tag?: string; bulk?: string }> }) {
+  const { show, q, tag, bulk } = await searchParams;
   const problemsOnly = show === "problems";
   const heldOnly = show === "held";
   const { shop, db, role } = await requireShop("orders");
@@ -96,6 +98,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             <RiskHoldForm value={shop.holdRiskyOrders} options={Object.entries(RISK_HOLD_LABELS)} />
           </section>
         )}
+        {bulk && <BulkResult value={bulk} />}
         {filtered && orders.length === 0 ? (
           <div className="card p-10 text-center hint">{q ? `No orders match "${q}".` : `No orders are tagged "${tag}".`}</div>
         ) : heldOnly && orders.length === 0 ? (
@@ -109,12 +112,28 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             <a href={`/s/${shop.handle}`} target="_blank" className="btn btn-secondary">Visit your store ↗</a>
           </div>
         ) : (
+          <>
+          <form id="bulk" action={bulkOrdersAction} className="flex flex-wrap items-end gap-2 text-sm" aria-label="Picked orders">
+            {show && <input type="hidden" name="keep-show" value={show} />}
+            {q && <input type="hidden" name="keep-q" value={q} />}
+            {tag && <input type="hidden" name="keep-tag" value={tag} />}
+            <div className="field">
+              <label className="label" htmlFor="bulk-tag">Tag for the picked orders</label>
+              <input className="input" id="bulk-tag" name="bulkTag" list="bulk-tags" placeholder="e.g. rush" />
+              <datalist id="bulk-tags">{tags.map((t) => <option key={t.tag} value={t.tag} />)}</datalist>
+            </div>
+            <button className="btn btn-secondary" name="op" value="add">Add tag</button>
+            <button className="btn btn-secondary" name="op" value="remove">Remove tag</button>
+            <button className="btn btn-secondary" name="op" value="slips">Packing slips</button>
+            <p className="hint w-full">Tick orders below, then tag them or print their packing slips together.</p>
+          </form>
           <div className="card overflow-x-auto">
             <table className="table min-w-[680px]">
-              <thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Payment</th><th>Delivery</th><th className="text-right">Total</th></tr></thead>
+              <thead><tr><th className="w-8"><SelectAll form="bulk" /></th><th>Order</th><th>Date</th><th>Customer</th><th>Payment</th><th>Delivery</th><th className="text-right">Total</th></tr></thead>
               <tbody>
                 {orders.map((o) => (
                   <tr key={o.id} className="hover:bg-sunken">
+                    <td><input type="checkbox" name="ids" value={o.id} form="bulk" aria-label={`Pick order #${o.number}`} /></td>
                     <td><Link href={`/admin/orders/${o.id}`} className="font-semibold num">#{o.number}</Link></td>
                     <td className="hint num">{dateFmt.format(o.createdAt)}</td>
                     <td className="max-w-[240px]">
@@ -134,8 +153,25 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
     </main>
   );
+}
+
+/** What the bulk bar just did, from the redirect back. */
+function BulkResult({ value }: { value: string }) {
+  if (value === "none") return <p role="status" className="banner banner-warning">Pick at least one order.</p>;
+  const [kind, ...rest] = value.split(":");
+  if (kind === "error") return <p role="status" className="banner banner-warning">{rest.join(":")}</p>;
+  const [count, fullCount, ...tagParts] = rest;
+  const n = Number(count);
+  const full = Number(fullCount);
+  const tag = tagParts.join(":");
+  const orders = n === 1 ? "1 order" : `${n} orders`;
+  const noRoom = full ? ` ${full === 1 ? "1 order already has" : `${full} orders already have`} 10 tags, so ${full === 1 ? "it was" : "they were"} left as ${full === 1 ? "it was" : "they were"}.` : "";
+  if (kind === "tagged") return <p role="status" className={`banner ${n ? "banner-success" : "banner-warning"}`}>{n ? `Tagged ${orders} “${tag}”.` : full ? "" : `Those orders were already tagged “${tag}”.`}{noRoom}</p>;
+  if (kind === "untagged") return <p role="status" className="banner banner-success">{n ? `Took “${tag}” off ${orders}.` : `None of those orders were tagged “${tag}”.`}</p>;
+  return null;
 }
