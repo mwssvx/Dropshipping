@@ -462,6 +462,23 @@ function assistant(s: State, req: ModelRequest): BetaContentBlock[] {
   }
 }
 
+/* ───────────── Review summarizer ───────────── */
+
+function summarizer(s: State): BetaContentBlock[] {
+  const r = s.has("read_reviews");
+  if (!r) return [toolCall("read_reviews", {})];
+  if (r.isError) return [text("I couldn't read the reviews.")];
+  if (!s.has("save_review_summary")) {
+    const lines = strip(r.result.reviews).split("\n").filter(Boolean);
+    const happy = lines.filter((l) => /^[45]\//.test(l)).length;
+    const unhappy = lines.filter((l) => /^[12]\//.test(l)).length;
+    const tone = happy >= lines.length * 0.7 ? "Most buyers are happy with it" : unhappy >= lines.length * 0.5 ? "Many buyers are disappointed with it" : "Buyers' opinions are mixed";
+    const summary = `${tone}, rating it ${r.result.average_stars} out of 5 on average across ${r.result.count} reviews.${unhappy ? ` ${unhappy === 1 ? "One buyer" : `${unhappy} buyers`} had a bad experience.` : ""}`;
+    return [toolCall("save_review_summary", { summary })];
+  }
+  return [text("I wrote a short summary of the reviews. You can edit or remove it on the product page.")];
+}
+
 /* ───────────── Shopping assistant ───────────── */
 
 const STOP_WORDS = new Set("a an and any are as at be can could do does for from have i in is it me my of on or please show something that the there this to want what which with you your yours looking need find buy get got tell about sell store shop".split(" "));
@@ -515,4 +532,5 @@ const BRAINS: Record<ModelRequest["agent"], (s: State, req: ModelRequest) => Bet
   margin,
   assistant,
   shopper,
+  summarizer,
 };

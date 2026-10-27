@@ -308,6 +308,10 @@ export const products = pgTable(
     videoUrl: text("video_url"),
     // Facts shown as a table on the product page, like Material: Aluminium or Size: 20 × 10 cm.
     details: jsonb("details").$type<ProductDetail[]>().notNull().default([]),
+    // "What buyers say": a short summary of the published reviews, by AI or the merchant, and how
+    // many reviews it was written from.
+    reviewSummary: text("review_summary"),
+    reviewSummaryCount: integer("review_summary_count"),
     // A short label of the merchant's own on product cards, like "Bestseller".
     badge: text("badge"),
     // How the product shows in search results; the title and description are used when empty.
@@ -935,7 +939,7 @@ export const appeals = pgTable(
 
 // AI agents. Every run is recorded with its token use and cost, and every tool call it makes is an
 // agent action: reads run straight away, changes may wait for the merchant's approval.
-export const AGENTS = ["listing", "assistant", "buyer_support", "fulfilment", "margin", "writer", "translator", "answerer", "sizer", "shopper"] as const;
+export const AGENTS = ["listing", "assistant", "buyer_support", "fulfilment", "margin", "writer", "translator", "answerer", "sizer", "shopper", "summarizer"] as const;
 export type AgentName = (typeof AGENTS)[number];
 
 export const agentRuns = pgTable(

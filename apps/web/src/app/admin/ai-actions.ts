@@ -7,6 +7,8 @@ import {
   merchantReply,
   runMarginWatch,
   setAiSettings,
+  setReviewSummary,
+  summarizeReviewsWithAi,
   UserError,
   writeListing,
 } from "@sf/core";
@@ -56,6 +58,32 @@ export async function writeListingAction(productId: string, _: AgentState): Prom
   } catch (e) {
     return fail(e);
   }
+}
+
+export async function summarizeReviewsAction(productId: string, _: AgentState): Promise<AgentState> {
+  const { shop } = await requireShop("products");
+  try {
+    const run = await summarizeReviewsWithAi(await agents(), shop, productId);
+    revalidatePath(`/admin/products/${productId}`);
+    if (run.status === "over_budget") return { error: "This month's AI budget is used up. You can raise it in AI settings." };
+    if (run.status === "failed") return { error: run.error ?? "The summary couldn't be written. Try again." };
+    return { saved: true, message: run.text };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function saveReviewSummaryAction(productId: string, _: AgentState, form: FormData): Promise<AgentState> {
+  const { shop, db } = await requireShop("products");
+  const text = String(form.get("summary") ?? "");
+  try {
+    const current = await db.query.products.findFirst({ where: (p, { and, eq }) => and(eq(p.id, productId), eq(p.shopId, shop.id)), columns: { reviewSummaryCount: true } });
+    await setReviewSummary(db, shop.id, productId, text, current?.reviewSummaryCount ?? null);
+  } catch (e) {
+    return fail(e);
+  }
+  revalidatePath(`/admin/products/${productId}`);
+  return { saved: true, message: text.trim() ? "Saved. It shows above the reviews on the product page." : "Removed from the product page." };
 }
 
 export async function fixOrderAction(orderId: string, _: AgentState): Promise<AgentState> {

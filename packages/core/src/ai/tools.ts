@@ -1051,11 +1051,74 @@ const shopperTools = [
           delivery_days: v.shipDaysMin != null && v.shipDaysMax != null ? `${v.shipDaysMin}-${v.shipDaysMax}` : null,
         })),
         size_chart: chart ? { unit: chart.unit, columns: chart.columns, rows: chart.rows, note: chart.note } : null,
+        what_buyers_say: p.reviewSummary ? untrusted("review summary", p.reviewSummary) : null,
         answered_questions: answered.map((q) => ({ question: untrusted("shopper", q.body), answer: q.answer })),
       };
     },
   }),
   storePolicies,
+];
+
+/* ───────────── Review summarizer: "What buyers say" on the product page ───────────── */
+
+/** A product needs this many published reviews before a summary says anything useful. */
+export const REVIEW_SUMMARY_MIN = 3;
+export const REVIEW_SUMMARY_MAX_LENGTH = 400;
+
+/** Saves the summary shown above a product's reviews; empty removes it. Merchants edit it here too. */
+export async function setReviewSummary(db: RunScope["ctx"]["db"], shopId: string, productId: string, text: string, count: number | null = null) {
+  const summary = text.trim();
+  if (summary.length > REVIEW_SUMMARY_MAX_LENGTH) throw new UserError(`Keep the summary under ${REVIEW_SUMMARY_MAX_LENGTH} characters.`);
+  if (/https?:|www\.|<[a-z]/i.test(summary)) throw new UserError("The summary can't contain links or HTML.");
+  const [row] = await db
+    .update(schema.products)
+    .set({ reviewSummary: summary || null, reviewSummaryCount: summary ? count : null, updatedAt: new Date() })
+    .where(and(eq(schema.products.id, productId), eq(schema.products.shopId, shopId)))
+    .returning({ id: schema.products.id });
+  if (!row) throw new UserError("That product isn't in this store.");
+}
+
+const summarizerTools = [
+  tool({
+    name: "read_reviews",
+    kind: "read",
+    description: "The product's title and its published reviews (up to 60, newest first) with their star ratings, and the average.",
+    input: z.object({}),
+    summary: () => "Read the product's reviews",
+    async run(_, run) {
+      const { db } = run.ctx;
+      const product = await db.query.products.findFirst({ where: and(eq(schema.products.id, run.productId!), eq(schema.products.shopId, run.shop.id)) });
+      if (!product) throw new UserError("That product isn't in this store.");
+      const reviews = await db.query.reviews.findMany({
+        where: and(eq(schema.reviews.productId, product.id), eq(schema.reviews.status, "published")),
+        orderBy: desc(schema.reviews.createdAt),
+        limit: 60,
+      });
+      const average = reviews.length ? Math.round((reviews.reduce((s, r) => s + r.rating, 0) / reviews.length) * 10) / 10 : null;
+      return {
+        product: product.title,
+        count: reviews.length,
+        average_stars: average,
+        reviews: untrusted("buyers", reviews.map((r) => `${r.rating}/5: ${r.body.slice(0, 600).replace(/\s+/g, " ")}`).join("\n")),
+      };
+    },
+  }),
+  tool({
+    name: "save_review_summary",
+    kind: "change",
+    description: "Save the summary shown as \"What buyers say\" above the product's reviews. Plain text, no links. The merchant can edit or remove it.",
+    input: z.object({ summary: z.string().min(20).max(REVIEW_SUMMARY_MAX_LENGTH).describe("Two or three sentences in plain text.") }),
+    policy: () => AUTO,
+    summary: () => "Summarized the product's reviews",
+    async run(i, run) {
+      const [{ n }] = (await run.ctx.db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(schema.reviews)
+        .where(and(eq(schema.reviews.productId, run.productId!), eq(schema.reviews.status, "published")))) as [{ n: number }];
+      await setReviewSummary(run.ctx.db, run.shop.id, run.productId!, i.summary, Number(n));
+      return { saved: true };
+    },
+  }),
 ];
 
 export const AGENT_TOOLS: Record<AgentName, AgentTool[]> = {
@@ -1069,6 +1132,7 @@ export const AGENT_TOOLS: Record<AgentName, AgentTool[]> = {
   answerer: answererTools,
   sizer: sizerTools,
   shopper: shopperTools,
+  summarizer: summarizerTools,
 };
 
 export function findTool(agent: AgentName, name: string) {

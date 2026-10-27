@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts, detailsText, MAX_DETAILS, stockHistory, incomingStock, countryName, type StockMovement } from "@sf/core";
+import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts, detailsText, MAX_DETAILS, stockHistory, incomingStock, countryName, type StockMovement, productReviews, REVIEW_SUMMARY_MIN, REVIEW_SUMMARY_MAX_LENGTH } from "@sf/core";
 import { requireShop, storeAddress, suppliers } from "@/lib/server";
 import { duplicateProductAction, updateProductAction } from "../../../actions";
 import { setUpsellAction } from "../../../growth-actions";
@@ -23,6 +23,7 @@ import { VariantPhotosPanel } from "./VariantPhotosPanel";
 import { BackupPanel, type BackupView } from "./BackupPanel";
 import { StockPanel } from "./StockPanel";
 import { WriteListingButton } from "./WriteListingButton";
+import { ReviewSummaryForm } from "./ReviewSummaryForm";
 
 const dateIn = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
 const toPrice = (m: number | null | undefined) => (m == null ? "" : (m / 100).toFixed(2));
@@ -41,6 +42,7 @@ export default async function EditProductPage({ params, searchParams }: { params
   const label = link ? supplierLabel(suppliers(), link) : undefined;
   const product = { ...found, supplier: label ? { label } : null };
   const own = await listOwnSuppliers(db, shop.id);
+  const published = (await productReviews(db, found.id, 1)).count;
   const backupLink = found.backup ? await getSupplierLink(db, shop.id, found.backup.supplierId) : undefined;
   const backup: BackupView | null = found.backup
     ? {
@@ -188,6 +190,15 @@ export default async function EditProductPage({ params, searchParams }: { params
               <p className="hint">Short facts buyers look for, like material, size, weight or what&apos;s in the box. They show as a table under the description, and search engines read them too.</p>
             </div>
             <DetailsForm productId={product.id} text={detailsText(product.details)} max={MAX_DETAILS} />
+          </section>
+        )}
+        {!product.giftCard && (published > 0 || product.reviewSummary) && (
+          <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="review-summary-heading">
+            <div>
+              <h2 id="review-summary-heading" className="font-semibold">What buyers say</h2>
+              <p className="hint">A short summary of this product&apos;s reviews, shown above them on the product page. AI writes it from the published reviews; you can change or remove it.</p>
+            </div>
+            <ReviewSummaryForm productId={product.id} summary={product.reviewSummary ?? ""} from={product.reviewSummaryCount} published={published} min={REVIEW_SUMMARY_MIN} max={REVIEW_SUMMARY_MAX_LENGTH} />
           </section>
         )}
         <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="badge-heading">
