@@ -906,3 +906,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Pages for the order list (after launch, part 140)
 
 1. **Busy stores**: the order list shows 50 orders at a time, newest first, with Older orders and Newest orders links. Pages go by order number rather than by position, so new orders coming in don't shift the page under the merchant and going far back stays fast. The Needs attention and On hold counts are counted in the database instead of loading those orders (`orderPage` and `countOrders` in `packages/core/src/orders.ts`). The spreadsheet download still covers every order that matches.
+
+### Fast home page for busy stores (after launch, part 141)
+
+1. **Counts, not lists**: the admin home page used to load every order and product the store ever had to work out today's sales, what's waiting to send and the setup steps. It now asks the database for the counts (`homeCounts` in `packages/core/src/home.ts`), so it opens as fast with 50,000 orders as with 5. The phone app's All orders list loads only the latest 200 the same way.
