@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { can, formatMoney, listOrders, listProducts, listRequirements, soldOutAtSupplier, twoStepStatus } from "@sf/core";
+import { can, formatMoney, homeCounts, listRequirements, soldOutAtSupplier, twoStepStatus } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "./PageHeader";
 
@@ -8,29 +8,23 @@ export const metadata = { title: "Home" };
 export default async function AdminHome({ searchParams }: { searchParams: Promise<{ denied?: string }> }) {
   const { shop, db, role, user } = await requireShop("home");
   const { denied } = await searchParams;
-  const [orders, products, requirements, twoStep, soldOut] = await Promise.all([
-    listOrders(db, shop.id),
-    listProducts(db, shop.id),
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const [counts, requirements, twoStep, soldOut] = await Promise.all([
+    homeCounts(db, shop.id, startOfDay),
     listRequirements(db, shop.id),
     twoStepStatus(db, user.id),
     can(role, "products") ? soldOutAtSupplier(db, shop.id) : [],
   ]);
   const seesMoney = can(role, "money");
   const holds = seesMoney ? requirements.filter((r) => r.holdsPayouts) : [];
-  const paid = orders.filter((o) => o.paymentStatus === "paid");
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  const today = paid.filter((o) => o.paidAt && o.paidAt >= startOfDay);
-  const held = paid.filter((o) => o.fulfillmentStatus === "unfulfilled" && o.heldAt);
-  const toSend = paid.filter((o) => o.fulfillmentStatus === "unfulfilled" && !o.heldAt);
-  const problems = paid.filter((o) => o.fulfillmentStatus === "problem");
-  const hasActive = products.some((p) => p.status === "active");
+  const { held, toSend, problems } = counts;
 
   const steps = [
     { done: true, title: "Create your store", href: "/admin" },
-    { done: products.length > 0, title: "Import your first product", href: "/admin/products/import" },
-    { done: hasActive, title: "Make a product active so buyers can see it", href: "/admin/products" },
-    { done: paid.length > 0, title: "Place a test order on your store", href: `/s/${shop.handle}` },
+    { done: counts.products > 0, title: "Import your first product", href: "/admin/products/import" },
+    { done: counts.activeProducts > 0, title: "Make a product active so buyers can see it", href: "/admin/products" },
+    { done: counts.paid > 0, title: "Place a test order on your store", href: `/s/${shop.handle}` },
     { done: shop.payoutsEnabled || requirements.length > 0, title: "Set up payouts so you get paid", href: "/admin/money" },
     { done: twoStep.on, title: "Turn on two-step sign-in to keep your money safe", href: "/admin/account" },
   ];
@@ -48,9 +42,9 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
         <div className="flex flex-col gap-6 min-w-0">
           <section className="grid grid-cols-2 sm:grid-cols-3 gap-px bg-border border border-border rounded-xl overflow-hidden">
             {[
-              seesMoney ? ["Sales today", formatMoney(today.reduce((s, o) => s + o.totalMinor, 0), shop.currency)] : ["Paid orders", String(paid.length)],
-              ["Orders today", String(today.length)],
-              ["Products", String(products.length)],
+              seesMoney ? ["Sales today", formatMoney(counts.todayMinor, shop.currency)] : ["Paid orders", String(counts.paid)],
+              ["Orders today", String(counts.today)],
+              ["Products", String(counts.products)],
             ].map(([k, v]) => (
               <div key={k} className="bg-surface p-4 flex flex-col gap-1">
                 <span className="hint">{k}</span>
@@ -60,7 +54,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
           </section>
           <section className="card">
             <h2 className="font-semibold px-4 pt-4">Needs your attention</h2>
-            {toSend.length || problems.length || holds.length || held.length || soldOut.length ? (
+            {toSend || problems || holds.length || held || soldOut.length ? (
               <ul className="p-2">
                 {holds.length > 0 && (
                   <li>
@@ -70,18 +64,18 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
                     </Link>
                   </li>
                 )}
-                {problems.length > 0 && (
+                {problems > 0 && (
                   <li>
                     <Link href="/admin/orders?show=problems" className="flex items-center justify-between gap-3 px-2 py-3 rounded-md hover:bg-sunken">
-                      <span><span className="pill pill-critical mr-2">Problem</span>{problems.length} {problems.length === 1 ? "order needs" : "orders need"} you: the supplier refused or hasn't shipped</span>
+                      <span><span className="pill pill-critical mr-2">Problem</span>{problems} {problems === 1 ? "order needs" : "orders need"} you: the supplier refused or hasn't shipped</span>
                       <span className="hint">Fix →</span>
                     </Link>
                   </li>
                 )}
-                {held.length > 0 && (
+                {held > 0 && (
                   <li>
                     <Link href="/admin/orders?show=held" className="flex items-center justify-between gap-3 px-2 py-3 rounded-md hover:bg-sunken">
-                      <span><span className="pill pill-warning mr-2">On hold</span>{held.length} {held.length === 1 ? "order looked" : "orders looked"} risky and {held.length === 1 ? "waits" : "wait"} for you before going to the supplier</span>
+                      <span><span className="pill pill-warning mr-2">On hold</span>{held} {held === 1 ? "order looked" : "orders looked"} risky and {held === 1 ? "waits" : "wait"} for you before going to the supplier</span>
                       <span className="hint">Check →</span>
                     </Link>
                   </li>
@@ -94,9 +88,9 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
                     </Link>
                   </li>
                 )}
-                {toSend.length > 0 && <li>
+                {toSend > 0 && <li>
                   <Link href="/admin/orders" className="flex items-center justify-between gap-3 px-2 py-3 rounded-md hover:bg-sunken">
-                    <span><span className="pill pill-warning mr-2">To send</span>{toSend.length} paid {toSend.length === 1 ? "order is" : "orders are"} waiting to be sent</span>
+                    <span><span className="pill pill-warning mr-2">To send</span>{toSend} paid {toSend === 1 ? "order is" : "orders are"} waiting to be sent</span>
                     <span className="hint">Review →</span>
                   </Link>
                 </li>}

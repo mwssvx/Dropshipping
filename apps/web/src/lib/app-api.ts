@@ -22,6 +22,7 @@ import {
   APP_DEVICE,
   noteDevice,
   listOrders,
+  orderPage,
   listPayouts,
   listProducts,
   listRefunds,
@@ -200,7 +201,9 @@ const routes: Record<string, Handler> = {
     const show = url.searchParams.get("show") ?? "all";
     const keep = ORDER_FILTERS[show];
     if (!keep) throw new UserError("Unknown filter.");
-    return { orders: (await listOrders(db, shop.id)).filter(keep).slice(0, 200).map(orderSummary) };
+    // The app shows the latest 200; for all orders that's one page, not the store's whole history.
+    const orders = show === "all" ? (await orderPage(db, shop.id, {}, { size: 200 })).orders : (await listOrders(db, shop.id)).filter(keep).slice(0, 200);
+    return { orders: orders.map(orderSummary) };
   },
   "GET orders/:id": async ({ params, db, shop }) => {
     const o = await getOrder(db, shop.id, params.id!);
