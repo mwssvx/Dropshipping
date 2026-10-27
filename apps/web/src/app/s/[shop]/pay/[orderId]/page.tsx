@@ -1,9 +1,9 @@
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { buyerAmounts, formatMoney, getOrder, NotFoundError } from "@sf/core";
+import { buyerAmounts, canPayByTransfer, formatMoney, getOrder, NotFoundError, TRANSFER_DAYS } from "@sf/core";
 import { db, payments } from "@/lib/server";
 import { SubmitButton } from "@/components/SubmitButton";
-import { fakePayAction } from "../../actions";
+import { fakePayAction, payByTransferAction } from "../../actions";
 import { loadShop, storeBase, storeLang, storeT } from "../../data";
 import { CardForm } from "./CardForm";
 
@@ -95,13 +95,20 @@ export default async function PayPage({ params }: { params: Promise<{ shop: stri
         )}
         <dt className="font-semibold text-base">{t.totalDue}</dt><dd className="font-semibold text-base text-right">{money(due.chargedMinor)}</dd>
       </dl>
-      {order.paymentStatus === "failed" && <p className="banner banner-critical">{t.payFailed}</p>}
+      {order.paymentStatus === "failed" && <p className="banner banner-critical">{order.manualPayment === "bank_transfer" ? t.transferLapsed : t.payFailed}</p>}
       {provider.name === "fake" ? (
         <form action={fakePayAction.bind(null, handle, order.id)} className="card p-5 flex flex-col gap-4">
           <p className="banner banner-info">{t.testMode}</p>
           <SubmitButton className="btn btn-primary btn-lg" pendingText={t.paying}>{payLabel}</SubmitButton>
         </form>
       ) : card ?? <p className="banner banner-critical">{t.cardsOff}</p>}
+      {canPayByTransfer(shop, order) && (
+        <form action={payByTransferAction.bind(null, handle, order.id)} className="card p-5 flex flex-col gap-3" aria-labelledby="transfer-heading">
+          <h2 id="transfer-heading" className="font-semibold">{t.payByTransfer}</h2>
+          <p className="text-sm hint">{t.payByTransferNote(shop.bankTransfer?.days ?? TRANSFER_DAYS.default)}</p>
+          <SubmitButton className="btn btn-secondary" pendingText={t.continuing}>{t.payByTransfer}</SubmitButton>
+        </form>
+      )}
     </main>
   );
 }

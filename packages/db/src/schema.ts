@@ -165,6 +165,8 @@ export const shops = pgTable(
     minOrderMinor: money("min_order_minor").notNull().default(0),
     // One option given free with orders over an amount ("Free tote over $75"), or null when there's none.
     freeGift: jsonb("free_gift").$type<FreeGift | null>(),
+    // Buyers may pay by bank transfer to these details, within so many days, or null when they can't.
+    bankTransfer: jsonb("bank_transfer").$type<BankTransfer | null>(),
     // Orders in by this hour (store time) start that shipping day, or null when there's no cutoff.
     shipCutoff: jsonb("ship_cutoff").$type<ShipCutoff | null>(),
     // The tip percentages buyers can pick at checkout, or null when the store doesn't ask.
@@ -527,6 +529,9 @@ export type LocalPickup = { address: string; instructions: string | null };
 export type GiftWrap = { priceMinor: number; note: string | null };
 export type FreeGift = { variantId: string; minSubtotalMinor: number };
 
+/** Paying by bank transfer: the account to pay into, as the merchant writes it, and days to pay before the order lapses. */
+export type BankTransfer = { details: string; days: number };
+
 /** Same-day cutoff: the hour (1 to 23) in the store's time zone, and whether it ships at weekends. */
 export type ShipCutoff = { hour: number; timeZone: string; weekends: boolean };
 
@@ -595,6 +600,9 @@ export const orders = pgTable(
     subscriptionId: uuid("subscription_id").references((): AnyPgColumn => subscriptions.id, { onDelete: "set null" }),
     // The buyer's card was kept with the payment provider at checkout, for an after-checkout offer.
     cardSaved: boolean("card_saved").notNull().default(false),
+    // The buyer chose to pay by bank transfer instead of by card, and when; the merchant marks it paid.
+    manualPayment: text("manual_payment", { enum: ["bank_transfer"] }),
+    manualPaymentAt: timestamp("manual_payment_at", { withTimezone: true }),
     note: text("note"),
     // Our sales fee (free plan only) and the estimated card processing fee, fixed at checkout.
     platformFeeMinor: money("platform_fee_minor").notNull().default(0),
@@ -755,7 +763,7 @@ export const emails = pgTable(
     id: id(),
     shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
     orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
-    kind: text("kind", { enum: ["order_confirmation", "shipping_update", "delivered", "refund", "support_reply", "abandoned_cart", "payment_link", "gift_shipped", "order_link", "order_updated", "abandoned_cart_offer", "pickup_ready"] }).notNull(),
+    kind: text("kind", { enum: ["order_confirmation", "shipping_update", "delivered", "refund", "support_reply", "abandoned_cart", "payment_link", "gift_shipped", "order_link", "order_updated", "abandoned_cart_offer", "pickup_ready", "bank_transfer", "bank_transfer_lapsed"] }).notNull(),
     // Tells apart emails of a kind that can repeat (one per refund). Empty for once-only kinds.
     ref: text("ref").notNull().default(""),
     to: text("to").notNull(),

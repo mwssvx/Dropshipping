@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, lt, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 
 /** A checkout counts as abandoned once it's been left unpaid this long, as for the reminder email. */
@@ -24,6 +24,8 @@ export async function abandonedCheckouts(db: Db, shopId: string, opts: { before?
     // Still unpaid, or paid after the reminder brought the buyer back.
     or(inArray(o.paymentStatus, ["pending", "failed"]), reminder),
     eq(o.source, "checkout"),
+    // Choosing to pay by bank transfer isn't leaving.
+    isNull(o.manualPayment),
     // Left an hour ago, or already reminded (the merchant can send reminders sooner by hand).
     or(lte(o.createdAt, new Date(now.getTime() - ABANDONED_AFTER_MS)), reminder),
     gte(o.createdAt, new Date(now.getTime() - ABANDONED_DAYS * 86_400_000)),

@@ -1,7 +1,7 @@
 // Small growth tools: abandoned checkout reminders, "goes well with" and "often bought together"
 // suggestions, and their settings.
 import { randomBytes } from "node:crypto";
-import { and, desc, eq, gt, gte, inArray, lte, ne, notInArray, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, inArray, isNull, lte, ne, notInArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { schema, type Db } from "@sf/db";
 import { NotFoundError, UserError } from "./errors";
@@ -31,6 +31,8 @@ export async function sendAbandonedCartEmails(ctx: FulfillmentContext, now = new
         eq(schema.orders.paymentStatus, "pending"),
         // Payment links aren't abandoned checkouts: the merchant follows those up themselves.
         eq(schema.orders.source, "checkout"),
+        // Nor is an order waiting for the buyer's bank transfer.
+        isNull(schema.orders.manualPayment),
         lte(schema.orders.createdAt, new Date(now.getTime() - HOUR)),
         gte(schema.orders.createdAt, new Date(now.getTime() - 48 * HOUR)),
         eq(schema.shops.abandonedCartEmails, true),
@@ -98,6 +100,7 @@ async function sendAbandonedCartOffers(ctx: FulfillmentContext, now: Date) {
       and(
         eq(schema.orders.paymentStatus, "pending"),
         eq(schema.orders.source, "checkout"),
+        isNull(schema.orders.manualPayment),
         gte(schema.orders.createdAt, new Date(now.getTime() - OFFER_WINDOW)),
         sql`${schema.shops.abandonedCartOffer} is not null`,
         eq(schema.shops.abandonedCartEmails, true),

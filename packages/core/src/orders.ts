@@ -755,7 +755,7 @@ export async function handlePaymentEvent(db: Db, provider: string, event: Paymen
   });
 }
 
-export type OrderFilter = { fulfillmentStatus?: Order["fulfillmentStatus"]; held?: boolean; tag?: string; query?: string; from?: Date; to?: Date };
+export type OrderFilter = { fulfillmentStatus?: Order["fulfillmentStatus"]; held?: boolean; transfer?: boolean; tag?: string; query?: string; from?: Date; to?: Date };
 
 function orderWhere(shopId: string, filter: OrderFilter) {
   const tag = filter.tag?.trim().toLowerCase();
@@ -766,6 +766,8 @@ function orderWhere(shopId: string, filter: OrderFilter) {
     filter.fulfillmentStatus ? eq(schema.orders.fulfillmentStatus, filter.fulfillmentStatus) : undefined,
     // Held for the risk check and still worth sending (a refunded one is settled).
     filter.held ? and(isNotNull(schema.orders.heldAt), inArray(schema.orders.paymentStatus, ["paid", "partially_refunded"])) : undefined,
+    // Waiting for the buyer's bank transfer.
+    filter.transfer ? and(eq(schema.orders.manualPayment, "bank_transfer"), eq(schema.orders.paymentStatus, "pending")) : undefined,
     tag ? sql`${schema.orders.tags} @> ${JSON.stringify([tag])}::jsonb` : undefined,
     q
       ? /^\d{1,9}$/.test(q)

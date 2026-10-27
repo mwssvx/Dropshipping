@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { can, countryName, crossesBorder, disputeEvidence, disputeReason, disputesForOrder, formatMoney, getOrder, orderEditOptions, listRefunds, replaceableLines, replacementBlocked, replacementsOf, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode, formatShipsBy, preorderWaitingOn, isOrderBuyerBlocked, orderDownloads, DOWNLOADS_PER_ITEM } from "@sf/core";
+import { can, countryName, crossesBorder, disputeEvidence, disputeReason, disputesForOrder, formatMoney, getOrder, orderEditOptions, listRefunds, replaceableLines, replacementBlocked, replacementsOf, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode, formatShipsBy, preorderWaitingOn, isOrderBuyerBlocked, orderDownloads, DOWNLOADS_PER_ITEM, transferDueBy } from "@sf/core";
 import { BlockBuyerForm } from "./BlockBuyerForm";
 import { fulfillment, requireShop, storeAddress, suppliers, testPayments } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
 import { editOrderAction } from "../../../actions";
 import { resetDownloadsAction } from "../../../digital-actions";
+import { markTransferPaidAction } from "../../../bank-transfer-actions";
 import { PaymentLinkActions } from "./PaymentLinkActions";
 import { CheckTrackingButton, DeliveredButton, ManualTrackingForm, PickupButtons, RetryButton } from "./FulfillmentActions";
 import { RefundForm } from "./RefundForm";
@@ -19,9 +20,9 @@ import { PageHeader } from "../../PageHeader";
 
 const when = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" });
 
-export default async function OrderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ link?: string; replacement?: string; downloads?: string }> }) {
+export default async function OrderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ link?: string; replacement?: string; downloads?: string; transfer?: string }> }) {
   const { id } = await params;
-  const { link, replacement: justSent, downloads: downloadsReset } = await searchParams;
+  const { link, replacement: justSent, downloads: downloadsReset, transfer } = await searchParams;
   const { shop, db, role } = await requireShop("orders");
   const seesMoney = can(role, "money");
   const order = await getOrder(db, shop.id, id).catch((e) => {
@@ -56,7 +57,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
     if (!supplierId) return "Sent by you";
     return labelFor(suppliers(), links.find((l) => l.id === supplierId));
   };
-  const EMAIL_LABEL = { order_confirmation: "Order confirmation", shipping_update: "Shipping update", delivered: "Delivery confirmation", refund: "Refund", support_reply: "Reply to a question", abandoned_cart: "Checkout reminder", abandoned_cart_offer: "Second checkout reminder (with a code)", payment_link: "Payment link", gift_shipped: "Gift heads-up", order_link: "Order link (Track your order)", order_updated: "Order change", pickup_ready: "Ready for pickup" };
+  const EMAIL_LABEL = { order_confirmation: "Order confirmation", shipping_update: "Shipping update", delivered: "Delivery confirmation", refund: "Refund", support_reply: "Reply to a question", abandoned_cart: "Checkout reminder", abandoned_cart_offer: "Second checkout reminder (with a code)", payment_link: "Payment link", gift_shipped: "Gift heads-up", order_link: "Order link (Track your order)", order_updated: "Order change", pickup_ready: "Ready for pickup", bank_transfer: "How to pay by bank transfer", bank_transfer_lapsed: "Bank transfer didn't arrive" };
   const timeline = [
     { at: order.createdAt, text: "Order placed" },
     ...(order.paidAt
@@ -104,6 +105,26 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
         <div className="flex flex-col gap-6 min-w-0">
           {justSent && order.source === "replacement" && (
             <p className="banner banner-success" role="status">Replacement sent as order #{order.number}. {order.email} has been emailed, and it&apos;s gone to the supplier.</p>
+          )}
+          {transfer === "paid" && order.manualPayment === "bank_transfer" && (
+            <p className="banner banner-success" role="status">Marked as paid. {order.email} gets their confirmation, and the order goes ahead like any other.</p>
+          )}
+          {order.manualPayment === "bank_transfer" && (order.paymentStatus === "pending" || order.paymentStatus === "failed") && (
+            <section className="card p-5 flex flex-col gap-3" aria-labelledby="transfer-heading">
+              <h2 id="transfer-heading" className="font-semibold">Waiting for a bank transfer</h2>
+              <p className="text-sm">
+                {order.shippingAddress.name.split(" ")[0]} chose to pay <strong className="num">{money(order.totalMinor - order.giftCardMinor)}</strong> by bank transfer, with the reference <strong className="num">Order {order.number}</strong>.{" "}
+                {order.paymentStatus === "failed"
+                  ? "It didn't arrive in time, so they were told the order is no longer held. If it arrives now, you can still mark it as paid."
+                  : `It should arrive by ${longDay.format(transferDueBy(shop, order) ?? new Date())}.`}
+              </p>
+              <p className="text-sm hint">Check your bank. Nothing goes to the supplier until you mark it as paid.</p>
+              {can(role, "money") && (
+                <form action={markTransferPaidAction.bind(null, order.id)}>
+                  <button type="submit" className="btn btn-primary">Mark as paid</button>
+                </form>
+              )}
+            </section>
           )}
           {order.source === "payment_link" && (order.paymentStatus === "pending" || order.paymentStatus === "failed") && (
             <section className="card p-5 flex flex-col gap-3" aria-labelledby="pay-link">
