@@ -369,6 +369,8 @@ export const variants = pgTable(
     stock: integer("stock"),
     // What one of these weighs packed, for shipping rates that go by weight.
     weightGrams: integer("weight_grams"),
+    // How much is in one (250 g, 1.5 l, 6 items), for the price per kg, litre or item buyers compare.
+    contents: jsonb("contents").$type<Contents | null>(),
     // The UPC, EAN or the store's own code a scanner reads off the item. Unique in the store.
     barcode: text("barcode"),
     // Where it sits in the store's own stock room ("A3", "Back shelf"), for the pick list and stock count.
@@ -528,6 +530,9 @@ export type LocalPickup = { address: string; instructions: string | null };
 /** The store's gift wrapping: its price and what buyers get ("Kraft paper and a ribbon"). */
 export type GiftWrap = { priceMinor: number; note: string | null };
 export type FreeGift = { variantId: string; minSubtotalMinor: number };
+
+/** What one variant holds, in the units its price per unit is shown in. */
+export type Contents = { amount: number; unit: "g" | "kg" | "ml" | "cl" | "l" | "cm" | "m" | "m2" | "item" };
 
 /** Paying by bank transfer: the account to pay into, as the merchant writes it, and days to pay before the order lapses. */
 export type BankTransfer = { details: string; days: number };

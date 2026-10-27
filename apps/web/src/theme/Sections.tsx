@@ -6,6 +6,7 @@ import type { BadgeSettings } from "@sf/db";
 import { storeText, type StoreText } from "@/lib/store-text";
 import type { DisplayFx } from "@sf/core/money";
 import { Price } from "@/components/Price";
+import { UnitPrice } from "@/components/UnitPrice";
 import { storeHref } from "./style";
 
 /*
@@ -78,7 +79,7 @@ export function badgeLabel(b: Badge, t: StoreText) {
   return b.kind === "custom" ? b.text : b.kind === "sold_out" ? t.soldOut : b.kind === "sale" ? t.badgeSale(b.percent) : t.badgeNew;
 }
 
-type GridProduct = Omit<StorefrontCatalog["products"][number], "badge" | "createdAt" | "soldOut" | "swatches"> & BadgeFacts & Partial<Pick<StorefrontCatalog["products"][number], "swatches">>;
+type GridProduct = Omit<StorefrontCatalog["products"][number], "badge" | "createdAt" | "soldOut" | "swatches" | "contents"> & BadgeFacts & Partial<Pick<StorefrontCatalog["products"][number], "swatches" | "contents">>;
 
 export function ProductGrid({ products, data }: { products: GridProduct[]; data: SectionData }) {
   const t = data.t ?? storeText(null);
@@ -107,6 +108,7 @@ export function ProductGrid({ products, data }: { products: GridProduct[]; data:
             </div>
             <span className="font-medium group-hover:underline">{p.title}</span>
             <Price minor={p.priceMinor} compareAt={p.compareAtMinor} currency={data.currency} fx={data.fx} />
+            <UnitPrice minor={p.priceMinor} contents={p.contents} currency={data.currency} fx={data.fx} itemWord={t.unitItem} />
             {p.swatches && (
               <span className="sf-swatches flex items-center gap-1 text-xs text-muted" role="img" aria-label={t.colorCount(p.swatches.count)}>
                 {p.swatches.colors.map((c, i) => (

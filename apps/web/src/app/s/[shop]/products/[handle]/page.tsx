@@ -17,6 +17,8 @@ import { addBundleAction, addToCartAction, askQuestionAction, stockAlertAction, 
 import { savedIds } from "@/lib/saved";
 import { loadShop, localProducts, storeBase, storeLang, storeT, missing } from "../../data";
 import { Price } from "@/components/Price";
+import { UnitPrice } from "@/components/UnitPrice";
+import type { Contents } from "@sf/db";
 import { PixelEvent } from "@/components/PixelEvent";
 import { StickyBuyBar } from "@/components/StickyBuyBar";
 
@@ -152,9 +154,10 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const shownMoney = (m: number) => (fx ? formatMoney(convertPrice(m, fx), fx.currency) : formatMoney(m, shop.currency));
   // A reduced price says what the lowest price was in the 30 days before (the EU's rule).
   const lowest = showsLowestPrice(shop.lowestPriceNote, await buyerCountry()) ? await lowestPricesBefore(await db(), shop.id, product, product.sale) : new Map<string, number>();
-  const shownPrice = (x: { id: string; priceMinor: number; compareAtMinor: number | null }) => (
+  const shownPrice = (x: { id: string; priceMinor: number; compareAtMinor: number | null; contents: Contents | null }) => (
     <span className="inline-flex flex-col">
       <Price minor={x.priceMinor} compareAt={x.compareAtMinor} currency={shop.currency} fx={fx} />
+      <UnitPrice minor={x.priceMinor} contents={x.contents} currency={shop.currency} fx={fx} itemWord={t.unitItem} />
       {lowest.has(x.id) && (
         <span className="text-xs hint font-normal">
           {t.lowestBefore} <Price minor={lowest.get(x.id)!} currency={shop.currency} fx={fx} />
@@ -240,6 +243,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                         <input type="radio" name="variantId" value={x.id} defaultChecked={x.id === v.id} disabled={out} className="sr-only peer" data-photo={x.imageUrl ?? undefined} />
                         <span>{x.title}</span>
                         <span className="hint num"><Price minor={x.priceMinor} currency={shop.currency} fx={fx} /></span>
+                        <UnitPrice minor={x.priceMinor} contents={x.contents} currency={shop.currency} fx={fx} itemWord={t.unitItem} />
                         {lowStock[x.id] && <span className="text-xs text-warning font-medium">{lowStock[x.id]}</span>}
                       </label>
                     );

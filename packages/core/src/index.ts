@@ -60,6 +60,8 @@ export * from "./wholesale";
 export * from "./gift-cards";
 export * from "./digital";
 export * from "./bank-transfer";
+export * from "./unit-price";
+export * from "./unit-contents";
 export * from "./shipping";
 export * from "./returns";
 export * from "./replacements";
