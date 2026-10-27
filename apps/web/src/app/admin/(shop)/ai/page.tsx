@@ -1,4 +1,4 @@
-import { aiBudget, BUYER_TOPICS, formatMoney, listAgentActivity } from "@sf/core";
+import { aiBudget, BUYER_TOPICS, formatMoney, listAgentActivity, MODEL_LABEL } from "@sf/core";
 import { aiModel, requireShop } from "@/lib/server";
 import { AGENT_LABEL } from "@/components/ApprovalCard";
 import { PageHeader } from "../PageHeader";
@@ -86,6 +86,7 @@ export default async function AiSettingsPage() {
               <div key={k} className="card p-4 flex flex-col gap-1.5 text-sm">
                 <div className="flex justify-between gap-2"><span className="font-medium">{AGENT_LABEL[k]}</span><span className="hint num">{used ? `${used.runs} run${used.runs === 1 ? "" : "s"} · ${usd(Math.ceil(used.micros / 10_000))}` : "Not used yet"}</span></div>
                 <p className="hint">{WHAT[k]}</p>
+                <p className="hint text-xs">Runs on {MODEL_LABEL[model.modelFor(k)] ?? model.modelFor(k)}</p>
                 {k === "margin" && <MarginCheckButton />}
               </div>
             );
