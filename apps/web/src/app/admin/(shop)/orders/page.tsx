@@ -5,6 +5,7 @@ import { FulfilmentStatus, PaymentStatus } from "@/components/Status";
 import { PageHeader } from "../PageHeader";
 import { BuyerCancelForm } from "./BuyerCancelForm";
 import { RiskHoldForm } from "./RiskHoldForm";
+import { TrackingImportForm } from "./TrackingImportForm";
 
 export const metadata = { title: "Orders" };
 
@@ -75,6 +76,10 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             <button className="btn btn-secondary">Download CSV</button>
             <p className="hint w-full">One row per item, with the orders shown above{filtered || show ? " (your filters apply)" : ""}. Leave the dates empty for all of them.</p>
           </form>
+        </details>
+        <details className="text-sm">
+          <summary className="cursor-pointer underline w-fit">Add tracking from a spreadsheet</summary>
+          <TrackingImportForm />
         </details>
         {can(role, "refunds") && (
           <details className="text-sm">
