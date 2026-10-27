@@ -862,3 +862,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Gift card balance (after launch, part 129)
 
 1. **What's left on it**: anyone with a gift card code (often the person it was given to) can check its balance at /gift-cards on the store, linked from every gift card email, without starting a cart. It shows the last four characters, what's left of the starting amount, or that it's used up or turned off, and never who bought it (`packages/core/src/gift-card-balance.ts`, no migration).
+
+### Colour dots (after launch, part 130)
+
+1. **Swatches**: the values of a product's colour option (Color, Colour, Farbe, Couleur…) show as dots of that colour next to their names on the product page. Common colour names in the six store languages fill themselves in ("Navy", "Dusty Rose", "Schwarz"); for names that don't say ("Sage" does, "Midnight" doesn't), the product's "Color dots" section in admin picks the colour once. Values the store hasn't coloured stay as words. The store export carries the picked colours (`packages/core/src/swatches.ts`, migration 0111).

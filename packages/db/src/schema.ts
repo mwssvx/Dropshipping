@@ -312,6 +312,8 @@ export const products = pgTable(
     minAge: integer("min_age"),
     // Countries it can't be shipped to (batteries, knives, a supplier that doesn't go there).
     blockedCountries: jsonb("blocked_countries").$type<string[]>().notNull().default([]),
+    // The colour each value of its colour option shows as on the store ({"Sage": "#9caf88"}), where the name alone doesn't say.
+    swatches: jsonb("swatches").$type<Record<string, string>>().notNull().default({}),
     // How many days the product usually lasts, for the one "running low?" email; null means no reminder.
     reorderDays: integer("reorder_days"),
     // A video for the product page: a YouTube or Vimeo link, or an https video file.

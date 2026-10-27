@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { setBlockedCountries, setCustomsInfo, setMinAge, setReorderDays, UserError } from "@sf/core";
+import { setBlockedCountries, setCustomsInfo, setMinAge, setReorderDays, setSwatches, UserError } from "@sf/core";
 import { requireShop } from "@/lib/server";
 
 export type CustomsState = { error?: string; saved?: boolean };
@@ -57,6 +57,23 @@ export async function blockedCountriesAction(productId: string, _: BlockedCountr
   const { shop, db } = await requireShop("products");
   try {
     await setBlockedCountries(db, shop.id, productId, form.getAll("country").map(String));
+    revalidatePath(`/admin/products/${productId}`);
+    return { saved: true };
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+}
+
+export type SwatchesState = { error?: string; saved?: boolean };
+
+/** Saves the colour each value of a product's colour option shows as on the store. */
+export async function swatchesAction(productId: string, _: SwatchesState, form: FormData): Promise<SwatchesState> {
+  const { shop, db } = await requireShop("products");
+  const colors: Record<string, string> = {};
+  for (const [key, value] of form.entries()) if (key.startsWith("swatch:")) colors[key.slice("swatch:".length)] = String(value);
+  try {
+    await setSwatches(db, shop.id, productId, colors);
     revalidatePath(`/admin/products/${productId}`);
     return { saved: true };
   } catch (e) {

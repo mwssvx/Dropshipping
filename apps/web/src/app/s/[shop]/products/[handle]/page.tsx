@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, formatDeliveryWindow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, countdownTo, shipsToCountry } from "@sf/core";
+import { bundlesForProduct, formatDeliveryWindow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, countdownTo, shipsToCountry } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { SaleCountdown } from "@/components/SaleCountdown";
 import { RecentlyViewed } from "@/components/RecentlyViewed";
@@ -99,6 +99,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const many = product.variants.length > 1;
   // Pick each option (Size, Color) on its own when every variant names the same options.
   const defs = optionDefsOf(product.variants);
+  const colors = productSwatches(product);
   const names = defs.map((d) => d.name).sort().join("|");
   const byOption =
     many && defs.length > 0 &&
@@ -222,6 +223,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                 prices={Object.fromEntries(product.variants.map((x) => [x.id, <span key={x.id}>{shownPrice(x)}</span>]))}
                 soldOutLabel={t.soldOut}
                 lowStock={lowStock}
+                swatches={colors ? { [colors.option]: Object.fromEntries(colors.values.filter((c) => c.color).map((c) => [c.value, c.color!])) } : undefined}
               />
             ) : many ? (
               <fieldset className="flex flex-col gap-2">

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts, detailsText, MAX_DETAILS, stockHistory, incomingStock, countryName, SHIPPING_COUNTRIES, type StockMovement } from "@sf/core";
+import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts, detailsText, MAX_DETAILS, stockHistory, incomingStock, countryName, SHIPPING_COUNTRIES, productSwatches, type StockMovement } from "@sf/core";
 import { requireShop, storeAddress, suppliers } from "@/lib/server";
 import { duplicateProductAction, updateProductAction } from "../../../actions";
 import { setUpsellAction } from "../../../growth-actions";
@@ -15,6 +15,7 @@ import { CustomsForm } from "./CustomsForm";
 import { MinAgeForm } from "./MinAgeForm";
 import { ReorderDaysForm } from "./ReorderDaysForm";
 import { BlockedCountriesForm } from "./BlockedCountriesForm";
+import { SwatchesForm } from "./SwatchesForm";
 import { VideoForm } from "./VideoForm";
 import { DetailsForm } from "./DetailsForm";
 import { BadgeForm } from "./BadgeForm";
@@ -205,6 +206,18 @@ export default async function EditProductPage({ params, searchParams }: { params
           <VariantPhotosPanel productId={product.id} photos={productPhotos(product)}
             {...variantPhotoRows(product.variants.map((v) => ({ id: v.id, title: v.title, options: v.options ?? {}, imageUrl: v.imageUrl })))} />
         )}
+        {(() => {
+          const sw = product.giftCard ? null : productSwatches(product);
+          return sw && sw.values.length > 1 ? (
+            <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="swatches-heading">
+              <div>
+                <h2 id="swatches-heading" className="font-semibold">{sw.option} dots</h2>
+                <p className="hint">Each {sw.option.toLowerCase()} shows as a dot of that colour on the product page. Common names like Navy or Olive fill themselves in; pick the rest.</p>
+              </div>
+              <SwatchesForm productId={product.id} option={sw.option} rows={sw.values} />
+            </section>
+          ) : null;
+        })()}
         <AddressForm productId={product.id} handle={product.handle} prefix={(await storeAddress(shop)).replace(/^https?:\/\//, "")} />
         {!product.giftCard && (
           <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="seo-heading">
