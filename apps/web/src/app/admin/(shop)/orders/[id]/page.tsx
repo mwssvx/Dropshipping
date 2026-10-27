@@ -410,6 +410,11 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
             <p className="hint">The buyer can open these from their order page too.</p>
           </section>
         )}
+        {order.ageConfirmed && (
+          <p className="card p-5 text-sm">
+            <span className="pill pill-warning">Buyer confirmed {order.ageConfirmed}+</span> Something in this order has a minimum age. Ask the courier to check ID on delivery, or check it yourself at pickup.
+          </p>
+        )}
         {order.protectionMinor > 0 && (
           <p className="card p-5 text-sm">
             <span className="pill pill-success">Protected delivery</span> The buyer paid {money(order.protectionMinor)} to protect it. If it&apos;s lost or arrives damaged, send it again for free{replaceable.length > 0 ? " below" : " once it has shipped"}.

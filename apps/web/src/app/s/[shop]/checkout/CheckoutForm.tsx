@@ -60,6 +60,8 @@ type Props = {
   protection?: ExtraChoice | null;
   /** Null when the store doesn't gift wrap, or nothing ships. */
   giftWrap?: ExtraChoice | null;
+  /** The "I'm old enough" box and its note, when something in the cart has a minimum age. */
+  ageCheck?: { checkbox: string; note: string } | null;
   /** The buyer's currency, for the total as it changes. */
   currency: string;
 };
@@ -119,7 +121,7 @@ export function Checkout({ summary, footer, taxLabel, totalLabel, totalWithoutSh
 }
 
 function CheckoutForm({
-  handle, text: t, initial, askPhone, paidByGiftCard, countries, zones, country, onCountry, onPostal, rates, rate, onRate, protection, protect, onProtect, giftWrap, gift, onGift, wrap, onWrap,
+  handle, text: t, initial, askPhone, paidByGiftCard, countries, zones, country, onCountry, onPostal, rates, rate, onRate, protection, protect, onProtect, giftWrap, ageCheck, gift, onGift, wrap, onWrap,
 }: Omit<Props, "summary" | "footer" | "taxLabel" | "totalLabel" | "totalWithoutShipping" | "defaultCountry" | "currency"> & {
   country: string;
   onCountry: (c: string) => void;
@@ -205,6 +207,15 @@ function CheckoutForm({
         </label>
       )}
       {zones && <GiftFields t={t} values={v} gift={gift} onGift={onGift} wrapChoice={giftWrap ?? null} wrap={wrap} onWrap={onWrap} />}
+      {ageCheck && (
+        <label className="card p-3 flex items-start gap-3 cursor-pointer">
+          <input type="checkbox" name="ageConfirmed" className="mt-1" required defaultChecked={v?.ageConfirmed === "on"} />
+          <span className="flex-1">
+            <span className="font-medium">{ageCheck.checkbox}</span>
+            <span className="block hint text-sm">{ageCheck.note}</span>
+          </span>
+        </label>
+      )}
       <div className="field">
         <label className="label" htmlFor="note">{t.orderNote}</label>
         <textarea className="input" id="note" name="note" rows={2} maxLength={500} defaultValue={v?.note} />

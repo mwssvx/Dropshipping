@@ -12,6 +12,7 @@ import { PersonalizationForm } from "./PersonalizationForm";
 import { PreorderForm } from "./PreorderForm";
 import { PurchaseLimitForm } from "./PurchaseLimitForm";
 import { CustomsForm } from "./CustomsForm";
+import { MinAgeForm } from "./MinAgeForm";
 import { VideoForm } from "./VideoForm";
 import { DetailsForm } from "./DetailsForm";
 import { BadgeForm } from "./BadgeForm";
@@ -324,6 +325,19 @@ export default async function EditProductPage({ params, searchParams }: { params
               </p>
             )}
             <CustomsForm productId={product.id} hsCode={product.hsCode} originCountry={product.originCountry} />
+          </section>
+        )}
+        {!product.giftCard && (
+          <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="age-heading">
+            <div>
+              <h2 id="age-heading" className="font-semibold">Age check</h2>
+              <p className="hint">
+                For alcohol, vapes, knives and anything else with a legal minimum age. Buyers tick a box at checkout to say they're old
+                enough, and the order shows it so you can ask the courier to check ID.
+              </p>
+            </div>
+            {product.minAge && <p className="text-sm" role="note">Buyers must confirm they're {product.minAge} or older.</p>}
+            <MinAgeForm productId={product.id} minAge={product.minAge} />
           </section>
         )}
         <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="upsell-heading">
