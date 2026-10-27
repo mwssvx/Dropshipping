@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts, detailsText, MAX_DETAILS } from "@sf/core";
+import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts, detailsText, MAX_DETAILS, stockHistory, type StockMovement } from "@sf/core";
 import { requireShop, storeAddress, suppliers } from "@/lib/server";
 import { duplicateProductAction, updateProductAction } from "../../../actions";
 import { setUpsellAction } from "../../../growth-actions";
@@ -58,6 +58,8 @@ export default async function EditProductPage({ params, searchParams }: { params
       }
     : null;
   const waitingBy = await waitingForProduct(db, shop.id, product.id);
+  // The store's own stock keeps a history of every change; imported products follow the supplier.
+  const history = !found.sourceUrl && !found.giftCard ? await stockHistory(db, shop.id, found.id) : [];
   const preSold = product.preorder ? await preordersSold(db, product.id) : 0;
   const saves = await savedCount(db, shop.id, product.id);
   const waiting = product.variants.filter((v) => waitingBy.has(v.id)).map((v) => ({ option: v.title, count: waitingBy.get(v.id)! }));
@@ -101,6 +103,26 @@ export default async function EditProductPage({ params, searchParams }: { params
         <WriteListingButton productId={product.id} live={product.status === "active"} />
         <StockPanel productId={product.id} waiting={waiting} linked={!!product.sourceUrl && !product.giftCard}
           checkedAt={product.stockCheckedAt ? product.stockCheckedAt.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : null} />
+        {history.length > 0 && (
+          <details className="card p-5 max-w-3xl" id="stock-history">
+            <summary className="font-semibold cursor-pointer">Stock history</summary>
+            <p className="hint text-sm mt-2">Every change to your count, newest first: sales, orders cancelled before they shipped, swaps and counts you typed.</p>
+            <table className="w-full text-sm mt-3">
+              <thead className="hint text-left"><tr><th className="font-normal py-1">When</th>{found.variants.length > 1 && <th className="font-normal">Option</th>}<th className="font-normal">Why</th><th className="font-normal text-right">Change</th><th className="font-normal text-right">Left</th></tr></thead>
+              <tbody>
+                {history.map((h) => (
+                  <tr key={h.id} className="border-t border-border">
+                    <td className="py-1.5 hint num whitespace-nowrap pr-3">{h.at.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</td>
+                    {found.variants.length > 1 && <td className="pr-3">{h.option}</td>}
+                    <td className="pr-3"><MovementReason m={h} /></td>
+                    <td className={`num text-right ${h.change < 0 ? "" : "text-success"}`}>{h.change > 0 ? `+${h.change}` : h.change}</td>
+                    <td className="num text-right">{h.stockAfter ?? "Not tracked"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </details>
+        )}
         {product.status === "draft" && (
           <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="publish-later-heading">
             <div>
@@ -285,4 +307,17 @@ export default async function EditProductPage({ params, searchParams }: { params
       </div>
     </main>
   );
+}
+
+/** Why a stock count changed, with a link to the order when there is one. */
+function MovementReason({ m }: { m: StockMovement }) {
+  const order = m.order ? <Link href={`/admin/orders/${m.order.id}`} className="underline">order #{m.order.number}</Link> : <>an order</>;
+  switch (m.reason) {
+    case "start": return <>Starting count</>;
+    case "edit": return <>Changed by hand</>;
+    case "sale": return <>Sold on {order}</>;
+    case "returned": return <>Back from {order}, cancelled before it shipped</>;
+    case "swap_out": return <>Swapped for another option on {order}</>;
+    case "swap_in": return <>Swapped in on {order}</>;
+  }
 }

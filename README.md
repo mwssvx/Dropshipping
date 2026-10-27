@@ -771,3 +771,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **The store's own price**: under Shipping, a store offers gift wrapping for a price it sets (0 for free) with a line on what buyers get, like "Kraft paper and a ribbon" (`shops.gift_wrap`, `setGiftWrap` in `packages/core/src/gift-wrap.ts`). Other platforms sell this as an app.
 2. **Only on gifts, only if asked**: once a buyer ticks "This order is a gift", checkout offers "Gift wrap it for …", never ticked for them. The order total follows as they tick it (`orders.gift_wrap_minor`, part of `orders_total_matches`). Repeat deliveries and after-checkout offers never add it.
 3. **Everywhere the money shows**: the receipt email, order pages, payment page, invoice, order export (a Gift wrap column), API and app show it. The admin order page marks the gift "Wrap it" and the packing slip says so on screen.
+
+### Stock history (after launch, part 110)
+
+1. **Every change, with why**: each change to the store's own stock count is written down with the option, how much, what's left and the reason (`stock_movements`, `recordMovement` in `packages/core/src/own-stock.ts`): the starting count, a sale, an order cancelled or refunded before it shipped, a swap to another option, or a count typed on the product form, in the app or through the API (`recordStockEdits`). Imported products follow the supplier, so they have none.
+2. **On the product page**: "Stock history" lists the latest 50 changes, newest first, with links to the orders behind them (`stockHistory`).

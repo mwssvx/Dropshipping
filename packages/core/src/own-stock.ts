@@ -4,7 +4,7 @@
 // shipped, and follows a swap from one option to another before it ships. Pre-ordered lines were
 // sold past the stock, so they don't take any, and stock never goes below 0. An option with no
 // count ("Not tracked") is left alone. The team is emailed once when an option runs low.
-import { and, asc, eq, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import type { Mailer } from "./email";
 import { UserError } from "./errors";
@@ -30,11 +30,30 @@ async function orderStock(db: Db, orderId: string) {
   return qty;
 }
 
-const change = (db: Db, variantId: string, by: number) =>
-  db
+type Reason = (typeof schema.stockMovements.$inferInsert)["reason"];
+
+/** Moves an option's count by this much (never below 0) and writes down why. */
+async function change(db: Db, variantId: string, by: number, why: { reason: Reason; orderId: string | null }) {
+  const before = await db.query.variants.findFirst({ where: eq(schema.variants.id, variantId), columns: { stock: true } });
+  const [after] = await db
     .update(schema.variants)
     .set({ stock: sql`greatest(${schema.variants.stock} + ${by}, 0)` })
-    .where(and(eq(schema.variants.id, variantId), isNotNull(schema.variants.stock)));
+    .where(and(eq(schema.variants.id, variantId), isNotNull(schema.variants.stock)))
+    .returning({ stock: schema.variants.stock });
+  if (!after || before?.stock == null || after.stock === before.stock) return;
+  await recordMovement(db, variantId, { ...why, change: after.stock! - before.stock, stockAfter: after.stock });
+}
+
+/** Writes one line of an option's stock history. */
+export async function recordMovement(db: Db, variantId: string, m: { reason: Reason; orderId?: string | null; change: number; stockAfter: number | null }) {
+  const [v] = await db
+    .select({ shopId: schema.products.shopId })
+    .from(schema.variants)
+    .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
+    .where(eq(schema.variants.id, variantId));
+  if (!v) return;
+  await db.insert(schema.stockMovements).values({ shopId: v.shopId, variantId, orderId: m.orderId ?? null, reason: m.reason, change: m.change, stockAfter: m.stockAfter });
+}
 
 /** A paid order takes its items off the store's own stock, once. */
 export async function takeOrderStock(db: Db, orderId: string, at = new Date()) {
@@ -45,7 +64,7 @@ export async function takeOrderStock(db: Db, orderId: string, at = new Date()) {
     .returning({ id: schema.orders.id });
   if (!claimed) return 0;
   const qty = await orderStock(db, orderId);
-  for (const [variantId, n] of qty) await change(db, variantId, -n);
+  for (const [variantId, n] of qty) await change(db, variantId, -n, { reason: "sale", orderId });
   return qty.size;
 }
 
@@ -58,16 +77,57 @@ export async function returnOrderStock(db: Db, orderId: string) {
     .returning({ id: schema.orders.id });
   if (!claimed) return 0;
   const qty = await orderStock(db, orderId);
-  for (const [variantId, n] of qty) await change(db, variantId, n);
+  for (const [variantId, n] of qty) await change(db, variantId, n, { reason: "returned", orderId });
   return qty.size;
 }
 
 /** A line of an order that took stock changed option: the old one goes back, the new one comes off. */
-export async function moveLineStock(db: Db, order: { stockTakenAt: Date | null }, line: { preorder: boolean; quantity: number }, from: string | null, to: string) {
+export async function moveLineStock(db: Db, order: { id: string; stockTakenAt: Date | null }, line: { preorder: boolean; quantity: number }, from: string | null, to: string) {
   if (!order.stockTakenAt || line.preorder) return;
   const own = await ownStockVariants(db, [from, to].filter((v): v is string => !!v));
-  if (from && own.has(from)) await change(db, from, line.quantity);
-  if (own.has(to)) await change(db, to, -line.quantity);
+  if (from && own.has(from)) await change(db, from, line.quantity, { reason: "swap_out", orderId: order.id });
+  if (own.has(to)) await change(db, to, -line.quantity, { reason: "swap_in", orderId: order.id });
+}
+
+/**
+ * The merchant typed new counts for a product's options (the product form, the app, bulk edits):
+ * each one that changed on the store's own stock goes in its history.
+ */
+export async function recordStockEdits(db: Db, productId: string, before: Map<string, number | null>) {
+  const product = await db.query.products.findFirst({ where: eq(schema.products.id, productId), columns: { sourceUrl: true } });
+  if (!product || product.sourceUrl) return;
+  const now = await db.query.variants.findMany({ where: eq(schema.variants.productId, productId), columns: { id: true, stock: true } });
+  for (const v of now) {
+    const was = before.has(v.id) ? before.get(v.id)! : undefined;
+    if (was === undefined) {
+      if (v.stock !== null) await recordMovement(db, v.id, { reason: "start", change: v.stock, stockAfter: v.stock });
+    } else if (was !== v.stock) {
+      await recordMovement(db, v.id, { reason: "edit", change: (v.stock ?? 0) - (was ?? 0), stockAfter: v.stock });
+    }
+  }
+}
+
+export type StockMovement = { id: string; at: Date; option: string; reason: Reason; change: number; stockAfter: number | null; order: { id: string; number: number } | null };
+
+/** A product's stock history, newest first. */
+export async function stockHistory(db: Db, shopId: string, productId: string, limit = 50): Promise<StockMovement[]> {
+  const rows = await db
+    .select({ m: schema.stockMovements, option: schema.variants.title, orderNumber: schema.orders.number })
+    .from(schema.stockMovements)
+    .innerJoin(schema.variants, eq(schema.variants.id, schema.stockMovements.variantId))
+    .leftJoin(schema.orders, eq(schema.orders.id, schema.stockMovements.orderId))
+    .where(and(eq(schema.stockMovements.shopId, shopId), eq(schema.variants.productId, productId)))
+    .orderBy(desc(schema.stockMovements.createdAt), desc(schema.stockMovements.id))
+    .limit(limit);
+  return rows.map(({ m, option, orderNumber }) => ({
+    id: m.id,
+    at: m.createdAt,
+    option,
+    reason: m.reason,
+    change: m.change,
+    stockAfter: m.stockAfter,
+    order: m.orderId && orderNumber !== null ? { id: m.orderId, number: orderNumber } : null,
+  }));
 }
 
 /** The most the running-low email can be set to. */
