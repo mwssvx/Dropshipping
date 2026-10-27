@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { listReviews, reviewPhotoUrl, reviewRequestStats } from "@sf/core";
+import { REVIEW_PAGE_SIZE, reviewCounts, reviewPage, reviewPhotoUrl, reviewRequestStats } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { moderateReviewAction, removeReviewPhotoAction, setReviewsAutoPublishAction } from "../../growth-actions";
 import { PageHeader } from "../PageHeader";
@@ -14,11 +14,28 @@ const TABS = [
   { key: "hidden", label: "Hidden" },
 ] as const;
 
-export default async function ReviewsPage({ searchParams }: { searchParams: Promise<{ show?: string }> }) {
+export default async function ReviewsPage({ searchParams }: { searchParams: Promise<{ show?: string; stars?: string; q?: string; page?: string }> }) {
   const { shop, db } = await requireShop("reviews");
-  const { show } = await searchParams;
-  const status = TABS.find((t) => t.key === show)?.key ?? "pending";
-  const [rows, requests] = await Promise.all([listReviews(db, shop.id, { status }), reviewRequestStats(db, shop.id)]);
+  const params = await searchParams;
+  const status = TABS.find((t) => t.key === params.show)?.key ?? "pending";
+  const stars = /^[1-5]$/.test(params.stars ?? "") ? Number(params.stars) : undefined;
+  const q = params.q?.trim().slice(0, 100) || undefined;
+  const page = /^\d{1,5}$/.test(params.page ?? "") ? Math.max(1, Number(params.page)) : 1;
+  const [{ reviews: rows, total }, counts, requests] = await Promise.all([
+    reviewPage(db, shop.id, { status, rating: stars, query: q, page }),
+    reviewCounts(db, shop.id),
+    reviewRequestStats(db, shop.id),
+  ]);
+  const pages = Math.max(1, Math.ceil(total / REVIEW_PAGE_SIZE));
+  const href = (change: { show?: string; stars?: number | null; q?: string | null; page?: number }) => {
+    const next = new URLSearchParams({ show: change.show ?? status });
+    const s = change.stars === undefined ? stars : change.stars;
+    if (s) next.set("stars", String(s));
+    const query = change.q === undefined ? q : change.q;
+    if (query) next.set("q", query);
+    if (change.page && change.page > 1) next.set("page", String(change.page));
+    return `/admin/reviews?${next}`;
+  };
 
   return (
     <main className="pb-12">
@@ -45,16 +62,37 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
             </p>
           )}
         </section>
-        <nav className="flex gap-1 border-b border-border" aria-label="Review status">
+        <nav className="flex gap-1 border-b border-border overflow-x-auto" aria-label="Review status">
           {TABS.map((t) => (
-            <Link key={t.key} href={`/admin/reviews?show=${t.key}`} aria-current={t.key === status ? "page" : undefined}
-              className={`px-3 py-2 text-sm -mb-px border-b-2 ${t.key === status ? "border-accent font-semibold" : "border-transparent hint"}`}>
-              {t.label}
+            <Link key={t.key} href={href({ show: t.key, stars: null, q: null })} aria-current={t.key === status ? "page" : undefined}
+              className={`px-3 py-2 text-sm -mb-px border-b-2 whitespace-nowrap ${t.key === status ? "border-accent font-semibold" : "border-transparent hint"}`}>
+              {t.label} <span className="num hint">({counts[t.key]})</span>
             </Link>
           ))}
         </nav>
+        <div className="flex flex-wrap items-center gap-3">
+          <form action="/admin/reviews" className="flex gap-2 flex-1 min-w-60" role="search">
+            <input type="hidden" name="show" value={status} />
+            {stars && <input type="hidden" name="stars" value={stars} />}
+            <label htmlFor="review-q" className="sr-only">Search reviews</label>
+            <input id="review-q" name="q" type="search" defaultValue={q} placeholder="Name, words or product" className="input flex-1" />
+            <button className="btn btn-secondary">Search</button>
+          </form>
+          <nav className="flex flex-wrap gap-1 text-sm" aria-label="Star filter">
+            <Link href={href({ stars: null, page: 1 })} aria-current={!stars ? "page" : undefined} className={`px-2 py-1 rounded-md ${!stars ? "bg-sunken font-semibold" : "hint"}`}>All stars</Link>
+            {[5, 4, 3, 2, 1].map((n) => (
+              <Link key={n} href={href({ stars: n, page: 1 })} aria-current={stars === n ? "page" : undefined} aria-label={`${n} star${n > 1 ? "s" : ""}`}
+                className={`px-2 py-1 rounded-md num ${stars === n ? "bg-sunken font-semibold" : "hint"}`}>{n}★</Link>
+            ))}
+          </nav>
+        </div>
+        {(q || stars) && (
+          <p className="hint text-sm">
+            {total} {total === 1 ? "review matches" : "reviews match"}{q && <> &ldquo;{q}&rdquo;</>}{stars && <> with {stars} star{stars > 1 ? "s" : ""}</>}. <Link href={href({ stars: null, q: null })} className="underline">Clear</Link>
+          </p>
+        )}
         {rows.length === 0 ? (
-          <p className="hint py-6 text-center">{status === "pending" ? "Nothing waiting. New reviews show up here." : "None here."}</p>
+          <p className="hint py-6 text-center">{q || stars ? "No reviews match." : status === "pending" ? "Nothing waiting. New reviews show up here." : "None here."}</p>
         ) : (
           <ul className="flex flex-col gap-3">
             {rows.map(({ review: r, productTitle, orderNumber }) => (
@@ -89,6 +127,13 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
               </li>
             ))}
           </ul>
+        )}
+        {pages > 1 && (
+          <nav aria-label="Pages" className="flex items-center gap-3 text-sm">
+            {page > 1 && <Link href={href({ page: page - 1 })} className="btn btn-secondary">← Newer</Link>}
+            <span className="hint num">Page {Math.min(page, pages)} of {pages}</span>
+            {page < pages && <Link href={href({ page: page + 1 })} className="btn btn-secondary ml-auto">Older →</Link>}
+          </nav>
         )}
       </div>
     </main>

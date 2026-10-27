@@ -1,4 +1,4 @@
-import { and, avg, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, avg, count, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
@@ -92,6 +92,63 @@ export async function listReviews(db: Db, shopId: string, filter: { status?: "pe
     .where(and(eq(schema.reviews.shopId, shopId), filter.status ? eq(schema.reviews.status, filter.status) : undefined))
     .orderBy(desc(schema.reviews.createdAt))
     .limit(200);
+}
+
+export const REVIEW_PAGE_SIZE = 50;
+export type ReviewStatus = "pending" | "published" | "hidden";
+
+/**
+ * One page of the admin review list, newest first: by status, optionally by star rating, and
+ * matching a search over the reviewer's name, what they wrote and the product's title. Returns the
+ * total so the page can say how many match.
+ */
+export async function reviewPage(
+  db: Db,
+  shopId: string,
+  opts: { status?: ReviewStatus; rating?: number; query?: string; page?: number; size?: number } = {},
+) {
+  const size = opts.size ?? REVIEW_PAGE_SIZE;
+  const page = Math.max(1, Math.floor(opts.page ?? 1));
+  const r = schema.reviews;
+  const q = opts.query?.trim().toLowerCase().slice(0, 100);
+  const like = q ? `%${q.replace(/[\\%_]/g, "\\$&")}%` : null;
+  const where = and(
+    eq(r.shopId, shopId),
+    opts.status ? eq(r.status, opts.status) : undefined,
+    opts.rating ? eq(r.rating, opts.rating) : undefined,
+    like
+      ? or(
+          sql`lower(${r.name}) like ${like}`,
+          sql`lower(${r.body}) like ${like}`,
+          inArray(r.productId, db.select({ id: schema.products.id }).from(schema.products).where(and(eq(schema.products.shopId, shopId), sql`lower(${schema.products.title}) like ${like}`))),
+        )
+      : undefined,
+  );
+  const [rows, [total]] = await Promise.all([
+    db
+      .select({ review: r, productTitle: schema.products.title, orderNumber: schema.orders.number })
+      .from(r)
+      .innerJoin(schema.products, eq(schema.products.id, r.productId))
+      .leftJoin(schema.orders, eq(schema.orders.id, r.orderId))
+      .where(where)
+      .orderBy(desc(r.createdAt), desc(r.id))
+      .limit(size)
+      .offset((page - 1) * size),
+    db.select({ n: sql<number>`count(*)::int` }).from(r).where(where),
+  ]);
+  return { reviews: rows, total: total!.n };
+}
+
+/** How many reviews each status tab holds. */
+export async function reviewCounts(db: Db, shopId: string): Promise<Record<ReviewStatus, number>> {
+  const rows = await db
+    .select({ status: schema.reviews.status, n: sql<number>`count(*)::int` })
+    .from(schema.reviews)
+    .where(eq(schema.reviews.shopId, shopId))
+    .groupBy(schema.reviews.status);
+  const counts = { pending: 0, published: 0, hidden: 0 };
+  for (const row of rows) counts[row.status] = row.n;
+  return counts;
 }
 
 export async function moderateReview(
