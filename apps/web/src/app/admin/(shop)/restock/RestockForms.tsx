@@ -3,7 +3,7 @@ import { startTransition, useActionState } from "react";
 import { FormError } from "@/components/FormError";
 import { cancelRestockAction, createRestockAction, receiveRestockAction, type RestockState } from "../../restock-actions";
 
-type Choice = { variantId: string; title: string; sku: string | null; stock: number | null; cost: string };
+type Choice = { variantId: string; title: string; sku: string | null; stock: number | null; cost: string; suggested?: number };
 
 // Submitted by hand so React doesn't empty what was typed when saving fails.
 const submitWith = (action: (data: FormData) => void) => (e: React.FormEvent<HTMLFormElement>) => {
@@ -47,7 +47,7 @@ export function NewRestockForm({ choices, currencySymbol }: { choices: Choice[];
               <tr key={c.variantId}>
                 <td className="p-3">{c.title}{c.sku && <span className="hint"> · {c.sku}</span>}</td>
                 <td className="p-3 num text-right">{c.stock ?? "Not tracked"}</td>
-                <td className="p-3"><input className="input num w-24" name={`qty.${c.variantId}`} inputMode="numeric" aria-label={`How many ${c.title}`} placeholder="0" /></td>
+                <td className="p-3"><input className="input num w-24" name={`qty.${c.variantId}`} inputMode="numeric" aria-label={`How many ${c.title}`} placeholder="0" defaultValue={c.suggested || ""} /></td>
                 <td className="p-3"><input className="input num w-28" name={`cost.${c.variantId}`} inputMode="decimal" aria-label={`Cost of each ${c.title}`} defaultValue={c.cost} placeholder="Optional" /></td>
               </tr>
             ))}

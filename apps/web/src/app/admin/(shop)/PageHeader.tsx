@@ -5,7 +5,7 @@ export function PageHeader({ title, back, actions }: { title: string; back?: Rea
         {back}
         <h1 className="text-2xl font-bold tracking-tight truncate">{title}</h1>
       </div>
-      {actions && <div className="flex gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
     </header>
   );
 }

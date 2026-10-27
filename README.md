@@ -818,3 +818,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Shelf locations (after launch, part 118)
 
 1. **Where it sits**: each option of the store's own stock can have a shelf location, like A3 or Back room. The pick list is sorted by it, so one walk of the stock room picks everything. The stock count lists options in shelf order, and the inventory page and spreadsheet show it. It goes along when the store is copied.
+
+### Suggested restock (after launch, part 119)
+
+1. **Order from what sold**: "Suggest a restock" on the Inventory page opens a new restock order filled in with enough of each option to last the next 30, 60 or 90 days at the pace of the last 30, less what's on the shelf and already on the way. Options that didn't sell are left empty. The merchant changes anything before saving (`restockSuggestions` in `packages/core/src/inventory.ts`).
