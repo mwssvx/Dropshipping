@@ -810,3 +810,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Barcode and SKU on each option**: the product form takes an option's SKU and barcode (a UPC or EAN from the maker, or the store's own code). Two options in the store can't share a barcode, and a copied product starts without them (`packages/core/src/barcode.ts`, `checkBarcodes` in `products.ts`). Shopify's "Variant Barcode" column comes over on import.
 2. **Labels**: "Print labels" on a product page prints a sheet of labels with the title, option, price and a Code 128 barcode of the barcode, or of the SKU when there's none. It starts at one label for each item on the shelf.
 3. **Scan to count**: the stock count page has a scan box. A scanner types the code and presses Enter, and each scan adds one to that option's count, found by barcode or SKU.
+
+### Pick list (after launch, part 117)
+
+1. **One walk of the shelf**: "Pick list" on the packing slips page adds up what the orders waiting to ship need from the store's own stock, per option, sorted by SKU, with the barcode, the orders each goes in, and what's left once they're picked (in red when it's short). Items a supplier ships are left off and counted in a note (`pickList` in `packages/core/src/pick-list.ts`).
