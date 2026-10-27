@@ -19,7 +19,7 @@ export default async function StockCountPage() {
         {choices.length === 0 ? (
           <p className="hint">Nothing to count: these are for products you keep in stock yourself.</p>
         ) : (
-          <StockCountForm options={choices.map((c) => ({ variantId: c.variantId, title: c.title, sku: c.sku, stock: c.stock }))} />
+          <StockCountForm options={choices.map((c) => ({ variantId: c.variantId, title: c.title, sku: c.sku, barcode: c.barcode, stock: c.stock }))} />
         )}
       </div>
     </main>

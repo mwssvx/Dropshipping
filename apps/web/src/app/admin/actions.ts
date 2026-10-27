@@ -70,6 +70,12 @@ function readStock(v: FormDataEntryValue | null) {
   return n;
 }
 
+/** Blank text means none; a missing field leaves it as it was. */
+function readText(v: FormDataEntryValue | null) {
+  if (v === null) return undefined;
+  return String(v).trim() || null;
+}
+
 /** Blank weight means none; a missing field leaves it as it was. */
 function readWeight(v: FormDataEntryValue | null) {
   if (v === null) return undefined;
@@ -91,6 +97,8 @@ function readProduct(form: FormData): ProductInput {
     }
     const stock = readStock(form.get(`stock.${i}`));
     const weightGrams = readWeight(form.get(`weight.${i}`));
+    const sku = readText(form.get(`sku.${i}`));
+    const barcode = readText(form.get(`barcode.${i}`));
     try {
       const rawOptions = form.get(`options.${i}`);
       let options: Record<string, string> | undefined;
@@ -107,6 +115,8 @@ function readProduct(form: FormData): ProductInput {
         costMinor: optionalMoney(form.get(`cost.${i}`)),
         stock,
         weightGrams,
+        sku,
+        barcode,
       };
     } catch {
       throw new UserError("Enter prices like 24.99.");

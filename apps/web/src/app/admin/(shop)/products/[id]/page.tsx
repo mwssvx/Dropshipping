@@ -74,6 +74,7 @@ export default async function EditProductPage({ params, searchParams }: { params
             <form action={duplicateProductAction.bind(null, product.id)}>
               <button className="btn btn-secondary">Duplicate</button>
             </form>
+            {!product.giftCard && <Link className="btn btn-secondary" href={`/admin/products/${product.id}/labels`}>Print labels</Link>}
             {product.status === "active" && <a className="btn btn-secondary" href={`/s/${shop.handle}/products/${product.handle}`} target="_blank">View on store ↗</a>}
           </>
         } />
@@ -162,6 +163,8 @@ export default async function EditProductPage({ params, searchParams }: { params
               cost: toPrice(v.costMinor),
               stock: v.stock,
               weightGrams: v.weightGrams,
+              sku: v.sku,
+              barcode: v.barcode,
               fromSupplier: !!v.supplierVariantRef,
             })),
             supplier: product.supplier ? { label: product.supplier.label, sourceUrl: product.sourceUrl } : undefined,

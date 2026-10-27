@@ -804,3 +804,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Customs info on products**: a Customs section on the product page takes the HS code (the tariff number, dots allowed) and the two-letter code of the country it was made in (`setCustomsInfo` in `packages/core/src/customs.ts`). Both go along when the store is copied.
 2. **The form**: an order shipping to another country than the store's gets a "Customs form" link next to the packing slip. It prints a declaration with from and to, each item's HS code, origin, quantity, weight and value, the totals, gift or sale, and a line to sign. Products still missing a code are named in a warning that doesn't print.
+
+### Barcodes (after launch, part 116)
+
+1. **Barcode and SKU on each option**: the product form takes an option's SKU and barcode (a UPC or EAN from the maker, or the store's own code). Two options in the store can't share a barcode, and a copied product starts without them (`packages/core/src/barcode.ts`, `checkBarcodes` in `products.ts`). Shopify's "Variant Barcode" column comes over on import.
+2. **Labels**: "Print labels" on a product page prints a sheet of labels with the title, option, price and a Code 128 barcode of the barcode, or of the SKU when there's none. It starts at one label for each item on the shelf.
+3. **Scan to count**: the stock count page has a scan box. A scanner types the code and presses Enter, and each scan adds one to that option's count, found by barcode or SKU.

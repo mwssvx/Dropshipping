@@ -7,6 +7,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { UserError } from "./errors";
 import { MAX_WEIGHT_GRAMS } from "./weight";
+import { parseBarcode } from "./barcode";
 import { isPhotoUrl, keptPhotoTexts, photoColumns, PHOTO_TEXT_MAX } from "./gallery";
 import { toHandle } from "./handles";
 import { MAX_OPTIONS, MAX_VARIANTS } from "./products";
@@ -60,6 +61,14 @@ function money(raw: string | undefined) {
   return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null;
 }
 
+function barcodeOrNull(raw: string) {
+  try {
+    return parseBarcode(raw);
+  } catch {
+    return null;
+  }
+}
+
 export type ShopifyVariant = {
   title: string;
   options: Record<string, string>;
@@ -69,6 +78,7 @@ export type ShopifyVariant = {
   costMinor: number | null;
   stock: number | null;
   weightGrams: number | null;
+  barcode: string | null;
   imageUrl: string | null;
 };
 export type ShopifyProduct = {
@@ -168,6 +178,7 @@ export function readShopifyProducts(text: string) {
       stock: tracked && Number.isFinite(qty) ? Math.max(0, qty) : null,
       // Shopify writes 0 when no weight was set.
       weightGrams: Number.isFinite(grams) && grams > 0 && grams <= MAX_WEIGHT_GRAMS ? grams : null,
+      barcode: barcodeOrNull(get(r, "variant barcode")),
       imageUrl: image && isPhotoUrl(image) ? image : null,
     });
   }

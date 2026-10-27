@@ -115,3 +115,4 @@ export * from "./weight";
 export * from "./restock";
 export * from "./inventory";
 export * from "./customs";
+export * from "./barcode";
