@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseMoney, setCheckoutPhone, setDeliveryEstimates, setDeliveryProtection, setLocalPickup, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
+import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseMoney, setCheckoutPhone, setDeliveryEstimates, setDeliveryProtection, setLocalDelivery, setLocalPickup, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
 import { logged, requireShop } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -142,6 +142,42 @@ export async function setLocalPickupAction(_: PickupState, form: FormData): Prom
     throw e;
   }
   await logged({ shop, user, db }, saved ? "Offered local pickup at checkout" : "Stopped offering local pickup", { href: "/admin/shipping#pickup-heading" });
+  revalidatePath("/admin/shipping");
+  return { saved };
+}
+
+export type LocalDeliveryState = { error?: string; saved?: { postalPrefixes: string[] } | null };
+
+/** Turns local delivery on with its area and price, or off. */
+export async function setLocalDeliveryAction(_: LocalDeliveryState, form: FormData): Promise<LocalDeliveryState> {
+  const { shop, db, user } = await requireShop("shipping");
+  const on = form.get("enabled") === "on";
+  let saved: LocalDeliveryState["saved"] = null;
+  try {
+    if (on) {
+      const amount = (name: string, what: string) => {
+        const raw = String(form.get(name) ?? "").trim();
+        if (!raw) return null;
+        try {
+          return parseMoney(raw);
+        } catch {
+          throw new UserError(`Enter the ${what} as an amount, like 5.00.`);
+        }
+      };
+      saved = await setLocalDelivery(db, shop.id, {
+        postalPrefixes: String(form.get("postalPrefixes") ?? ""),
+        priceMinor: amount("price", "delivery price") ?? 0,
+        freeOverMinor: amount("freeOver", "amount for free delivery"),
+        note: String(form.get("note") ?? ""),
+      });
+    } else {
+      await setLocalDelivery(db, shop.id, null);
+    }
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  await logged({ shop, user, db }, saved ? `Offered local delivery to ${saved.postalPrefixes.length} postal code${saved.postalPrefixes.length === 1 ? "" : "s"}` : "Stopped offering local delivery", { href: "/admin/shipping#local-delivery-heading" });
   revalidatePath("/admin/shipping");
   return { saved };
 }

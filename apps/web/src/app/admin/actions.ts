@@ -8,6 +8,7 @@ import {
   duplicateProduct,
   createShop,
   importProduct,
+  markDeliveredByStore,
   markPickedUp,
   markReadyForPickup,
   parseMoney,
@@ -207,6 +208,10 @@ export async function readyForPickupAction(orderId: string, _: FormState, _form:
 
 export async function pickedUpAction(orderId: string, _: FormState, _form: FormData): Promise<FormState> {
   return orderAction(orderId, async (shopId) => markPickedUp(await fulfillment(), shopId, orderId), "Marked order {order} picked up");
+}
+
+export async function deliveredByStoreAction(orderId: string, _: FormState, _form: FormData): Promise<FormState> {
+  return orderAction(orderId, async (shopId) => markDeliveredByStore(await fulfillment(), shopId, orderId), "Marked order {order} delivered");
 }
 
 export type OrderNotesState = { error?: string; saved?: boolean; note?: string; tags?: string };

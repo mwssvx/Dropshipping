@@ -33,9 +33,14 @@ export async function setLocalPickup(db: Db, shopId: string, input: { address: s
   return value;
 }
 
+/** None of these products come from a supplier: the store has them on its own shelf. */
+export function ownStockOnly(products: { supplierId: string | null; sourceUrl: string | null }[]) {
+  return products.length > 0 && products.every((p) => !p.supplierId && !p.sourceUrl);
+}
+
 /** Whether these products can be picked up: the store offers it and none of them come from a supplier. */
 export function canPickUp(shop: { localPickup: LocalPickup | null }, products: { supplierId: string | null; sourceUrl: string | null }[]) {
-  return !!shop.localPickup && products.length > 0 && products.every((p) => !p.supplierId && !p.sourceUrl);
+  return !!shop.localPickup && ownStockOnly(products);
 }
 
 async function pickupOrder(db: Db, shopId: string, orderId: string) {

@@ -107,6 +107,10 @@ export async function importTracking(ctx: FulfillmentContext, shopId: string, te
       skip(r, "The buyer is picking this order up, so it doesn't need tracking.");
       continue;
     }
+    if (order.localDelivery) {
+      skip(r, "You're delivering this order yourself. Mark it delivered from its page.");
+      continue;
+    }
     const parcels = (await db.query.fulfillments.findMany({ where: eq(schema.fulfillments.orderId, order.id) })).filter((f) => f.status !== "cancelled");
     if (parcels.some((f) => f.trackingNumber?.toLowerCase() === trackingNumber.toLowerCase())) {
       if (!shippedIds.has(order.id) && !result.alreadyHere.includes(order.number)) result.alreadyHere.push(order.number);
@@ -161,7 +165,7 @@ export async function ordersWaitingForTracking(db: Db, shopId: string) {
       ),
       orderBy: (o, { asc }) => [asc(o.number)],
     })
-  ).filter((o) => !o.heldAt && !o.pickup);
+  ).filter((o) => !o.heldAt && !o.pickup && !o.localDelivery);
   const ids = orders.map((o) => o.id);
   const tracked = ids.length
     ? await db.query.fulfillments.findMany({ where: and(inArray(schema.fulfillments.orderId, ids), isNotNull(schema.fulfillments.trackingNumber)) })

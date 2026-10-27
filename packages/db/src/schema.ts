@@ -157,6 +157,8 @@ export const shops = pgTable(
     packingSlipNote: text("packing_slip_note"),
     // Buyers in the store's country can pick up orders of its own stock here, or null when it doesn't offer it.
     localPickup: jsonb("local_pickup").$type<LocalPickup | null>(),
+    // The store delivers its own stock itself to these postal codes, for a fee, or null when it doesn't.
+    localDeliveryArea: jsonb("local_delivery_area").$type<LocalDeliveryArea | null>(),
     // Wholesale: approved business buyers pay this much less, on orders of at least the minimum.
     wholesaleEnabled: boolean("wholesale_enabled").notNull().default(false),
     wholesalePercentOff: integer("wholesale_percent_off").notNull().default(20),
@@ -483,6 +485,9 @@ export type DeliveryProtection = { percent: number; minMinor: number };
 /** Where and how buyers pick up their orders. */
 export type LocalPickup = { address: string; instructions: string | null };
 
+/** Where the store delivers itself and what it charges. Postal codes match by how they start. */
+export type LocalDeliveryArea = { postalPrefixes: string[]; priceMinor: number; freeOverMinor: number | null; note: string | null };
+
 export type Address = {
   name: string;
   line1: string;
@@ -572,6 +577,8 @@ export const orders = pgTable(
     // ready (pickupReadyAt); it's delivered when the merchant marks it picked up.
     pickup: boolean("pickup").notNull().default(false),
     pickupReadyAt: timestamp("pickup_ready_at", { withTimezone: true }),
+    // The store delivers it itself (local delivery); it's delivered when the merchant says so.
+    localDelivery: boolean("local_delivery").notNull().default(false),
     riskReviewedAt: timestamp("risk_reviewed_at", { withTimezone: true }),
     // Has pre-ordered items: waits for stock before going to the supplier, promised by this date.
     preorderShipsBy: timestamp("preorder_ships_by", { withTimezone: true }),

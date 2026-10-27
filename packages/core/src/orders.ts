@@ -26,7 +26,8 @@ import { cartLineKey, cleanPersonalization, missingPersonalization, personalizat
 import { openPreorder, preorderDeadline, preordersSold } from "./preorders";
 import { boughtBefore, describeLimitProblem, limitProblem } from "./purchase-limits";
 import { onHoliday } from "./store-closure";
-import { canPickUp, PICKUP_METHOD, PICKUP_RATE_ID } from "./local-pickup";
+import { canPickUp, ownStockOnly, PICKUP_METHOD, PICKUP_RATE_ID } from "./local-pickup";
+import { inDeliveryArea, LOCAL_DELIVERY_METHOD, LOCAL_DELIVERY_RATE_ID, localDeliveryPrice } from "./local-delivery";
 
 type Shop = typeof schema.shops.$inferSelect;
 type Order = typeof schema.orders.$inferSelect;
@@ -56,6 +57,8 @@ export async function quoteCart(
     /** Where the buyer seems to be, from their connection. Used for the estimate only if the store ships there. */
     countryHint?: string | null;
     shippingRateId?: string | null;
+    /** The buyer's postal code, for the store's own delivery area. */
+    postalCode?: string | null;
   } = {},
 ) {
   const wanted = lines.filter((l) => l.quantity > 0);
@@ -168,12 +171,16 @@ export async function quoteCart(
   let shippingMinor = 0;
   let shipping: { rateId: string; name: string; minDays: number | null; maxDays: number | null } | null = null;
   let freeShippingOverMinor: number | null = null;
-  // Picking up is free, in the store's own country, when nothing in the cart comes from a supplier.
-  const pickupHere =
-    hasGoods &&
-    (opts.country ?? shop.country) === shop.country &&
-    canPickUp(shop, rows.filter((r) => !r.product.giftCard && wanted.some((l) => l.variantId === r.variant.id)).map((r) => r.product));
+  // Picking up (free) and the store's own delivery are in its own country, when nothing in the
+  // cart comes from a supplier. Local delivery also needs the buyer's postal code in its area.
+  const onShelf = rows.filter((r) => !r.product.giftCard && wanted.some((l) => l.variantId === r.variant.id)).map((r) => r.product);
+  const nearby = hasGoods && (opts.country ?? shop.country) === shop.country;
+  const pickupHere = nearby && canPickUp(shop, onShelf);
   const pickingUp = pickupHere && opts.shippingRateId === PICKUP_RATE_ID;
+  const area = shop.localDeliveryArea;
+  const ownStock = hasGoods && ownStockOnly(onShelf);
+  const deliveryHere = nearby && !!area && ownStock && inDeliveryArea(area, opts.postalCode);
+  const deliveringLocally = deliveryHere && opts.shippingRateId === LOCAL_DELIVERY_RATE_ID;
   if (hasGoods) {
     const { zones } = await listShippingZones(db, shop.id);
     const hinted = opts.countryHint && zoneFor(zones, opts.countryHint)?.rates.length ? opts.countryHint : null;
@@ -187,9 +194,14 @@ export async function quoteCart(
       shipping = { rateId: PICKUP_RATE_ID, name: PICKUP_METHOD, minDays: null, maxDays: null };
       freeShippingOverMinor = null;
     }
-    if (!rates.length && opts.country && !pickingUp) throw new UserError(`${shop.name} doesn't ship to ${countryName(opts.country)} yet.`, "no_shipping");
+    if (deliveringLocally) {
+      shippingMinor = localDeliveryPrice(area!, goodsMinor);
+      shipping = { rateId: LOCAL_DELIVERY_RATE_ID, name: LOCAL_DELIVERY_METHOD, minDays: null, maxDays: null };
+      freeShippingOverMinor = shippingMinor ? area!.freeOverMinor : null;
+    }
+    if (!rates.length && opts.country && !pickingUp && !deliveringLocally) throw new UserError(`${shop.name} doesn't ship to ${countryName(opts.country)} yet.`, "no_shipping");
     // The rate the buyer picked, or the cheapest for this cart. Picking up is only ever chosen.
-    const rate = pickingUp ? undefined : (rates.find((r) => r.id === opts.shippingRateId) ?? [...rates].sort((a, b) => priceRate(a, goodsMinor) - priceRate(b, goodsMinor))[0]);
+    const rate = pickingUp || deliveringLocally ? undefined : (rates.find((r) => r.id === opts.shippingRateId) ?? [...rates].sort((a, b) => priceRate(a, goodsMinor) - priceRate(b, goodsMinor))[0]);
     if (rate) {
       shippingMinor = priceRate(rate, goodsMinor);
       shipping = { rateId: rate.id, name: rate.name, minDays: rate.minDays, maxDays: rate.maxDays };
@@ -283,6 +295,12 @@ export async function quoteCart(
     canPickUp: pickupHere,
     /** They chose to. */
     pickingUp,
+    /** Everything that ships is the store's own stock (not from a supplier). */
+    ownStock,
+    /** The store can deliver this cart itself to the buyer's postal code. */
+    canDeliverLocally: deliveryHere,
+    /** They chose it. */
+    deliveringLocally,
     giftCard,
     /** What's left to pay by card after the gift card. Before tax, until checkout. */
     dueMinor: totalMinor - (giftCard?.appliedMinor ?? 0),
@@ -402,6 +420,7 @@ export async function startCheckout(
     buyerEmail: noCodes ? null : input.buyerEmail,
     giftCardCode: noCodes ? null : input.giftCardCode,
     country: address.country,
+    postalCode: address.postalCode,
     shippingRateId: input.shippingRateId,
   });
   const cart = followUp ? asFollowUp(quoted, followUp.percentOff) : repeat ? asFollowUp(quoted, repeat.percentOff, { keepShipping: true }) : quoted;
@@ -443,9 +462,9 @@ export async function startCheckout(
     registrations: (await listTaxRegistrations(db, shop.id)).map((r) => r.jurisdiction),
   });
   // Protection is the buyer's own choice at checkout; repeat deliveries and offers never add it.
-  // Nothing travels on an order picked up, so there's nothing to protect.
+  // Nothing goes by courier on an order picked up or delivered by the store, so there's nothing to protect.
   const protectionMinor =
-    shop.deliveryProtection && input.protection && !followUp && !repeat && !cart.pickingUp ? protectionFee(shop.deliveryProtection, cart.goodsMinor - cart.discountMinor) : 0;
+    shop.deliveryProtection && input.protection && !followUp && !repeat && !cart.pickingUp && !cart.deliveringLocally ? protectionFee(shop.deliveryProtection, cart.goodsMinor - cart.discountMinor) : 0;
   const quote = {
     ...cart,
     protectionMinor,
@@ -523,6 +542,7 @@ export async function startCheckout(
         giftCardMinor,
         shippingMethod: cart.shipping?.name ?? null,
         pickup: cart.pickingUp,
+        localDelivery: cart.deliveringLocally,
         // Only something that ships can be a gift; gift cards are emailed to the buyer.
         gift: gift && cart.items.some((i) => !i.giftCard) ? gift : null,
         buyerNote: parsed.data.note,

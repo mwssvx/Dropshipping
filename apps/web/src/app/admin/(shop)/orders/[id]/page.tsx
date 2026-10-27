@@ -5,7 +5,7 @@ import { fulfillment, requireShop, storeAddress, suppliers, testPayments } from 
 import { OrderEditForm } from "@/components/OrderEditForm";
 import { editOrderAction } from "../../../actions";
 import { PaymentLinkActions } from "./PaymentLinkActions";
-import { CheckTrackingButton, ManualTrackingForm, PickupButtons, RetryButton } from "./FulfillmentActions";
+import { CheckTrackingButton, DeliveredButton, ManualTrackingForm, PickupButtons, RetryButton } from "./FulfillmentActions";
 import { RefundForm } from "./RefundForm";
 import { FixWithAiButton } from "./FixWithAiButton";
 import { RiskActions } from "./RiskActions";
@@ -263,6 +263,18 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
               </p>
               {refundable && !held && order.fulfillmentStatus !== "delivered" && <PickupButtons orderId={order.id} ready={!!order.pickupReadyAt} />}
             </section>
+          ) : order.localDelivery ? (
+            <section className="card p-5 flex flex-col gap-3" aria-labelledby="local-delivery-heading">
+              <h2 id="local-delivery-heading" className="font-semibold">You&apos;re delivering this</h2>
+              <p className="text-sm">
+                {order.fulfillmentStatus === "delivered"
+                  ? `Delivered on ${longDay.format(order.fulfillments.find((f) => f.deliveredAt)?.deliveredAt ?? order.updatedAt)}.`
+                  : !refundable
+                    ? "Nothing to deliver until the payment comes through."
+                    : `The buyer chose local delivery, so you drop it off at the address here. Press Delivered when it's at their door and we'll email ${order.email}.`}
+              </p>
+              {refundable && !held && order.fulfillmentStatus !== "delivered" && <DeliveredButton orderId={order.id} />}
+            </section>
           ) : (
           <section className="card p-5 flex flex-col gap-4">
             <h2 className="font-semibold">Delivery</h2>
@@ -329,7 +341,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
             {order.customerId && <Link href={`/admin/customers/${order.customerId}`} className="underline">View customer</Link>}
           </div>
           <div>
-            <h2 className="font-semibold mb-1">{order.pickup ? "Buyer's address (picking up)" : "Ship to"}</h2>
+            <h2 className="font-semibold mb-1">{order.pickup ? "Buyer's address (picking up)" : order.localDelivery ? "Deliver to" : "Ship to"}</h2>
             <address className="not-italic hint">
               {order.gift && <>{a.name}<br /></>}
               {a.line1}{a.line2 ? <>, {a.line2}</> : null}<br />{a.city}{a.region ? `, ${a.region}` : ""} {a.postalCode}<br />{a.country}

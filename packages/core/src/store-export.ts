@@ -94,6 +94,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       packing_slip_note: shop.packingSlipNote,
       restock_alert_at: shop.restockAlertAt,
       local_pickup: shop.localPickup,
+      local_delivery_area: shop.localDeliveryArea,
       price_watch: { min_margin_percent: shop.minMarginPercent, auto_reprice: shop.autoReprice },
       reviews_auto_publish: shop.reviewsAutoPublish,
       presentment_currencies: shop.presentmentCurrencies,
@@ -263,6 +264,10 @@ const importSchema = z.object({
       delivery_protection: z.object({ percent: z.number().min(0.5).max(10), min_minor: z.number().int().min(0).max(10_000) }).nullable().optional(),
       packing_slip_note: z.string().max(500).nullable().optional(),
       restock_alert_at: z.number().int().min(0).max(1000).optional(),
+      local_delivery_area: z
+        .object({ postalPrefixes: z.array(z.string().regex(/^[A-Z0-9]{1,10}$/)).min(1).max(200), priceMinor: z.number().int().min(0).max(100_000), freeOverMinor: z.number().int().positive().nullable(), note: z.string().max(200).nullable() })
+        .nullable()
+        .optional(),
       local_pickup: z.object({ address: z.string().trim().min(1).max(300), instructions: z.string().max(500).nullable() }).nullable().optional(),
       price_watch: z.object({ min_margin_percent: z.number().int().min(0).max(90), auto_reprice: z.boolean() }).optional(),
       reviews_auto_publish: z.boolean().optional(),
@@ -696,6 +701,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
     if (data.store.packing_slip_note !== undefined) settings.packingSlipNote = data.store.packing_slip_note;
     if (data.store.restock_alert_at !== undefined) settings.restockAlertAt = data.store.restock_alert_at;
     if (data.store.local_pickup !== undefined) settings.localPickup = data.store.local_pickup;
+    if (data.store.local_delivery_area !== undefined) settings.localDeliveryArea = data.store.local_delivery_area;
     if (data.store.price_watch) {
       settings.minMarginPercent = data.store.price_watch.min_margin_percent;
       settings.autoReprice = data.store.price_watch.auto_reprice;

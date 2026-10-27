@@ -4,6 +4,7 @@ import { PageHeader } from "../PageHeader";
 import { setCheckoutPhoneAction } from "../../shipping-actions";
 import { DeliveryEstimatesForm } from "./DeliveryEstimatesForm";
 import { DeliveryProtectionForm } from "./DeliveryProtectionForm";
+import { LocalDeliveryForm } from "./LocalDeliveryForm";
 import { LocalPickupForm } from "./LocalPickupForm";
 import { DeleteButton, RateForm, StarterButton, ZoneForm, type Country } from "./ShippingForms";
 
@@ -144,6 +145,17 @@ export default async function ShippingPage() {
             and Picked up when they have it.
           </p>
           <LocalPickupForm pickup={shop.localPickup} />
+        </section>
+        <section className="card p-5 flex flex-col gap-3" aria-labelledby="local-delivery-heading" id="local-delivery">
+          <h2 id="local-delivery-heading" className="font-semibold">Local delivery</h2>
+          <p className="text-sm">
+            Drop orders off yourself to buyers nearby, for your own price. Buyers see it at checkout once their postal code is in your area and everything in the
+            cart is your own stock. Press Delivered on the order when it&apos;s at their door.
+          </p>
+          <LocalDeliveryForm
+            area={shop.localDeliveryArea}
+            symbol={new Intl.NumberFormat("en-US", { style: "currency", currency: shop.currency }).formatToParts(0).find((p) => p.type === "currency")?.value ?? ""}
+          />
         </section>
         <section className="card p-5 flex flex-col gap-3" aria-labelledby="new-zone">
           <h2 id="new-zone" className="font-semibold">Add a zone</h2>

@@ -659,6 +659,13 @@
       "when": 1793090349248,
       "tag": "0093_local_pickup",
       "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1793091812372,
+      "tag": "0094_local_delivery",
+      "breakpoints": true
     }
   ]
 }
