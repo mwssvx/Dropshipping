@@ -137,3 +137,21 @@ export async function recordStockCount(db: Db, shopId: string, counts: { variant
     return { changed, missing, found, missingCostMinor };
   });
 }
+
+export const SUGGEST_DAYS = [30, 60, 90] as const;
+
+/**
+ * How many of each option to order to last the next `days` days at the pace of the last 30: what
+ * that pace sells in those days, less what's on the shelf and already on the way. Options that
+ * didn't sell get no suggestion, since there's no pace to go by.
+ */
+export async function restockSuggestions(db: Db, shop: { id: string; restockAlertAt: number }, days: number = 30, now = new Date()) {
+  const { rows } = await inventoryReport(db, shop, now);
+  const out = new Map<string, number>();
+  for (const r of rows) {
+    if (r.sold <= 0) continue;
+    const need = Math.ceil((r.sold / DAYS) * days) - Math.max(r.stock, 0) - r.incoming;
+    if (need > 0) out.set(r.variantId, need);
+  }
+  return out;
+}
