@@ -15,6 +15,9 @@ export type VariantValues = {
   stock?: number | null;
   /** Grams, for shipping rates that go by weight. */
   weightGrams?: number | null;
+  sku?: string | null;
+  /** The UPC, EAN or the store's own code a scanner reads. */
+  barcode?: string | null;
   fromSupplier?: boolean;
 };
 
@@ -243,6 +246,14 @@ function VariantRow({ index, initial, currency, showTitle, generated, onPrices }
         <div className="field">
           <label className="label" htmlFor={id("weight")}>Weight (g)</label>
           <input className="input num" id={id("weight")} name={`weight.${index}`} inputMode="numeric" defaultValue={initial.weightGrams ?? ""} placeholder="Packed, optional" />
+        </div>
+        <div className="field">
+          <label className="label" htmlFor={id("sku")}>SKU</label>
+          <input className="input" id={id("sku")} name={`sku.${index}`} maxLength={100} defaultValue={initial.sku ?? ""} placeholder="Optional" />
+        </div>
+        <div className="field">
+          <label className="label" htmlFor={id("barcode")}>Barcode</label>
+          <input className="input num" id={id("barcode")} name={`barcode.${index}`} maxLength={48} defaultValue={initial.barcode ?? ""} placeholder="UPC, EAN or your own" />
         </div>
       </div>
       <p className="hint num" aria-live="polite">

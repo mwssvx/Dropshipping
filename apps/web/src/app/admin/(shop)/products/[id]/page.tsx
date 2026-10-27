@@ -162,6 +162,8 @@ export default async function EditProductPage({ params, searchParams }: { params
               cost: toPrice(v.costMinor),
               stock: v.stock,
               weightGrams: v.weightGrams,
+              sku: v.sku,
+              barcode: v.barcode,
               fromSupplier: !!v.supplierVariantRef,
             })),
             supplier: product.supplier ? { label: product.supplier.label, sourceUrl: product.sourceUrl } : undefined,
