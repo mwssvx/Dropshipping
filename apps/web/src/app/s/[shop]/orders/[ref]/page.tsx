@@ -58,7 +58,7 @@ export default async function OrderStatusPage({ params, searchParams }: { params
   const subscription = paid ? await subscriptionForOrder(await db(), order.id) : null;
   const partOf = order.subscriptionId ? await (await db()).query.subscriptions.findFirst({ where: (s, { eq }) => eq(s.id, order.subscriptionId!), columns: { token: true, status: true } }) : null;
   const arrives = paid ? await orderDelivery(await db(), shop, order) : null;
-  const pickupText = paid && order.pickup ? await storeT(handle) : null;
+  const pickupText = paid && (order.pickup || order.localDelivery) ? await storeT(handle) : null;
   const steps = order.pickup ? [
     { label: "Order confirmed", done: paid },
     { label: "Being prepared", done: paid },
@@ -66,7 +66,7 @@ export default async function OrderStatusPage({ params, searchParams }: { params
     { label: "Picked up", done: order.fulfillmentStatus === "delivered" },
   ] : [
     { label: "Order confirmed", done: paid },
-    { label: "Being prepared", done: order.fulfillments.some((f) => f.placedAt || f.shippedAt) },
+    { label: "Being prepared", done: order.localDelivery ? paid : order.fulfillments.some((f) => f.placedAt || f.shippedAt) },
     { label: "On its way", done: ["shipped", "delivered"].includes(order.fulfillmentStatus) },
     { label: "Delivered", done: order.fulfillmentStatus === "delivered" },
   ];
@@ -188,7 +188,13 @@ export default async function OrderStatusPage({ params, searchParams }: { params
           Your delivery is protected. If it&apos;s lost or arrives damaged, <a className="underline" href="#questions">tell {shop.name} below</a> and they&apos;ll send it again for free.
         </p>
       )}
-      {pickupText && order.paymentStatus !== "refunded" && (
+      {pickupText && order.localDelivery && order.paymentStatus !== "refunded" && (
+        <p className="banner banner-info text-sm" role="status">
+          {order.fulfillmentStatus === "delivered" ? pickupText.localDelivered(shop.name) : pickupText.localDeliveryWaiting(shop.name)}
+          {order.fulfillmentStatus !== "delivered" && shop.localDeliveryArea?.note && <> {shop.localDeliveryArea.note.replace(/\.$/, "")}.</>}
+        </p>
+      )}
+      {pickupText && order.pickup && order.paymentStatus !== "refunded" && (
         <section className="banner banner-info text-sm flex flex-col gap-1" role="status" aria-label={pickupText.pickUp}>
           {order.fulfillmentStatus === "delivered" ? (
             <p>{pickupText.pickedUp}</p>
@@ -203,7 +209,7 @@ export default async function OrderStatusPage({ params, searchParams }: { params
           )}
         </section>
       )}
-      {paid && shipped.length === 0 && !order.preorderShipsBy && !order.pickup && (
+      {paid && shipped.length === 0 && !order.preorderShipsBy && !order.pickup && !order.localDelivery && (
         <p className="hint text-sm">
           {order.lines.length === 1 ? "Your item usually ships" : "Your items usually ship"} within a few days. We&apos;ll email tracking to {order.email} as soon as it&apos;s on its way.
         </p>

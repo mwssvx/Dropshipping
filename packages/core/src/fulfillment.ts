@@ -653,7 +653,9 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
         ``,
         order.pickup
           ? `You're picking it up from ${shop.name}. We'll email you when it's ready, with the address. See your order any time: ${link}`
-          : `We'll email you again when it ships. Track your order any time: ${link}`,
+          : order.localDelivery
+            ? `${shop.name} is delivering it to you themselves${shop.localDeliveryArea?.note ? ` (${shop.localDeliveryArea.note})` : ""}. See your order any time: ${link}`
+            : `We'll email you again when it ships. Track your order any time: ${link}`,
       ].join("\n"),
     };
   }

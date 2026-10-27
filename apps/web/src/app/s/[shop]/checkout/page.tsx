@@ -1,6 +1,6 @@
 import { PixelEvent } from "@/components/PixelEvent";
 import { redirect } from "next/navigation";
-import { addonOffer, convertAmount, convertPrice, protectionFee, countryName, formatMoney, lastCheckoutDetails, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, onHoliday, PICKUP_RATE_ID, storePixels, taxExemptionFor, UserError } from "@sf/core";
+import { addonOffer, convertAmount, convertPrice, protectionFee, countryName, formatMoney, lastCheckoutDetails, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, onHoliday, LOCAL_DELIVERY_RATE_ID, localDeliveryPrice, PICKUP_RATE_ID, storePixels, taxExemptionFor, UserError } from "@sf/core";
 import { buyerFx } from "@/lib/currency";
 import { currentBuyer } from "@/lib/buyer";
 import { readCart, readDiscountCode, readGiftCardCode } from "@/lib/cart";
@@ -64,20 +64,35 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
         }),
       }))
     : null;
-  // Picking up, free, next to the rates for the store's own country.
+  // Picking up and the store's own delivery sit next to the rates for its own country.
+  const homeZone = (zs: ZoneChoice[]) => {
+    const own = zs.find((z) => z.countries.includes(shop.country));
+    if (own) return own;
+    const made = { countries: [shop.country], rates: [...(zs.find((z) => z.countries.includes("*"))?.rates ?? [])] };
+    zs.unshift(made);
+    return made;
+  };
   if (choices && quote.canPickUp && shop.localPickup) {
     const pickup: RateChoice = {
       id: PICKUP_RATE_ID, name: t.pickUp, days: t.pickupFrom(shop.localPickup.address.split("\n")[0]!), priceMinor: 0, priceLabel: t.free,
       totalLabel: money(presentQuote({ ...quote, shippingMinor: 0, taxMinor: 0 }, fx).totalMinor), pickup: true,
     };
-    const own = choices.find((z) => z.countries.includes(shop.country));
-    if (own) own.rates.push(pickup);
-    else choices.unshift({ countries: [shop.country], rates: [...(choices.find((z) => z.countries.includes("*"))?.rates ?? []), pickup] });
+    homeZone(choices).rates.push(pickup);
+  }
+  // The store's own delivery, shown once the postal code is in its area.
+  if (choices && quote.ownStock && shop.localDeliveryArea) {
+    const area = shop.localDeliveryArea;
+    const price = quote.discount?.freeShipping ? 0 : localDeliveryPrice(area, quote.goodsMinor);
+    const p = presentQuote({ ...quote, shippingMinor: price, taxMinor: 0 }, fx);
+    homeZone(choices).rates.push({
+      id: LOCAL_DELIVERY_RATE_ID, name: t.localDelivery, days: area.note ?? t.deliveredBy(shop.name), priceMinor: p.shippingMinor,
+      priceLabel: p.shippingMinor ? money(p.shippingMinor) : t.free, totalLabel: money(p.totalMinor), postalPrefixes: area.postalPrefixes,
+    });
   }
   const lang = await storeLang(handle);
   const nameOf = countryNames(lang);
   const shipped = hasGoods ? shipsTo(zones) : [...SHIPPING_COUNTRIES];
-  if (quote.canPickUp && shop.localPickup && !shipped.includes(shop.country)) shipped.push(shop.country);
+  if ((quote.canPickUp || (quote.ownStock && shop.localDeliveryArea)) && !shipped.includes(shop.country)) shipped.push(shop.country);
   const countries = shipped.map((c) => [c, nameOf(c, countryName(c))] as [string, string]).sort((a, b) => a[1].localeCompare(b[1], lang ?? "en"));
   const withoutShipping = presentQuote({ ...quote, shippingMinor: 0, taxMinor: 0 }, fx);
   // One more product for a little less, unless this is a wholesale or gift-card-only order.

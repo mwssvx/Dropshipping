@@ -2,7 +2,7 @@
 import { useActionState, useState } from "react";
 import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
-import { addTrackingAction, checkTrackingAction, pickedUpAction, readyForPickupAction, retryOrderAction } from "../../../actions";
+import { addTrackingAction, checkTrackingAction, deliveredByStoreAction, pickedUpAction, readyForPickupAction, retryOrderAction } from "../../../actions";
 
 export function RetryButton({ orderId }: { orderId: string }) {
   const [state, action] = useActionState(retryOrderAction.bind(null, orderId), {});
@@ -79,5 +79,18 @@ export function PickupButtons({ orderId, ready }: { orderId: string; ready: bool
         </form>
       </div>
     </div>
+  );
+}
+
+/** For an order the store delivers itself. */
+export function DeliveredButton({ orderId }: { orderId: string }) {
+  const [state, action] = useActionState(deliveredByStoreAction.bind(null, orderId), {});
+  return (
+    <form action={action} className="flex flex-col gap-2">
+      <FormError message={state.error} />
+      <div>
+        <SubmitButton pendingText="Saving…">Delivered</SubmitButton>
+      </div>
+    </form>
   );
 }

@@ -10,6 +10,7 @@ import type { PaymentProvider } from "./payments";
 import { BuiltInTaxCalculator, listTaxRegistrations, type TaxCalculator } from "./tax";
 import { percentOff } from "./wholesale";
 import { PICKUP_RATE_ID } from "./local-pickup";
+import { LOCAL_DELIVERY_RATE_ID } from "./local-delivery";
 
 type Shop = typeof schema.shops.$inferSelect;
 type Order = typeof schema.orders.$inferSelect;
@@ -130,8 +131,8 @@ export async function acceptPostPurchaseOffer(
       ctx.payments,
       shop,
       { email: parent.email, address: parent.shippingAddress, lines: [{ variantId: input.variantId, quantity: 1 }], followUp: { parentOrderId: parent.id, percentOff: offer.percentOff },
-        // Picked up with the order it was added to, when it can be.
-        shippingRateId: parent.pickup ? PICKUP_RATE_ID : null },
+        // Picked up or delivered with the order it was added to, when it can be.
+        shippingRateId: parent.pickup ? PICKUP_RATE_ID : parent.localDelivery ? LOCAL_DELIVERY_RATE_ID : null },
       opts.taxCalculator,
     ));
   } catch (e) {
