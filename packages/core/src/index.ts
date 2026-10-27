@@ -36,6 +36,7 @@ export * from "./discounts";
 export * from "./reviews";
 export * from "./questions";
 export * from "./growth";
+export * from "./abandoned";
 export * from "./analytics";
 export * from "./api-keys";
 export * from "./webhooks";

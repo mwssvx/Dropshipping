@@ -922,3 +922,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Light product pickers (after launch, part 144)
 
 1. **Pages that only need a list of names**: the discount, after-checkout offer, tag rule, profit, theme menu, blog and price-change pages used to load every product with all its options and photos just to fill a dropdown, and the shipping and currency pages did the same to show one example. They now load only ids, titles and status (`productChoices`), or one example product (`sampleProduct`), so they stay quick with a big catalog.
+
+### Abandoned checkouts (after launch, part 145)
+
+1. **See who left at checkout**: Orders → Abandoned checkouts lists every buyer from the last 30 days who started checking out and didn't pay, an hour or more ago (`abandonedCheckouts`). Each row shows what they left, whether the reminder email went out (and whether it carried a code), and whether they came back and paid, on the same checkout or as a new order with the same email. The top of the page sums how many were left, what they were worth and how many came back. When reminder emails are off, the page says so and links to Marketing.
