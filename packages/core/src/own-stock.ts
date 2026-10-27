@@ -45,14 +45,27 @@ async function change(db: Db, variantId: string, by: number, why: { reason: Reas
 }
 
 /** Writes one line of an option's stock history. */
-export async function recordMovement(db: Db, variantId: string, m: { reason: Reason; orderId?: string | null; change: number; stockAfter: number | null }) {
+export async function recordMovement(db: Db, variantId: string, m: { reason: Reason; orderId?: string | null; restockOrderId?: string | null; change: number; stockAfter: number | null }) {
   const [v] = await db
     .select({ shopId: schema.products.shopId })
     .from(schema.variants)
     .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
     .where(eq(schema.variants.id, variantId));
   if (!v) return;
-  await db.insert(schema.stockMovements).values({ shopId: v.shopId, variantId, orderId: m.orderId ?? null, reason: m.reason, change: m.change, stockAfter: m.stockAfter });
+  await db.insert(schema.stockMovements).values({ shopId: v.shopId, variantId, orderId: m.orderId ?? null, restockOrderId: m.restockOrderId ?? null, reason: m.reason, change: m.change, stockAfter: m.stockAfter });
+}
+
+/**
+ * Stock that arrived on a restock order goes on the shelf. An option that wasn't counted starts
+ * counting from what arrived.
+ */
+export async function receiveStock(db: Db, variantId: string, n: number, restockOrderId: string) {
+  const [after] = await db
+    .update(schema.variants)
+    .set({ stock: sql`coalesce(${schema.variants.stock}, 0) + ${n}` })
+    .where(eq(schema.variants.id, variantId))
+    .returning({ stock: schema.variants.stock });
+  if (after) await recordMovement(db, variantId, { reason: "received", restockOrderId, change: n, stockAfter: after.stock });
 }
 
 /** A paid order takes its items off the store's own stock, once. */
@@ -107,19 +120,29 @@ export async function recordStockEdits(db: Db, productId: string, before: Map<st
   }
 }
 
-export type StockMovement = { id: string; at: Date; option: string; reason: Reason; change: number; stockAfter: number | null; order: { id: string; number: number } | null };
+export type StockMovement = {
+  id: string;
+  at: Date;
+  option: string;
+  reason: Reason;
+  change: number;
+  stockAfter: number | null;
+  order: { id: string; number: number } | null;
+  restock: { id: string; number: number } | null;
+};
 
 /** A product's stock history, newest first. */
 export async function stockHistory(db: Db, shopId: string, productId: string, limit = 50): Promise<StockMovement[]> {
   const rows = await db
-    .select({ m: schema.stockMovements, option: schema.variants.title, orderNumber: schema.orders.number })
+    .select({ m: schema.stockMovements, option: schema.variants.title, orderNumber: schema.orders.number, restockNumber: schema.restockOrders.number })
     .from(schema.stockMovements)
     .innerJoin(schema.variants, eq(schema.variants.id, schema.stockMovements.variantId))
     .leftJoin(schema.orders, eq(schema.orders.id, schema.stockMovements.orderId))
+    .leftJoin(schema.restockOrders, eq(schema.restockOrders.id, schema.stockMovements.restockOrderId))
     .where(and(eq(schema.stockMovements.shopId, shopId), eq(schema.variants.productId, productId)))
     .orderBy(desc(schema.stockMovements.seq))
     .limit(limit);
-  return rows.map(({ m, option, orderNumber }) => ({
+  return rows.map(({ m, option, orderNumber, restockNumber }) => ({
     id: m.id,
     at: m.createdAt,
     option,
@@ -127,6 +150,7 @@ export async function stockHistory(db: Db, shopId: string, productId: string, li
     change: m.change,
     stockAfter: m.stockAfter,
     order: m.orderId && orderNumber !== null ? { id: m.orderId, number: orderNumber } : null,
+    restock: m.restockOrderId && restockNumber !== null ? { id: m.restockOrderId, number: restockNumber } : null,
   }));
 }
 

@@ -782,3 +782,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **What things weigh**: each option of a product can carry its packed weight in grams ("Weight (g)" on the product page, `variants.weight_grams`). Shopify imports bring it in from "Variant Grams", and the store backup keeps it.
 2. **Rates for a weight range**: a shipping rate can be limited to orders from and/or up to a weight in kg ("Only for some order weights" when adding a rate; `minWeightGrams`/`maxWeightGrams`, `fitsWeight` in `packages/core/src/shipping.ts`). Both ends count, so "up to 2 kg" includes 2 kg.
 3. **At checkout**: the cart's weight is the sum of its options' weights (`quoteCart` returns `weightGrams`; options without one count as nothing). Only rates that fit show, the cheapest fitting one is the default, and an order heavier than every rate's limit is told plainly that there's no shipping for it.
+
+### Restock orders (after launch, part 112)
+
+1. **What you ordered**: for the stock a store keeps itself, the merchant writes down a restock order: who it's from, when it should arrive, and how many of each option at what cost (Restock in the menu; `restock_orders`, `restock_lines`, `createRestockOrder` in `packages/core/src/restock.ts`). Supplier products restock on their own, so they can't be added.
+2. **On the way**: each product shows what's still coming for it from open restock orders (`incomingStock`).
+3. **When it arrives**: the merchant receives the parcel, all at once or a part at a time (`receiveRestock`). It goes on the stock count (an option that wasn't counted starts counting), the cost paid becomes the option's cost, and the stock history says which restock it arrived on. The order is done once everything is in; cancelling keeps what already arrived.

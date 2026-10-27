@@ -112,3 +112,4 @@ export * from "./local-pickup";
 export * from "./local-delivery";
 export * from "./gift-wrap";
 export * from "./weight";
+export * from "./restock";

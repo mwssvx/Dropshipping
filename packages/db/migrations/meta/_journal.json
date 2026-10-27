@@ -687,6 +687,13 @@
       "when": 1793097194813,
       "tag": "0097_weight_rates",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1793098089082,
+      "tag": "0098_restock_orders",
+      "breakpoints": true
     }
   ]
 }

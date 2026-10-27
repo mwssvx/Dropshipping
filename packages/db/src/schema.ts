@@ -1605,7 +1605,9 @@ export const stockMovements = pgTable(
     shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
     variantId: uuid("variant_id").notNull().references(() => variants.id, { onDelete: "cascade" }),
     orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
-    reason: text("reason", { enum: ["start", "edit", "sale", "returned", "swap_out", "swap_in"] }).notNull(),
+    // The restock order it arrived on, for "received".
+    restockOrderId: uuid("restock_order_id").references((): AnyPgColumn => restockOrders.id, { onDelete: "set null" }),
+    reason: text("reason", { enum: ["start", "edit", "sale", "returned", "swap_out", "swap_in", "received"] }).notNull(),
     change: integer("change").notNull(),
     // The count after it; null when the option stopped being counted.
     stockAfter: integer("stock_after"),
@@ -1614,6 +1616,47 @@ export const stockMovements = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("stock_movements_variant_idx").on(t.variantId, t.seq)],
+);
+
+// Restock orders: what the merchant ordered from their own supplier for the stock they keep
+// themselves, and how much of it has arrived. Receiving adds it to the stock count.
+export const restockOrders = pgTable(
+  "restock_orders",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    // #1, #2… per store.
+    number: integer("number").notNull(),
+    supplierName: text("supplier_name").notNull(),
+    note: text("note"),
+    expectedOn: date("expected_on", { mode: "string" }),
+    status: text("status", { enum: ["open", "received", "cancelled"] }).notNull().default("open"),
+    createdAt: createdAt(),
+    receivedAt: timestamp("received_at", { withTimezone: true }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("restock_orders_shop_number_uq").on(t.shopId, t.number), index("restock_orders_shop_status_idx").on(t.shopId, t.status)],
+);
+
+export const restockLines = pgTable(
+  "restock_lines",
+  {
+    id: id(),
+    restockOrderId: uuid("restock_order_id").notNull().references(() => restockOrders.id, { onDelete: "cascade" }),
+    // Kept when the option is deleted later, with its name as it was.
+    variantId: uuid("variant_id").references(() => variants.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    quantity: integer("quantity").notNull(),
+    receivedQuantity: integer("received_quantity").notNull().default(0),
+    // What one costs from this supplier; becomes the option's cost when it arrives.
+    unitCostMinor: money("unit_cost_minor"),
+    position: integer("position").notNull().default(0),
+  },
+  (t) => [
+    index("restock_lines_order_idx").on(t.restockOrderId),
+    index("restock_lines_variant_idx").on(t.variantId),
+    check("restock_lines_quantity_ok", sql`${t.quantity} > 0 and ${t.receivedQuantity} >= 0 and ${t.receivedQuantity} <= ${t.quantity}`),
+  ],
 );
 
 // Old store links that should keep working: a renamed product, or a page from a store moved here.
