@@ -9,6 +9,7 @@ import { NotFoundError, UserError } from "./errors";
 import { describePersonalization } from "./personalization";
 import { ordersWaitingForTracking } from "./tracking-import";
 import { groupBy } from "./group";
+import { z } from "zod";
 
 export const MAX_PACKING_SLIP_NOTE = 500;
 /** More than this at once is too many to print in one go. */
@@ -27,12 +28,18 @@ export type PackingSlip = {
 };
 
 /** The store's name, address and note, and a slip for each order, in order number order. */
-export async function packingSlips(db: Db, shopId: string, scope: { orderId: string } | "waiting") {
+export async function packingSlips(db: Db, shopId: string, scope: { orderId: string } | { orderIds: string[] } | "waiting") {
   const shop = await db.query.shops.findFirst({ where: eq(schema.shops.id, shopId) });
   if (!shop) throw new NotFoundError("Store");
   let orders;
   if (scope === "waiting") {
     orders = (await ordersWaitingForTracking(db, shopId)).slice(0, MAX_PACKING_SLIPS);
+  } else if ("orderIds" in scope) {
+    // Orders picked on the order list, oldest first like the waiting ones. Ids from another store are left out.
+    const ids = scope.orderIds.filter((id) => z.string().uuid().safeParse(id).success).slice(0, MAX_PACKING_SLIPS);
+    orders = ids.length
+      ? await db.query.orders.findMany({ where: and(eq(schema.orders.shopId, shopId), inArray(schema.orders.id, ids)), orderBy: asc(schema.orders.number) })
+      : [];
   } else {
     const order = await db.query.orders.findFirst({ where: and(eq(schema.orders.id, scope.orderId), eq(schema.orders.shopId, shopId)) });
     if (!order) throw new NotFoundError("Order");
