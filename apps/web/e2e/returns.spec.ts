@@ -130,6 +130,15 @@ test("store credit instead of a refund, declining needs a reason, and returns ca
   await request.getByLabel("Amount").fill("5");
   await request.getByRole("button", { name: "Give store credit" }).click();
   await expect(page.getByRole("listitem", { name: "Answered return for order #1001" }).first()).toContainText("Store credit");
+  // The answered list can be searched by order number or email.
+  await page.getByLabel("Search answered returns").fill("#1001");
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await expect(page).toHaveURL(/q=%231001/);
+  await expect(page.getByText("2 returns match")).toBeVisible();
+  await page.getByLabel("Search answered returns").fill("nobody@nowhere.example");
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await expect(page.getByText("0 returns match")).toBeVisible();
+  await page.goto("/admin/returns");
   expect(await lastEmail(page, email, "Your $5.00 gift card for")).toMatch(/Gift card code: [A-Z2-9-]{19}/);
   await buyer.reload();
   await expect(buyer.locator("#returns")).toContainText("$5.00 in store credit");

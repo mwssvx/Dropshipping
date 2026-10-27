@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { DEFAULT_RETURN_INSTRUCTIONS, formatMoney, listReturns, RETURN_REASON_LABELS } from "@sf/core";
+import { countReturns, DEFAULT_RETURN_INSTRUCTIONS, formatMoney, listReturns, RETURN_PAGE_SIZE, RETURN_REASON_LABELS } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { DecideForm, ReturnSettingsForm } from "./ReturnForms";
@@ -17,11 +17,18 @@ const STATUS = {
   declined: ["Declined", "pill-neutral"],
 } as const;
 
-export default async function ReturnsPage() {
+export default async function ReturnsPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string }> }) {
   const { shop, db } = await requireShop("returns");
-  const all = await listReturns(db, shop.id, "all");
-  const open = all.filter((r) => r.status === "requested" || r.status === "approved");
-  const closed = all.filter((r) => !open.includes(r));
+  const params = await searchParams;
+  const q = params.q?.trim().slice(0, 100) || undefined;
+  const page = /^\d{1,5}$/.test(params.page ?? "") ? Math.max(1, Number(params.page)) : 1;
+  const [open, closed, closedTotal] = await Promise.all([
+    listReturns(db, shop.id, "open"),
+    listReturns(db, shop.id, "answered", { query: q, page }),
+    countReturns(db, shop.id, "answered", q),
+  ]);
+  const pages = Math.max(1, Math.ceil(closedTotal / RETURN_PAGE_SIZE));
+  const href = (p: number) => `/admin/returns?${new URLSearchParams({ ...(q ? { q } : {}), ...(p > 1 ? { page: String(p) } : {}) })}#closed-returns`;
   const orders = open.length
     ? await db.query.orders.findMany({ where: (o, { inArray }) => inArray(o.id, open.map((r) => r.orderId)), columns: { id: true, totalMinor: true, refundedMinor: true } })
     : [];
@@ -73,9 +80,22 @@ export default async function ReturnsPage() {
           <h2 id="return-settings" className="font-semibold">Return policy</h2>
           <ReturnSettingsForm windowDays={shop.returnWindowDays} instructions={shop.returnInstructions ?? ""} placeholder={DEFAULT_RETURN_INSTRUCTIONS} />
         </section>
-        {closed.length > 0 && (
+        {(closedTotal > 0 || q) && (
           <section className="flex flex-col gap-3" aria-labelledby="closed-returns">
-            <h2 id="closed-returns" className="font-semibold">Answered</h2>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 id="closed-returns" className="font-semibold">Answered</h2>
+              <form action="/admin/returns#closed-returns" className="flex gap-2 min-w-60" role="search">
+                <label htmlFor="return-q" className="sr-only">Search answered returns</label>
+                <input id="return-q" name="q" type="search" defaultValue={q} placeholder="Order # or buyer's email" className="input flex-1" />
+                <button className="btn btn-secondary">Search</button>
+              </form>
+            </div>
+            {q && (
+              <p className="hint text-sm">
+                {closedTotal} {closedTotal === 1 ? "return matches" : "returns match"} &ldquo;{q}&rdquo;. <Link href="/admin/returns#closed-returns" className="underline">Clear</Link>
+              </p>
+            )}
+            {closed.length > 0 && (
             <ul className="card divide-y divide-border">
               {closed.map((r) => (
                 <li key={r.id} className="p-4 flex flex-wrap items-center justify-between gap-2 text-sm" aria-label={`Answered return for order #${r.orderNumber}`}>
@@ -91,6 +111,14 @@ export default async function ReturnsPage() {
                 </li>
               ))}
             </ul>
+            )}
+            {pages > 1 && (
+              <nav aria-label="Pages" className="flex items-center gap-3 text-sm">
+                {page > 1 && <Link href={href(page - 1)} className="btn btn-secondary">← Newer</Link>}
+                <span className="hint num">Page {Math.min(page, pages)} of {pages}</span>
+                {page < pages && <Link href={href(page + 1)} className="btn btn-secondary ml-auto">Older →</Link>}
+              </nav>
+            )}
           </section>
         )}
       </div>

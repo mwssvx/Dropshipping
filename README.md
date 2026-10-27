@@ -938,3 +938,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Subscriptions in pages (after launch, part 148)
 
 1. **Find a subscriber**: the Subscriptions page used to load every subscription a store ever had. It now shows 50 a page, with filters for Active, Paused and Cancelled, a **Card problems** filter (an active subscription whose last charge failed, or one paused after three failed charges) with a count, and a search by the subscriber's email (`listSubscriptions` and `countSubscriptions` in `packages/core/src/subscriptions.ts`).
+
+### Returns that never go missing (after launch, part 149)
+
+1. **Every open return shows**: the Returns page used to load the newest 200 returns and split them into "Waiting on you" and "Answered", so on a busy store an old return still waiting could drop off the page. Returns waiting on the merchant are now always all listed, and the answered ones come 50 a page with a search by order number or the buyer's email (`listReturns` and `countReturns` in `packages/core/src/returns.ts`).

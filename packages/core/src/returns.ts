@@ -3,7 +3,7 @@
 // it, gives store credit, or declines it, and the buyer is emailed each step. For "it doesn't fit",
 // the buyer can ask for another size or colour of the same product at the same price instead, and
 // the merchant sends it as a free order.
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, notInArray, or, sql } from "drizzle-orm";
 import { RETURN_REASONS, schema, type Db, type ReturnItem } from "@sf/db";
 import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
@@ -145,28 +145,64 @@ export async function requestReturn(db: Db, shop: Shop, order: Order, input: z.i
   return row;
 }
 
-export async function listReturns(db: Db, shopId: string, filter: "open" | "all" = "open") {
+export const RETURN_PAGE_SIZE = 50;
+const OPEN_RETURN = ["requested", "approved"] as const;
+
+function returnWhere(shopId: string, filter: "open" | "answered" | "all", query?: string) {
+  const r = schema.returnRequests;
+  const q = query?.trim().toLowerCase().replace(/^#/, "").slice(0, 100);
+  return and(
+    eq(r.shopId, shopId),
+    filter === "open" ? inArray(r.status, [...OPEN_RETURN]) : filter === "answered" ? notInArray(r.status, [...OPEN_RETURN]) : undefined,
+    q
+      ? or(
+          /^\d{1,9}$/.test(q) ? eq(schema.orders.number, Number(q)) : undefined,
+          sql`lower(${schema.orders.email}) like ${`%${q.replace(/[\\%_]/g, "\\$&")}%`}`,
+        )
+      : undefined,
+  );
+}
+
+/**
+ * Return requests, newest first. "open" (waiting on the merchant) is every one, so none is ever
+ * hidden behind newer answered ones; "answered" comes a page at a time and can be searched by
+ * order number or the buyer's email.
+ */
+export async function listReturns(
+  db: Db,
+  shopId: string,
+  filter: "open" | "answered" | "all" = "open",
+  opts: { query?: string; page?: number; size?: number } = {},
+) {
+  const size = opts.size ?? (filter === "open" ? 1000 : filter === "all" ? 200 : RETURN_PAGE_SIZE);
+  const page = Math.max(1, Math.floor(opts.page ?? 1));
   const rows = await db
     .select({ request: schema.returnRequests, orderNumber: schema.orders.number, email: schema.orders.email, currency: schema.orders.currency })
     .from(schema.returnRequests)
     .innerJoin(schema.orders, eq(schema.orders.id, schema.returnRequests.orderId))
-    .where(
-      and(
-        eq(schema.returnRequests.shopId, shopId),
-        filter === "open" ? inArray(schema.returnRequests.status, ["requested", "approved"]) : undefined,
-      ),
-    )
-    .orderBy(desc(schema.returnRequests.createdAt))
-    .limit(200);
+    .where(returnWhere(shopId, filter, opts.query))
+    .orderBy(desc(schema.returnRequests.createdAt), desc(schema.returnRequests.id))
+    .limit(size)
+    .offset((page - 1) * size);
   return rows.map((r) => ({ ...r.request, orderNumber: r.orderNumber, email: r.email, currency: r.currency }));
 }
 
+/** How many returns match, for "Page N of M". */
+export async function countReturns(db: Db, shopId: string, filter: "open" | "answered" | "all", query?: string) {
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(schema.returnRequests)
+    .innerJoin(schema.orders, eq(schema.orders.id, schema.returnRequests.orderId))
+    .where(returnWhere(shopId, filter, query));
+  return row?.n ?? 0;
+}
+
 export async function countOpenReturns(db: Db, shopId: string) {
-  const rows = await db.query.returnRequests.findMany({
-    where: and(eq(schema.returnRequests.shopId, shopId), eq(schema.returnRequests.status, "requested")),
-    columns: { id: true },
-  });
-  return rows.length;
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(schema.returnRequests)
+    .where(and(eq(schema.returnRequests.shopId, shopId), eq(schema.returnRequests.status, "requested")));
+  return row?.n ?? 0;
 }
 
 export async function setReturnSettings(db: Db, shopId: string, input: { windowDays: number; instructions: string }) {
