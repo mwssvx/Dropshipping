@@ -858,3 +858,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Countries a product can't go to (after launch, part 128)
 
 1. **Can't ship to**: some things can't be posted everywhere (lithium batteries, knives to the UK, aerosols) or a supplier doesn't cover a country the rest of the store does. A product's page in admin ticks the countries it can't go to. Buyers browsing from one of them see "This item can't be shipped to …" instead of a delivery date, and checkout stops before payment with what to remove, rather than taking an order the supplier rejects later. The store export carries the list (`packages/core/src/country-limits.ts`, migration 0110).
+
+### Gift card balance (after launch, part 129)
+
+1. **What's left on it**: anyone with a gift card code (often the person it was given to) can check its balance at /gift-cards on the store, linked from every gift card email, without starting a cart. It shows the last four characters, what's left of the starting amount, or that it's used up or turned off, and never who bought it (`packages/core/src/gift-card-balance.ts`, no migration).

@@ -70,7 +70,8 @@ async function sendCode(ctx: GiftCardContext, shop: Shop, card: GiftCard, code: 
       text:
         `Hi,\n\n${intro}\n\nGift card code: ${code}\nBalance: ${formatMoney(card.balanceMinor, card.currency)}\n` +
         (card.note ? `\nNote: ${card.note}\n` : "") +
-        `\nShop at ${store} and enter the code in your cart. It never expires, and whatever you don't spend stays on the card.\n`,
+        `\nShop at ${store} and enter the code in your cart. It never expires, and whatever you don't spend stays on the card.\n` +
+        `\nCheck what's left on it: ${store}/gift-cards\n`,
     });
     await ctx.db.update(schema.giftCards).set({ sentAt: new Date() }).where(eq(schema.giftCards.id, card.id));
     return true;
