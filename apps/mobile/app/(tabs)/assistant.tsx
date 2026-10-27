@@ -14,7 +14,7 @@ type Chat = {
   demo: boolean;
 };
 
-const SUGGESTIONS = ["How am I doing this month?", "Are any orders stuck?", "Which products make the least?"];
+const SUGGESTIONS = ["How am I doing this month?", "What are shoppers searching for?", "Are any orders stuck?", "Which products make the least?"];
 const AUTHOR = { merchant: "You", agent: "Assistant", staff: "Support team" } as const;
 
 export default function AssistantScreen() {

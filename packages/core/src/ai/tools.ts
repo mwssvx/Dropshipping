@@ -19,6 +19,9 @@ import { getActiveProductByHandle } from "../products";
 import { searchProducts } from "../search";
 import { sizeChartForProduct } from "../size-charts";
 import { productQuestions } from "../questions";
+import { analyticsReport } from "../analytics";
+import { searchReport } from "../search-terms";
+import { inventoryReport } from "../inventory";
 import { AUTO, blocked, needsOk, untrusted, type Decision, type RunScope } from "./context";
 import { addMessage, BUYER_TOPICS, discardDrafts, sendBuyerMessage, setConversationStatus, type BuyerTopic } from "./conversations";
 
@@ -320,6 +323,74 @@ const assistantTools = [
     summary: (i) => (i.search ? `Looked up products matching “${i.search}”` : "Looked up products"),
     async run(i, run) {
       return (await productMargins(run, i.search)).slice(0, 20);
+    },
+  }),
+  tool({
+    name: "read_sales",
+    kind: "read",
+    description: "Sales over the last 7, 30 or 90 days: orders, sales, average order, visitors and how many bought, the steps where visitors drop out, best-selling products with their page views, and where visitors came from.",
+    input: z.object({ days: z.union([z.literal(7), z.literal(30), z.literal(90)]) }),
+    summary: (i) => `Read sales for the last ${i.days} days`,
+    async run(i, run) {
+      const to = new Date();
+      const r = await analyticsReport(run.ctx.db, run.shop.id, { from: new Date(to.getTime() - i.days * DAY), to });
+      return {
+        days: i.days,
+        orders: r.orders,
+        sales: money(run, r.salesMinor),
+        average_order: money(run, r.averageOrderMinor),
+        visitors: r.visitors,
+        bought_per_100_visitors: r.conversion === null ? null : Math.round(r.conversion * 1000) / 10,
+        steps: r.funnel.map((f) => `${f.step}: ${f.count}`),
+        best_sellers: r.topProducts.map((p) => ({ product: p.title, units: p.units, sales: money(run, p.salesMinor), page_views: p.views })),
+        visitors_from: r.sources.map((s) => `${s.source}: ${s.visitors}`),
+      };
+    },
+  }),
+  tool({
+    name: "read_shopper_interest",
+    kind: "read",
+    description: "What shoppers looked for over the last 30 days: the store's top searches, searches that found nothing, and the latest questions asked to the store's shopping assistant. Searches that found nothing are products to add or listings to reword.",
+    input: z.object({}),
+    summary: () => "Read what shoppers searched for and asked",
+    async run(_, run) {
+      const { db } = run.ctx;
+      const to = new Date();
+      const [searches, chats] = await Promise.all([
+        // Search counts are per day, and the range ends before its last day: include today.
+        searchReport(db, run.shop.id, { from: new Date(to.getTime() - 30 * DAY), to: new Date(to.getTime() + DAY) }, 15),
+        db
+          .select({ body: schema.messages.body })
+          .from(schema.messages)
+          .innerJoin(schema.conversations, eq(schema.conversations.id, schema.messages.conversationId))
+          .where(and(eq(schema.conversations.shopId, run.shop.id), eq(schema.conversations.kind, "shopper"), eq(schema.messages.author, "buyer")))
+          .orderBy(desc(schema.messages.createdAt))
+          .limit(20),
+      ]);
+      return {
+        searches: searches.searches,
+        found_nothing_share_pct: searches.nothingShare === null ? null : Math.round(searches.nothingShare * 100),
+        top_searches: searches.top.map((t) => `${t.term}: ${t.searches} searches, ${t.results} results`),
+        searches_that_found_nothing: searches.nothing.map((t) => `${t.term}: ${t.searches} searches`),
+        shopping_assistant_questions: chats.length ? untrusted("shopper", chats.map((c) => `- ${c.body.slice(0, 200)}`).join("\n")) : null,
+      };
+    },
+  }),
+  tool({
+    name: "read_stock",
+    kind: "read",
+    description: "Stock of the products the store keeps itself (not supplier products): what's on the shelf and on the way, sales in the last 30 days and about how many days it lasts, soonest to run out first.",
+    input: z.object({}),
+    summary: () => "Read stock levels",
+    async run(_, run) {
+      const r = await inventoryReport(run.ctx.db, run.shop);
+      return {
+        options_counted: r.rows.length,
+        value_at_cost: money(run, r.totals.atCostMinor),
+        running_low_at: run.shop.restockAlertAt,
+        soonest_to_run_out: r.rows.slice(0, 15).map((x) => ({ option: x.title, in_stock: x.stock, on_the_way: x.incoming, sold_30_days: x.sold, lasts_about_days: x.daysLeft, running_low: x.low })),
+        note: r.rows.length ? null : "The store doesn't keep its own stock: its products ship from suppliers.",
+      };
     },
   }),
   tool({
