@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseKg, parseMoney, setCheckoutPhone, setDeliveryEstimates, setDeliveryProtection, setGiftWrap, setLocalDelivery, setLocalPickup, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
+import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseKg, parseMoney, setCheckoutPhone, setDeliveryEstimates, setDeliveryProtection, setGiftWrap, setLocalDelivery, setLocalPickup, setShipCutoff, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
 import { logged, requireShop } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -215,6 +215,26 @@ export async function setGiftWrapAction(_: GiftWrapState, form: FormData): Promi
     throw e;
   }
   await logged({ shop, user, db }, saved ? "Offered gift wrapping at checkout" : "Stopped offering gift wrapping", { href: "/admin/shipping#gift-wrap-heading" });
+  revalidatePath("/admin/shipping");
+  return { saved };
+}
+
+export type ShipCutoffState = { error?: string; saved?: { hour: number } | null };
+
+/** Sets the time orders must be in by to ship that day, or turns the cutoff off. */
+export async function setShipCutoffAction(_: ShipCutoffState, form: FormData): Promise<ShipCutoffState> {
+  const { shop, db, user } = await requireShop("shipping");
+  const on = form.get("enabled") === "on";
+  let saved: ShipCutoffState["saved"] = null;
+  try {
+    saved = on
+      ? await setShipCutoff(db, shop.id, { hour: Number(form.get("hour") ?? ""), timeZone: String(form.get("timeZone") ?? ""), weekends: form.get("weekends") === "on" })
+      : await setShipCutoff(db, shop.id, null);
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  await logged({ shop, user, db }, saved ? "Set a same-day shipping cutoff" : "Turned off the same-day shipping cutoff", { href: "/admin/shipping#cutoff-heading" });
   revalidatePath("/admin/shipping");
   return { saved };
 }

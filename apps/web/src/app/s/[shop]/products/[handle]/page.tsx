@@ -276,6 +276,17 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           <p id="delivery-estimate" className="text-sm flex flex-col gap-0.5">
             <span className="font-medium">{t.arrives(formatDeliveryWindow(delivery, (d) => dayFormat.format(d)), new Intl.DisplayNames([lang], { type: "region" }).of(delivery.country) ?? delivery.country)}</span>
             <span className="hint">{t.deliveryDetail(delivery.processingDays, delivery.transitMin, delivery.transitMax)}</span>
+            {delivery.cutoff && (
+              <SaleCountdown
+                endsAt={delivery.cutoff.deadline.toISOString()}
+                lang={lang}
+                text={{
+                  endsIn: delivery.cutoff.today ? t.shipsTodayIn : t.shipsOnIn(new Intl.DateTimeFormat(lang, { weekday: "long", timeZone: "UTC" }).format(delivery.cutoff.shipsOn)),
+                  ended: t.cutoffPassed,
+                }}
+                className="text-accent font-medium num"
+              />
+            )}
           </p>
         )}
         {chart && (
