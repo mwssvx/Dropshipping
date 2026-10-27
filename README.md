@@ -850,3 +850,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Reorder reminders (after launch, part 126)
 
 1. **Running low?**: a product that runs out (coffee, vitamins, refills) can say how long it usually lasts, from 7 to 180 days. That many days after an order arrives (or after payment, when the courier never said), the buyer gets one email with a link back to the product. Never for gifts, replacements or repeat deliveries, never once they've bought it again, never to buyers who unsubscribed, and never for orders more than 30 days past due, so turning it on doesn't email old buyers. The daily job sends them (`packages/core/src/reorder-reminders.ts`, migration 0108).
+
+### Same-day cutoff (after launch, part 127)
+
+1. **Order by 2 pm, ships today**: under Delivery dates, a store that packs its own orders (or whose supplier ships the same day) sets the time orders must be in by, its time zone (it starts at the store's country) and whether it ships at weekends. When the next cutoff is less than a day away, the product page counts down to it: "Order within 02:14:09 and it ships today" (or the day it ships). Orders after the cutoff, or on a day it doesn't ship, start the next shipping day, processing days count shipping days only, and delivery dates on product pages, order pages and receipts follow it, daylight saving included (`packages/core/src/ship-cutoff.ts`, migration 0109).

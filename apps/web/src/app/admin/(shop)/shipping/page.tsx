@@ -1,9 +1,10 @@
-import { countryName, describeRate, EVERYWHERE_ELSE, formatDeliveryWindow, formatMoney, listProducts, listShippingZones, productDelivery, rateDays, rateWeight, SHIPPING_COUNTRIES } from "@sf/core";
+import { countryName, describeRate, EVERYWHERE_ELSE, formatDeliveryWindow, formatMoney, listProducts, listShippingZones, productDelivery, rateDays, rateWeight, SHIPPING_COUNTRIES, CUTOFF_TIME_ZONES, defaultCutoffZone } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { setCheckoutPhoneAction } from "../../shipping-actions";
 import { DeliveryEstimatesForm } from "./DeliveryEstimatesForm";
 import { DeliveryProtectionForm } from "./DeliveryProtectionForm";
+import { ShipCutoffForm } from "./ShipCutoffForm";
 import { GiftWrapForm } from "./GiftWrapForm";
 import { LocalDeliveryForm } from "./LocalDeliveryForm";
 import { LocalPickupForm } from "./LocalPickupForm";
@@ -99,6 +100,15 @@ export default async function ShippingPage() {
             you never promise faster than the supplier ships.
           </p>
           <DeliveryEstimatesForm enabled={shop.deliveryEstimates} processingDays={shop.processingDays} />
+          <div className="border-t border-border pt-3 flex flex-col gap-2">
+            <h3 id="cutoff-heading" className="font-medium">Same-day cutoff</h3>
+            <p className="text-sm hint">
+              If you pack orders yourself, or your supplier ships the same day, say what time orders must be in by. Product pages count
+              down to it (&quot;Order within 2 h 14 min and it ships today&quot;), and later orders start the next shipping day. Processing days
+              count shipping days only.
+            </p>
+            <ShipCutoffForm cutoff={shop.shipCutoff} zones={CUTOFF_TIME_ZONES} defaultZone={defaultCutoffZone(shop.country)} />
+          </div>
           {example && (
             <p className="text-sm border-t border-border pt-3" role="note">
               {preview

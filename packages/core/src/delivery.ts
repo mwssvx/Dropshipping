@@ -2,9 +2,10 @@
 // is the store's processing days, then days in transit. Transit is the slower of the supplier's own
 // estimate and the shipping rate's, so a store never promises faster than its supplier ships.
 import { and, eq, inArray } from "drizzle-orm";
-import { schema, type Db } from "@sf/db";
+import { schema, type Db, type ShipCutoff } from "@sf/db";
 import { z } from "zod";
 import { UserError } from "./errors";
+import { nextCutoff, shipDay } from "./ship-cutoff";
 import { listShippingZones, zoneFor, type Rate } from "./shipping";
 
 type Shop = typeof schema.shops.$inferSelect;
@@ -14,8 +15,15 @@ const DAY = 86_400_000;
 
 export type DeliveryWindow = { processingDays: number; transitMin: number; transitMax: number; from: Date; to: Date };
 
-/** The window for an order placed (or shipped, with no processing left) at `start`. */
-export function deliveryWindow(start: Date, processingDays: number, transitMin: number, transitMax: number): DeliveryWindow {
+/**
+ * The window for an order placed (or shipped, with no processing left) at `start`. With a same-day
+ * cutoff, it counts from the shipping day the order makes, in the store's time zone.
+ */
+export function deliveryWindow(start: Date, processingDays: number, transitMin: number, transitMax: number, cutoff?: ShipCutoff | null): DeliveryWindow {
+  if (cutoff) {
+    const leaves = shipDay(start, processingDays, cutoff).getTime();
+    return { processingDays, transitMin, transitMax, from: new Date(leaves + transitMin * DAY), to: new Date(leaves + transitMax * DAY) };
+  }
   return {
     processingDays,
     transitMin,
@@ -77,7 +85,11 @@ export async function productDelivery(db: Db, shop: Shop, productId: string, opt
   const variants = await db.query.variants.findMany({ where: eq(schema.variants.productId, productId), columns: { shipDaysMin: true, shipDaysMax: true } });
   const transit = transitDays(variants, cheapest(rates));
   if (!transit) return null;
-  return { ...deliveryWindow(opts.now ?? new Date(), shop.processingDays, transit.min, transit.max), country };
+  const now = opts.now ?? new Date();
+  // The countdown shows once the cutoff is less than a day away.
+  const next = shop.shipCutoff ? nextCutoff(now, shop.processingDays, shop.shipCutoff) : null;
+  const cutoff = next && next.msLeft <= DAY ? next : null;
+  return { ...deliveryWindow(now, shop.processingDays, transit.min, transit.max, shop.shipCutoff), country, cutoff };
 }
 
 /**
@@ -105,7 +117,7 @@ export async function orderDelivery(db: Db, shop: Shop, order: Order) {
   if (allShipped) return deliveryWindow(new Date(lastShipped), 0, transit.min, transit.max);
   // A pre-order waiting for stock is counted from the date it's promised to ship by.
   if (order.preorderShipsBy && order.fulfillmentStatus === "unfulfilled") return deliveryWindow(order.preorderShipsBy, 0, transit.min, transit.max);
-  return deliveryWindow(order.paidAt, shop.processingDays, transit.min, transit.max);
+  return deliveryWindow(order.paidAt, shop.processingDays, transit.min, transit.max, shop.shipCutoff);
 }
 
 const short = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
