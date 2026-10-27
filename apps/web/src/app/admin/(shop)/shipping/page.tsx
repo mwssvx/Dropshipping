@@ -4,6 +4,7 @@ import { PageHeader } from "../PageHeader";
 import { setCheckoutPhoneAction } from "../../shipping-actions";
 import { DeliveryEstimatesForm } from "./DeliveryEstimatesForm";
 import { DeliveryProtectionForm } from "./DeliveryProtectionForm";
+import { LocalPickupForm } from "./LocalPickupForm";
 import { DeleteButton, RateForm, StarterButton, ZoneForm, type Country } from "./ShippingForms";
 
 export const metadata = { title: "Shipping" };
@@ -134,6 +135,15 @@ export default async function ShippingPage() {
             protection={shop.deliveryProtection}
             symbol={new Intl.NumberFormat("en-US", { style: "currency", currency: shop.currency }).formatToParts(0).find((p) => p.type === "currency")?.value ?? ""}
           />
+        </section>
+        <section className="card p-5 flex flex-col gap-3" aria-labelledby="pickup-heading" id="pickup">
+          <h2 id="pickup-heading" className="font-semibold">Local pickup</h2>
+          <p className="text-sm">
+            Buyers in {countryName(shop.country)} can choose to collect their order from you for free instead of paying for shipping. It&apos;s offered when
+            everything in the cart is your own stock, since supplier items ship from the supplier. Press Ready for pickup on the order when it&apos;s packed,
+            and Picked up when they have it.
+          </p>
+          <LocalPickupForm pickup={shop.localPickup} />
         </section>
         <section className="card p-5 flex flex-col gap-3" aria-labelledby="new-zone">
           <h2 id="new-zone" className="font-semibold">Add a zone</h2>

@@ -5,7 +5,7 @@ import { fulfillment, requireShop, storeAddress, suppliers, testPayments } from 
 import { OrderEditForm } from "@/components/OrderEditForm";
 import { editOrderAction } from "../../../actions";
 import { PaymentLinkActions } from "./PaymentLinkActions";
-import { CheckTrackingButton, ManualTrackingForm, RetryButton } from "./FulfillmentActions";
+import { CheckTrackingButton, ManualTrackingForm, PickupButtons, RetryButton } from "./FulfillmentActions";
 import { RefundForm } from "./RefundForm";
 import { FixWithAiButton } from "./FixWithAiButton";
 import { RiskActions } from "./RiskActions";
@@ -53,7 +53,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
     if (!supplierId) return "Sent by you";
     return labelFor(suppliers(), links.find((l) => l.id === supplierId));
   };
-  const EMAIL_LABEL = { order_confirmation: "Order confirmation", shipping_update: "Shipping update", delivered: "Delivery confirmation", refund: "Refund", support_reply: "Reply to a question", abandoned_cart: "Checkout reminder", abandoned_cart_offer: "Second checkout reminder (with a code)", payment_link: "Payment link", gift_shipped: "Gift heads-up", order_link: "Order link (Track your order)", order_updated: "Order change" };
+  const EMAIL_LABEL = { order_confirmation: "Order confirmation", shipping_update: "Shipping update", delivered: "Delivery confirmation", refund: "Refund", support_reply: "Reply to a question", abandoned_cart: "Checkout reminder", abandoned_cart_offer: "Second checkout reminder (with a code)", payment_link: "Payment link", gift_shipped: "Gift heads-up", order_link: "Order link (Track your order)", order_updated: "Order change", pickup_ready: "Ready for pickup" };
   const timeline = [
     { at: order.createdAt, text: "Order placed" },
     ...(order.paidAt
@@ -61,8 +61,8 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
       : []),
     ...order.fulfillments.flatMap((f) => [
       ...(f.placedAt ? [{ at: f.placedAt, text: `Sent to ${supplierLabel(f.supplierId)} (ref ${f.supplierOrderRef ?? "n/a"})${f.backupNote ? `. ${f.backupNote}` : ""}` }] : []),
-      ...(f.shippedAt ? [{ at: f.shippedAt, text: `Shipped with ${f.carrier}, tracking ${f.trackingNumber}` }] : []),
-      ...(f.deliveredAt ? [{ at: f.deliveredAt, text: "Delivered" }] : []),
+      ...(f.shippedAt && f.trackingNumber ? [{ at: f.shippedAt, text: `Shipped with ${f.carrier}, tracking ${f.trackingNumber}` }] : []),
+      ...(f.deliveredAt ? [{ at: f.deliveredAt, text: order.pickup ? "Picked up" : "Delivered" }] : []),
       ...(f.status === "failed" ? [{ at: f.updatedAt, text: f.problemCode && f.problemMessage?.includes("can't send it") ? f.problemMessage : `Supplier refused the order: ${f.problemMessage}` }] : []),
     ]),
     ...(order.risk && (order.heldAt || order.riskReviewedAt) ? [{ at: new Date(order.risk.checkedAt), text: `Held for a risk check (${order.risk.level} risk)` }] : []),
@@ -249,6 +249,21 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
               {f.status === "failed" && can(role, "assistant") && <FixWithAiButton orderId={order.id} />}
             </section>
           ))}
+          {order.pickup ? (
+            <section className="card p-5 flex flex-col gap-3" aria-labelledby="pickup-heading">
+              <h2 id="pickup-heading" className="font-semibold">Picking up</h2>
+              <p className="text-sm">
+                {order.fulfillmentStatus === "delivered"
+                  ? `Picked up on ${longDay.format(order.fulfillments.find((f) => f.deliveredAt)?.deliveredAt ?? order.updatedAt)}.`
+                  : !refundable
+                    ? "Nothing to get ready until the payment comes through."
+                    : order.pickupReadyAt
+                      ? `Ready since ${longDay.format(order.pickupReadyAt)}. ${order.email} was emailed where to collect it. Press Picked up when they have it.`
+                      : "The buyer is collecting this from you, so there's nothing to ship. Press Ready for pickup when it's packed and we'll email them where to collect it."}
+              </p>
+              {refundable && !held && order.fulfillmentStatus !== "delivered" && <PickupButtons orderId={order.id} ready={!!order.pickupReadyAt} />}
+            </section>
+          ) : (
           <section className="card p-5 flex flex-col gap-4">
             <h2 className="font-semibold">Delivery</h2>
             {order.fulfillments.length === 0 ? (
@@ -284,6 +299,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
               {paid && order.fulfillments.length === 0 && <ManualTrackingForm orderId={order.id} />}
             </div>
           </section>
+          )}
           {edit?.canEdit && (
             <section className="card p-5 flex flex-col gap-2" aria-labelledby="edit-heading">
               <h2 id="edit-heading" className="font-semibold">Change the order</h2>
@@ -313,7 +329,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
             {order.customerId && <Link href={`/admin/customers/${order.customerId}`} className="underline">View customer</Link>}
           </div>
           <div>
-            <h2 className="font-semibold mb-1">Ship to</h2>
+            <h2 className="font-semibold mb-1">{order.pickup ? "Buyer's address (picking up)" : "Ship to"}</h2>
             <address className="not-italic hint">
               {order.gift && <>{a.name}<br /></>}
               {a.line1}{a.line2 ? <>, {a.line2}</> : null}<br />{a.city}{a.region ? `, ${a.region}` : ""} {a.postalCode}<br />{a.country}

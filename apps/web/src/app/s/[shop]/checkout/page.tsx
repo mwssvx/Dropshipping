@@ -1,6 +1,6 @@
 import { PixelEvent } from "@/components/PixelEvent";
 import { redirect } from "next/navigation";
-import { addonOffer, convertAmount, convertPrice, protectionFee, countryName, formatMoney, lastCheckoutDetails, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, onHoliday, storePixels, taxExemptionFor, UserError } from "@sf/core";
+import { addonOffer, convertAmount, convertPrice, protectionFee, countryName, formatMoney, lastCheckoutDetails, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, onHoliday, PICKUP_RATE_ID, storePixels, taxExemptionFor, UserError } from "@sf/core";
 import { buyerFx } from "@/lib/currency";
 import { currentBuyer } from "@/lib/buyer";
 import { readCart, readDiscountCode, readGiftCardCode } from "@/lib/cart";
@@ -9,7 +9,7 @@ import { countryNames } from "@/lib/store-text";
 import { lineTitles, loadShop, localProducts, storeBase, storeLang, storeT } from "../data";
 import { addAddonAction } from "../actions";
 import { AddonOffer } from "./AddonOffer";
-import { Checkout, type ZoneChoice } from "./CheckoutForm";
+import { Checkout, type RateChoice, type ZoneChoice } from "./CheckoutForm";
 
 export const metadata = { title: "Checkout" };
 
@@ -64,9 +64,21 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
         }),
       }))
     : null;
+  // Picking up, free, next to the rates for the store's own country.
+  if (choices && quote.canPickUp && shop.localPickup) {
+    const pickup: RateChoice = {
+      id: PICKUP_RATE_ID, name: t.pickUp, days: t.pickupFrom(shop.localPickup.address.split("\n")[0]!), priceMinor: 0, priceLabel: t.free,
+      totalLabel: money(presentQuote({ ...quote, shippingMinor: 0, taxMinor: 0 }, fx).totalMinor), pickup: true,
+    };
+    const own = choices.find((z) => z.countries.includes(shop.country));
+    if (own) own.rates.push(pickup);
+    else choices.unshift({ countries: [shop.country], rates: [...(choices.find((z) => z.countries.includes("*"))?.rates ?? []), pickup] });
+  }
   const lang = await storeLang(handle);
   const nameOf = countryNames(lang);
-  const countries = (hasGoods ? shipsTo(zones) : [...SHIPPING_COUNTRIES]).map((c) => [c, nameOf(c, countryName(c))] as [string, string]).sort((a, b) => a[1].localeCompare(b[1], lang ?? "en"));
+  const shipped = hasGoods ? shipsTo(zones) : [...SHIPPING_COUNTRIES];
+  if (quote.canPickUp && shop.localPickup && !shipped.includes(shop.country)) shipped.push(shop.country);
+  const countries = shipped.map((c) => [c, nameOf(c, countryName(c))] as [string, string]).sort((a, b) => a[1].localeCompare(b[1], lang ?? "en"));
   const withoutShipping = presentQuote({ ...quote, shippingMinor: 0, taxMinor: 0 }, fx);
   // One more product for a little less, unless this is a wholesale or gift-card-only order.
   const offer = !quote.wholesale && hasGoods ? await addonOffer(await db(), shop, [...new Set(variants.map((v) => v.productId))]) : null;

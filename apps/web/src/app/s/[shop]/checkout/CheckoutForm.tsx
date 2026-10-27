@@ -4,13 +4,14 @@ import { FormError } from "@/components/FormError";
 import { checkoutAction } from "../actions";
 
 /** A shipping rate priced for this cart, in the buyer's currency. */
-export type RateChoice = { id: string; name: string; days: string | null; priceLabel: string; totalLabel: string; priceMinor: number; protectedTotalLabel?: string };
+export type RateChoice = { id: string; name: string; days: string | null; priceLabel: string; totalLabel: string; priceMinor: number; protectedTotalLabel?: string; pickup?: boolean };
 /** Delivery protection the buyer can add, priced for this cart in their currency. */
 export type ProtectionChoice = { checkbox: string; note: string; summary: string; priceLabel: string };
 export type ZoneChoice = { countries: string[]; rates: RateChoice[] };
 
 const zoneFor = (zones: ZoneChoice[], country: string) => zones.find((z) => z.countries.includes(country)) ?? zones.find((z) => z.countries.includes("*"));
-const cheapest = (rates: RateChoice[]) => [...rates].sort((a, b) => a.priceMinor - b.priceMinor)[0];
+// Picking up is free, so it would always be cheapest: it's only ever chosen.
+const cheapest = (rates: RateChoice[]) => [...rates].filter((r) => !r.pickup).sort((a, b) => a.priceMinor - b.priceMinor)[0] ?? rates[0];
 
 function Field({ id, label, values, ...rest }: { id: string; label: string; values?: Record<string, string> } & React.InputHTMLAttributes<HTMLInputElement>) {
   return (
@@ -61,7 +62,8 @@ export function Checkout({ summary, footer, taxLabel, totalLabel, totalWithoutSh
   const [rateId, setRateId] = useState<string | null>(null);
   const rate = rates.find((r) => r.id === rateId) ?? cheapest(rates);
   const [protect, setProtect] = useState(false);
-  const protecting = protect && !!form.protection;
+  // Nothing travels when it's picked up, so there's nothing to protect.
+  const protecting = protect && !!form.protection && !rate?.pickup;
   return (
     <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10 grid gap-10 md:grid-cols-[1fr_340px] items-start">
       <div className="flex flex-col gap-6 min-w-0">
@@ -166,7 +168,7 @@ function CheckoutForm({
           )}
         </fieldset>
       )}
-      {zones && protection && (
+      {zones && protection && !rate?.pickup && (
         <label className="card p-3 flex items-start gap-3 cursor-pointer">
           <input type="checkbox" name="protection" className="mt-1" checked={protect} onChange={(e) => onProtect(e.target.checked)} />
           <span className="flex-1">

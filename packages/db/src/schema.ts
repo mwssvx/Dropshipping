@@ -155,6 +155,8 @@ export const shops = pgTable(
     mailingAddress: text("mailing_address"),
     // Printed at the foot of packing slips, like a thank-you or a code for next time.
     packingSlipNote: text("packing_slip_note"),
+    // Buyers in the store's country can pick up orders of its own stock here, or null when it doesn't offer it.
+    localPickup: jsonb("local_pickup").$type<LocalPickup | null>(),
     // Wholesale: approved business buyers pay this much less, on orders of at least the minimum.
     wholesaleEnabled: boolean("wholesale_enabled").notNull().default(false),
     wholesalePercentOff: integer("wholesale_percent_off").notNull().default(20),
@@ -478,6 +480,9 @@ export type AbandonedCartOffer = { percentOff: number };
 /** A share of the goods, at least a set amount: what a buyer pays to have a lost or damaged parcel sent again. */
 export type DeliveryProtection = { percent: number; minMinor: number };
 
+/** Where and how buyers pick up their orders. */
+export type LocalPickup = { address: string; instructions: string | null };
+
 export type Address = {
   name: string;
   line1: string;
@@ -563,6 +568,10 @@ export const orders = pgTable(
     heldAt: timestamp("held_at", { withTimezone: true }),
     // When the items came off the store's own stock (products added by hand); cleared when they're put back.
     stockTakenAt: timestamp("stock_taken_at", { withTimezone: true }),
+    // The buyer picks it up from the store instead of having it shipped. They're emailed once it's
+    // ready (pickupReadyAt); it's delivered when the merchant marks it picked up.
+    pickup: boolean("pickup").notNull().default(false),
+    pickupReadyAt: timestamp("pickup_ready_at", { withTimezone: true }),
     riskReviewedAt: timestamp("risk_reviewed_at", { withTimezone: true }),
     // Has pre-ordered items: waits for stock before going to the supplier, promised by this date.
     preorderShipsBy: timestamp("preorder_ships_by", { withTimezone: true }),
@@ -675,7 +684,7 @@ export const emails = pgTable(
     id: id(),
     shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
     orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
-    kind: text("kind", { enum: ["order_confirmation", "shipping_update", "delivered", "refund", "support_reply", "abandoned_cart", "payment_link", "gift_shipped", "order_link", "order_updated", "abandoned_cart_offer"] }).notNull(),
+    kind: text("kind", { enum: ["order_confirmation", "shipping_update", "delivered", "refund", "support_reply", "abandoned_cart", "payment_link", "gift_shipped", "order_link", "order_updated", "abandoned_cart_offer", "pickup_ready"] }).notNull(),
     // Tells apart emails of a kind that can repeat (one per refund). Empty for once-only kinds.
     ref: text("ref").notNull().default(""),
     to: text("to").notNull(),

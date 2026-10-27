@@ -753,3 +753,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Listed on the Products page**: options of products the store added itself (its own stock) with the store's number or fewer left show under "Running low", fewest first, sold-out ones in red (`runningLow` in `packages/core/src/own-stock.ts`). Imported products, drafts and options without a count aren't listed.
 2. **One email per option**: the scheduled job emails everyone who looks after products when an option gets down to the number (`notifyLowStock`, `variants.low_stock_notified_at`). It's told again only after it's restocked above the number and runs low again.
 3. **The store picks the number**: "Running-low email" on the Products page, 3 by default, 0 turns it off (`shops.restock_alert_at`). Store export and import keep it.
+
+### Local pickup (after launch, part 107)
+
+1. **A free choice at checkout**: a store turns it on under Shipping with its pickup address and how to collect (`shops.local_pickup`, `setLocalPickup` in `packages/core/src/local-pickup.ts`). Buyers in the store's own country see "Pick it up yourself" next to the shipping rates when everything in the cart is the store's own stock. It's never picked for them, costs nothing, and delivery protection isn't offered with it (`orders.pickup`).
+2. **Ready, then picked up**: the order page shows Ready for pickup, which emails the buyer the address and instructions once (`markReadyForPickup`, `orders.pickup_ready_at`), and Picked up, which marks the order delivered and sends the usual thank-you (`markPickedUp`). The buyer's order page follows along in their language.
+3. **No tracking needed**: pickup orders stay out of the tracking spreadsheet and its import, and get no delivery estimate. An after-checkout offer added to a pickup order is picked up with it when it can be. Store export and import keep the setting.

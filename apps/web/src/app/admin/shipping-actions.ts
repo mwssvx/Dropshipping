@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseMoney, setCheckoutPhone, setDeliveryEstimates, setDeliveryProtection, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
+import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseMoney, setCheckoutPhone, setDeliveryEstimates, setDeliveryProtection, setLocalPickup, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
 import { logged, requireShop } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -124,6 +124,24 @@ export async function setDeliveryProtectionAction(_: ProtectionState, form: Form
     throw e;
   }
   await logged({ shop, user, db }, saved ? `Offered delivery protection at checkout for ${saved.percent}% of the order` : "Stopped offering delivery protection", { href: "/admin/shipping#protection-heading" });
+  revalidatePath("/admin/shipping");
+  return { saved };
+}
+
+export type PickupState = { error?: string; saved?: { address: string; instructions: string | null } | null };
+
+/** Turns local pickup at checkout on with where and how, or off. */
+export async function setLocalPickupAction(_: PickupState, form: FormData): Promise<PickupState> {
+  const { shop, db, user } = await requireShop("shipping");
+  const on = form.get("enabled") === "on";
+  let saved: PickupState["saved"] = null;
+  try {
+    saved = await setLocalPickup(db, shop.id, on ? { address: String(form.get("address") ?? ""), instructions: String(form.get("instructions") ?? "") } : null);
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  await logged({ shop, user, db }, saved ? "Offered local pickup at checkout" : "Stopped offering local pickup", { href: "/admin/shipping#pickup-heading" });
   revalidatePath("/admin/shipping");
   return { saved };
 }
