@@ -814,3 +814,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Pick list (after launch, part 117)
 
 1. **One walk of the shelf**: "Pick list" on the packing slips page adds up what the orders waiting to ship need from the store's own stock, per option, sorted by SKU, with the barcode, the orders each goes in, and what's left once they're picked (in red when it's short). Items a supplier ships are left off and counted in a note (`pickList` in `packages/core/src/pick-list.ts`).
+
+### Shelf locations (after launch, part 118)
+
+1. **Where it sits**: each option of the store's own stock can have a shelf location, like A3 or Back room. The pick list is sorted by it, so one walk of the stock room picks everything. The stock count lists options in shelf order, and the inventory page and spreadsheet show it. It goes along when the store is copied.

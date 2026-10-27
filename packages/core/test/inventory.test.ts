@@ -20,7 +20,7 @@ describe("inventory", () => {
     expect(totals).toEqual({ units: 19, incoming: 5, atCostMinor: 5100, atPriceMinor: 22000, missingCost: 1 });
 
     const [head, first] = (await inventoryCsv(f.db, shop)).trim().split("\n");
-    expect(head).toBe("Option,SKU,In stock,On the way,Cost each,Price,Value at cost,Value at price,Sold in 30 days,Days left");
-    expect(first).toBe("Mug,MUG-1,17,0,3.00,10.00,51.00,170.00,3,170");
+    expect(head).toBe("Option,SKU,Shelf,In stock,On the way,Cost each,Price,Value at cost,Value at price,Sold in 30 days,Days left");
+    expect(first).toBe("Mug,MUG-1,,17,0,3.00,10.00,51.00,170.00,3,170");
   });
 });

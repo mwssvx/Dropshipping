@@ -16,7 +16,7 @@ export type RestockLineInput = { variantId: string; quantity: number; unitCostMi
 /** The options a restock order can be for: the store's own stock, not supplier or gift card products. */
 export async function restockChoices(db: Db, shopId: string) {
   const rows = await db
-    .select({ variantId: schema.variants.id, option: schema.variants.title, sku: schema.variants.sku, barcode: schema.variants.barcode, stock: schema.variants.stock, costMinor: schema.variants.costMinor, productId: schema.products.id, product: schema.products.title })
+    .select({ variantId: schema.variants.id, option: schema.variants.title, sku: schema.variants.sku, barcode: schema.variants.barcode, location: schema.variants.location, stock: schema.variants.stock, costMinor: schema.variants.costMinor, productId: schema.products.id, product: schema.products.title })
     .from(schema.variants)
     .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
     .where(and(eq(schema.products.shopId, shopId), isNull(schema.products.sourceUrl), isNull(schema.products.supplierId), eq(schema.products.giftCard, false)))

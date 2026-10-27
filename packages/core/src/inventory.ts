@@ -15,6 +15,8 @@ export type InventoryRow = {
   productId: string;
   title: string;
   sku: string | null;
+  /** Where it sits on the shelf. */
+  location: string | null;
   stock: number;
   /** Still to come on open restock orders. */
   incoming: number;
@@ -63,6 +65,7 @@ export async function inventoryReport(db: Db, shop: { id: string; restockAlertAt
       productId: v.productId,
       title: v.title === "Default" ? product : `${product} (${v.title})`,
       sku: v.sku,
+      location: v.location,
       stock,
       incoming: comingBy.get(v.id) ?? 0,
       costMinor: v.costMinor,
@@ -93,8 +96,8 @@ export async function inventoryReport(db: Db, shop: { id: string; restockAlertAt
 export async function inventoryCsv(db: Db, shop: { id: string; restockAlertAt: number; currency: string }, now = new Date()) {
   const { rows } = await inventoryReport(db, shop, now);
   const amount = (m: number | null) => (m === null ? null : formatMoney(m, shop.currency).replace(/[^\d.,-]/g, "").replace(/,/g, ""));
-  const header = ["Option", "SKU", "In stock", "On the way", "Cost each", "Price", "Value at cost", "Value at price", `Sold in ${DAYS} days`, "Days left"];
-  const lines = rows.map((r) => [r.title, r.sku, r.stock, r.incoming, amount(r.costMinor), amount(r.priceMinor), amount(r.valueAtCostMinor), amount(r.valueAtPriceMinor), r.sold, r.daysLeft]);
+  const header = ["Option", "SKU", "Shelf", "In stock", "On the way", "Cost each", "Price", "Value at cost", "Value at price", `Sold in ${DAYS} days`, "Days left"];
+  const lines = rows.map((r) => [r.title, r.sku, r.location, r.stock, r.incoming, amount(r.costMinor), amount(r.priceMinor), amount(r.valueAtCostMinor), amount(r.valueAtPriceMinor), r.sold, r.daysLeft]);
   return [header, ...lines].map((l) => l.map((c) => csvCell(c ?? null)).join(",")).join("\n") + "\n";
 }
 

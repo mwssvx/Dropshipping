@@ -165,6 +165,7 @@ export default async function EditProductPage({ params, searchParams }: { params
               weightGrams: v.weightGrams,
               sku: v.sku,
               barcode: v.barcode,
+              location: v.location,
               fromSupplier: !!v.supplierVariantRef,
             })),
             supplier: product.supplier ? { label: product.supplier.label, sourceUrl: product.sourceUrl } : undefined,

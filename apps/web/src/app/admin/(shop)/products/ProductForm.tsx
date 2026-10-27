@@ -18,6 +18,8 @@ export type VariantValues = {
   sku?: string | null;
   /** The UPC, EAN or the store's own code a scanner reads. */
   barcode?: string | null;
+  /** Where it sits on the shelf. */
+  location?: string | null;
   fromSupplier?: boolean;
 };
 
@@ -255,6 +257,12 @@ function VariantRow({ index, initial, currency, showTitle, generated, onPrices }
           <label className="label" htmlFor={id("barcode")}>Barcode</label>
           <input className="input num" id={id("barcode")} name={`barcode.${index}`} maxLength={48} defaultValue={initial.barcode ?? ""} placeholder="UPC, EAN or your own" />
         </div>
+        {!initial.fromSupplier && (
+          <div className="field">
+            <label className="label" htmlFor={id("location")}>Shelf location</label>
+            <input className="input" id={id("location")} name={`location.${index}`} maxLength={40} defaultValue={initial.location ?? ""} placeholder="Like A3, optional" />
+          </div>
+        )}
       </div>
       <p className="hint num" aria-live="polite">
         {margin === null

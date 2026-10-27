@@ -18,7 +18,7 @@ export default async function PickListPage() {
       </div>
       <h1 className="text-2xl font-bold tracking-tight">Pick list</h1>
       <p className="hint max-w-2xl">
-        Walk the shelf once: each option the orders waiting to ship need, how many in all, and which orders they go in. Sorted by SKU. &quot;Left after&quot; is your stock once these are picked; below 0 means you&apos;re short.
+        Walk the shelf once: each option the orders waiting to ship need, how many in all, and which orders they go in. In shelf order, then by SKU. &quot;Left after&quot; is your stock once these are picked; below 0 means you&apos;re short.
       </p>
       {fromSuppliers > 0 && <p className="text-sm" role="note">{fromSuppliers} {fromSuppliers === 1 ? "item ships" : "items ship"} straight from your suppliers, so {fromSuppliers === 1 ? "it isn't" : "they aren't"} on the list.</p>}
       {items.length === 0 ? (
@@ -31,6 +31,7 @@ export default async function PickListPage() {
               <thead>
                 <tr className="text-left border-b border-border">
                   <th className="py-2 w-10" aria-label="Picked"></th>
+                  <th className="py-2">Shelf</th>
                   <th className="py-2">Item</th>
                   <th className="py-2">SKU</th>
                   <th className="py-2 text-right">Quantity</th>
@@ -42,6 +43,7 @@ export default async function PickListPage() {
                 {items.map((i) => (
                   <tr key={i.key} className="border-b border-border align-top">
                     <td className="py-2"><span className="inline-block size-4 border border-ink rounded-sm" aria-hidden /></td>
+                    <td className="py-2 font-semibold">{i.location ?? "–"}</td>
                     <td className="py-2">{i.title}{i.barcode && <span className="block text-muted num">{i.barcode}</span>}</td>
                     <td className="py-2 num text-muted">{i.sku ?? "–"}</td>
                     <td className="py-2 num text-right font-semibold">{i.quantity}</td>

@@ -56,6 +56,7 @@ export default async function InventoryPage() {
                       <td className="p-3">
                         <Link href={`/admin/products/${r.productId}`} className="underline">{r.title}</Link>
                         {r.sku && <span className="hint"> · {r.sku}</span>}
+                        {r.location && <span className="hint"> · Shelf {r.location}</span>}
                         {r.stock === 0 ? <span className="ml-2 pill pill-critical">Sold out</span> : r.low && <span className="ml-2 pill pill-warning">Running low</span>}
                       </td>
                       <td className="p-3 num text-right">{r.stock}</td>

@@ -75,7 +75,7 @@ describe("barcodes", () => {
   it("go along when the store is copied", async () => {
     const f = await makeFixture(new DemoModel());
     const shop = await f.shop();
-    const mug = await createProduct(f.db, shop.id, { title: "Mug", status: "active", variants: [{ priceMinor: 1500, barcode: "4006381333931" }] });
+    const mug = await createProduct(f.db, shop.id, { title: "Mug", status: "active", variants: [{ priceMinor: 1500, barcode: "4006381333931", location: "B4" }] });
     const data = await exportStore(f.db, shop.id);
     const g = await makeFixture(new DemoModel());
     const target = await g.shop();
@@ -83,6 +83,6 @@ describe("barcodes", () => {
     await importStore(g.db, target.id, data);
     const copied = await g.db.query.products.findFirst({ where: eq(schema.products.handle, mug.handle) });
     const [v] = await g.variants(copied!.id);
-    expect(v!.barcode).toBe("4006381333931");
+    expect([v!.barcode, v!.location]).toEqual(["4006381333931", "B4"]);
   });
 });
