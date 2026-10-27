@@ -6,6 +6,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { UserError } from "./errors";
+import { MAX_WEIGHT_GRAMS } from "./weight";
 import { isPhotoUrl, keptPhotoTexts, photoColumns, PHOTO_TEXT_MAX } from "./gallery";
 import { toHandle } from "./handles";
 import { MAX_OPTIONS, MAX_VARIANTS } from "./products";
@@ -67,6 +68,7 @@ export type ShopifyVariant = {
   compareAtMinor: number | null;
   costMinor: number | null;
   stock: number | null;
+  weightGrams: number | null;
   imageUrl: string | null;
 };
 export type ShopifyProduct = {
@@ -155,6 +157,7 @@ export function readShopifyProducts(text: string) {
     const tracked = get(r, "variant inventory tracker").toLowerCase() === "shopify";
     const qty = Number.parseInt(get(r, "variant inventory qty"), 10);
     const image = get(r, "variant image");
+    const grams = Number.parseInt(get(r, "variant grams"), 10);
     p.variants.push({
       title: plain ? "Default" : values.filter(Boolean).join(" / ").slice(0, 200) || "Default",
       options: plain ? {} : options,
@@ -163,6 +166,8 @@ export function readShopifyProducts(text: string) {
       compareAtMinor: money(get(r, "variant compare at price")),
       costMinor: money(get(r, "cost per item")),
       stock: tracked && Number.isFinite(qty) ? Math.max(0, qty) : null,
+      // Shopify writes 0 when no weight was set.
+      weightGrams: Number.isFinite(grams) && grams > 0 && grams <= MAX_WEIGHT_GRAMS ? grams : null,
       imageUrl: image && isPhotoUrl(image) ? image : null,
     });
   }

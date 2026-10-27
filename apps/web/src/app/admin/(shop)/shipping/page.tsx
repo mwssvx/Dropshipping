@@ -1,4 +1,4 @@
-import { countryName, describeRate, EVERYWHERE_ELSE, formatDeliveryWindow, formatMoney, listProducts, listShippingZones, productDelivery, rateDays, SHIPPING_COUNTRIES } from "@sf/core";
+import { countryName, describeRate, EVERYWHERE_ELSE, formatDeliveryWindow, formatMoney, listProducts, listShippingZones, productDelivery, rateDays, rateWeight, SHIPPING_COUNTRIES } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { setCheckoutPhoneAction } from "../../shipping-actions";
@@ -66,6 +66,7 @@ export default async function ShippingPage() {
                         <span>
                           <span className="font-medium">{r.name}</span>
                           {rateDays(r) && <span className="hint"> · {rateDays(r)}</span>}
+                          {rateWeight(r) && <span className="hint"> · orders {rateWeight(r)}</span>}
                         </span>
                         <span className="flex items-center gap-3">
                           <span className="num">

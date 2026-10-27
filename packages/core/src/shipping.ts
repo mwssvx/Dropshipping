@@ -7,6 +7,7 @@ import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
 import { formatMoney } from "./money";
 import { LAUNCH_COUNTRIES } from "./shops";
+import { formatWeight, MAX_WEIGHT_GRAMS } from "./weight";
 
 type Shop = typeof schema.shops.$inferSelect;
 
@@ -22,14 +23,25 @@ export const SHIPPING_COUNTRIES = [...LAUNCH_COUNTRIES, "AU", "NZ", "CH", "NO", 
 const names = new Intl.DisplayNames(["en"], { type: "region" });
 export const countryName = (code: string) => (code === EVERYWHERE_ELSE ? "Everywhere else" : (names.of(code) ?? code));
 
-export type Rate = { id: string; name: string; priceMinor: number; freeOverMinor: number | null; minDays: number | null; maxDays: number | null };
+export type Rate = {
+  id: string;
+  name: string;
+  priceMinor: number;
+  freeOverMinor: number | null;
+  minDays: number | null;
+  maxDays: number | null;
+  /** Offered only for carts from / up to this weight. Empty means any weight. */
+  minWeightGrams: number | null;
+  maxWeightGrams: number | null;
+};
+
 export type Zone = { id: string; name: string; countries: string[]; rates: Rate[] };
 
 const DEFAULT_ZONE: Zone = {
   id: DEFAULT_RATE_ID,
   name: "Everywhere",
   countries: [EVERYWHERE_ELSE],
-  rates: [{ id: DEFAULT_RATE_ID, name: "Standard", priceMinor: FLAT_SHIPPING_MINOR, freeOverMinor: FREE_SHIPPING_OVER_MINOR, minDays: null, maxDays: null }],
+  rates: [{ id: DEFAULT_RATE_ID, name: "Standard", priceMinor: FLAT_SHIPPING_MINOR, freeOverMinor: FREE_SHIPPING_OVER_MINOR, minDays: null, maxDays: null, minWeightGrams: null, maxWeightGrams: null }],
 };
 
 /** The store's zones with their rates, or the built-in default if it has none. */
@@ -45,7 +57,7 @@ export async function listShippingZones(db: Db, shopId: string): Promise<{ zones
       id: z.id,
       name: z.name,
       countries: z.countries,
-      rates: rates.filter((r) => r.zoneId === z.id).map(({ id, name, priceMinor, freeOverMinor, minDays, maxDays }) => ({ id, name, priceMinor, freeOverMinor, minDays, maxDays })),
+      rates: rates.filter((r) => r.zoneId === z.id).map(({ id, name, priceMinor, freeOverMinor, minDays, maxDays, minWeightGrams, maxWeightGrams }) => ({ id, name, priceMinor, freeOverMinor, minDays, maxDays, minWeightGrams, maxWeightGrams })),
     })),
     isDefault: false,
   };
@@ -54,6 +66,21 @@ export async function listShippingZones(db: Db, shopId: string): Promise<{ zones
 /** The zone for a country: the one that names it, else the "everywhere else" zone. */
 export function zoneFor(zones: Zone[], country: string) {
   return zones.find((z) => z.countries.includes(country)) ?? zones.find((z) => z.countries.includes(EVERYWHERE_ELSE)) ?? null;
+}
+
+/** Whether a rate is offered for a cart this heavy. Both ends count: "up to 2 kg" includes 2 kg. */
+export const fitsWeight = (rate: Pick<Rate, "minWeightGrams" | "maxWeightGrams">, grams: number) =>
+  (rate.minWeightGrams === null || grams >= rate.minWeightGrams) && (rate.maxWeightGrams === null || grams <= rate.maxWeightGrams);
+
+/** "up to 2 kg", "2 kg and over", "2–5 kg", or null for any weight. */
+export function rateWeight(rate: Pick<Rate, "minWeightGrams" | "maxWeightGrams">) {
+  const { minWeightGrams: min, maxWeightGrams: max } = rate;
+  if (min === null && max === null) return null;
+  if (min === null) return `up to ${formatWeight(max!)}`;
+  if (max === null) return `${formatWeight(min)} and over`;
+  // "2–10 kg" rather than "2 kg–10 kg" when both are in kilograms.
+  const from = min >= 1000 && max! >= 1000 ? formatWeight(min).replace(" kg", "") : formatWeight(min);
+  return `${from}–${formatWeight(max!)}`;
 }
 
 /** What a rate costs for this much in goods. */
@@ -69,7 +96,8 @@ export function describeRate(rate: Rate, currency: string) {
   const days = rateDays(rate);
   const price = rate.priceMinor ? formatMoney(rate.priceMinor, currency) : "Free";
   const free = rate.priceMinor && rate.freeOverMinor !== null ? `, free over ${formatMoney(rate.freeOverMinor, currency)}` : "";
-  return `${rate.name}: ${price}${free}${days ? ` (${days})` : ""}`;
+  const weight = rateWeight(rate);
+  return `${rate.name}${weight ? ` (orders ${weight})` : ""}: ${price}${free}${days ? ` (${days})` : ""}`;
 }
 
 /** The countries a buyer can pick at checkout. */
@@ -144,8 +172,13 @@ const rateInput = z
     freeOverMinor: z.number().int().min(1, "Leave \"Free over\" empty, or enter an amount.").max(100_000_000).nullable(),
     minDays: z.number().int().min(0).max(120).nullable(),
     maxDays: z.number().int().min(0).max(120).nullable(),
+    minWeightGrams: z.number().int().min(0, "The weight can't be negative.").max(MAX_WEIGHT_GRAMS, "Keep the weight under 1,000 kg.").nullable().default(null),
+    maxWeightGrams: z.number().int().min(1, "Leave \"Up to\" empty, or enter a weight over 0.").max(MAX_WEIGHT_GRAMS, "Keep the weight under 1,000 kg.").nullable().default(null),
   })
-  .refine((r) => r.minDays === null || r.maxDays === null || r.minDays <= r.maxDays, "The fastest delivery can't be slower than the slowest.");
+  .refine((r) => r.minDays === null || r.maxDays === null || r.minDays <= r.maxDays, "The fastest delivery can't be slower than the slowest.")
+  .refine((r) => r.minWeightGrams === null || r.maxWeightGrams === null || r.minWeightGrams < r.maxWeightGrams, "The lightest weight has to be under the heaviest.")
+  // "From 0" means any weight up to the limit.
+  .transform((r) => ({ ...r, minWeightGrams: r.minWeightGrams || null }));
 
 export async function addShippingRate(db: Db, shopId: string, zoneId: string, input: z.input<typeof rateInput>) {
   const parsed = rateInput.safeParse(input);

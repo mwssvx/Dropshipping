@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
+import { MAX_WEIGHT_GRAMS } from "./weight";
 import { recordStockEdits } from "./own-stock";
 import { uniqueHandle } from "./handles";
 import { editProductPhotos, inheritedPhoto, photoColumns } from "./gallery";
@@ -19,6 +20,8 @@ const variantInput = z.object({
   costMinor: z.number().int().min(0).nullish(),
   sku: z.string().trim().nullish(),
   stock: z.number().int().nullish(),
+  /** What one weighs packed, in grams, for shipping rates that go by weight. */
+  weightGrams: z.number().int().min(1, "Leave the weight empty, or enter more than 0.").max(MAX_WEIGHT_GRAMS, "Keep the weight under 1,000 kg.").nullish(),
   /** Named options like { Color: "Black", Size: "XL" }, which shoppers can filter by. */
   options: z.record(z.string().trim().min(1).max(40), z.string().trim().min(1).max(60)).optional(),
 });

@@ -70,6 +70,16 @@ function readStock(v: FormDataEntryValue | null) {
   return n;
 }
 
+/** Blank weight means none; a missing field leaves it as it was. */
+function readWeight(v: FormDataEntryValue | null) {
+  if (v === null) return undefined;
+  const s = String(v).trim().replace(/,/g, "").replace(/\s*g$/i, "");
+  if (s === "") return null;
+  const n = Number(s);
+  if (!Number.isInteger(n) || n <= 0) throw new UserError("Enter the weight in whole grams, like 350, or leave it blank.");
+  return n;
+}
+
 function readProduct(form: FormData): ProductInput {
   const count = [...form.keys()].filter((k) => k.startsWith("price.")).length;
   const variants = Array.from({ length: count }, (_, i) => {
@@ -80,6 +90,7 @@ function readProduct(form: FormData): ProductInput {
       throw new UserError("Enter a price like 24.99.");
     }
     const stock = readStock(form.get(`stock.${i}`));
+    const weightGrams = readWeight(form.get(`weight.${i}`));
     try {
       const rawOptions = form.get(`options.${i}`);
       let options: Record<string, string> | undefined;
@@ -95,6 +106,7 @@ function readProduct(form: FormData): ProductInput {
         compareAtMinor: optionalMoney(form.get(`compareAt.${i}`)),
         costMinor: optionalMoney(form.get(`cost.${i}`)),
         stock,
+        weightGrams,
       };
     } catch {
       throw new UserError("Enter prices like 24.99.");

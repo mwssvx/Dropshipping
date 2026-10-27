@@ -5,6 +5,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { schema, SOLD_OUT_DISPLAY, TAG_RULE_KINDS, type Db } from "@sf/db";
 import { z } from "zod";
 import { collectionRulesSchema } from "./collection-rules";
+import { MAX_WEIGHT_GRAMS } from "./weight";
 import { NotFoundError, UserError } from "./errors";
 import { CURRENCIES } from "./currency";
 import { csvCell } from "./payouts";
@@ -126,7 +127,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
         : shipping.zones.map((z) => ({
             name: z.name,
             countries: z.countries,
-            rates: z.rates.map((r) => ({ name: r.name, price_minor: r.priceMinor, free_over_minor: r.freeOverMinor, min_days: r.minDays, max_days: r.maxDays })),
+            rates: z.rates.map((r) => ({ name: r.name, price_minor: r.priceMinor, free_over_minor: r.freeOverMinor, min_days: r.minDays, max_days: r.maxDays, min_weight_grams: r.minWeightGrams, max_weight_grams: r.maxWeightGrams })),
           })),
     },
     theme: theme ? { template: theme.template, draft: theme.draft, published: theme.published } : null,
@@ -162,6 +163,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
           compare_at_price: v.compareAtMinor,
           cost: v.costMinor,
           stock: v.stock,
+          weight_grams: v.weightGrams,
           ship_days_min: v.shipDaysMin,
           ship_days_max: v.shipDaysMax,
           image_url: v.imageUrl,
@@ -311,6 +313,8 @@ const importSchema = z.object({
                   free_over_minor: z.number().int().min(1).max(100_000_000).nullable(),
                   min_days: z.number().int().min(0).max(120).nullable(),
                   max_days: z.number().int().min(0).max(120).nullable(),
+                  min_weight_grams: z.number().int().min(0).max(MAX_WEIGHT_GRAMS).nullable().optional(),
+                  max_weight_grams: z.number().int().min(1).max(MAX_WEIGHT_GRAMS).nullable().optional(),
                 }),
               )
               .max(5),
@@ -384,6 +388,7 @@ const importSchema = z.object({
               compare_at_price: money.nullable().optional(),
               cost: money.nullable().optional(),
               stock: z.number().int().min(0).nullable().optional(),
+              weight_grams: z.number().int().min(1).max(MAX_WEIGHT_GRAMS).nullable().optional(),
               ship_days_min: z.number().int().min(0).max(365).nullable().optional(),
               ship_days_max: z.number().int().min(0).max(365).nullable().optional(),
               image_url: z.string().max(2000).nullable().optional(),
@@ -591,6 +596,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
           compareAtMinor: v.compare_at_price ?? null,
           costMinor: v.cost ?? null,
           stock: v.stock ?? null,
+          weightGrams: v.weight_grams ?? null,
           shipDaysMin: v.ship_days_min ?? null,
           shipDaysMax: v.ship_days_max ?? null,
           position: i,
@@ -778,6 +784,9 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
               freeOverMinor: r.free_over_minor,
               minDays: r.min_days,
               maxDays: r.min_days !== null && r.max_days !== null && r.max_days < r.min_days ? r.min_days : r.max_days,
+              // A range that doesn't make sense comes in without its upper limit.
+              minWeightGrams: r.min_weight_grams || null,
+              maxWeightGrams: r.max_weight_grams && (!r.min_weight_grams || r.max_weight_grams > r.min_weight_grams) ? r.max_weight_grams : null,
             })),
           );
         }

@@ -50,11 +50,11 @@ describe("moving from Shopify", () => {
       imageAlts: { "https://cdn.shopify.com/cloud-2.jpg": "Pink cloud lamp on a nightstand" },
     });
     expect(lamp.variants).toEqual([
-      { title: "White / Small", options: { Color: "White", Size: "Small" }, sku: "CL-W-S", priceMinor: 2999, compareAtMinor: 3999, costMinor: 850, stock: 12, imageUrl: null },
-      { title: "Pink / Large", options: { Color: "Pink", Size: "Large" }, sku: "CL-P-L", priceMinor: 103400, compareAtMinor: null, costMinor: null, stock: 0, imageUrl: "https://cdn.shopify.com/cloud-pink.jpg" },
+      { title: "White / Small", options: { Color: "White", Size: "Small" }, sku: "CL-W-S", priceMinor: 2999, compareAtMinor: 3999, costMinor: 850, stock: 12, weightGrams: null, imageUrl: null },
+      { title: "Pink / Large", options: { Color: "Pink", Size: "Large" }, sku: "CL-P-L", priceMinor: 103400, compareAtMinor: null, costMinor: null, stock: 0, weightGrams: null, imageUrl: "https://cdn.shopify.com/cloud-pink.jpg" },
     ]);
     // No options in Shopify is one option here, and untracked stock is unlimited.
-    expect(products[1]!.variants).toEqual([{ title: "Default", options: {}, sku: null, priceMinor: 1200, compareAtMinor: null, costMinor: null, stock: null, imageUrl: null }]);
+    expect(products[1]!.variants).toEqual([{ title: "Default", options: {}, sku: null, priceMinor: 1200, compareAtMinor: null, costMinor: null, stock: null, weightGrams: null, imageUrl: null }]);
     expect(problems).toEqual([
       'Row 7: "free" isn\'t a price, so that option of Broken was left out.',
       "Gift Card is a gift card. Make gift cards under Gift cards instead.",
