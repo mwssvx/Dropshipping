@@ -1,5 +1,6 @@
 import type { BetaContentBlock, BetaMessageParam } from "@anthropic-ai/sdk/resources/beta/messages";
-import { DEFAULT_MODEL, estimateTokens, text, toolCall, type ModelClient, type ModelRequest, type ModelResponse } from "./model";
+import type { AgentName } from "@sf/db";
+import { AGENT_MODELS, DEFAULT_MODEL, estimateTokens, text, toolCall, type ModelClient, type ModelRequest, type ModelResponse } from "./model";
 
 /**
  * A stand-in for Claude so every agent works before an Anthropic API key is added. It follows each
@@ -8,7 +9,14 @@ import { DEFAULT_MODEL, estimateTokens, text, toolCall, type ModelClient, type M
  */
 export class DemoModel implements ModelClient {
   readonly live = false;
-  constructor(readonly model = DEFAULT_MODEL) {}
+  constructor(
+    readonly model = DEFAULT_MODEL,
+    private readonly models: Partial<Record<AgentName, string>> = AGENT_MODELS,
+  ) {}
+
+  modelFor(agent: AgentName) {
+    return this.models[agent] ?? this.model;
+  }
 
   async create(req: ModelRequest): Promise<ModelResponse> {
     const state = readState(req.messages);
@@ -18,7 +26,7 @@ export class DemoModel implements ModelClient {
     return {
       content,
       stopReason: content.some((b) => b.type === "tool_use") ? "tool_use" : "end_turn",
-      model: this.model,
+      model: req.model,
       usage: { inputTokens: input, outputTokens: output, cacheReadTokens: 0, cacheWriteTokens: 0 },
     };
   }

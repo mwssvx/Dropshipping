@@ -75,7 +75,7 @@ export async function runAgent(ctx: AgentContext, spec: AgentSpec, shop: Shop, i
     shopId: shop.id,
     agent: spec.agent,
     trigger: input.trigger,
-    model: ctx.model.model,
+    model: ctx.model.modelFor(spec.agent),
     conversationId: input.conversationId ?? null,
     orderId: input.orderId ?? null,
     productId: input.productId ?? null,
@@ -104,7 +104,7 @@ export async function runAgent(ctx: AgentContext, spec: AgentSpec, shop: Shop, i
         error = "The assistant took too many steps and was stopped.";
         break;
       }
-      const res = await ctx.model.create({ agent: spec.agent, system, tools, messages, effort: spec.effort, maxTokens: spec.maxTokens });
+      const res = await ctx.model.create({ agent: spec.agent, model: base.model, system, tools, messages, effort: spec.effort, maxTokens: spec.maxTokens });
       const cost = costMicros(res.model, res.usage);
       spent += cost;
       await db
