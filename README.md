@@ -854,3 +854,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Same-day cutoff (after launch, part 127)
 
 1. **Order by 2 pm, ships today**: under Delivery dates, a store that packs its own orders (or whose supplier ships the same day) sets the time orders must be in by, its time zone (it starts at the store's country) and whether it ships at weekends. When the next cutoff is less than a day away, the product page counts down to it: "Order within 02:14:09 and it ships today" (or the day it ships). Orders after the cutoff, or on a day it doesn't ship, start the next shipping day, processing days count shipping days only, and delivery dates on product pages, order pages and receipts follow it, daylight saving included (`packages/core/src/ship-cutoff.ts`, migration 0109).
+
+### Countries a product can't go to (after launch, part 128)
+
+1. **Can't ship to**: some things can't be posted everywhere (lithium batteries, knives to the UK, aerosols) or a supplier doesn't cover a country the rest of the store does. A product's page in admin ticks the countries it can't go to. Buyers browsing from one of them see "This item can't be shipped to …" instead of a delivery date, and checkout stops before payment with what to remove, rather than taking an order the supplier rejects later. The store export carries the list (`packages/core/src/country-limits.ts`, migration 0110).

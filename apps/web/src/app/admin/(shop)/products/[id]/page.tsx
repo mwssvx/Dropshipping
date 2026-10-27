@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts, detailsText, MAX_DETAILS, stockHistory, incomingStock, countryName, type StockMovement } from "@sf/core";
+import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts, detailsText, MAX_DETAILS, stockHistory, incomingStock, countryName, SHIPPING_COUNTRIES, type StockMovement } from "@sf/core";
 import { requireShop, storeAddress, suppliers } from "@/lib/server";
 import { duplicateProductAction, updateProductAction } from "../../../actions";
 import { setUpsellAction } from "../../../growth-actions";
@@ -14,6 +14,7 @@ import { PurchaseLimitForm } from "./PurchaseLimitForm";
 import { CustomsForm } from "./CustomsForm";
 import { MinAgeForm } from "./MinAgeForm";
 import { ReorderDaysForm } from "./ReorderDaysForm";
+import { BlockedCountriesForm } from "./BlockedCountriesForm";
 import { VideoForm } from "./VideoForm";
 import { DetailsForm } from "./DetailsForm";
 import { BadgeForm } from "./BadgeForm";
@@ -352,6 +353,21 @@ export default async function EditProductPage({ params, searchParams }: { params
             </div>
             {product.reorderDays && <p className="text-sm" role="note">Buyers are reminded {product.reorderDays} days after it arrives.</p>}
             <ReorderDaysForm productId={product.id} days={product.reorderDays} />
+          </section>
+        )}
+        {!product.giftCard && (
+          <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="countries-heading">
+            <div>
+              <h2 id="countries-heading" className="font-semibold">Countries it can&apos;t go to</h2>
+              <p className="hint">
+                For things that can&apos;t be posted everywhere, like batteries, knives or aerosols, or a supplier that doesn&apos;t cover a country.
+                Buyers there see it on the product page, and checkout asks them to remove it before they pay.
+              </p>
+            </div>
+            {product.blockedCountries.length > 0 && (
+              <p className="text-sm" role="note">Doesn&apos;t ship to {product.blockedCountries.map(countryName).join(", ")}.</p>
+            )}
+            <BlockedCountriesForm productId={product.id} blocked={product.blockedCountries} countries={SHIPPING_COUNTRIES.map((c) => [c, countryName(c)] as [string, string]).sort((a, b) => a[1].localeCompare(b[1]))} />
           </section>
         )}
         <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="upsell-heading">

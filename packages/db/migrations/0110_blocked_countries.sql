@@ -1,0 +1,1 @@
+ALTER TABLE "products" ADD COLUMN "blocked_countries" jsonb DEFAULT '[]'::jsonb NOT NULL;

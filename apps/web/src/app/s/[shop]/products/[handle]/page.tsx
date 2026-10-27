@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, formatDeliveryWindow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, countdownTo } from "@sf/core";
+import { bundlesForProduct, formatDeliveryWindow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, countdownTo, shipsToCountry } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { SaleCountdown } from "@/components/SaleCountdown";
 import { RecentlyViewed } from "@/components/RecentlyViewed";
@@ -141,7 +141,10 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const bundles = wholesale ? [] : await bundlesForProduct(await db(), shop.id, product.id);
   const bundleTitles = new Map((await localProducts(shopHandle, bundles.flatMap((b) => b.products))).map((p) => [p.id, p.title]));
   // "Arrives Oct 18 – Oct 25 to United States", for the visitor's country when the store ships there.
-  const delivery = buyable.length ? await productDelivery(await db(), shop, product.id, { country: await buyerCountry() }) : null;
+  // Some products can't go to some countries; buyers there are told before they add it.
+  const here = await buyerCountry();
+  const cantShipHere = here && !shipsToCountry(product.blockedCountries, here) ? here : null;
+  const delivery = buyable.length && !cantShipHere ? await productDelivery(await db(), shop, product.id, { country: await buyerCountry() }) : null;
   // A reduced price says what the lowest price was in the 30 days before (the EU's rule).
   const lowest = showsLowestPrice(shop.lowestPriceNote, await buyerCountry()) ? await lowestPricesBefore(await db(), shop.id, product, product.sale) : new Map<string, number>();
   const shownPrice = (x: { id: string; priceMinor: number; compareAtMinor: number | null }) => (
@@ -272,6 +275,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           </form>
         )}
         {v && orderable.length === 0 && <p className="banner banner-info">{t.soldOutForNow}</p>}
+        {cantShipHere && <p className="banner banner-warning" role="note">{t.cantShipTo(new Intl.DisplayNames([lang], { type: "region" }).of(cantShipHere) ?? cantShipHere)}</p>}
         {delivery && (
           <p id="delivery-estimate" className="text-sm flex flex-col gap-0.5">
             <span className="font-medium">{t.arrives(formatDeliveryWindow(delivery, (d) => dayFormat.format(d)), new Intl.DisplayNames([lang], { type: "region" }).of(delivery.country) ?? delivery.country)}</span>
