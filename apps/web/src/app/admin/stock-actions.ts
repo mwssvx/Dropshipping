@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { formatMoney, sendStockAlerts, setLowStockNote, syncProductStock, UserError } from "@sf/core";
+import { formatMoney, sendStockAlerts, setLowStockNote, setRestockAlert, syncProductStock, UserError } from "@sf/core";
 import { requireShop, stock } from "@/lib/server";
 
 export type StockState = { error?: string; message?: string };
@@ -45,6 +45,20 @@ export async function lowStockNoteAction(_: LowStockState, form: FormData): Prom
     const saved = await setLowStockNote(db, shop.id, raw === "" ? Number.NaN : Number(raw));
     revalidatePath("/admin/products");
     revalidatePath(`/s/${shop.handle}`, "layout");
+    return { saved };
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+}
+
+/** When the team is emailed that an option of their own stock is running low; 0 turns it off. */
+export async function restockAlertAction(_: LowStockState, form: FormData): Promise<LowStockState> {
+  const { shop, db } = await requireShop("products");
+  const raw = String(form.get("restockAlertAt") ?? "").trim();
+  try {
+    const saved = await setRestockAlert(db, shop.id, raw === "" ? Number.NaN : Number(raw));
+    revalidatePath("/admin/products");
     return { saved };
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };

@@ -747,3 +747,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Products added by hand**: their stock is the store's own (imported products keep following the supplier's count every day). It comes off when an order is paid, once (`takeOrderStock` in `packages/core/src/own-stock.ts`, `orders.stock_taken_at`), and never below 0. Options left "Not tracked" and pre-ordered lines don't change.
 2. **Back on the shelf**: a full refund or a buyer's own cancellation before anything has shipped puts the items back (`returnOrderStock`). Back-in-stock emails go out as usual once it's above 0.
 3. **Swaps follow**: when a buyer or the merchant changes an item to another option before it ships, the old option gets its stock back and the new one takes it (`moveLineStock`). The product form says how own stock behaves.
+
+### Running low (after launch, part 106)
+
+1. **Listed on the Products page**: options of products the store added itself (its own stock) with the store's number or fewer left show under "Running low", fewest first, sold-out ones in red (`runningLow` in `packages/core/src/own-stock.ts`). Imported products, drafts and options without a count aren't listed.
+2. **One email per option**: the scheduled job emails everyone who looks after products when an option gets down to the number (`notifyLowStock`, `variants.low_stock_notified_at`). It's told again only after it's restocked above the number and runs low again.
+3. **The store picks the number**: "Running-low email" on the Products page, 3 by default, 0 turns it off (`shops.restock_alert_at`). Store export and import keep it.

@@ -3,9 +3,12 @@
 // order is paid, goes back when a paid order is cancelled or fully refunded before anything has
 // shipped, and follows a swap from one option to another before it ships. Pre-ordered lines were
 // sold past the stock, so they don't take any, and stock never goes below 0. An option with no
-// count ("Not tracked") is left alone.
-import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+// count ("Not tracked") is left alone. The team is emailed once when an option runs low.
+import { and, asc, eq, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
+import type { Mailer } from "./email";
+import { UserError } from "./errors";
+import { can } from "./team";
 
 /** Of these options, the ones counting the store's own stock. */
 async function ownStockVariants(db: Db, variantIds: string[]) {
@@ -65,4 +68,122 @@ export async function moveLineStock(db: Db, order: { stockTakenAt: Date | null }
   const own = await ownStockVariants(db, [from, to].filter((v): v is string => !!v));
   if (from && own.has(from)) await change(db, from, line.quantity);
   if (own.has(to)) await change(db, to, -line.quantity);
+}
+
+/** The most the running-low email can be set to. */
+export const RESTOCK_ALERT_MAX = 1000;
+
+/** The team hears when an option has this many or fewer left; 0 turns it off. */
+export async function setRestockAlert(db: Db, shopId: string, n: number) {
+  if (!Number.isInteger(n) || n < 0 || n > RESTOCK_ALERT_MAX) throw new UserError(`Pick a number from 0 to ${RESTOCK_ALERT_MAX}. 0 turns the email off.`);
+  await db.update(schema.shops).set({ restockAlertAt: n, updatedAt: new Date() }).where(eq(schema.shops.id, shopId));
+  // Options already told about are told again under the new number if they're still low.
+  await db
+    .update(schema.variants)
+    .set({ lowStockNotifiedAt: null })
+    .where(and(isNotNull(schema.variants.lowStockNotifiedAt), inArray(schema.variants.productId, db.select({ id: schema.products.id }).from(schema.products).where(eq(schema.products.shopId, shopId)))));
+  return n;
+}
+
+export type RunningLow = { variantId: string; productId: string; title: string; stock: number };
+
+/** Options of stores' own products on sale at or under the store's number, fewest first. */
+function lowOptions(db: Db, shopId?: string) {
+  return db
+    .select({
+      variantId: schema.variants.id,
+      productId: schema.products.id,
+      shopId: schema.products.shopId,
+      product: schema.products.title,
+      option: schema.variants.title,
+      stock: schema.variants.stock,
+      notifiedAt: schema.variants.lowStockNotifiedAt,
+    })
+    .from(schema.variants)
+    .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
+    .innerJoin(schema.shops, eq(schema.shops.id, schema.products.shopId))
+    .where(
+      and(
+        shopId ? eq(schema.shops.id, shopId) : undefined,
+        sql`${schema.shops.restockAlertAt} > 0`,
+        eq(schema.products.status, "active"),
+        eq(schema.products.giftCard, false),
+        isNull(schema.products.sourceUrl),
+        isNotNull(schema.variants.stock),
+        lte(schema.variants.stock, schema.shops.restockAlertAt),
+      ),
+    )
+    .orderBy(asc(schema.variants.stock), asc(schema.products.title), asc(schema.variants.position));
+}
+
+const label = (product: string, option: string) => (option === "Default" ? product : `${product} – ${option}`);
+
+/** For the Products page: the store's own options running low right now. */
+export async function runningLow(db: Db, shopId: string): Promise<RunningLow[]> {
+  return (await lowOptions(db, shopId)).map((r) => ({ variantId: r.variantId, productId: r.productId, title: label(r.product, r.option), stock: r.stock! }));
+}
+
+const LISTED = 20;
+
+/**
+ * From the scheduled job: restocked options get ready to be told about again, and each store with
+ * options newly at or under its number emails the people who look after products, once per option.
+ */
+export async function notifyLowStock(ctx: { db: Db; mailer: Mailer; adminUrl: (path: string) => string }, opts: { shopId?: string; now?: Date } = {}) {
+  const { db } = ctx;
+  const now = opts.now ?? new Date();
+  // Restocked above the number, or the option stopped counting: ready to be told about again.
+  const cleared = await db
+    .update(schema.variants)
+    .set({ lowStockNotifiedAt: null })
+    .where(
+      and(
+        isNotNull(schema.variants.lowStockNotifiedAt),
+        sql`(${schema.variants.stock} is null or ${schema.variants.stock} > (select s.restock_alert_at from ${schema.products} p join ${schema.shops} s on s.id = p.shop_id where p.id = ${schema.variants.productId}))`,
+        opts.shopId ? inArray(schema.variants.productId, db.select({ id: schema.products.id }).from(schema.products).where(eq(schema.products.shopId, opts.shopId))) : undefined,
+      ),
+    )
+    .returning({ id: schema.variants.id });
+  const fresh = (await lowOptions(db, opts.shopId)).filter((r) => !r.notifiedAt);
+  let sent = 0;
+  for (const shopId of new Set(fresh.map((r) => r.shopId))) {
+    const shop = await db.query.shops.findFirst({ where: eq(schema.shops.id, shopId) });
+    if (!shop || shop.status !== "active") continue;
+    const claimed = new Set(
+      (
+        await db
+          .update(schema.variants)
+          .set({ lowStockNotifiedAt: now })
+          .where(and(inArray(schema.variants.id, fresh.filter((r) => r.shopId === shopId).map((r) => r.variantId)), isNull(schema.variants.lowStockNotifiedAt)))
+          .returning({ id: schema.variants.id })
+      ).map((r) => r.id),
+    );
+    const mine = fresh.filter((r) => claimed.has(r.variantId));
+    if (!mine.length) continue;
+    const people = await db
+      .select({ email: schema.users.email, role: schema.shopMembers.role })
+      .from(schema.shopMembers)
+      .innerJoin(schema.users, eq(schema.users.id, schema.shopMembers.userId))
+      .where(eq(schema.shopMembers.shopId, shop.id));
+    const one = mine.length === 1;
+    const out = mine.filter((r) => r.stock === 0).length;
+    const subject = one
+      ? `${label(mine[0]!.product, mine[0]!.option)} is ${mine[0]!.stock === 0 ? "sold out" : "running low"} (${shop.name})`
+      : `${mine.length} options are running low (${shop.name})`;
+    const text = [
+      `Hi,`,
+      ``,
+      `${one ? "This option of your own stock is" : "These options of your own stock are"} at ${shop.restockAlertAt} or fewer${out ? `, and ${out === mine.length ? (one ? "it's" : "they're") : `${out} of them are`} sold out` : ""}:`,
+      ``,
+      ...mine.slice(0, LISTED).map((r) => `  ${label(r.product, r.option)}: ${r.stock === 0 ? "sold out" : `${r.stock} left`}. ${ctx.adminUrl(`/admin/products/${r.productId}`)}`),
+      ...(mine.length > LISTED ? [`  and ${mine.length - LISTED} more: ${ctx.adminUrl("/admin/products#running-low")}`] : []),
+      ``,
+      `Restock and enter the new count on the product page. You can change the number or turn this email off on the Products page.`,
+    ].join("\n");
+    for (const p of people.filter((x) => can(x.role, "products"))) {
+      await ctx.mailer.send({ to: p.email, subject, text });
+      sent++;
+    }
+  }
+  return { sent, back: cleared.length };
 }

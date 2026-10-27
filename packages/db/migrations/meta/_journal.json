@@ -645,6 +645,13 @@
       "when": 1793087923097,
       "tag": "0091_own_stock",
       "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1793088903617,
+      "tag": "0092_running_low",
+      "breakpoints": true
     }
   ]
 }
