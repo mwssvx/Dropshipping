@@ -113,6 +113,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       local_pickup: shop.localPickup,
       local_delivery_area: shop.localDeliveryArea,
       gift_wrap: shop.giftWrap,
+      min_order_minor: shop.minOrderMinor,
       tipping: shop.tipping,
       ship_cutoff: shop.shipCutoff,
       survey: shop.survey,
@@ -296,6 +297,7 @@ const importSchema = z.object({
       packing_slip_note: z.string().max(500).nullable().optional(),
       restock_alert_at: z.number().int().min(0).max(1000).optional(),
       gift_wrap: z.object({ priceMinor: z.number().int().min(0).max(10_000), note: z.string().max(120).nullable() }).nullable().optional(),
+      min_order_minor: z.number().int().min(0).max(100_000).optional(),
       ship_cutoff: z.object({ hour: z.number().int().min(1).max(23), timeZone: z.string().max(60), weekends: z.boolean() }).nullable().optional(),
       tipping: z.object({ percents: z.array(z.number().int().min(1).max(30)).min(1).max(3), note: z.string().max(120).nullable() }).nullable().optional(),
       survey: z.object({ question: z.string().max(120), options: z.array(z.string().max(40)).min(2).max(8), other: z.boolean() }).nullable().optional(),
@@ -766,6 +768,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
     if (data.store.local_pickup !== undefined) settings.localPickup = data.store.local_pickup;
     if (data.store.local_delivery_area !== undefined) settings.localDeliveryArea = data.store.local_delivery_area;
     if (data.store.gift_wrap !== undefined) settings.giftWrap = data.store.gift_wrap;
+    if (data.store.min_order_minor !== undefined) settings.minOrderMinor = data.store.min_order_minor;
     if (data.store.tipping !== undefined) settings.tipping = data.store.tipping;
     if (data.store.ship_cutoff !== undefined) settings.shipCutoff = data.store.ship_cutoff;
     if (data.store.survey !== undefined) settings.survey = data.store.survey;

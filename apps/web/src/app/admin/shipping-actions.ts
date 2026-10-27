@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseKg, parseMoney, setCheckoutPhone, setDeliveryEstimates, setDeliveryProtection, setGiftWrap, setLocalDelivery, setLocalPickup, setShipCutoff, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
+import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseKg, parseMoney, setCheckoutPhone, setDeliveryEstimates, setDeliveryProtection, setGiftWrap, setLocalDelivery, setLocalPickup, setMinOrder, setShipCutoff, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
 import { logged, requireShop } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -216,6 +216,31 @@ export async function setGiftWrapAction(_: GiftWrapState, form: FormData): Promi
   }
   await logged({ shop, user, db }, saved ? "Offered gift wrapping at checkout" : "Stopped offering gift wrapping", { href: "/admin/shipping#gift-wrap-heading" });
   revalidatePath("/admin/shipping");
+  return { saved };
+}
+
+export type MinOrderState = { error?: string; saved?: number };
+
+/** Sets the smallest order the store takes; empty or 0 takes any amount. */
+export async function setMinOrderAction(_: MinOrderState, form: FormData): Promise<MinOrderState> {
+  const { shop, db, user } = await requireShop("shipping");
+  const raw = String(form.get("min") ?? "").trim();
+  let saved = 0;
+  try {
+    let minor = 0;
+    try {
+      minor = raw ? parseMoney(raw) : 0;
+    } catch {
+      return { error: "Enter the smallest order as an amount, like 15.00." };
+    }
+    saved = await setMinOrder(db, shop.id, minor);
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  await logged({ shop, user, db }, saved ? "Set the smallest order" : "Took orders of any amount", { href: "/admin/shipping#min-order-heading" });
+  revalidatePath("/admin/shipping");
+  revalidatePath(`/s/${shop.handle}`, "layout");
   return { saved };
 }
 

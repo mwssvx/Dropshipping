@@ -8,6 +8,7 @@ import { ShipCutoffForm } from "./ShipCutoffForm";
 import { GiftWrapForm } from "./GiftWrapForm";
 import { LocalDeliveryForm } from "./LocalDeliveryForm";
 import { LocalPickupForm } from "./LocalPickupForm";
+import { MinOrderForm } from "./MinOrderForm";
 import { DeleteButton, RateForm, StarterButton, ZoneForm, type Country } from "./ShippingForms";
 
 export const metadata = { title: "Shipping" };
@@ -118,6 +119,18 @@ export default async function ShippingPage() {
                   : "Delivery dates are off."}
             </p>
           )}
+        </section>
+        <section className="card p-5 flex flex-col gap-3" aria-labelledby="min-order-heading" id="min-order">
+          <h2 id="min-order-heading" className="font-semibold">Smallest order</h2>
+          <p className="text-sm">
+            A very small order can cost more to pack and send than it earns. Set the least a buyer can spend and the cart asks them to add a little more
+            before checkout. It counts what they pay for goods after discounts. Gift cards on their own, wholesale orders and payment links you send
+            aren&apos;t held to it. Leave it empty to take any amount.
+          </p>
+          <MinOrderForm
+            min={shop.minOrderMinor ? (shop.minOrderMinor / 100).toFixed(2) : ""}
+            symbol={new Intl.NumberFormat("en-US", { style: "currency", currency: shop.currency }).formatToParts(0).find((p) => p.type === "currency")?.value ?? ""}
+          />
         </section>
         <section className="card p-5 flex flex-col gap-3" aria-labelledby="phone-heading">
           <h2 id="phone-heading" className="font-semibold">Phone number at checkout</h2>

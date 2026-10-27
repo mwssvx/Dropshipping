@@ -24,6 +24,7 @@ import { bundleSavings, bundlesInCart } from "./bundles";
 import { salePrice, salesFor } from "./sales";
 import { addonsByProduct, type CheckoutAddon } from "./addons";
 import { FREE_GIFT_NOTE, freeGiftFor } from "./free-gift";
+import { minimumOrder } from "./min-order";
 import { countryName, fitsWeight, listShippingZones, priceRate, zoneFor } from "./shipping";
 import { formatWeight } from "./weight";
 import { normalizeTags } from "./customers";
@@ -305,6 +306,8 @@ export async function quoteCart(
     spendNudge,
     /** The store's free gift: added to the order once `unlocked`, else how much more it takes. */
     freeGift,
+    /** The store's smallest order and how far the goods are from it. Null when it has none, or for gift cards alone and wholesale. */
+    minimumOrder: wholesale || !hasGoods ? null : minimumOrder(shop, goodsMinor - discountMinor),
     discountMinor,
     shippingMinor,
     totalMinor,
@@ -476,6 +479,13 @@ export async function startCheckout(
     throw new UserError(
       `Wholesale orders start at ${formatMoney(cart.wholesale.minOrderMinor, shop.currency)}. Add ${formatMoney(cart.wholesale.shortByMinor, shop.currency)} more to check out.`,
       "wholesale_minimum",
+    );
+  }
+  // The store's smallest order applies on its own checkout, not to payment links the merchant builds.
+  if (input.storefront && cart.minimumOrder && cart.minimumOrder.shortByMinor > 0) {
+    throw new UserError(
+      `${shop.name} takes orders of ${formatMoney(cart.minimumOrder.minMinor, shop.currency)} or more. Add ${formatMoney(cart.minimumOrder.shortByMinor, shop.currency)} more to check out.`,
+      "below_minimum",
     );
   }
   // A buyer shopping in another currency is charged exactly what they saw, in that currency.
@@ -673,6 +683,7 @@ function asFollowUp(cart: Awaited<ReturnType<typeof quoteCart>>, percent: number
     offerNudge: null,
     spendNudge: null,
     freeGift: null,
+    minimumOrder: null,
     freeShipping: null,
     totalMinor: subtotalMinor + (opts.keepShipping ? cart.shippingMinor : 0),
     dueMinor: subtotalMinor + (opts.keepShipping ? cart.shippingMinor : 0),

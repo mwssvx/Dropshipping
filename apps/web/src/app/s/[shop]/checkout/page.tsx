@@ -29,6 +29,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
     throw e;
   }
   if (quote.wholesale && quote.wholesale.shortByMinor > 0) redirect(`${base}/cart`);
+  if (quote.minimumOrder && quote.minimumOrder.shortByMinor > 0) redirect(`${base}/cart`);
   // The cart says which personalisation is missing.
   if (quote.items.some((i) => i.missingPersonalization.length)) redirect(`${base}/cart`);
   // And which quantities are outside a product's purchase limits.

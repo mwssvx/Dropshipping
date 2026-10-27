@@ -894,3 +894,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Save for later in the cart (after launch, part 137)
 
 1. **Not this time**: every cart line has "Save for later", which moves it out of the cart and onto the buyer's saved items (kept in the browser for guests, on their account once signed in), so they can pay for the rest without losing it. The cart says "Moved to your saved items." with a link to them; if the saved list is full, the item stays in the cart (`saveForLaterAction` in `apps/web/src/app/s/[shop]/actions.ts`, no migration).
+
+### Smallest order (after launch, part 138)
+
+1. **No more $4 orders**: under Shipping, a store can set the least a buyer can spend ("Orders start at $15.00"). A smaller cart says "Orders start at $15.00: add $5.00 more to check out." and offers Keep shopping instead of Check out, and checkout itself won't start below it. It counts what the buyer pays for goods after discounts. Gift cards on their own, wholesale orders (they have their own minimum) and payment links the merchant sends aren't held to it (`packages/core/src/min-order.ts`, migration `0113_min_order`).
