@@ -826,3 +826,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Emailing a restock order (after launch, part 120)
 
 1. **Send it to the supplier**: a restock order can carry the supplier's email. "Email this order" on the order sends them a purchase order with what's still to come, SKUs, agreed costs and the total, when it's wanted, the store's mailing address and the note. The reply goes to whoever sent it. It can't go out twice within a few minutes by accident, and the page shows when it was last sent (`emailRestockOrder` in `packages/core/src/restock.ts`, migration 0103).
+
+### Age check (after launch, part 121)
+
+1. **Minimum age on a product**: alcohol, vapes, knives and the like can carry a minimum age (13 to 25) from the product page. The store's product page says who it's for, and checkout asks the buyer to tick "I confirm I'm 21 or older" (the highest age in the cart) before they can pay. The order keeps the age they confirmed and the order page says to have ID checked on delivery. Payment links, repeat deliveries and after-checkout offers don't ask again (`setMinAge` in `packages/core/src/age-check.ts`, the check in `startCheckout`, migration 0104).

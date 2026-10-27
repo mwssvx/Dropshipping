@@ -163,6 +163,8 @@ export async function quoteCart(
       limit,
       /** The product's limits, so the cart's quantity box can follow them. */
       purchaseLimit: row.product.purchaseLimit,
+      /** Buyers must be this old to buy it, or null. */
+      minAge: row.product.minAge,
     };
   });
   const subtotalMinor = items.reduce((s, i) => s + i.lineMinor, 0);
@@ -300,6 +302,8 @@ export async function quoteCart(
     goodsMinor,
     /** What the goods weigh in grams, from their options' weights. 0 when none are set. */
     weightGrams,
+    /** The oldest age any item asks for: checkout needs the buyer to confirm it. Null when none do. */
+    minAge: items.reduce<number | null>((m, i) => (i.minAge !== null && (m === null || i.minAge > m) ? i.minAge : m), null),
     /** The rate used. Null when nothing needs shipping, or the cart's estimate country has no zone. */
     shipping,
     /** The buyer can pick this cart up from the store instead (see local-pickup.ts). */
@@ -409,6 +413,8 @@ export async function startCheckout(
     protection?: boolean;
     /** The buyer asked for the gift to be wrapped, where the store wraps. */
     giftWrap?: boolean;
+    /** The buyer ticked "I'm N or older" for age-restricted items. */
+    ageConfirmed?: boolean;
   },
   taxCalculator: TaxCalculator = new BuiltInTaxCalculator(),
 ) {
@@ -442,6 +448,12 @@ export async function startCheckout(
     throw new UserError(`Add ${unfinished.missingPersonalization.join(" and ")} for ${unfinished.title} before checking out.`, "personalization_missing");
   }
   // Repeat deliveries keep going; the buyer signed up for them.
+  // Age-restricted items need the buyer to say they're old enough, on the store's own checkout.
+  // Repeat deliveries and after-checkout offers follow an order where they already did.
+  if (input.storefront && !followUp && !repeat && quoted.minAge !== null && !input.ageConfirmed) {
+    const item = quoted.items.find((i) => i.minAge === quoted.minAge)!;
+    throw new UserError(`Confirm you're ${quoted.minAge} or older to buy ${item.title}.`, "age_unconfirmed");
+  }
   const overLimit = repeat ? null : quoted.items.find((i) => i.limit);
   if (overLimit) throw new UserError(describeLimitProblem(overLimit.limit!, overLimit.limit!.product), "purchase_limit");
   if (cart.wholesale && cart.wholesale.shortByMinor > 0) {
@@ -545,6 +557,7 @@ export async function startCheckout(
         shippingMinor: quote.shippingMinor,
         protectionMinor,
         giftWrapMinor,
+        ageConfirmed: quoted.minAge !== null && input.ageConfirmed ? quoted.minAge : null,
         taxMinor: quote.taxMinor,
         taxIncluded: quote.taxIncluded,
         taxBreakdown: quote.taxBreakdown,

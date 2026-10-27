@@ -125,6 +125,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
           checkbox: shop.giftWrap.priceMinor ? t.giftWrapFor(money(convertAmount(shop.giftWrap.priceMinor, fx))) : t.giftWrapFree, note: shop.giftWrap.note, summary: t.giftWrap,
           priceLabel: shop.giftWrap.priceMinor ? money(convertAmount(shop.giftWrap.priceMinor, fx)) : t.free, priceMinor: convertAmount(shop.giftWrap.priceMinor, fx),
         } : null}
+        ageCheck={quote.minAge ? { checkbox: t.ageConfirm(quote.minAge), note: t.ageNote } : null}
         summary={
           <>
             <ul className="flex flex-col gap-2 text-sm">

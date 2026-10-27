@@ -153,6 +153,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       video_url: p.videoUrl,
       hs_code: p.hsCode,
       origin_country: p.originCountry,
+      min_age: p.minAge,
       details: p.details.length ? p.details : undefined,
       badge: p.badge,
       gift_card: p.giftCard,
@@ -376,6 +377,7 @@ const importSchema = z.object({
         details: z.array(z.object({ label: z.string().max(200), value: z.string().max(1000) })).max(100).optional(),
         badge: z.string().max(20).nullable().optional(),
         hs_code: z.string().max(20).nullable().optional(),
+        min_age: z.number().int().nullable().optional(),
         origin_country: z.string().max(10).nullable().optional(),
         purchase_limit: z
           .object({ min: z.number().int().min(2).max(99).nullable(), max: z.number().int().min(1).max(99).nullable(), per_customer: z.number().int().min(1).max(999).nullable() })
@@ -590,6 +592,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
           // Kept only when they'd save here.
           hsCode: /^\d{6,10}$/.test(x.hs_code ?? "") ? x.hs_code! : null,
           originCountry: countryCode(x.origin_country),
+          minAge: x.min_age != null && x.min_age >= 13 && x.min_age <= 25 ? x.min_age : null,
           // Read like the merchant's own text, so lines that wouldn't save here are dropped.
           details: x.details ? parseDetails(detailsText(x.details)) : [],
           badge: x.badge?.trim() || null,

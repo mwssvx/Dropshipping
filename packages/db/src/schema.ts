@@ -302,6 +302,8 @@ export const products = pgTable(
     // For customs forms on orders that cross a border: the tariff code and where it was made.
     hsCode: text("hs_code"),
     originCountry: text("origin_country"),
+    // Buyers must say they're at least this old to check out with it (alcohol, vapes, knives).
+    minAge: integer("min_age"),
     // A video for the product page: a YouTube or Vimeo link, or an https video file.
     videoUrl: text("video_url"),
     // Facts shown as a table on the product page, like Material: Aluminium or Size: 20 × 10 cm.
@@ -327,6 +329,7 @@ export const products = pgTable(
   (t) => [
     uniqueIndex("products_shop_handle_uq").on(t.shopId, t.handle),
     index("products_shop_status_idx").on(t.shopId, t.status),
+    check("products_min_age_ok", sql`${t.minAge} is null or ${t.minAge} between 13 and 25`),
   ],
 );
 
@@ -610,6 +613,9 @@ export const orders = pgTable(
     protectionMinor: money("protection_minor").notNull().default(0),
     // What the buyer paid to have the gift wrapped.
     giftWrapMinor: money("gift_wrap_minor").notNull().default(0),
+    // The age the buyer confirmed at checkout for age-restricted items, so the courier or the
+    // merchant knows to check ID. Null when nothing in it was restricted.
+    ageConfirmed: integer("age_confirmed"),
     // When the buyer was asked to review what they got, once per order.
     reviewRequestedAt: timestamp("review_requested_at", { withTimezone: true }),
     // The merchant's own note and labels ("follow up", "vip"). Never shown to the buyer.

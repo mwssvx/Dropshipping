@@ -262,6 +262,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
               <input type="hidden" name="quantity" value="1" />
             )}
             {limitNote && <p id="limit-note" className="text-sm hint">{limitNote}</p>}
+            {product.minAge && <p className="text-sm" role="note">{t.ageRestricted(product.minAge)}</p>}
             {preorder && soldOut.length > 0 && (
               <p className="text-sm font-medium" role="note">
                 {buyable.length === 0 ? t.preorderShipsBy(shipsBy(preorder.shipsBy)) : t.preorderSome(shipsBy(preorder.shipsBy))}
