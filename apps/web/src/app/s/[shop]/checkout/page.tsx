@@ -147,6 +147,12 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
                   <span className="num">{money(shown.units[i.variantId]! * i.quantity)}</span>
                 </li>
               ))}
+              {quote.freeGift?.unlocked && (
+                <li className="flex justify-between gap-3">
+                  <span>{quote.freeGift.title} <span className="hint">× 1</span><span className="block hint">{t.freeGift}</span></span>
+                  <span className="num">{t.free}</span>
+                </li>
+              )}
             </ul>
             <dl className="grid grid-cols-[1fr_auto] gap-y-1 num text-sm border-t border-border pt-3">
               <dt className="hint">{t.subtotal}</dt><dd className="text-right">{money(shown.subtotalMinor)}</dd>

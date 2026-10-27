@@ -116,6 +116,18 @@ export default async function CartPage({ params, searchParams }: { params: Promi
                 <span className="num font-semibold w-20 text-right">{money(shown!.units[i.variantId]! * i.quantity)}</span>
               </li>
             ))}
+            {quote.freeGift?.unlocked && (
+              <li className="py-4 flex gap-4 items-center" aria-label={t.freeGift}>
+                <div className="size-16 rounded-md bg-sunken overflow-hidden shrink-0">
+                  {quote.freeGift.imageUrl && <img src={quote.freeGift.imageUrl} alt="" className="size-full object-cover" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <Link href={`${base}/products/${quote.freeGift.productHandle}`} className="font-medium hover:underline">{quote.freeGift.title}</Link>
+                  <p className="text-sm text-success">{t.freeGift}</p>
+                </div>
+                <span className="num font-semibold w-20 text-right">{t.free}</span>
+              </li>
+            )}
           </ul>
           {quote.freeShipping && !quote.wholesale && (
             <div className="self-end w-full max-w-xs flex flex-col gap-1.5" role="status">
@@ -156,6 +168,9 @@ export default async function CartPage({ params, searchParams }: { params: Promi
             <p className="self-end banner banner-info text-sm" role="status">
               {t.spendNudge(money(convertAmount(quote.spendNudge.moreMinor, fx)), quote.spendNudge.kind === "percent" ? `${quote.spendNudge.value}%` : money(convertAmount(quote.spendNudge.value, fx)))}
             </p>
+          )}
+          {quote.freeGift && !quote.freeGift.unlocked && (
+            <p className="self-end banner banner-info text-sm" role="status">{t.giftNudge(money(convertAmount(quote.freeGift.moreMinor, fx)), quote.freeGift.title)}</p>
           )}
           {quote.offerNudge && (
             <p className="self-end banner banner-info text-sm" role="status">{quote.offerNudge.label}: {t.offerNudge(quote.offerNudge.missing, quote.offerNudge.free)}</p>

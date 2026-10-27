@@ -1,15 +1,16 @@
-import { bundleProductChoices, formatMoney, listAddons, MAX_ADDONS } from "@sf/core";
+import { bundleProductChoices, formatMoney, freeGiftChoices, listAddons, MAX_ADDONS } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { deleteAddonAction, toggleAddonAction } from "../../addon-actions";
 import { PageHeader } from "../PageHeader";
 import { AddonForm } from "./AddonForm";
+import { FreeGiftForm } from "./FreeGiftForm";
 import { TipsForm } from "./TipsForm";
 
 export const metadata = { title: "Checkout add-ons" };
 
 export default async function AddonsPage() {
   const { shop, db } = await requireShop("marketing");
-  const [addons, products] = await Promise.all([listAddons(db, shop.id), bundleProductChoices(db, shop.id)]);
+  const [addons, products, giftChoices] = await Promise.all([listAddons(db, shop.id), bundleProductChoices(db, shop.id), freeGiftChoices(db, shop.id)]);
   const choices = products.filter((p) => !addons.some((a) => a.productId === p.id));
   return (
     <main className="pb-12">
@@ -27,6 +28,19 @@ export default async function AddonsPage() {
             <p className="hint">Add a product first.</p>
           ) : (
             <AddonForm products={choices} />
+          )}
+        </section>
+        <section className="card p-5 flex flex-col gap-3" aria-labelledby="gift-heading">
+          <h2 id="gift-heading" className="font-semibold">Free gift</h2>
+          <p className="text-sm">
+            Give something away with orders over an amount, like a tote bag over {formatMoney(7500, shop.currency)}. The cart tells buyers how much more
+            it takes, and the gift is added to the order for free once they get there, so it&apos;s sent with everything else. The amount is what they
+            pay for goods after discounts. Wholesale orders don&apos;t get one.
+          </p>
+          {giftChoices.length === 0 ? (
+            <p className="hint">Add a product first.</p>
+          ) : (
+            <FreeGiftForm gift={shop.freeGift} choices={giftChoices} min={shop.freeGift ? (shop.freeGift.minSubtotalMinor / 100).toFixed(2) : ""} />
           )}
         </section>
         <section className="card p-5 flex flex-col gap-3" aria-labelledby="tips-heading" id="tips">
