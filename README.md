@@ -926,3 +926,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Abandoned checkouts (after launch, part 145)
 
 1. **See who left at checkout**: Orders → Abandoned checkouts lists every buyer from the last 30 days who started checking out and didn't pay, an hour or more ago (`abandonedCheckouts`). Each row shows what they left, whether the reminder email went out (and whether it carried a code), and whether they came back and paid, on the same checkout or as a new order with the same email. The top of the page sums how many were left, what they were worth and how many came back. When reminder emails are off, the page says so and links to Marketing.
+
+### Every review, in pages (after launch, part 146)
+
+1. **Reviews for a busy store**: the Reviews page used to show the newest 200 of each kind and nothing older, which a store that brought its reviews over could pass on day one. It now shows 50 a page with Newer and Older links, the number in each tab (Waiting, Published, Hidden), a star filter (for finding the 1- and 2-star reviews to answer), and a search over the reviewer's name, what they wrote and the product (`reviewPage` and `reviewCounts` in `packages/core/src/reviews.ts`).
