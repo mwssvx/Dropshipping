@@ -410,6 +410,11 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
             <p className="hint">The buyer can open these from their order page too.</p>
           </section>
         )}
+        {order.surveyAnswer && (
+          <p className="card p-5 text-sm">
+            <span className="hint">Heard about you from:</span> <Link href="/admin/survey" className="font-medium">{order.surveyAnswer}</Link>{order.surveyOther ? ` (${order.surveyOther})` : ""}
+          </p>
+        )}
         {order.ageConfirmed && (
           <p className="card p-5 text-sm">
             <span className="pill pill-warning">Buyer confirmed {order.ageConfirmed}+</span> Something in this order has a minimum age. Ask the courier to check ID on delivery, or check it yourself at pickup.

@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, cancelOrderByBuyer, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer } from "@sf/core";
+import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, cancelOrderByBuyer, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer, answerSurvey } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
 import { agents, campaigns, db, fulfillment, payments, platformUrl, refunds, subscriptions, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
@@ -498,6 +498,19 @@ export async function startSubscriptionAction(handle: string, ref: string, _: { 
   }
   revalidatePath(`/s/${handle}/orders/${ref}`);
   redirect(`${await storeBase(handle)}/orders/${ref}?subscribed=1`);
+}
+
+/** The buyer's answer to the store's survey on their order page. */
+export async function answerSurveyAction(handle: string, ref: string, _: { error?: string }, form: FormData): Promise<{ error?: string }> {
+  const shop = await loadShop(handle);
+  try {
+    await answerSurvey(await db(), shop, ref, { answer: String(form.get("answer") ?? ""), other: String(form.get("other") ?? "") });
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath(`/s/${handle}/orders/${ref}`);
+  redirect(`${await storeBase(handle)}/orders/${ref}?answered=1`);
 }
 
 /** Skip, change how often, pause, resume or cancel, from the subscription's page. */

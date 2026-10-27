@@ -830,3 +830,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Age check (after launch, part 121)
 
 1. **Minimum age on a product**: alcohol, vapes, knives and the like can carry a minimum age (13 to 25) from the product page. The store's product page says who it's for, and checkout asks the buyer to tick "I confirm I'm 21 or older" (the highest age in the cart) before they can pay. The order keeps the age they confirmed and the order page says to have ID checked on delivery. Payment links, repeat deliveries and after-checkout offers don't ask again (`setMinAge` in `packages/core/src/age-check.ts`, the check in `startCheckout`, migration 0104).
+
+### Buyer survey (after launch, part 122)
+
+1. **How did you hear about us?**: the store can ask buyers one question on their order page right after paying, with 2 to 8 answers and an optional "Other" box. Each order keeps its answer, which shows on the order page. The Buyer survey page lists orders, share and sales per answer for the last 30 days, 90 days or year, and what people typed under "Other". Replacements, repeat deliveries and add-ons are not asked, and buyers can answer for 30 days (`packages/core/src/survey.ts`, migration 0105).
