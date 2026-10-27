@@ -40,8 +40,10 @@ test("shoppers ask the store's assistant about products once the merchant turns 
   const chat = buyer.getByRole("dialog", { name: "Shopping assistant" });
   await chat.getByLabel("Ask a question…").fill("Do you have a projection lamp?");
   await chat.getByRole("button", { name: "Send" }).click();
-  const link = chat.getByRole("link", { name: /Sunset Projection Lamp/i });
+  const link = chat.getByRole("link", { name: /Sunset Projection Lamp/i }).first();
   await expect(link).toBeVisible();
+  // The product it means, as a card with its photo and price.
+  await expect(chat.getByRole("article", { name: "Sunset Projection Lamp" })).toContainText(/from \$\d+\.\d\d/);
   await shot(buyer, "144-shop-assistant");
 
   // On the product's page, "it" means that product, and the chat carries over.

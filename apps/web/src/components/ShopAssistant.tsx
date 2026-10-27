@@ -2,10 +2,10 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname } from "next/navigation";
 import { shopperLinks } from "@sf/core/shopper-links";
-import type { ShopAssistantState } from "@/app/s/[shop]/actions";
+import type { ShopAssistantCard, ShopAssistantState } from "@/app/s/[shop]/actions";
 
-type Line = { from: "shopper" | "assistant"; body: string };
-type Text = { open: string; title: string; intro: string; placeholder: string; send: string; close: string; thinking: string; error: string; note: string };
+type Line = { from: "shopper" | "assistant"; body: string; cards?: ShopAssistantCard[] };
+type Text = { open: string; title: string; intro: string; placeholder: string; send: string; close: string; thinking: string; error: string; note: string; addToCart: string; soldOut: string; from: string };
 
 /** "Ask us" on every store page: a small chat with the store's shopping assistant. */
 export function ShopAssistant(props: {
@@ -15,6 +15,8 @@ export function ShopAssistant(props: {
   t: Text;
   ask: (chatId: string | null, question: string, productHandle: string | null) => Promise<ShopAssistantState>;
   load: (chatId: string) => Promise<Line[]>;
+  /** Adds one of a single-option product to the cart, then shows the cart. */
+  addToCart: (form: FormData) => void;
 }) {
   const { t } = props;
   const [open, setOpen] = useState(false);
@@ -59,7 +61,7 @@ export function ShopAssistant(props: {
           window.localStorage.setItem(props.storageKey, r.chatId);
         } catch {}
       }
-      if (r.reply) setLines((l) => [...l, { from: "assistant", body: r.reply! }]);
+      if (r.reply) setLines((l) => [...l, { from: "assistant", body: r.reply!, cards: r.cards }]);
       else setError(r.error ?? t.error);
     });
   }
@@ -83,11 +85,30 @@ export function ShopAssistant(props: {
           l.from === "shopper" ? (
             <p key={i} className="self-end max-w-[85%] rounded-2xl bg-sunken px-3 py-2 whitespace-pre-line">{l.body}</p>
           ) : (
-            <p key={i} className="self-start max-w-[90%] whitespace-pre-line">
-              {shopperLinks(l.body).map((part, j) =>
-                "handle" in part ? <a key={j} className="underline font-medium" href={`${props.base}/products/${part.handle}`}>{part.text}</a> : <span key={j}>{part.text}</span>,
-              )}
-            </p>
+            <div key={i} className="self-start max-w-[90%] flex flex-col gap-2">
+              <p className="whitespace-pre-line">
+                {shopperLinks(l.body).map((part, j) =>
+                  "handle" in part ? <a key={j} className="underline font-medium" href={`${props.base}/products/${part.handle}`}>{part.text}</a> : <span key={j}>{part.text}</span>,
+                )}
+              </p>
+              {l.cards?.map((c) => (
+                <article key={c.handle} aria-label={c.title} className="flex gap-3 items-center rounded-lg border border-border p-2">
+                  {c.imageUrl ? <img src={c.imageUrl} alt="" className="size-12 rounded object-cover shrink-0" /> : <span className="size-12 rounded bg-sunken shrink-0" />}
+                  <div className="min-w-0 flex-1">
+                    <a className="font-medium block truncate" href={`${props.base}/products/${c.handle}`}>{c.title}</a>
+                    <span className="num">{c.from && `${t.from} `}{c.price}</span>{c.was && <s className="hint num ml-2">{c.was}</s>}
+                    {!c.inStock && <span className="hint block">{t.soldOut}</span>}
+                  </div>
+                  {c.variantId && (
+                    <form action={props.addToCart}>
+                      <input type="hidden" name="variantId" value={c.variantId} />
+                      <input type="hidden" name="quantity" value="1" />
+                      <button type="submit" className="btn text-xs px-2 py-1" aria-label={`${t.addToCart}: ${c.title}`}>{t.addToCart}</button>
+                    </form>
+                  )}
+                </article>
+              ))}
+            </div>
           ),
         )}
         {pending && <p className="hint" role="status">{t.thinking}</p>}
@@ -102,7 +123,7 @@ export function ShopAssistant(props: {
             ref={input}
             rows={2}
             maxLength={500}
-            className="input flex-1 resize-none"
+            className="input flex-1 resize-none h-16 min-h-0"
             placeholder={t.placeholder}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) send(e);

@@ -6,7 +6,7 @@ import { SaleCountdown } from "@/components/SaleCountdown";
 import { AdPixels } from "@/components/AdPixels";
 import { db, storeAddress } from "@/lib/server";
 import { buyerCountry, buyerFx } from "@/lib/currency";
-import { askShopAssistantAction, setCurrencyAction, shopAssistantChatAction } from "./actions";
+import { addToCartAction, askShopAssistantAction, setCurrencyAction, shopAssistantChatAction } from "./actions";
 import { ShopAssistant } from "@/components/ShopAssistant";
 import { themeLayoutAttrs, themeStyle } from "@/theme/style";
 import { closureDate, loadShop, loadTheme, storeBase, storeLang, storePath, storeRoot, storeT } from "./data";
@@ -76,7 +76,8 @@ export default async function StoreLayout({ children, params }: { children: Reac
           storageKey={`sf_chat_${shop.id}`}
           ask={askShopAssistantAction.bind(null, param)}
           load={shopAssistantChatAction.bind(null, param)}
-          t={{ open: t.assistantOpen, title: t.assistantTitle, intro: t.assistantIntro, placeholder: t.assistantPlaceholder, send: t.assistantSend, close: t.assistantClose, thinking: t.assistantThinking, error: t.assistantError, note: t.assistantNote }}
+          addToCart={addToCartAction.bind(null, param)}
+          t={{ open: t.assistantOpen, title: t.assistantTitle, intro: t.assistantIntro, placeholder: t.assistantPlaceholder, send: t.assistantSend, close: t.assistantClose, thinking: t.assistantThinking, error: t.assistantError, note: t.assistantNote, addToCart: t.addToCart, soldOut: t.soldOut, from: t.assistantFrom }}
         />
       )}
       {pixels && <AdPixels ids={pixels} ask={ask} text={{ message: t.cookieMessage, accept: t.cookieAccept, decline: t.cookieDecline, settings: t.cookieSettings }} />}

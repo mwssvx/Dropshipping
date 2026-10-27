@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, cancelOrderByBuyer, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer, askShopAssistant, shopperThread } from "@sf/core";
+import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, cancelOrderByBuyer, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, saveItem, setPriceAlerts, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer, askShopAssistant, shopperCards, shopperThread, convertPrice, formatMoney } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
 import { agents, campaigns, db, fulfillment, payments, platformUrl, refunds, subscriptions, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
@@ -517,7 +517,17 @@ export async function changeSubscriptionAction(handle: string, token: string, _:
   return { done };
 }
 
-export type ShopAssistantState = { reply?: string; chatId?: string; error?: string };
+export type ShopAssistantCard = { handle: string; title: string; imageUrl: string | null; price: string; was: string | null; from: boolean; inStock: boolean; variantId: string | null };
+export type ShopAssistantState = { reply?: string; cards?: ShopAssistantCard[]; chatId?: string; error?: string };
+
+/** The products an answer links to, priced in the buyer's currency. */
+async function chatCards(shop: Awaited<ReturnType<typeof loadShop>>, reply: string): Promise<ShopAssistantCard[]> {
+  const cards = await shopperCards(await db(), shop.id, reply);
+  if (!cards.length) return [];
+  const fx = await buyerFx(shop);
+  const show = (m: number) => formatMoney(convertPrice(m, fx), fx.currency);
+  return cards.map(({ priceMinor, compareAtMinor, ...c }) => ({ ...c, price: show(priceMinor), was: compareAtMinor && compareAtMinor > priceMinor ? show(compareAtMinor) : null }));
+}
 
 /**
  * A shopper asks the store's shopping assistant. The browser keeps the chat's id and sends it
@@ -527,15 +537,17 @@ export async function askShopAssistantAction(handle: string, chatId: string | nu
   const shop = await loadShop(handle);
   try {
     const r = await askShopAssistant(await agents(), shop, { conversationId: chatId, question, productHandle });
-    return { reply: r.reply, chatId: r.conversationId };
+    return { reply: r.reply, cards: await chatCards(shop, r.reply), chatId: r.conversationId };
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
     throw e;
   }
 }
 
-/** The shopper's chat so far, when they open the assistant on another page. */
+/** The shopper's chat so far, when they open the assistant on another page. Cards only for the last answer. */
 export async function shopAssistantChatAction(handle: string, chatId: string) {
   const shop = await loadShop(handle);
-  return (await shopperThread(await db(), shop.id, chatId)).map((m) => ({ from: m.from, body: m.body }));
+  const lines = await shopperThread(await db(), shop.id, chatId);
+  const last = lines.map((m) => m.from).lastIndexOf("assistant");
+  return Promise.all(lines.map(async (m, i) => ({ from: m.from, body: m.body, cards: i === last ? await chatCards(shop, m.body) : [] })));
 }
