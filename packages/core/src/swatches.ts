@@ -94,3 +94,9 @@ export async function setSwatches(db: Db, shopId: string, productId: string, col
   await db.update(schema.products).set({ swatches: next, updatedAt: new Date() }).where(eq(schema.products.id, product.id));
   return productSwatches({ swatches: next, variants })!;
 }
+
+/** Up to `max` colour dots for a product card, and how many more colours there are. Null under two colours. */
+export function cardSwatches(product: { swatches: Record<string, string> | null; variants: { options: Record<string, string> | null }[] }, max = 5) {
+  const colors = productSwatches(product)?.values.map((v) => v.color).filter((c): c is string => !!c) ?? [];
+  return colors.length >= 2 ? { colors: colors.slice(0, max), count: colors.length } : null;
+}

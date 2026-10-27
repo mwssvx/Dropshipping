@@ -8,6 +8,7 @@ import { convertPrice, noConversion, type DisplayFx } from "./money";
 import { listActiveProducts } from "./products";
 import { placeSoldOut, productSoldOut, soldOutDisplay } from "./badges";
 import { fixedSearch } from "./search-terms";
+import { cardSwatches } from "./swatches";
 
 type ActiveProduct = Awaited<ReturnType<typeof listActiveProducts>>[number];
 
@@ -194,5 +195,6 @@ export const compactProducts = (products: ActiveProduct[]) =>
       badge: p.badge,
       createdAt: p.createdAt,
       soldOut: productSoldOut(p),
+      swatches: cardSwatches(p),
     };
   });
