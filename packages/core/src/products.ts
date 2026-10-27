@@ -204,6 +204,34 @@ async function productsWithVariants(db: Db, scope: SQL | undefined) {
   return rows.map((p) => ({ ...p, variants: byProduct.get(p.id) ?? [] }));
 }
 
+/**
+ * Every product's id, title, handle and status, newest first, without options or photos: for the
+ * product pickers on admin pages, which don't need the rest and would otherwise load the whole
+ * catalog with every option.
+ */
+export async function productChoices(db: Db, shopId: string) {
+  await publishDueProducts(db, shopId);
+  return db
+    .select({ id: schema.products.id, title: schema.products.title, handle: schema.products.handle, status: schema.products.status, giftCard: schema.products.giftCard })
+    .from(schema.products)
+    .where(eq(schema.products.shopId, shopId))
+    .orderBy(desc(schema.products.createdAt));
+}
+
+/** One of the store's products on sale (not a gift card) with its options, newest first, to show examples with; null if there's none. */
+export async function sampleProduct(db: Db, shopId: string) {
+  await publishDueProducts(db, shopId);
+  const [product] = await db
+    .select()
+    .from(schema.products)
+    .where(and(eq(schema.products.shopId, shopId), eq(schema.products.status, "active"), eq(schema.products.giftCard, false)))
+    .orderBy(desc(schema.products.createdAt))
+    .limit(1);
+  if (!product) return null;
+  const variants = await db.select().from(schema.variants).where(eq(schema.variants.productId, product.id)).orderBy(asc(schema.variants.position));
+  return { ...product, variants };
+}
+
 /** Products on one page of the admin product list. */
 export const PRODUCT_PAGE_SIZE = 100;
 

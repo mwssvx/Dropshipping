@@ -1,4 +1,4 @@
-import { getTheme, listCollections, listPages, listProducts } from "@sf/core";
+import { getTheme, listCollections, listPages, productChoices } from "@sf/core";
 import { requireShop, storeAddress } from "@/lib/server";
 import { ThemeEditor } from "./ThemeEditor";
 
@@ -10,7 +10,7 @@ export default async function ThemePage() {
     getTheme(db, shop),
     listCollections(db, shop.id),
     listPages(db, shop.id),
-    listProducts(db, shop.id),
+    productChoices(db, shop.id),
     storeAddress(shop),
   ]);
   // Suggestions for every link field: the store's own pages first.

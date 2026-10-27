@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AD_CHANNEL_LABELS, formatMoney, listProducts, PROFIT_RANGES, profitReport, type ProfitRange } from "@sf/core";
+import { AD_CHANNEL_LABELS, formatMoney, productChoices, PROFIT_RANGES, profitReport, type ProfitRange } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { deleteAdSpendAction } from "../../profit-actions";
 import { PageHeader } from "../PageHeader";
@@ -14,7 +14,7 @@ export default async function ProfitPage({ searchParams }: { searchParams: Promi
   const { shop, db } = await requireShop("money");
   const { days: raw } = await searchParams;
   const days = (PROFIT_RANGES.find((d) => String(d) === raw) ?? 30) as ProfitRange;
-  const [r, products] = await Promise.all([profitReport(db, shop, days), listProducts(db, shop.id)]);
+  const [r, products] = await Promise.all([profitReport(db, shop, days), productChoices(db, shop.id)]);
   const money = (m: number) => formatMoney(m, shop.currency);
   const symbol = money(0).replace(/[\d.,\s]/g, "");
   const t = r.totals;

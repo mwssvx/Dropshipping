@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getPost, listProducts, NotFoundError } from "@sf/core";
+import { getPost, NotFoundError, productChoices } from "@sf/core";
 import { requireShop, storeAddress } from "@/lib/server";
 import { deletePostAction, updatePostAction } from "../../../blog-actions";
 import { PageHeader } from "../../PageHeader";
@@ -16,7 +16,7 @@ export default async function EditPostPage({ params, searchParams }: { params: P
     if (e instanceof NotFoundError) notFound();
     throw e;
   });
-  const [products, address] = await Promise.all([listProducts(db, shop.id), storeAddress(shop)]);
+  const [products, address] = await Promise.all([productChoices(db, shop.id), storeAddress(shop)]);
   // Featured products that went off sale stay listed (and ticked), so saving doesn't drop them.
   const choices = products
     .filter((p) => p.status === "active" || post.productIds.includes(p.id))
