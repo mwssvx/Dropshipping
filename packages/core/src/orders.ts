@@ -749,32 +749,58 @@ export async function handlePaymentEvent(db: Db, provider: string, event: Paymen
   });
 }
 
-export async function listOrders(
-  db: Db,
-  shopId: string,
-  filter: { fulfillmentStatus?: Order["fulfillmentStatus"]; held?: boolean; tag?: string; query?: string; from?: Date; to?: Date } = {},
-) {
+export type OrderFilter = { fulfillmentStatus?: Order["fulfillmentStatus"]; held?: boolean; tag?: string; query?: string; from?: Date; to?: Date };
+
+function orderWhere(shopId: string, filter: OrderFilter) {
   const tag = filter.tag?.trim().toLowerCase();
   // "1042", "#1042", a name or an email.
   const q = filter.query?.trim().toLowerCase().replace(/^#(?=\d+$)/, "");
-  return db.query.orders.findMany({
-    where: and(
-      eq(schema.orders.shopId, shopId),
-      filter.fulfillmentStatus ? eq(schema.orders.fulfillmentStatus, filter.fulfillmentStatus) : undefined,
-      // Held for the risk check and still worth sending (a refunded one is settled).
-      filter.held ? and(isNotNull(schema.orders.heldAt), inArray(schema.orders.paymentStatus, ["paid", "partially_refunded"])) : undefined,
-      tag ? sql`${schema.orders.tags} @> ${JSON.stringify([tag])}::jsonb` : undefined,
-      q
-        ? /^\d{1,9}$/.test(q)
-          ? eq(schema.orders.number, Number(q))
-          : sql`(lower(${schema.orders.email}) like ${`%${q}%`} or lower(${schema.orders.shippingAddress}->>'name') like ${`%${q}%`})`
-        : undefined,
-      // Placed in this range (from inclusive, to exclusive).
-      filter.from ? gte(schema.orders.createdAt, filter.from) : undefined,
-      filter.to ? lt(schema.orders.createdAt, filter.to) : undefined,
-    ),
+  return and(
+    eq(schema.orders.shopId, shopId),
+    filter.fulfillmentStatus ? eq(schema.orders.fulfillmentStatus, filter.fulfillmentStatus) : undefined,
+    // Held for the risk check and still worth sending (a refunded one is settled).
+    filter.held ? and(isNotNull(schema.orders.heldAt), inArray(schema.orders.paymentStatus, ["paid", "partially_refunded"])) : undefined,
+    tag ? sql`${schema.orders.tags} @> ${JSON.stringify([tag])}::jsonb` : undefined,
+    q
+      ? /^\d{1,9}$/.test(q)
+        ? eq(schema.orders.number, Number(q))
+        : sql`(lower(${schema.orders.email}) like ${`%${q}%`} or lower(${schema.orders.shippingAddress}->>'name') like ${`%${q}%`})`
+      : undefined,
+    // Placed in this range (from inclusive, to exclusive).
+    filter.from ? gte(schema.orders.createdAt, filter.from) : undefined,
+    filter.to ? lt(schema.orders.createdAt, filter.to) : undefined,
+  );
+}
+
+/** Every order matching the filter, newest first. For exports and summaries; the order list pages through them. */
+export async function listOrders(db: Db, shopId: string, filter: OrderFilter = {}) {
+  return db.query.orders.findMany({ where: orderWhere(shopId, filter), orderBy: desc(schema.orders.number) });
+}
+
+/** Orders on one page of the order list. */
+export const ORDER_PAGE_SIZE = 50;
+
+/**
+ * One page of the order list, newest first: the orders numbered below `before` (the newest when
+ * it's left out). `older` is where the next page starts, or null on the last one. Paging by
+ * number rather than by offset keeps a page in place when new orders come in, and stays fast
+ * however far back the merchant goes.
+ */
+export async function orderPage(db: Db, shopId: string, filter: OrderFilter = {}, page: { before?: number; size?: number } = {}) {
+  const size = page.size ?? ORDER_PAGE_SIZE;
+  const rows = await db.query.orders.findMany({
+    where: and(orderWhere(shopId, filter), page.before ? lt(schema.orders.number, page.before) : undefined),
     orderBy: desc(schema.orders.number),
+    limit: size + 1,
   });
+  const orders = rows.slice(0, size);
+  return { orders, older: rows.length > size ? orders.at(-1)!.number : null };
+}
+
+/** How many orders match the filter, for the counts on the order list's tabs. */
+export async function countOrders(db: Db, shopId: string, filter: OrderFilter = {}) {
+  const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.orders).where(orderWhere(shopId, filter));
+  return row!.n;
 }
 
 const orderNotesInput = z.object({

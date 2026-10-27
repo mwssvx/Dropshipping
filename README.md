@@ -902,3 +902,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Work on many orders at once (after launch, part 139)
 
 1. **Tick, then act**: the order list has a box on each row and one to pick everything shown. With orders picked, the bar above the list adds a tag to all of them, takes one off, or opens just their packing slips to print together. Orders that already have the tag, or already have ten, are left alone and the banner says so. The filters stay as they were after a change (`tagOrders` in `packages/core/src/orders.ts`, `packingSlips(…, { orderIds })`).
+
+### Pages for the order list (after launch, part 140)
+
+1. **Busy stores**: the order list shows 50 orders at a time, newest first, with Older orders and Newest orders links. Pages go by order number rather than by position, so new orders coming in don't shift the page under the merchant and going far back stays fast. The Needs attention and On hold counts are counted in the database instead of loading those orders (`orderPage` and `countOrders` in `packages/core/src/orders.ts`). The spreadsheet download still covers every order that matches.
