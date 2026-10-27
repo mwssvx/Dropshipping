@@ -76,6 +76,20 @@ export function RateForm({ zoneId, currencySymbol }: { zoneId: string; currencyS
           <input className="input num" id={`rate-max-${zoneId}`} name="maxDays" type="number" min={0} max={120} />
         </div>
       </div>
+      <details className="text-sm">
+        <summary className="cursor-pointer text-muted">Only for some order weights</summary>
+        <p className="hint mt-1">Charge more for heavy orders with one rate per weight range. Set what each product weighs on its page.</p>
+        <div className="grid grid-cols-2 gap-2 mt-2 max-w-sm">
+          <div className="field">
+            <label className="label" htmlFor={`rate-minkg-${zoneId}`}>Orders from (kg)</label>
+            <input className="input num" id={`rate-minkg-${zoneId}`} name="minKg" inputMode="decimal" placeholder="0" />
+          </div>
+          <div className="field">
+            <label className="label" htmlFor={`rate-maxkg-${zoneId}`}>Up to (kg)</label>
+            <input className="input num" id={`rate-maxkg-${zoneId}`} name="maxKg" inputMode="decimal" placeholder="Any" />
+          </div>
+        </div>
+      </details>
       <SubmitButton className="btn btn-secondary self-start">Add rate</SubmitButton>
     </form>
   );

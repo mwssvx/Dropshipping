@@ -680,6 +680,13 @@
       "when": 1793097095112,
       "tag": "0096_stock_history",
       "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1793097194813,
+      "tag": "0097_weight_rates",
+      "breakpoints": true
     }
   ]
 }

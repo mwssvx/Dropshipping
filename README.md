@@ -776,3 +776,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Every change, with why**: each change to the store's own stock count is written down with the option, how much, what's left and the reason (`stock_movements`, `recordMovement` in `packages/core/src/own-stock.ts`): the starting count, a sale, an order cancelled or refunded before it shipped, a swap to another option, or a count typed on the product form, in the app or through the API (`recordStockEdits`). Imported products follow the supplier, so they have none.
 2. **On the product page**: "Stock history" lists the latest 50 changes, newest first, with links to the orders behind them (`stockHistory`).
+
+### Shipping by weight (after launch, part 111)
+
+1. **What things weigh**: each option of a product can carry its packed weight in grams ("Weight (g)" on the product page, `variants.weight_grams`). Shopify imports bring it in from "Variant Grams", and the store backup keeps it.
+2. **Rates for a weight range**: a shipping rate can be limited to orders from and/or up to a weight in kg ("Only for some order weights" when adding a rate; `minWeightGrams`/`maxWeightGrams`, `fitsWeight` in `packages/core/src/shipping.ts`). Both ends count, so "up to 2 kg" includes 2 kg.
+3. **At checkout**: the cart's weight is the sum of its options' weights (`quoteCart` returns `weightGrams`; options without one count as nothing). Only rates that fit show, the cheapest fitting one is the default, and an order heavier than every rate's limit is told plainly that there's no shipping for it.

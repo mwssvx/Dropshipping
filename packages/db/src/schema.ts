@@ -340,6 +340,8 @@ export const variants = pgTable(
     compareAtMinor: money("compare_at_minor"),
     costMinor: money("cost_minor"),
     stock: integer("stock"),
+    // What one of these weighs packed, for shipping rates that go by weight.
+    weightGrams: integer("weight_grams"),
     // When the team was told this option of the store's own stock is running low. Cleared once it's restocked.
     lowStockNotifiedAt: timestamp("low_stock_notified_at", { withTimezone: true }),
     shipDaysMin: integer("ship_days_min"),
@@ -1511,12 +1513,16 @@ export const shippingRates = pgTable(
     freeOverMinor: money("free_over_minor"),
     minDays: integer("min_days"),
     maxDays: integer("max_days"),
+    // Only offered when the cart weighs at least / under this much. Both empty means any weight.
+    minWeightGrams: integer("min_weight_grams"),
+    maxWeightGrams: integer("max_weight_grams"),
     createdAt: createdAt(),
   },
   (t) => [
     index("shipping_rates_zone_idx").on(t.zoneId),
     check("shipping_rates_price_ok", sql`${t.priceMinor} >= 0`),
     check("shipping_rates_days_ok", sql`${t.minDays} is null or ${t.maxDays} is null or ${t.minDays} <= ${t.maxDays}`),
+    check("shipping_rates_weight_ok", sql`${t.minWeightGrams} is null or ${t.maxWeightGrams} is null or ${t.minWeightGrams} < ${t.maxWeightGrams}`),
   ],
 );
 

@@ -1,6 +1,6 @@
 import { PixelEvent } from "@/components/PixelEvent";
 import { redirect } from "next/navigation";
-import { addonOffer, convertAmount, convertPrice, protectionFee, countryName, formatMoney, lastCheckoutDetails, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, onHoliday, LOCAL_DELIVERY_RATE_ID, localDeliveryPrice, PICKUP_RATE_ID, storePixels, taxExemptionFor, UserError } from "@sf/core";
+import { addonOffer, convertAmount, convertPrice, protectionFee, countryName, fitsWeight, formatMoney, lastCheckoutDetails, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, onHoliday, LOCAL_DELIVERY_RATE_ID, localDeliveryPrice, PICKUP_RATE_ID, storePixels, taxExemptionFor, UserError } from "@sf/core";
 import { buyerFx } from "@/lib/currency";
 import { currentBuyer } from "@/lib/buyer";
 import { readCart, readDiscountCode, readGiftCardCode } from "@/lib/cart";
@@ -52,7 +52,8 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
   const choices: ZoneChoice[] | null = hasGoods
     ? zones.map((z) => ({
         countries: z.countries,
-        rates: z.rates.map((r) => {
+        // Rates for other weights (a heavy-parcel rate on a light cart) don't show.
+        rates: z.rates.filter((r) => fitsWeight(r, quote.weightGrams)).map((r) => {
           const price = quote.discount?.freeShipping ? 0 : priceRate(r, quote.goodsMinor);
           const p = presentQuote({ ...quote, shippingMinor: price, taxMinor: 0 }, fx);
           const days = r.minDays !== null && r.maxDays !== null ? t.arrivesIn(r.minDays, r.maxDays) : null;

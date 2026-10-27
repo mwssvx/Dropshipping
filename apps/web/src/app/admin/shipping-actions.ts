@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseMoney, setCheckoutPhone, setDeliveryEstimates, setDeliveryProtection, setGiftWrap, setLocalDelivery, setLocalPickup, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
+import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseKg, parseMoney, setCheckoutPhone, setDeliveryEstimates, setDeliveryProtection, setGiftWrap, setLocalDelivery, setLocalPickup, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
 import { logged, requireShop } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -31,6 +31,12 @@ function days(raw: FormDataEntryValue | null) {
   const n = Number(s);
   if (!Number.isInteger(n)) throw new UserError("Enter delivery days as whole numbers.");
   return n;
+}
+
+function kg(raw: FormDataEntryValue | null) {
+  const grams = parseKg(String(raw ?? ""));
+  if (Number.isNaN(grams)) throw new UserError("Enter weights in kg, like 0.5 or 2.");
+  return grams;
 }
 
 const zone = (form: FormData) => ({ name: String(form.get("name") ?? ""), countries: form.getAll("countries").map(String) });
@@ -64,6 +70,8 @@ export async function addRateAction(zoneId: string, _: FormState, form: FormData
       freeOverMinor: money(form.get("freeOver"), "the free shipping amount"),
       minDays: days(form.get("minDays")),
       maxDays: days(form.get("maxDays")),
+      minWeightGrams: kg(form.get("minKg")),
+      maxWeightGrams: kg(form.get("maxKg")),
     }),
   );
 }

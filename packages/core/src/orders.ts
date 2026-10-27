@@ -20,7 +20,8 @@ import { findGiftCard } from "./gift-cards";
 import { bundleSavings, bundlesInCart } from "./bundles";
 import { salePrice, salesFor } from "./sales";
 import { addonsByProduct, type CheckoutAddon } from "./addons";
-import { countryName, listShippingZones, priceRate, zoneFor } from "./shipping";
+import { countryName, fitsWeight, listShippingZones, priceRate, zoneFor } from "./shipping";
+import { formatWeight } from "./weight";
 import { normalizeTags } from "./customers";
 import { cartLineKey, cleanPersonalization, missingPersonalization, personalizationValues } from "./personalization";
 import { openPreorder, preorderDeadline, preordersSold } from "./preorders";
@@ -168,6 +169,10 @@ export async function quoteCart(
   // Discounts and shipping only count goods: gift cards are sent by email at face value.
   const goodsMinor = items.filter((i) => !i.giftCard).reduce((s, i) => s + i.lineMinor, 0);
   const hasGoods = items.some((i) => !i.giftCard);
+  // What the parcel weighs, for rates that go by weight. Options without a weight count as nothing.
+  const weightGrams = items
+    .filter((i) => !i.giftCard)
+    .reduce((s, i) => s + (rows.find((r) => r.variant.id === i.variantId)?.variant.weightGrams ?? 0) * i.quantity, 0);
   let shippingMinor = 0;
   let shipping: { rateId: string; name: string; minDays: number | null; maxDays: number | null } | null = null;
   let freeShippingOverMinor: number | null = null;
@@ -184,7 +189,8 @@ export async function quoteCart(
   if (hasGoods) {
     const { zones } = await listShippingZones(db, shop.id);
     const hinted = opts.countryHint && zoneFor(zones, opts.countryHint)?.rates.length ? opts.countryHint : null;
-    const rates = zoneFor(zones, opts.country ?? hinted ?? shop.country)?.rates ?? [];
+    const zoneRates = zoneFor(zones, opts.country ?? hinted ?? shop.country)?.rates ?? [];
+    const rates = zoneRates.filter((r) => fitsWeight(r, weightGrams));
     // The lowest amount that makes a paid rate free, unless a rate is free anyway.
     if (!rates.some((r) => r.priceMinor === 0)) {
       const over = rates.map((r) => r.freeOverMinor).filter((m): m is number => m !== null);
@@ -199,7 +205,10 @@ export async function quoteCart(
       shipping = { rateId: LOCAL_DELIVERY_RATE_ID, name: LOCAL_DELIVERY_METHOD, minDays: null, maxDays: null };
       freeShippingOverMinor = shippingMinor ? area!.freeOverMinor : null;
     }
-    if (!rates.length && opts.country && !pickingUp && !deliveringLocally) throw new UserError(`${shop.name} doesn't ship to ${countryName(opts.country)} yet.`, "no_shipping");
+    if (!rates.length && opts.country && !pickingUp && !deliveringLocally) {
+      if (zoneRates.length) throw new UserError(`${shop.name} has no shipping for an order this heavy (${formatWeight(weightGrams)}) to ${countryName(opts.country)}. Try fewer items, or split the order.`, "no_shipping");
+      throw new UserError(`${shop.name} doesn't ship to ${countryName(opts.country)} yet.`, "no_shipping");
+    }
     // The rate the buyer picked, or the cheapest for this cart. Picking up is only ever chosen.
     const rate = pickingUp || deliveringLocally ? undefined : (rates.find((r) => r.id === opts.shippingRateId) ?? [...rates].sort((a, b) => priceRate(a, goodsMinor) - priceRate(b, goodsMinor))[0]);
     if (rate) {
@@ -289,6 +298,8 @@ export async function quoteCart(
     shippingMinor,
     totalMinor,
     goodsMinor,
+    /** What the goods weigh in grams, from their options' weights. 0 when none are set. */
+    weightGrams,
     /** The rate used. Null when nothing needs shipping, or the cart's estimate country has no zone. */
     shipping,
     /** The buyer can pick this cart up from the store instead (see local-pickup.ts). */

@@ -13,6 +13,8 @@ export type VariantValues = {
   compareAt: string;
   cost: string;
   stock?: number | null;
+  /** Grams, for shipping rates that go by weight. */
+  weightGrams?: number | null;
   fromSupplier?: boolean;
 };
 
@@ -96,7 +98,7 @@ export function ProductForm({
   const rows: { key: string; value: VariantValues; generated: boolean }[] = generated
     ? (tooMany ? [] : combos).map((c) => {
         const same = initial.variants.find((v) => sameOptions(v.options, c.options)) ?? initial.variants.find((v) => !Object.keys(v.options ?? {}).length && v.title === c.title);
-        return { key: c.title, generated: true, value: same ? { ...same, title: c.title, options: c.options } : { title: c.title, options: c.options, price: first.price, compareAt: first.compareAt, cost: first.cost, stock: null } };
+        return { key: c.title, generated: true, value: same ? { ...same, title: c.title, options: c.options } : { title: c.title, options: c.options, price: first.price, compareAt: first.compareAt, cost: first.cost, stock: null, weightGrams: first.weightGrams } };
       })
     : initial.optionsEditable && hadOptions
       ? // Every option removed: one price for the whole product.
@@ -219,7 +221,7 @@ function VariantRow({ index, initial, currency, showTitle, generated, onPrices }
       ) : (
         <input type="hidden" name={`variantTitle.${index}`} value={initial.title || "Default"} />
       )}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <div className="field">
           <label className="label" htmlFor={id("price")}>Price</label>
           <input className="input num" id={id("price")} name={`price.${index}`} inputMode="decimal" required value={price}
@@ -237,6 +239,10 @@ function VariantRow({ index, initial, currency, showTitle, generated, onPrices }
         <div className="field">
           <label className="label" htmlFor={id("stock")}>Stock</label>
           <input className="input num" id={id("stock")} name={`stock.${index}`} inputMode="numeric" defaultValue={initial.stock ?? ""} placeholder="Not tracked" />
+        </div>
+        <div className="field">
+          <label className="label" htmlFor={id("weight")}>Weight (g)</label>
+          <input className="input num" id={id("weight")} name={`weight.${index}`} inputMode="numeric" defaultValue={initial.weightGrams ?? ""} placeholder="Packed, optional" />
         </div>
       </div>
       <p className="hint num" aria-live="polite">
