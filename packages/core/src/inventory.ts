@@ -4,6 +4,8 @@
 import { and, eq, gte, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { formatMoney } from "./money";
+import { UserError } from "./errors";
+import { recordMovement } from "./own-stock";
 import { csvCell } from "./payouts";
 
 const DAYS = 30;
@@ -94,4 +96,41 @@ export async function inventoryCsv(db: Db, shop: { id: string; restockAlertAt: n
   const header = ["Option", "SKU", "In stock", "On the way", "Cost each", "Price", "Value at cost", "Value at price", `Sold in ${DAYS} days`, "Days left"];
   const lines = rows.map((r) => [r.title, r.sku, r.stock, r.incoming, amount(r.costMinor), amount(r.priceMinor), amount(r.valueAtCostMinor), amount(r.valueAtPriceMinor), r.sold, r.daysLeft]);
   return [header, ...lines].map((l) => l.map((c) => csvCell(c ?? null)).join(",")).join("\n") + "\n";
+}
+
+/**
+ * A stock count: the merchant counted the shelf and typed what's there. Each option whose count
+ * differs is set to it and the difference goes in its history as "Stock count". Options left
+ * empty aren't touched. Says how many changed and what went missing, at cost.
+ */
+export async function recordStockCount(db: Db, shopId: string, counts: { variantId: string; counted: number }[]) {
+  for (const c of counts) if (!Number.isInteger(c.counted) || c.counted < 0 || c.counted > 10_000_000) throw new UserError("Enter what you counted as whole numbers.");
+  if (!counts.length) throw new UserError("Enter what you counted for at least one option.");
+  return db.transaction(async (tx) => {
+    const rows = await tx
+      .select({ id: schema.variants.id, stock: schema.variants.stock, costMinor: schema.variants.costMinor })
+      .from(schema.variants)
+      .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
+      .where(and(eq(schema.products.shopId, shopId), isNull(schema.products.sourceUrl), isNull(schema.products.supplierId), inArray(schema.variants.id, counts.map((c) => c.variantId))))
+      .for("update");
+    if (rows.length !== new Set(counts.map((c) => c.variantId)).size) throw new UserError("Some of those options aren't stock you keep yourself. Reload the page and count again.");
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    let changed = 0;
+    let missing = 0;
+    let missingCostMinor = 0;
+    let found = 0;
+    for (const c of counts) {
+      const was = byId.get(c.variantId)!;
+      const diff = c.counted - (was.stock ?? 0);
+      if (was.stock === c.counted) continue;
+      await tx.update(schema.variants).set({ stock: c.counted }).where(eq(schema.variants.id, c.variantId));
+      await recordMovement(tx as unknown as Db, c.variantId, { reason: "count", change: diff, stockAfter: c.counted });
+      changed++;
+      if (diff < 0) {
+        missing -= diff;
+        missingCostMinor += -diff * (was.costMinor ?? 0);
+      } else found += diff;
+    }
+    return { changed, missing, found, missingCostMinor };
+  });
 }

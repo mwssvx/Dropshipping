@@ -15,6 +15,7 @@ export default async function InventoryPage() {
         title="Inventory"
         actions={rows.length > 0 && <>
           <a href="/admin/inventory/inventory.csv" className="btn btn-secondary" download>Download spreadsheet</a>
+          <Link href="/admin/inventory/count" className="btn btn-secondary">Count stock</Link>
           <Link href="/admin/restock/new" className="btn btn-primary">New restock order</Link>
         </>}
       />

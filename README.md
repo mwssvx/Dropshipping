@@ -794,3 +794,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **One list of the stock you keep**: Inventory in the menu shows every counted option of the store's own products, with what's on the shelf, what's on the way from restock orders, and what it's worth at cost and at its price (`inventoryReport` in `packages/core/src/inventory.ts`). Supplier products follow the supplier, so they aren't listed.
 2. **How long it lasts**: sales over the last 30 days, less what came back, give a rough "lasts about N days". The soonest to run out come first, and options at or under the running-low number are marked.
 3. **As a spreadsheet**: "Download spreadsheet" gives the same list as a CSV (`inventoryCsv`).
+
+### Stock count (after launch, part 114)
+
+1. **Count the shelf**: "Count stock" on the Inventory page lists every option of the store's own stock with what the count says. The merchant types what they counted; options left empty stay as they are (`recordStockCount` in `packages/core/src/inventory.ts`).
+2. **What changed**: each option that differs is set to the count, and the difference goes in its stock history as "Stock count". The page says how many options changed, how many items went missing and what they were worth at cost, and how many turned up.

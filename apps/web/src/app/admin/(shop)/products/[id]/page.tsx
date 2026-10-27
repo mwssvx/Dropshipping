@@ -121,7 +121,7 @@ export default async function EditProductPage({ params, searchParams }: { params
         {history.length > 0 && (
           <details className="card p-5 max-w-3xl" id="stock-history">
             <summary className="font-semibold cursor-pointer">Stock history</summary>
-            <p className="hint text-sm mt-2">Every change to your count, newest first: sales, orders cancelled before they shipped, swaps, restocks that arrived and counts you typed.</p>
+            <p className="hint text-sm mt-2">Every change to your count, newest first: sales, orders cancelled before they shipped, swaps, restocks that arrived, stock counts and numbers you typed.</p>
             <table className="w-full text-sm mt-3">
               <thead className="hint text-left"><tr><th className="font-normal py-1">When</th>{found.variants.length > 1 && <th className="font-normal">Option</th>}<th className="font-normal">Why</th><th className="font-normal text-right">Change</th><th className="font-normal text-right">Left</th></tr></thead>
               <tbody>
@@ -335,6 +335,7 @@ function MovementReason({ m }: { m: StockMovement }) {
     case "returned": return <>Back from {order}, cancelled before it shipped</>;
     case "swap_out": return <>Swapped for another option on {order}</>;
     case "swap_in": return <>Swapped in on {order}</>;
+    case "count": return <>Stock count</>;
     case "received": return m.restock ? <>Arrived on <Link href={`/admin/restock/${m.restock.id}`} className="underline">restock #{m.restock.number}</Link></> : <>Arrived on a restock order</>;
   }
 }
