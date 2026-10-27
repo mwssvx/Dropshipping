@@ -132,3 +132,42 @@ test("store credit pays for part of an order, and a turned-off card stops workin
   await applyCode(buyer, second);
   await expect(buyer.locator("#code-error")).toContainText("turned off");
 });
+
+test("the merchant finds a gift card by the code a buyer reads out", async ({ page }, info) => {
+  const id = `${info.project.name}-find-${Date.now()}`;
+  await newMerchantWithLamp(page, id);
+  await page.goto("/admin/gift-cards");
+  const codes: string[] = [];
+  for (const [who, amount] of [["ada", "10"], ["grace", "15"]] as const) {
+    const email = `gc-${who}-${id}@example.com`;
+    await page.getByLabel("Send to").fill(email);
+    await page.getByLabel("Amount", { exact: true }).fill(amount);
+    await page.getByRole("button", { name: "Send gift card" }).click();
+    await expect(page.getByText("Gift card sent.")).toBeVisible();
+    codes.push(await codeFromInbox(page, email, `$${amount}.00`));
+  }
+  const cards = page.getByRole("listitem", { name: /^Gift card ending / });
+  await expect(cards).toHaveCount(2);
+
+  // Typed loosely, the way it's read over the phone.
+  await page.getByLabel("Find a gift card").fill(codes[1]!.toLowerCase().replace(/-/g, " "));
+  await page.getByRole("button", { name: "Find", exact: true }).click();
+  await expect(page).toHaveURL(/q=/);
+  await expect(cards).toHaveCount(1);
+  await expect(page.getByRole("listitem", { name: `Gift card ending ${codes[1]!.slice(-4)}` })).toContainText("$15.00 left of $15.00");
+  await expect(page.getByText(/1 card matches/)).toBeVisible();
+  await shot(page, "470-gift-card-find");
+
+  await page.getByRole("link", { name: "Clear" }).click();
+  await expect(page).not.toHaveURL(/q=/);
+  await expect(cards).toHaveCount(2);
+  await page.getByRole("listitem", { name: `Gift card ending ${codes[0]!.slice(-4)}` }).getByRole("button", { name: "Turn off" }).click();
+  await expect(page.getByRole("listitem", { name: `Gift card ending ${codes[0]!.slice(-4)}` })).toContainText("Turned off");
+  await page.getByRole("navigation", { name: "Gift card filter" }).getByRole("link", { name: "Turned off" }).click();
+  await expect(page).toHaveURL(/show=off/);
+  await expect(cards).toHaveCount(1);
+  await page.getByLabel("Find a gift card").fill(`gc-grace-${id}`);
+  await page.getByRole("button", { name: "Find", exact: true }).click();
+  await expect(page).toHaveURL(/q=gc-grace/);
+  await expect(page.getByText("No gift card matches.", { exact: false })).toBeVisible();
+});
