@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseMoney, setCheckoutPhone, setDeliveryEstimates, setDeliveryProtection, setLocalDelivery, setLocalPickup, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
+import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseMoney, setCheckoutPhone, setDeliveryEstimates, setDeliveryProtection, setGiftWrap, setLocalDelivery, setLocalPickup, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
 import { logged, requireShop } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -178,6 +178,35 @@ export async function setLocalDeliveryAction(_: LocalDeliveryState, form: FormDa
     throw e;
   }
   await logged({ shop, user, db }, saved ? `Offered local delivery to ${saved.postalPrefixes.length} postal code${saved.postalPrefixes.length === 1 ? "" : "s"}` : "Stopped offering local delivery", { href: "/admin/shipping#local-delivery-heading" });
+  revalidatePath("/admin/shipping");
+  return { saved };
+}
+
+export type GiftWrapState = { error?: string; saved?: { priceMinor: number } | null };
+
+/** Turns gift wrapping at checkout on with its price, or off. */
+export async function setGiftWrapAction(_: GiftWrapState, form: FormData): Promise<GiftWrapState> {
+  const { shop, db, user } = await requireShop("shipping");
+  const on = form.get("enabled") === "on";
+  let saved: GiftWrapState["saved"] = null;
+  try {
+    if (on) {
+      const raw = String(form.get("price") ?? "").trim();
+      let priceMinor = 0;
+      try {
+        priceMinor = raw ? parseMoney(raw) : 0;
+      } catch {
+        return { error: "Enter the wrapping price as an amount, like 4.00." };
+      }
+      saved = await setGiftWrap(db, shop.id, { priceMinor, note: String(form.get("note") ?? "") });
+    } else {
+      await setGiftWrap(db, shop.id, null);
+    }
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  await logged({ shop, user, db }, saved ? "Offered gift wrapping at checkout" : "Stopped offering gift wrapping", { href: "/admin/shipping#gift-wrap-heading" });
   revalidatePath("/admin/shipping");
   return { saved };
 }

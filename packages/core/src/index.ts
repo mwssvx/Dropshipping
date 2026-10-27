@@ -110,3 +110,4 @@ export * from "./packing-slips";
 export * from "./own-stock";
 export * from "./local-pickup";
 export * from "./local-delivery";
+export * from "./gift-wrap";

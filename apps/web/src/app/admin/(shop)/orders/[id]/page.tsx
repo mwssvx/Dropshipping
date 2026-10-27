@@ -212,6 +212,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
               {!order.discountMinor && order.discountCode && <><dt className="hint">Code</dt><dd>{order.discountCode} (free shipping)</dd></>}
               <dt className="hint">Shipping{order.shippingMethod ? ` (${order.shippingMethod})` : ""}</dt><dd>{order.shippingMinor ? money(order.shippingMinor) : "Free"}</dd>
               {order.protectionMinor > 0 && <><dt className="hint">Delivery protection</dt><dd>{money(order.protectionMinor)}</dd></>}
+              {order.giftWrapMinor > 0 && <><dt className="hint">Gift wrapping</dt><dd>{money(order.giftWrapMinor)}</dd></>}
               {order.taxExemptId ? (
                 <><dt className="hint">Tax (exempt, {order.taxExemptId})</dt><dd>{money(0)}</dd></>
               ) : (
@@ -361,7 +362,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
           )}
           {order.gift && (
             <section aria-labelledby="gift-heading">
-              <h2 id="gift-heading" className="font-semibold mb-1">Gift <span className="pill pill-info ml-1">Gift</span></h2>
+              <h2 id="gift-heading" className="font-semibold mb-1">Gift <span className="pill pill-info ml-1">Gift</span>{order.giftWrapMinor > 0 && <span className="pill pill-warning ml-1">Wrap it</span>}</h2>
               <p className="hint">From {order.gift.from} to {a.name}</p>
               {order.gift.message && <p className="whitespace-pre-line border-l-2 border-border pl-3 mt-1">{order.gift.message}</p>}
               <p className="hint mt-1">{order.gift.recipientEmail ? `We email ${order.gift.recipientEmail} when it ships, without prices.` : "No recipient email, so only the buyer hears from us."}</p>

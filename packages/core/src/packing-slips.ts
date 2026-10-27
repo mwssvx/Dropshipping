@@ -20,6 +20,8 @@ export type PackingSlip = {
   shipTo: Address;
   items: { title: string; sku: string | null; quantity: number; personalization: string | null; preorder: boolean }[];
   gift: { from: string; message: string | null } | null;
+  /** The buyer paid to have it gift wrapped. */
+  giftWrap: boolean;
   buyerNote: string | null;
 };
 
@@ -58,6 +60,7 @@ export async function packingSlips(db: Db, shopId: string, scope: { orderId: str
         preorder: l.preorder,
       })),
     gift: o.gift ? { from: o.gift.from, message: o.gift.message } : null,
+    giftWrap: o.giftWrapMinor > 0,
     buyerNote: o.buyerNote,
   }));
   return {

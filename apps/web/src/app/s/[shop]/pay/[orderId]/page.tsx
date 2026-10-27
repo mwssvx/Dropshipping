@@ -63,6 +63,12 @@ export default async function PayPage({ params }: { params: Promise<{ shop: stri
             <dd className="text-right">{money(due.protectionMinor)}</dd>
           </>
         )}
+        {due.giftWrapMinor > 0 && (
+          <>
+            <dt className="hint">{t.giftWrap}</dt>
+            <dd className="text-right">{money(due.giftWrapMinor)}</dd>
+          </>
+        )}
         {order.taxMinor > 0 && (
           <>
             <dt className="hint">{order.taxBreakdown.map((x) => x.label).join(", ") || t.tax}{order.taxIncluded ? ` (${t.included})` : ""}</dt>

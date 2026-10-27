@@ -4,6 +4,7 @@ import { PageHeader } from "../PageHeader";
 import { setCheckoutPhoneAction } from "../../shipping-actions";
 import { DeliveryEstimatesForm } from "./DeliveryEstimatesForm";
 import { DeliveryProtectionForm } from "./DeliveryProtectionForm";
+import { GiftWrapForm } from "./GiftWrapForm";
 import { LocalDeliveryForm } from "./LocalDeliveryForm";
 import { LocalPickupForm } from "./LocalPickupForm";
 import { DeleteButton, RateForm, StarterButton, ZoneForm, type Country } from "./ShippingForms";
@@ -134,6 +135,17 @@ export default async function ShippingPage() {
           </p>
           <DeliveryProtectionForm
             protection={shop.deliveryProtection}
+            symbol={new Intl.NumberFormat("en-US", { style: "currency", currency: shop.currency }).formatToParts(0).find((p) => p.type === "currency")?.value ?? ""}
+          />
+        </section>
+        <section className="card p-5 flex flex-col gap-3" aria-labelledby="gift-wrap-heading" id="gift-wrap">
+          <h2 id="gift-wrap-heading" className="font-semibold">Gift wrapping</h2>
+          <p className="text-sm">
+            Buyers who tick &quot;This order is a gift&quot; can have it wrapped for your price. What they pay is yours. Wrapped orders are marked on the order
+            page and on the packing slip. If a supplier ships the item, check they can wrap it before you turn this on.
+          </p>
+          <GiftWrapForm
+            wrap={shop.giftWrap}
             symbol={new Intl.NumberFormat("en-US", { style: "currency", currency: shop.currency }).formatToParts(0).find((p) => p.type === "currency")?.value ?? ""}
           />
         </section>
