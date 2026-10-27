@@ -6,7 +6,7 @@ import { schema, type Db, type ShipCutoff } from "@sf/db";
 import { z } from "zod";
 import { UserError } from "./errors";
 import { nextCutoff, shipDay } from "./ship-cutoff";
-import { listShippingZones, zoneFor, type Rate } from "./shipping";
+import { fitsWeight, listShippingZones, zoneFor, type Rate } from "./shipping";
 
 type Shop = typeof schema.shops.$inferSelect;
 type Order = typeof schema.orders.$inferSelect;
@@ -124,3 +124,21 @@ const short = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric",
 /** "Oct 18 – Oct 25", in English, for emails. */
 export const formatDeliveryWindow = (w: Pick<DeliveryWindow, "from" | "to">, format: (d: Date) => string = (d) => short.format(d)) =>
   w.from.getTime() === w.to.getTime() ? format(w.from) : `${format(w.from)} – ${format(w.to)}`;
+
+/**
+ * What shipping one of this item costs to the buyer's country, for the product page, so it isn't a
+ * surprise at checkout: the cheapest rate that takes its weight (free when the item alone reaches
+ * a rate's free-over amount), and the lowest amount that makes shipping free. Null when the store
+ * doesn't ship there or it's a gift card.
+ */
+export async function productShipping(db: Db, shop: Shop, item: { priceMinor: number; weightGrams: number | null; giftCard?: boolean }, country: string | null) {
+  if (item.giftCard) return null;
+  const { zones } = await listShippingZones(db, shop.id);
+  const to = country ?? shop.country;
+  const rates = (zoneFor(zones, to)?.rates ?? []).filter((r) => fitsWeight(r, item.weightGrams ?? 0));
+  if (!rates.length) return null;
+  const price = (r: Rate) => (r.freeOverMinor !== null && item.priceMinor >= r.freeOverMinor ? 0 : r.priceMinor);
+  const priceMinor = Math.min(...rates.map(price));
+  const over = rates.map((r) => r.freeOverMinor).filter((m): m is number => m !== null);
+  return { country: to, priceMinor, freeOverMinor: priceMinor > 0 && over.length ? Math.min(...over) : null };
+}

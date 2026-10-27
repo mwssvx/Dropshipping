@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, formatDeliveryWindow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, countdownTo, shipsToCountry } from "@sf/core";
+import { bundlesForProduct, formatDeliveryWindow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, countdownTo, shipsToCountry } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { SaleCountdown } from "@/components/SaleCountdown";
 import { RecentlyViewed } from "@/components/RecentlyViewed";
@@ -146,6 +146,9 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const here = await buyerCountry();
   const cantShipHere = here && !shipsToCountry(product.blockedCountries, here) ? here : null;
   const delivery = buyable.length && !cantShipHere ? await productDelivery(await db(), shop, product.id, { country: await buyerCountry() }) : null;
+  // "Shipping to United States: $4.99 · Free on orders of $50 or more", so it isn't a surprise at checkout.
+  const shipping = v && orderable.length && !cantShipHere ? await productShipping(await db(), shop, { priceMinor: v.priceMinor, weightGrams: v.weightGrams, giftCard: product.giftCard }, here) : null;
+  const shownMoney = (m: number) => (fx ? formatMoney(convertPrice(m, fx), fx.currency) : formatMoney(m, shop.currency));
   // A reduced price says what the lowest price was in the 30 days before (the EU's rule).
   const lowest = showsLowestPrice(shop.lowestPriceNote, await buyerCountry()) ? await lowestPricesBefore(await db(), shop.id, product, product.sale) : new Map<string, number>();
   const shownPrice = (x: { id: string; priceMinor: number; compareAtMinor: number | null }) => (
@@ -278,6 +281,16 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
         )}
         {v && orderable.length === 0 && <p className="banner banner-info">{t.soldOutForNow}</p>}
         {cantShipHere && <p className="banner banner-warning" role="note">{t.cantShipTo(new Intl.DisplayNames([lang], { type: "region" }).of(cantShipHere) ?? cantShipHere)}</p>}
+        {shipping && (
+          <p id="shipping-cost" className="text-sm">
+            <span className="font-medium">
+              {shipping.priceMinor === 0
+                ? t.freeShippingTo(new Intl.DisplayNames([lang], { type: "region" }).of(shipping.country) ?? shipping.country)
+                : t.shippingTo(shownMoney(shipping.priceMinor), new Intl.DisplayNames([lang], { type: "region" }).of(shipping.country) ?? shipping.country)}
+            </span>
+            {shipping.freeOverMinor !== null && <span className="hint"> · {t.freeShippingOver(shownMoney(shipping.freeOverMinor))}</span>}
+          </p>
+        )}
         {delivery && (
           <p id="delivery-estimate" className="text-sm flex flex-col gap-0.5">
             <span className="font-medium">{t.arrives(formatDeliveryWindow(delivery, (d) => dayFormat.format(d)), new Intl.DisplayNames([lang], { type: "region" }).of(delivery.country) ?? delivery.country)}</span>

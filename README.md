@@ -874,3 +874,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Exchanges (after launch, part 132)
 
 1. **Swap it instead**: when a buyer asks for a return from their order page, each item that has other options at the same price in stock offers "Swap for …" instead of a refund (another size or colour of the same product). The merchant sees "Wants instead" on the return and presses "Send the exchange": the new option goes out as a free order linked to the first, the buyer is emailed with what to send back, and nothing is refunded. On Shopify this takes a paid returns app (`packages/core/src/returns.ts`, no migration).
+
+### Shipping cost on product pages (after launch, part 133)
+
+1. **No surprise at checkout**: under the price, product pages say what shipping costs to the buyer's country ("Shipping to United States: $4.99 · Free on orders of $50.00 or more"), or "Free shipping to United States" when the item alone gets there. It's the cheapest of the store's rates for that country that takes the item's weight, in the buyer's currency, and it's left out where the store doesn't ship, for gift cards, and when the item can't go to that country (`productShipping` in `packages/core/src/delivery.ts`, no migration).
