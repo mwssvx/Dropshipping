@@ -41,6 +41,7 @@ test("tag several orders at once and print their packing slips", async ({ page, 
   await page.getByRole("button", { name: "Add tag" }).click();
   await expect(page.getByRole("status")).toHaveText("Tagged 2 orders “rush”.");
   await page.getByRole("navigation", { name: "Filter by tag" }).getByRole("link", { name: /rush/ }).click();
+  await expect(page).toHaveURL(/tag=rush/);
   await expect(page.getByRole("checkbox", { name: /Pick order/ })).toHaveCount(2);
 
   await page.getByRole("checkbox", { name: "Pick order #1001" }).check();
