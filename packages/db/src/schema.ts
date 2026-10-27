@@ -1376,6 +1376,24 @@ export const savedReplies = pgTable(
   (t) => [index("saved_replies_shop_idx").on(t.shopId, t.title)],
 );
 
+/** An email or delivery address the store won't take orders from (chargebacks, stolen cards). */
+export const blockedBuyers = pgTable(
+  "blocked_buyers",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["email", "address"] }).notNull(),
+    // Lowercased email, or "COUNTRY|POSTAL|street" for an address (addressKey in core/blocklist.ts).
+    value: text("value").notNull(),
+    // What the merchant sees in the list.
+    label: text("label").notNull(),
+    note: text("note"),
+    orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("blocked_buyers_shop_value_uq").on(t.shopId, t.kind, t.value)],
+);
+
 /** A right password for someone with two-step sign-in on, waiting for their code (10 minutes). */
 export const signInChallenges = pgTable(
   "sign_in_challenges",

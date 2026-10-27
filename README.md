@@ -834,3 +834,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Buyer survey (after launch, part 122)
 
 1. **How did you hear about us?**: the store can ask buyers one question on their order page right after paying, with 2 to 8 answers and an optional "Other" box. Each order keeps its answer, which shows on the order page. The Buyer survey page lists orders, share and sales per answer for the last 30 days, 90 days or year, and what people typed under "Other". Replacements, repeat deliveries and add-ons are not asked, and buyers can answer for 30 days (`packages/core/src/survey.ts`, migration 0105).
+
+### Blocked buyers (after launch, part 123)
+
+1. **Block a buyer**: "Block this buyer" on an order blocks its email and delivery address, with a note only the merchant sees. The Blocked buyers page (from Customers) lists them, blocks an email typed by hand, and unblocks. A blocked email, or a new email at a blocked address (however the street is typed), gets "We can't take this order" at checkout before any payment, so a buyer behind chargebacks can't cost the store another dispute fee. Repeat deliveries and after-checkout offers carry on (`packages/core/src/blocklist.ts`, migration 0106).

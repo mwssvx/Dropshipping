@@ -25,7 +25,7 @@ test("a blocked buyer can't check out again", async ({ page, browser }, info) =>
   const checkout = async (line1: string) => {
     await buyer.goto(store);
     await buyer.getByRole("button", { name: "Add to cart" }).click();
-    await expect(buyer.getByRole("link", { name: /^Cart, \d item/ })).toBeVisible();
+    await expect(buyer.getByRole("link", { name: /^Cart, 1 item/ })).toBeVisible();
     await buyer.goto(store.replace(/\/products\/.*$/, "/cart"));
     await buyer.getByRole("link", { name: "Check out" }).click();
     await buyer.getByRole("textbox", { name: "Email" }).first().fill(`mallory-${id}@example.com`);

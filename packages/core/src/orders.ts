@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { schema, type Address, type Db } from "@sf/db";
 import { z } from "zod";
+import { BLOCKED_MESSAGE, blockedMatch } from "./blocklist";
 import { applyDisputeEvent } from "./disputes";
 import { NotFoundError, UserError } from "./errors";
 import type { PaymentEvent, PaymentProvider } from "./payments";
@@ -433,6 +434,8 @@ export async function startCheckout(
   // On a holiday break only orders already agreed to carry on: repeat deliveries and after-checkout offers.
   if (!followUp && !repeat && onHoliday(shop)) throw new UserError("This store is on a break and isn't taking orders right now.", "shop_holiday");
   const noCodes = !!followUp || !!repeat;
+  // Buyers the store blocked (chargebacks, stolen cards) are turned away before any payment.
+  if (!followUp && !repeat && (await blockedMatch(db, shop.id, { email, address }))) throw new UserError(BLOCKED_MESSAGE, "buyer_blocked");
   const quoted = await quoteCart(db, shop, input.lines, {
     discountCode: noCodes ? null : input.discountCode,
     email,

@@ -117,5 +117,6 @@ export * from "./inventory";
 export * from "./customs";
 export * from "./age-check";
 export * from "./survey";
+export * from "./blocklist";
 export * from "./barcode";
 export * from "./pick-list";

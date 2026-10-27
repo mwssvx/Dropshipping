@@ -56,9 +56,9 @@ export const listBlockedBuyers = (db: Db, shopId: string) =>
 
 /** What on this checkout is blocked, or null when nothing is. */
 export async function blockedMatch(db: Db, shopId: string, buyer: { email: string; address?: Address | null }) {
-  const keys = [{ kind: "email" as const, value: cleanEmail(buyer.email) }];
+  const keys: { kind: "email" | "address"; value: string }[] = [{ kind: "email", value: cleanEmail(buyer.email) }];
   const key = buyer.address ? addressKey(buyer.address) : null;
-  if (key) keys.push({ kind: "address" as const, value: key });
+  if (key) keys.push({ kind: "address", value: key });
   for (const k of keys) {
     const hit = await db.query.blockedBuyers.findFirst({ where: and(eq(schema.blockedBuyers.shopId, shopId), eq(schema.blockedBuyers.kind, k.kind), eq(schema.blockedBuyers.value, k.value)) });
     if (hit) return hit;
