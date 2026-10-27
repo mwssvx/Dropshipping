@@ -6,15 +6,16 @@ import { db } from "@/lib/server";
 import { currentBuyer } from "@/lib/buyer";
 import { readRecent } from "@/lib/recent";
 import { RecentlyViewed } from "@/components/RecentlyViewed";
-import { addToCartAction, removeCodeAction, removeGiftCardAction, updateCartAction } from "../actions";
+import { addToCartAction, removeCodeAction, removeGiftCardAction, saveForLaterAction, updateCartAction } from "../actions";
 import { CodeForm } from "./CodeForm";
 import { lineTitles, loadShop, localProducts, storeBase, storeLang, storeT } from "../data";
 
 export const metadata = { title: "Cart" };
 
-export default async function CartPage({ params, searchParams }: { params: Promise<{ shop: string }>; searchParams: Promise<{ unavailable?: string }> }) {
+export default async function CartPage({ params, searchParams }: { params: Promise<{ shop: string }>; searchParams: Promise<{ unavailable?: string; saved?: string }> }) {
   const { shop: handle } = await params;
   const unavailable = Number((await searchParams).unavailable) || 0;
+  const saved = (await searchParams).saved;
   const shop = await loadShop(handle);
   const base = await storeBase(handle);
   const lines = await readCart(shop.id);
@@ -69,6 +70,12 @@ export default async function CartPage({ params, searchParams }: { params: Promi
         </p>
       )}
       {problem && <p className="banner banner-critical">{problem}</p>}
+      {saved === "moved" && (
+        <p className="banner banner-success" role="status">
+          {t.movedToSaved} <Link href={`${base}/saved`} className="underline">{t.seeSaved}</Link>
+        </p>
+      )}
+      {saved === "full" && <p className="banner banner-warning" role="status">{t.savedFull}</p>}
       {unavailable > 0 && (
         <p className="banner banner-warning" role="status">
           {t.unavailable(unavailable)}
@@ -106,6 +113,9 @@ export default async function CartPage({ params, searchParams }: { params: Promi
                   )}
                   {i.preorderShipsBy && <p className="text-sm font-medium">{t.preorderShipsBy(shipsBy(i.preorderShipsBy))}</p>}
                   {i.priceNote && <p className="text-sm text-success">{i.priceNote}</p>}
+                  <form action={saveForLaterAction.bind(null, handle, i.key, i.productId)}>
+                    <button className="text-sm underline hint" aria-label={`${t.saveForLater}: ${titles.get(i.variantId) ?? i.title}`}>{t.saveForLater}</button>
+                  </form>
                 </div>
                 <form action={updateCartAction.bind(null, handle)} className="flex items-center gap-2">
                   <input type="hidden" name="line" value={i.key} />
