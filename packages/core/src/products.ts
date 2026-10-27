@@ -3,6 +3,7 @@ import { schema, type Db } from "@sf/db";
 import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
 import { MAX_WEIGHT_GRAMS } from "./weight";
+import { BARCODE_MAX, BarcodeError } from "./barcode";
 import { recordStockEdits } from "./own-stock";
 import { uniqueHandle } from "./handles";
 import { editProductPhotos, inheritedPhoto, photoColumns } from "./gallery";
@@ -18,7 +19,15 @@ const variantInput = z.object({
   priceMinor: z.number().int().min(0, "Price can't be negative."),
   compareAtMinor: z.number().int().min(0).nullish(),
   costMinor: z.number().int().min(0).nullish(),
-  sku: z.string().trim().nullish(),
+  sku: z.string().trim().max(100, "Keep the SKU under 100 characters.").nullish(),
+  /** The UPC, EAN or the store's own code a scanner reads. */
+  barcode: z
+    .string()
+    .trim()
+    .max(BARCODE_MAX, new BarcodeError().message)
+    .regex(/^[\x20-\x7e]*$/, new BarcodeError().message)
+    .nullish()
+    .transform((v) => (v === "" ? null : v)),
   stock: z.number().int().nullish(),
   /** What one weighs packed, in grams, for shipping rates that go by weight. */
   weightGrams: z.number().int().min(1, "Leave the weight empty, or enter more than 0.").max(MAX_WEIGHT_GRAMS, "Keep the weight under 1,000 kg.").nullish(),
@@ -59,6 +68,7 @@ export async function createProduct(db: Db, shopId: string, input: ProductInput)
   return db.transaction(async (tx) => {
     const [product] = await tx.insert(schema.products).values({ ...data, ...photoColumns(imageUrl ? [imageUrl] : []), shopId, handle }).returning();
     await tx.insert(schema.variants).values(variants.map(({ id: _id, ...v }, i) => ({ ...v, productId: product!.id, position: i })));
+    await checkBarcodes(tx as unknown as Db, shopId, product!.id, variants);
     await recordStockEdits(tx as unknown as Db, product!.id, new Map());
     return product!;
   });
@@ -86,7 +96,8 @@ export async function duplicateProduct(db: Db, shopId: string, productId: string
     for (const { id, ...v } of vs) {
       const [row] = await tx
         .insert(schema.variants)
-        .values({ ...v, productId: copy!.id, stock: original.supplierId || v.stock === null ? v.stock : 0 })
+        // Barcodes stay with the original: two products can't scan as the same thing.
+        .values({ ...v, productId: copy!.id, barcode: null, stock: original.supplierId || v.stock === null ? v.stock : 0 })
         .returning({ id: schema.variants.id });
       ids.set(id, row!.id);
     }
@@ -138,9 +149,28 @@ export async function updateProduct(db: Db, shopId: string, productId: string, i
     }
     const extra = existing.filter((e) => !kept.has(e.id)).map((e) => e.id);
     if (extra.length) await tx.delete(schema.variants).where(inArray(schema.variants.id, extra));
+    await checkBarcodes(tx as unknown as Db, shopId, productId, variants);
     await recordStockEdits(tx as unknown as Db, productId, new Map(existing.map((e) => [e.id, e.stock])));
     return product;
   });
+}
+
+/** After saving, no two options in the store may share a barcode just given; the save is undone if they do. */
+async function checkBarcodes(db: Db, shopId: string, productId: string, variants: { barcode?: string | null }[]) {
+  const given = [...new Set(variants.map((v) => v.barcode).filter((b): b is string => !!b))];
+  if (!given.length) return;
+  const rows = await db
+    .select({ barcode: schema.variants.barcode, position: schema.variants.position, productId: schema.variants.productId, product: schema.products.title, option: schema.variants.title })
+    .from(schema.variants)
+    .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
+    .where(and(eq(schema.products.shopId, shopId), inArray(schema.variants.barcode, given)));
+  for (const code of given) {
+    const same = rows.filter((r) => r.barcode === code);
+    if (same.length < 2) continue;
+    // The one that had it before this save, if any.
+    const other = same.find((r) => r.productId !== productId || variants[r.position]?.barcode !== code);
+    throw new UserError(other ? `${other.option === "Default" ? other.product : `${other.product} (${other.option})`} already has the barcode ${code}.` : `Two options can't share the barcode ${code}.`);
+  }
 }
 
 export async function listProducts(db: Db, shopId: string) {

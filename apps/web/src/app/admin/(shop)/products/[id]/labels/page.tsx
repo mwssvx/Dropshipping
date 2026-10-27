@@ -43,7 +43,7 @@ export default async function LabelsPage({ params, searchParams }: { params: Pro
         <div className="flex flex-wrap gap-3 items-end">
           {rows.filter((r) => r.code).map((r) => (
             <div key={r.v.id} className="field w-40">
-              <label className="label" htmlFor={`n-${r.v.id}`}>{r.title ?? "Labels"}</label>
+              <label className="label" htmlFor={`n-${r.v.id}`}>{r.title ?? "Number of labels"}</label>
               <input className="input num" id={`n-${r.v.id}`} name={`n.${r.v.id}`} type="number" min={0} max={MAX_LABELS} defaultValue={r.count} />
             </div>
           ))}

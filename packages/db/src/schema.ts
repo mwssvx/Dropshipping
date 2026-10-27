@@ -345,6 +345,8 @@ export const variants = pgTable(
     stock: integer("stock"),
     // What one of these weighs packed, for shipping rates that go by weight.
     weightGrams: integer("weight_grams"),
+    // The UPC, EAN or the store's own code a scanner reads off the item. Unique in the store.
+    barcode: text("barcode"),
     // When the team was told this option of the store's own stock is running low. Cleared once it's restocked.
     lowStockNotifiedAt: timestamp("low_stock_notified_at", { withTimezone: true }),
     shipDaysMin: integer("ship_days_min"),
@@ -353,7 +355,7 @@ export const variants = pgTable(
     /** One of the product's photos, shown when a buyer picks this variant (the red one, say). */
     imageUrl: text("image_url"),
   },
-  (t) => [index("variants_product_idx").on(t.productId), check("variants_price_nonneg", sql`${t.priceMinor} >= 0`)],
+  (t) => [index("variants_product_idx").on(t.productId), index("variants_barcode_idx").on(t.barcode), check("variants_price_nonneg", sql`${t.priceMinor} >= 0`)],
 );
 
 export const customers = pgTable(

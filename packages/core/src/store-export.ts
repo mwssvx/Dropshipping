@@ -7,6 +7,7 @@ import { z } from "zod";
 import { collectionRulesSchema } from "./collection-rules";
 import { MAX_WEIGHT_GRAMS } from "./weight";
 import { countryCode } from "./customs";
+import { parseBarcode } from "./barcode";
 import { NotFoundError, UserError } from "./errors";
 import { CURRENCIES } from "./currency";
 import { csvCell } from "./payouts";
@@ -167,6 +168,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
           cost: v.costMinor,
           stock: v.stock,
           weight_grams: v.weightGrams,
+          barcode: v.barcode,
           ship_days_min: v.shipDaysMin,
           ship_days_max: v.shipDaysMax,
           image_url: v.imageUrl,
@@ -394,6 +396,7 @@ const importSchema = z.object({
               cost: money.nullable().optional(),
               stock: z.number().int().min(0).nullable().optional(),
               weight_grams: z.number().int().min(1).max(MAX_WEIGHT_GRAMS).nullable().optional(),
+              barcode: z.string().max(100).nullable().optional(),
               ship_days_min: z.number().int().min(0).max(365).nullable().optional(),
               ship_days_max: z.number().int().min(0).max(365).nullable().optional(),
               image_url: z.string().max(2000).nullable().optional(),
@@ -605,6 +608,13 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
           costMinor: v.cost ?? null,
           stock: v.stock ?? null,
           weightGrams: v.weight_grams ?? null,
+          barcode: (() => {
+            try {
+              return parseBarcode(v.barcode);
+            } catch {
+              return null;
+            }
+          })(),
           shipDaysMin: v.ship_days_min ?? null,
           shipDaysMax: v.ship_days_max ?? null,
           position: i,
