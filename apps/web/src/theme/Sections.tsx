@@ -78,7 +78,7 @@ export function badgeLabel(b: Badge, t: StoreText) {
   return b.kind === "custom" ? b.text : b.kind === "sold_out" ? t.soldOut : b.kind === "sale" ? t.badgeSale(b.percent) : t.badgeNew;
 }
 
-type GridProduct = Omit<StorefrontCatalog["products"][number], "badge" | "createdAt" | "soldOut"> & BadgeFacts;
+type GridProduct = Omit<StorefrontCatalog["products"][number], "badge" | "createdAt" | "soldOut" | "swatches"> & BadgeFacts & Partial<Pick<StorefrontCatalog["products"][number], "swatches">>;
 
 export function ProductGrid({ products, data }: { products: GridProduct[]; data: SectionData }) {
   const t = data.t ?? storeText(null);
@@ -107,6 +107,14 @@ export function ProductGrid({ products, data }: { products: GridProduct[]; data:
             </div>
             <span className="font-medium group-hover:underline">{p.title}</span>
             <Price minor={p.priceMinor} compareAt={p.compareAtMinor} currency={data.currency} fx={data.fx} />
+            {p.swatches && (
+              <span className="sf-swatches flex items-center gap-1 text-xs text-muted" role="img" aria-label={t.colorCount(p.swatches.count)}>
+                {p.swatches.colors.map((c, i) => (
+                  <span key={i} className="size-3.5 rounded-full border border-black/20" style={{ background: c }} />
+                ))}
+                {p.swatches.count > p.swatches.colors.length && <span aria-hidden="true">+{p.swatches.count - p.swatches.colors.length}</span>}
+              </span>
+            )}
           </Link>
         </li>
         );

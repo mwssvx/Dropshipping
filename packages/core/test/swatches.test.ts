@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { colorOption, createProduct, DemoModel, exportStore, getProduct, namedColor, productSwatches, setSwatches } from "../src";
+import { cardSwatches, colorOption, compactProducts, createProduct, listActiveProducts, storefrontCatalog, DemoModel, exportStore, getProduct, namedColor, productSwatches, setSwatches } from "../src";
 import { makeFixture } from "../evals/fixture";
 
 describe("colour swatches", () => {
@@ -45,5 +45,20 @@ describe("colour swatches", () => {
     await expect(setSwatches(f.db, shopId, plain.id, {})).rejects.toThrow("Add a colour option to this product first.");
 
     expect((await exportStore(f.db, shopId)).products.find((p) => p.title === "Linen Tee")!.swatches).toEqual({ Midnight: "#191970", Sage: "#aabbcc" });
+  });
+
+  it("puts up to five dots on product cards, with how many colours there are", async () => {
+    const f = await makeFixture(new DemoModel());
+    const shopId = (await f.shop()).id;
+    const names = ["Black", "White", "Red", "Blue", "Green", "Pink", "Midnight"];
+    await createProduct(f.db, shopId, { title: "Rainbow Socks", status: "active", variants: names.map((n) => ({ title: n, options: { Colour: n }, priceMinor: 900, stock: 5 })) });
+    await createProduct(f.db, shopId, { title: "Plain Mug", status: "active", variants: [{ title: "Default", priceMinor: 900, stock: 5 }] });
+    const socks = compactProducts(await listActiveProducts(f.db, shopId)).find((p) => p.title === "Rainbow Socks")!;
+    // Midnight has no colour yet, so it isn't counted.
+    expect(socks.swatches).toEqual({ colors: ["#111111", "#ffffff", "#d22b2b", "#2f6fd6", "#2e8b57"], count: 6 });
+    const catalog = await storefrontCatalog(f.db, shopId);
+    expect(catalog.products.find((p) => p.title === "Rainbow Socks")!.swatches!.count).toBe(6);
+    expect(catalog.products.find((p) => p.title === "Plain Mug")!.swatches).toBeNull();
+    expect(cardSwatches({ swatches: {}, variants: [{ options: { Color: "Red" } }, { options: { Color: "Midnight" } }] })).toBeNull();
   });
 });

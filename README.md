@@ -866,3 +866,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Colour dots (after launch, part 130)
 
 1. **Swatches**: the values of a product's colour option (Color, Colour, Farbe, Couleur…) show as dots of that colour next to their names on the product page. Common colour names in the six store languages fill themselves in ("Navy", "Dusty Rose", "Schwarz"); for names that don't say ("Sage" does, "Midnight" doesn't), the product's "Color dots" section in admin picks the colour once. Values the store hasn't coloured stay as words. The store export carries the picked colours (`packages/core/src/swatches.ts`, migration 0111).
+
+### Colour dots on product cards (after launch, part 131)
+
+1. **At a glance**: product cards on the home page, collections, search and blog posts show up to five colour dots under the price, with "+2" when there are more, so buyers see a product comes in several colours before opening it. Screen readers hear "6 colours" instead. It uses the same colours as the product page (`cardSwatches` in `packages/core/src/swatches.ts`, no migration).

@@ -39,4 +39,9 @@ test("a product's colours show as dots on the store", async ({ page }, info) => 
   await expect(color.locator('[data-swatch="#191970"]')).toHaveCount(1);
   await color.getByText("Midnight", { exact: true }).click();
   await expect(color).toHaveAccessibleName("Color: Midnight");
+
+  // Collection cards show the colours too.
+  await page.goto(store.replace(/\/products\/.*$/, "/collections/all"));
+  const card = page.getByRole("listitem").filter({ hasText: "Linen Tee" });
+  await expect(card.getByRole("img", { name: "3 colours" })).toBeVisible();
 });
