@@ -838,3 +838,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Blocked buyers (after launch, part 123)
 
 1. **Block a buyer**: "Block this buyer" on an order blocks its email and delivery address, with a note only the merchant sees. The Blocked buyers page (from Customers) lists them, blocks an email typed by hand, and unblocks. A blocked email, or a new email at a blocked address (however the street is typed), gets "We can't take this order" at checkout before any payment, so a buyer behind chargebacks can't cost the store another dispute fee. Repeat deliveries and after-checkout offers carry on (`packages/core/src/blocklist.ts`, migration 0106).
+
+### Store policies (after launch, part 124)
+
+1. **Policies written from your settings**: the Pages page drafts Returns and refunds, Shipping, Privacy policy and Terms of service from the store's own settings: the return window and instructions, buyer cancelling, each shipping zone's rates, free-shipping amounts and delivery times, processing days, pickup and local delivery, ad tracking and the legal name. The merchant reads each one, ticks the ones they want and adds them as ordinary pages to edit. A page already at /pages/returns (and so on) is never replaced. The returns page also meets the trust checklist's returns item (`packages/core/src/policies.ts`, no migration).

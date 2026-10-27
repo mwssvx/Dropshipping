@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { listPages } from "@sf/core";
+import { draftPolicies, listPages } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
+import { PoliciesForm } from "./PoliciesForm";
 
 export const metadata = { title: "Pages" };
 
@@ -9,7 +10,7 @@ const STARTERS = ["About us", "Shipping and returns", "Contact"];
 
 export default async function PagesPage() {
   const { shop, db } = await requireShop("pages");
-  const pages = await listPages(db, shop.id);
+  const [pages, drafts] = await Promise.all([listPages(db, shop.id), draftPolicies(db, shop)]);
   return (
     <main className="pb-12">
       <PageHeader title="Pages" actions={<Link href="/admin/pages/new" className="btn btn-primary">Add page</Link>} />
@@ -38,6 +39,17 @@ export default async function PagesPage() {
             </table>
           </div>
         )}
+        <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="policies-heading">
+          <div>
+            <h2 id="policies-heading" className="font-semibold">Store policies</h2>
+            <p className="hint">
+              Buyers, banks deciding a chargeback and ad platforms look for these before they trust a store. We write them from your settings: your
+              return window, shipping rates and times, pickup and ad tracking. Read them, add the ones you want, then edit them like any page. They&apos;re a
+              starting point, not legal advice.
+            </p>
+          </div>
+          <PoliciesForm drafts={drafts} />
+        </section>
       </div>
     </main>
   );
