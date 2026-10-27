@@ -117,7 +117,7 @@ export async function stockHistory(db: Db, shopId: string, productId: string, li
     .innerJoin(schema.variants, eq(schema.variants.id, schema.stockMovements.variantId))
     .leftJoin(schema.orders, eq(schema.orders.id, schema.stockMovements.orderId))
     .where(and(eq(schema.stockMovements.shopId, shopId), eq(schema.variants.productId, productId)))
-    .orderBy(desc(schema.stockMovements.createdAt), desc(schema.stockMovements.id))
+    .orderBy(desc(schema.stockMovements.seq))
     .limit(limit);
   return rows.map(({ m, option, orderNumber }) => ({
     id: m.id,

@@ -1603,9 +1603,11 @@ export const stockMovements = pgTable(
     change: integer("change").notNull(),
     // The count after it; null when the option stopped being counted.
     stockAfter: integer("stock_after"),
+    // In the order they happened: changes saved together share a createdAt.
+    seq: bigint("seq", { mode: "number" }).generatedAlwaysAsIdentity(),
     createdAt: createdAt(),
   },
-  (t) => [index("stock_movements_variant_idx").on(t.variantId, t.createdAt)],
+  (t) => [index("stock_movements_variant_idx").on(t.variantId, t.seq)],
 );
 
 // Old store links that should keep working: a renamed product, or a page from a store moved here.

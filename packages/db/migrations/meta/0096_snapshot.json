@@ -1,5 +1,5 @@
 {
-  "id": "81f8939a-117c-44a9-a696-4d8666d15795",
+  "id": "ac3e2c7d-c4aa-4d64-8a7e-d10061374e34",
   "prevId": "1eac3184-7361-4187-8c06-d2cdd029bcc8",
   "version": "7",
   "dialect": "postgresql",
@@ -9407,6 +9407,23 @@
           "primaryKey": false,
           "notNull": false
         },
+        "seq": {
+          "name": "seq",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "identity": {
+            "type": "always",
+            "name": "stock_movements_seq_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -9426,7 +9443,7 @@
               "nulls": "last"
             },
             {
-              "expression": "created_at",
+              "expression": "seq",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
