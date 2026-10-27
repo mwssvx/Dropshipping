@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { BUYER_EDIT_HOURS, can, countOrders, formatMoney, orderPage, orderTags, RISK_HOLD_LABELS } from "@sf/core";
+import { BANK_DETAILS_MAX, BUYER_EDIT_HOURS, can, countOrders, formatMoney, orderPage, orderTags, RISK_HOLD_LABELS, TRANSFER_DAYS } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { FulfilmentStatus, PaymentStatus } from "@/components/Status";
 import { PageHeader } from "../PageHeader";
 import { BuyerCancelForm } from "./BuyerCancelForm";
 import { RiskHoldForm } from "./RiskHoldForm";
+import { BankTransferForm } from "./BankTransferForm";
 import { TrackingImportForm } from "./TrackingImportForm";
 import { SelectAll } from "./SelectAll";
 import { bulkOrdersAction } from "../../bulk-order-actions";
@@ -18,11 +19,13 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const before = /^\d{1,9}$/.test(beforeParam ?? "") ? Number(beforeParam) : undefined;
   const problemsOnly = show === "problems";
   const heldOnly = show === "held";
+  const transfersOnly = show === "transfers";
   const { shop, db, role } = await requireShop("orders");
-  const [{ orders, older }, problems, held, tags] = await Promise.all([
-    orderPage(db, shop.id, { ...(problemsOnly ? { fulfillmentStatus: "problem" as const } : heldOnly ? { held: true } : {}), query: q, tag }, { before }),
+  const [{ orders, older }, problems, held, transfers, tags] = await Promise.all([
+    orderPage(db, shop.id, { ...(problemsOnly ? { fulfillmentStatus: "problem" as const } : heldOnly ? { held: true } : transfersOnly ? { transfer: true } : {}), query: q, tag }, { before }),
     countOrders(db, shop.id, { fulfillmentStatus: "problem" }),
     countOrders(db, shop.id, { held: true }),
+    countOrders(db, shop.id, { transfer: true }),
     orderTags(db, shop.id),
   ]);
   // On hold the same way the On hold tab counts it: held for the risk check and not refunded.
@@ -38,12 +41,15 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       <PageHeader title="Orders" actions={<><Link href="/admin/orders/abandoned" className="btn btn-secondary">Abandoned checkouts</Link><Link href="/admin/orders/packing-slips" className="btn btn-secondary">Packing slips</Link><Link href="/admin/orders/new" className="btn btn-secondary">Create payment link</Link></>} />
       <div className="px-4 sm:px-8 flex flex-col gap-4">
         <nav className="flex gap-1" aria-label="Order filters">
-          <Link href={href({ show: undefined })} className={`chip text-sm ${!problemsOnly && !heldOnly ? "font-semibold border-accent" : ""}`} aria-current={!problemsOnly && !heldOnly ? "page" : undefined}>All</Link>
+          <Link href={href({ show: undefined })} className={`chip text-sm ${!problemsOnly && !heldOnly && !transfersOnly ? "font-semibold border-accent" : ""}`} aria-current={!problemsOnly && !heldOnly && !transfersOnly ? "page" : undefined}>All</Link>
           <Link href={href({ show: "problems" })} className={`chip text-sm ${problemsOnly ? "font-semibold border-accent" : ""}`} aria-current={problemsOnly ? "page" : undefined}>
             Needs attention {problems > 0 && <span className="pill pill-critical">{problems}</span>}
           </Link>
           <Link href={href({ show: "held" })} className={`chip text-sm ${heldOnly ? "font-semibold border-accent" : ""}`} aria-current={heldOnly ? "page" : undefined}>
             On hold {held > 0 && <span className="pill pill-warning">{held}</span>}
+          </Link>
+          <Link href={href({ show: "transfers" })} className={`chip text-sm ${transfersOnly ? "font-semibold border-accent" : ""}`} aria-current={transfersOnly ? "page" : undefined}>
+            Bank transfers {transfers > 0 && <span className="pill pill-info">{transfers}</span>}
           </Link>
         </nav>
         <form className="flex gap-2 max-w-md" role="search">
@@ -100,11 +106,22 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             <RiskHoldForm value={shop.holdRiskyOrders} options={Object.entries(RISK_HOLD_LABELS)} />
           </section>
         )}
+        {transfersOnly && (
+          <section className="card p-5 flex flex-col gap-3" aria-labelledby="transfer-settings">
+            <h2 id="transfer-settings" className="font-semibold">Bank transfers</h2>
+            <p className="text-sm hint max-w-2xl">Let buyers pay by bank transfer instead of by card. They&apos;re emailed your account details with the order number as the reference. Nothing goes to the supplier until you see the money arrive and press Mark as paid on the order. If it doesn&apos;t arrive in time, the order stops waiting and the buyer can still pay by card.</p>
+            {shop.plan === "free"
+              ? <p className="text-sm">Bank transfers are on paid plans, because on the free plan our 2% comes out of card payments. <Link href="/admin/plan" className="underline">See plans</Link></p>
+              : can(role, "money") ? <BankTransferForm value={shop.bankTransfer} max={BANK_DETAILS_MAX} days={TRANSFER_DAYS} /> : <p className="text-sm hint">{shop.bankTransfer ? "Buyers can pay by bank transfer." : "Bank transfers are off."} The store owner can change this.</p>}
+          </section>
+        )}
         {bulk && <BulkResult value={bulk} />}
         {before && orders.length === 0 ? (
           <div className="card p-10 text-center hint">No older orders. <Link href={href({ before: undefined })} className="underline">Back to the newest</Link></div>
         ) : filtered && orders.length === 0 ? (
           <div className="card p-10 text-center hint">{q ? `No orders match "${q}".` : `No orders are tagged "${tag}".`}</div>
+        ) : transfersOnly && orders.length === 0 ? (
+          <div className="card p-10 text-center hint">No orders are waiting for a bank transfer.</div>
         ) : heldOnly && orders.length === 0 ? (
           <div className="card p-10 text-center hint">No orders on hold.</div>
         ) : problemsOnly && orders.length === 0 ? (

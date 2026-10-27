@@ -1,13 +1,13 @@
 import { PixelEvent } from "@/components/PixelEvent";
 import { notFound } from "next/navigation";
-import { buyerAmounts, buyerCancelOptions, buyerThread, formatDeliveryDate, formatDeliveryWindow, orderDelivery, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems, formatShipsBy, storePixels, surveyFor, orderDownloads, formatFileSize } from "@sf/core";
+import { buyerAmounts, buyerCancelOptions, buyerThread, formatDeliveryDate, formatDeliveryWindow, orderDelivery, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems, formatShipsBy, storePixels, surveyFor, orderDownloads, formatFileSize, transferDueBy } from "@sf/core";
 import Link from "next/link";
 import { db, fulfillment, storeAddress } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
 import { cancelOrderByBuyerAction, editOrderByBuyerAction } from "../../actions";
 import { CancelOrder } from "./CancelOrder";
 import { ReferralCard } from "@/components/ReferralCard";
-import { loadShop, storeBase, storeT } from "../../data";
+import { loadShop, storeBase, storeLang, storeT } from "../../data";
 import { ReviewForm } from "./ReviewForm";
 import { QuestionForm } from "./QuestionForm";
 import { ReturnForm } from "./ReturnForm";
@@ -60,6 +60,10 @@ export default async function OrderStatusPage({ params, searchParams }: { params
   const partOf = order.subscriptionId ? await (await db()).query.subscriptions.findFirst({ where: (s, { eq }) => eq(s.id, order.subscriptionId!), columns: { token: true, status: true } }) : null;
   const survey = surveyFor(shop, order);
   const arrives = paid ? await orderDelivery(await db(), shop, order) : null;
+  // Paying by bank transfer: where to send it, or that it didn't arrive in time.
+  const transfer = order.manualPayment === "bank_transfer" && (order.paymentStatus === "pending" || order.paymentStatus === "failed")
+    ? { t: await storeT(handle), lang: (await storeLang(handle)) ?? "en", due: transferDueBy(shop, order) }
+    : null;
   // Files bought as digital downloads, with how many times each link still works.
   const downloads = paid ? await orderDownloads(await db(), order.id) : [];
   const downloadProblem = download === "limit" ? "That download has been used the most times it can be. Ask the store below if you need it again."
@@ -85,8 +89,8 @@ export default async function OrderStatusPage({ params, searchParams }: { params
       )}
       <div className="flex flex-col gap-2">
         <p className="hint num">Order #{order.number}</p>
-        <h1 className="text-3xl font-bold tracking-tight">{replacing ? "Your replacement" : paid ? `Thank you, ${(order.gift?.from ?? order.shippingAddress.name).split(" ")[0]}!` : "We're waiting for your payment"}</h1>
-        <p className="text-muted">{replacing ? `${shop.name} is sending this at no charge. This page updates as it moves.` : paid ? `We've emailed a receipt to ${order.email}. This page updates as your order moves.` : "If you've paid, this page updates in a moment."}</p>
+        <h1 className="text-3xl font-bold tracking-tight">{replacing ? "Your replacement" : paid || order.manualPayment === "bank_transfer" ? `Thank you, ${(order.gift?.from ?? order.shippingAddress.name).split(" ")[0]}!` : "We're waiting for your payment"}</h1>
+        <p className="text-muted">{replacing ? `${shop.name} is sending this at no charge. This page updates as it moves.` : paid ? `We've emailed a receipt to ${order.email}. This page updates as your order moves.` : order.manualPayment === "bank_transfer" ? `We've emailed ${order.email} how to pay. Your order starts as soon as the transfer arrives.` : "If you've paid, this page updates in a moment."}</p>
         {paid && (
           <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
             <Link href={`${base}/account`} className="underline">See all your orders</Link>
@@ -170,6 +174,21 @@ export default async function OrderStatusPage({ params, searchParams }: { params
           {order.giftCardMinor
             ? " to how you paid: card refunds take 5 to 10 business days, and gift card refunds can be used right away."
             : " to the card you paid with. Banks usually show it within 5 to 10 business days."}
+        </p>
+      )}
+      {transfer && order.paymentStatus === "pending" && (
+        <section id="transfer" className="card p-5 flex flex-col gap-2 text-sm" aria-labelledby="transfer-heading">
+          <h2 id="transfer-heading" className="font-semibold">{transfer.t.payByTransfer}</h2>
+          <p>{transfer.t.transferSend(money(due.chargedMinor), new Intl.DateTimeFormat(transfer.lang, { weekday: "long", month: "long", day: "numeric" }).format(transfer.due ?? new Date()))}</p>
+          <p className="whitespace-pre-line border-l-2 border-border pl-3 num">{shop.bankTransfer?.details}</p>
+          <p className="font-semibold num">{transfer.t.transferReference(order.number)}</p>
+          <p className="hint">{transfer.t.transferNote}</p>
+          <p><Link href={`${base}/pay/${order.id}`} className="underline">{transfer.t.payByCardInstead}</Link></p>
+        </section>
+      )}
+      {transfer && order.paymentStatus === "failed" && (
+        <p className="banner banner-warning" role="status">
+          {transfer.t.transferLapsed} <Link href={`${base}/pay/${order.id}`} className="underline">{transfer.t.payByCardInstead}</Link>
         </p>
       )}
       <ol className="grid grid-cols-4 gap-2" aria-label="Order progress">

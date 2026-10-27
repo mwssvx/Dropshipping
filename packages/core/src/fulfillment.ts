@@ -477,6 +477,43 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
       ].join("\n"),
     };
   }
+  if (kind === "bank_transfer" || kind === "bank_transfer_lapsed") {
+    const lines = await ctx.db.query.orderLines.findMany({ where: eq(schema.orderLines.orderId, order.id) });
+    const due = buyerAmounts(order, lines);
+    const amount = formatMoney(due.chargedMinor, due.currency);
+    const pay = ctx.payUrl ? await ctx.payUrl(shop, order) : link;
+    const by = new Date((order.manualPaymentAt ?? now(ctx)).getTime() + (shop.bankTransfer?.days ?? 7) * 24 * 60 * 60 * 1000);
+    const day = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(by);
+    if (kind === "bank_transfer_lapsed") {
+      return {
+        subject: `We didn't get your payment for order #${order.number}`,
+        text: [
+          `Hi ${first},`,
+          ``,
+          `Your bank transfer of ${amount} for order #${order.number} hasn't reached ${shop.name}, so the order is no longer being held for you.`,
+          ``,
+          `If you've already sent it, reply to this email and we'll look out for it. Or pay by card now: ${pay}`,
+        ].join("\n"),
+      };
+    }
+    return {
+      subject: `How to pay for your order #${order.number}`,
+      text: [
+        `Hi ${first},`,
+        ``,
+        `Thanks for your order from ${shop.name}. To finish it, send ${amount} by bank transfer to:`,
+        ``,
+        ...(shop.bankTransfer?.details ?? "").split("\n").map((l) => `  ${l}`),
+        ``,
+        `Reference: Order ${order.number}`,
+        ``,
+        `Please put the reference on the transfer so we can match it, and send it by ${day}. We'll email you when it arrives and start on your order then.`,
+        ``,
+        `Your order: ${link}`,
+        `Rather pay by card? ${pay}`,
+      ].join("\n"),
+    };
+  }
   if (kind === "payment_link") {
     const lines = await ctx.db.query.orderLines.findMany({ where: eq(schema.orderLines.orderId, order.id) });
     const paid = buyerAmounts(order, lines);
