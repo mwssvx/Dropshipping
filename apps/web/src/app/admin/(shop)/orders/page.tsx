@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BUYER_EDIT_HOURS, can, formatMoney, listOrders, orderTags, RISK_HOLD_LABELS } from "@sf/core";
+import { BUYER_EDIT_HOURS, can, countOrders, formatMoney, orderPage, orderTags, RISK_HOLD_LABELS } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { FulfilmentStatus, PaymentStatus } from "@/components/Status";
 import { PageHeader } from "../PageHeader";
@@ -13,21 +13,23 @@ export const metadata = { title: "Orders" };
 
 const dateFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
-export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ show?: string; q?: string; tag?: string; bulk?: string }> }) {
-  const { show, q, tag, bulk } = await searchParams;
+export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ show?: string; q?: string; tag?: string; bulk?: string; before?: string }> }) {
+  const { show, q, tag, bulk, before: beforeParam } = await searchParams;
+  const before = /^\d{1,9}$/.test(beforeParam ?? "") ? Number(beforeParam) : undefined;
   const problemsOnly = show === "problems";
   const heldOnly = show === "held";
   const { shop, db, role } = await requireShop("orders");
-  const [orders, problems, held, tags] = await Promise.all([
-    listOrders(db, shop.id, { ...(problemsOnly ? { fulfillmentStatus: "problem" as const } : heldOnly ? { held: true } : {}), query: q, tag }),
-    listOrders(db, shop.id, { fulfillmentStatus: "problem" }),
-    listOrders(db, shop.id, { held: true }),
+  const [{ orders, older }, problems, held, tags] = await Promise.all([
+    orderPage(db, shop.id, { ...(problemsOnly ? { fulfillmentStatus: "problem" as const } : heldOnly ? { held: true } : {}), query: q, tag }, { before }),
+    countOrders(db, shop.id, { fulfillmentStatus: "problem" }),
+    countOrders(db, shop.id, { held: true }),
     orderTags(db, shop.id),
   ]);
-  const heldIds = new Set(held.map((o) => o.id));
+  // On hold the same way the On hold tab counts it: held for the risk check and not refunded.
+  const onHold = (o: (typeof orders)[number]) => !!o.heldAt && (o.paymentStatus === "paid" || o.paymentStatus === "partially_refunded");
   const filtered = !!(q || tag);
   // Keeps the other filters when one changes.
-  const href = (next: { show?: string; q?: string; tag?: string }) => {
+  const href = (next: { show?: string; q?: string; tag?: string; before?: string }) => {
     const params = new URLSearchParams(Object.entries({ show, q, tag, ...next }).filter((e): e is [string, string] => !!e[1]));
     return params.size ? `/admin/orders?${params}` : "/admin/orders";
   };
@@ -38,10 +40,10 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         <nav className="flex gap-1" aria-label="Order filters">
           <Link href={href({ show: undefined })} className={`chip text-sm ${!problemsOnly && !heldOnly ? "font-semibold border-accent" : ""}`} aria-current={!problemsOnly && !heldOnly ? "page" : undefined}>All</Link>
           <Link href={href({ show: "problems" })} className={`chip text-sm ${problemsOnly ? "font-semibold border-accent" : ""}`} aria-current={problemsOnly ? "page" : undefined}>
-            Needs attention {problems.length > 0 && <span className="pill pill-critical">{problems.length}</span>}
+            Needs attention {problems > 0 && <span className="pill pill-critical">{problems}</span>}
           </Link>
           <Link href={href({ show: "held" })} className={`chip text-sm ${heldOnly ? "font-semibold border-accent" : ""}`} aria-current={heldOnly ? "page" : undefined}>
-            On hold {held.length > 0 && <span className="pill pill-warning">{held.length}</span>}
+            On hold {held > 0 && <span className="pill pill-warning">{held}</span>}
           </Link>
         </nav>
         <form className="flex gap-2 max-w-md" role="search">
@@ -76,7 +78,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             {q && <input type="hidden" name="q" value={q} />}
             {tag && <input type="hidden" name="tag" value={tag} />}
             <button className="btn btn-secondary">Download CSV</button>
-            <p className="hint w-full">One row per item, with the orders shown above{filtered || show ? " (your filters apply)" : ""}. Leave the dates empty for all of them.</p>
+            <p className="hint w-full">One row per item, for every order on the list (not just this page){filtered || show ? " with your filters" : ""}. Leave the dates empty for all of them.</p>
           </form>
         </details>
         <details className="text-sm">
@@ -99,7 +101,9 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           </section>
         )}
         {bulk && <BulkResult value={bulk} />}
-        {filtered && orders.length === 0 ? (
+        {before && orders.length === 0 ? (
+          <div className="card p-10 text-center hint">No older orders. <Link href={href({ before: undefined })} className="underline">Back to the newest</Link></div>
+        ) : filtered && orders.length === 0 ? (
           <div className="card p-10 text-center hint">{q ? `No orders match "${q}".` : `No orders are tagged "${tag}".`}</div>
         ) : heldOnly && orders.length === 0 ? (
           <div className="card p-10 text-center hint">No orders on hold.</div>
@@ -117,6 +121,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             {show && <input type="hidden" name="keep-show" value={show} />}
             {q && <input type="hidden" name="keep-q" value={q} />}
             {tag && <input type="hidden" name="keep-tag" value={tag} />}
+            {before && <input type="hidden" name="keep-before" value={before} />}
             <div className="field">
               <label className="label" htmlFor="bulk-tag">Tag for the picked orders</label>
               <input className="input" id="bulk-tag" name="bulkTag" list="bulk-tags" placeholder="e.g. rush" />
@@ -146,13 +151,20 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                       )}
                     </td>
                     <td><PaymentStatus value={o.paymentStatus} /></td>
-                    <td>{heldIds.has(o.id) ? <span className="pill pill-warning">On hold</span> : <FulfilmentStatus value={o.fulfillmentStatus} />}</td>
+                    <td>{onHold(o) ? <span className="pill pill-warning">On hold</span> : <FulfilmentStatus value={o.fulfillmentStatus} />}</td>
                     <td className="text-right num">{formatMoney(o.totalMinor, o.currency)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          {(before || older) && (
+            <nav aria-label="Pages" className="flex items-center gap-3 text-sm">
+              {before && <Link href={href({ before: undefined })} className="btn btn-secondary">← Newest orders</Link>}
+              <span className="hint num">#{orders[0]!.number} to #{orders.at(-1)!.number}</span>
+              {older && <Link href={href({ before: String(older) })} className="btn btn-secondary ml-auto">Older orders →</Link>}
+            </nav>
+          )}
           </>
         )}
       </div>
