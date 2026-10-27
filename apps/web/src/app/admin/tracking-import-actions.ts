@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { importTracking, UserError, type TrackingImportResult } from "@sf/core";
+import { importTracking, setPackingSlipNote, UserError, type TrackingImportResult } from "@sf/core";
 import { fulfillment, logged, notifyLater, requireShop } from "@/lib/server";
 
 export type TrackingImportState = { error?: string; result?: TrackingImportResult };
@@ -24,4 +24,20 @@ export async function trackingImportAction(_: TrackingImportState, form: FormDat
     if (e instanceof UserError) return { error: e.message };
     throw e;
   }
+}
+
+export type PackingSlipNoteState = { error?: string; saved?: boolean };
+
+/** The note printed at the foot of every packing slip. */
+export async function packingSlipNoteAction(_: PackingSlipNoteState, form: FormData): Promise<PackingSlipNoteState> {
+  const { shop, user, db } = await requireShop("orders");
+  try {
+    const note = await setPackingSlipNote(db, shop.id, String(form.get("note") ?? ""));
+    await logged({ shop, user, db }, note ? "Changed the packing slip note" : "Removed the packing slip note", { href: "/admin/orders/packing-slips" });
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath("/admin/orders/packing-slips");
+  return { saved: true };
 }

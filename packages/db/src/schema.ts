@@ -153,6 +153,8 @@ export const shops = pgTable(
     roundConvertedPrices: boolean("round_converted_prices").notNull().default(true),
     // Printed at the foot of marketing emails, as anti-spam law requires.
     mailingAddress: text("mailing_address"),
+    // Printed at the foot of packing slips, like a thank-you or a code for next time.
+    packingSlipNote: text("packing_slip_note"),
     // Wholesale: approved business buyers pay this much less, on orders of at least the minimum.
     wholesaleEnabled: boolean("wholesale_enabled").notNull().default(false),
     wholesalePercentOff: integer("wholesale_percent_off").notNull().default(20),

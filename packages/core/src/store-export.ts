@@ -91,6 +91,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       checkout_phone: shop.checkoutPhone,
       abandoned_cart_offer: shop.abandonedCartOffer ? { percent_off: shop.abandonedCartOffer.percentOff } : null,
       delivery_protection: shop.deliveryProtection ? { percent: shop.deliveryProtection.percent, min_minor: shop.deliveryProtection.minMinor } : null,
+      packing_slip_note: shop.packingSlipNote,
       price_watch: { min_margin_percent: shop.minMarginPercent, auto_reprice: shop.autoReprice },
       reviews_auto_publish: shop.reviewsAutoPublish,
       presentment_currencies: shop.presentmentCurrencies,
@@ -258,6 +259,7 @@ const importSchema = z.object({
       checkout_phone: z.enum(["off", "optional", "required"]).optional(),
       abandoned_cart_offer: z.object({ percent_off: z.number().int().min(5).max(50) }).nullable().optional(),
       delivery_protection: z.object({ percent: z.number().min(0.5).max(10), min_minor: z.number().int().min(0).max(10_000) }).nullable().optional(),
+      packing_slip_note: z.string().max(500).nullable().optional(),
       price_watch: z.object({ min_margin_percent: z.number().int().min(0).max(90), auto_reprice: z.boolean() }).optional(),
       reviews_auto_publish: z.boolean().optional(),
       presentment_currencies: z.array(z.enum(CURRENCIES)).max(CURRENCIES.length).optional(),
@@ -687,6 +689,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
     if (data.store.checkout_phone) settings.checkoutPhone = data.store.checkout_phone;
     if (data.store.abandoned_cart_offer !== undefined) settings.abandonedCartOffer = data.store.abandoned_cart_offer && { percentOff: data.store.abandoned_cart_offer.percent_off };
     if (data.store.delivery_protection !== undefined) settings.deliveryProtection = data.store.delivery_protection && { percent: data.store.delivery_protection.percent, minMinor: data.store.delivery_protection.min_minor };
+    if (data.store.packing_slip_note !== undefined) settings.packingSlipNote = data.store.packing_slip_note;
     if (data.store.price_watch) {
       settings.minMarginPercent = data.store.price_watch.min_margin_percent;
       settings.autoReprice = data.store.price_watch.auto_reprice;
