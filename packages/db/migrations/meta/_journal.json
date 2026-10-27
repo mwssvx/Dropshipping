@@ -624,6 +624,13 @@
       "when": 1793019412002,
       "tag": "0088_tax_exempt",
       "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1793084041999,
+      "tag": "0089_delivery_protection",
+      "breakpoints": true
     }
   ]
 }

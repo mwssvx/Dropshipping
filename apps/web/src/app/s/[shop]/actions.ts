@@ -166,6 +166,7 @@ export async function checkoutAction(handle: string, _: CheckoutState, form: For
       discountCode: await readDiscountCode(shop.id),
       fx: await buyerFx(shop),
       acceptsMarketing: values.acceptsMarketing === "on",
+      protection: values.protection === "on",
       campaignId: (await cookies()).get(campaignCookie(shop.id))?.value ?? null,
       buyerEmail: (await currentBuyer(shop.id))?.email ?? null,
       giftCardCode: await readGiftCardCode(shop.id),

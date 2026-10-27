@@ -1,6 +1,6 @@
 import { PixelEvent } from "@/components/PixelEvent";
 import { redirect } from "next/navigation";
-import { addonOffer, convertPrice, countryName, formatMoney, lastCheckoutDetails, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, onHoliday, storePixels, taxExemptionFor, UserError } from "@sf/core";
+import { addonOffer, convertAmount, convertPrice, protectionFee, countryName, formatMoney, lastCheckoutDetails, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, onHoliday, storePixels, taxExemptionFor, UserError } from "@sf/core";
 import { buyerFx } from "@/lib/currency";
 import { currentBuyer } from "@/lib/buyer";
 import { readCart, readDiscountCode, readGiftCardCode } from "@/lib/cart";
@@ -46,6 +46,8 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
   // Every rate the buyer could pick, priced for this cart in their currency, so the summary
   // follows the country and rate they choose.
   const hasGoods = quote.items.some((i) => !i.giftCard);
+  // Delivery protection, when the store offers it and something ships. Priced on the items after discounts.
+  const protectionMinor = hasGoods && shop.deliveryProtection ? protectionFee(shop.deliveryProtection, quote.goodsMinor - quote.discountMinor) : 0;
   const { zones } = await listShippingZones(await db(), shop.id);
   const choices: ZoneChoice[] | null = hasGoods
     ? zones.map((z) => ({
@@ -54,7 +56,11 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
           const price = quote.discount?.freeShipping ? 0 : priceRate(r, quote.goodsMinor);
           const p = presentQuote({ ...quote, shippingMinor: price, taxMinor: 0 }, fx);
           const days = r.minDays !== null && r.maxDays !== null ? t.arrivesIn(r.minDays, r.maxDays) : null;
-          return { id: r.id, name: r.name, days, priceMinor: p.shippingMinor, priceLabel: p.shippingMinor ? money(p.shippingMinor) : t.free, totalLabel: money(p.totalMinor) };
+          const protectedTotal = protectionMinor ? presentQuote({ ...quote, shippingMinor: price, taxMinor: 0, protectionMinor }, fx).totalMinor : null;
+          return {
+            id: r.id, name: r.name, days, priceMinor: p.shippingMinor, priceLabel: p.shippingMinor ? money(p.shippingMinor) : t.free, totalLabel: money(p.totalMinor),
+            ...(protectedTotal !== null ? { protectedTotalLabel: money(protectedTotal) } : {}),
+          };
         }),
       }))
     : null;
@@ -87,6 +93,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
         taxLabel={exempt ? t.taxExempt : quote.pricesIncludeTax ? t.taxIncluded : t.taxNextStep}
         totalLabel={exempt || quote.pricesIncludeTax ? t.total : t.totalBeforeTax}
         totalWithoutShipping={money(withoutShipping.totalMinor)}
+        protection={protectionMinor ? { checkbox: t.protectDelivery(money(convertAmount(protectionMinor, fx))), note: t.protectionNote, summary: t.protection, priceLabel: money(convertAmount(protectionMinor, fx)) } : null}
         summary={
           <>
             <ul className="flex flex-col gap-2 text-sm">

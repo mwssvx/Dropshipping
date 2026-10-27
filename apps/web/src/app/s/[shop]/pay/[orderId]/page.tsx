@@ -57,6 +57,12 @@ export default async function PayPage({ params }: { params: Promise<{ shop: stri
         )}
         <dt className={`hint ${order.discountMinor ? "" : "border-t border-border pt-2 mt-1"}`}>{t.shipping}{order.discountCode && !order.shippingMinor && !order.discountMinor ? ` (${order.discountCode})` : order.shippingMethod ? ` (${order.shippingMethod})` : ""}</dt>
         <dd className={`text-right ${order.discountMinor ? "" : "border-t border-border pt-2 mt-1"}`}>{due.shippingMinor ? money(due.shippingMinor) : t.free}</dd>
+        {due.protectionMinor > 0 && (
+          <>
+            <dt className="hint">{t.protection}</dt>
+            <dd className="text-right">{money(due.protectionMinor)}</dd>
+          </>
+        )}
         {order.taxMinor > 0 && (
           <>
             <dt className="hint">{order.taxBreakdown.map((x) => x.label).join(", ") || t.tax}{order.taxIncluded ? ` (${t.included})` : ""}</dt>

@@ -3,6 +3,7 @@ import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { setCheckoutPhoneAction } from "../../shipping-actions";
 import { DeliveryEstimatesForm } from "./DeliveryEstimatesForm";
+import { DeliveryProtectionForm } from "./DeliveryProtectionForm";
 import { DeleteButton, RateForm, StarterButton, ZoneForm, type Country } from "./ShippingForms";
 
 export const metadata = { title: "Shipping" };
@@ -122,6 +123,17 @@ export default async function ShippingPage() {
             </fieldset>
             <button className="btn btn-secondary self-start">Save</button>
           </form>
+        </section>
+        <section className="card p-5 flex flex-col gap-3" aria-labelledby="protection-heading" id="protection">
+          <h2 id="protection-heading" className="font-semibold">Delivery protection</h2>
+          <p className="text-sm">
+            Buyers can pay a little extra at checkout to protect their parcel. If a protected order is lost or arrives damaged, send it again for free
+            with Send a replacement on the order page. What they pay is yours and helps cover those replacements. It&apos;s never ticked for them.
+          </p>
+          <DeliveryProtectionForm
+            protection={shop.deliveryProtection}
+            symbol={new Intl.NumberFormat("en-US", { style: "currency", currency: shop.currency }).formatToParts(0).find((p) => p.type === "currency")?.value ?? ""}
+          />
         </section>
         <section className="card p-5 flex flex-col gap-3" aria-labelledby="new-zone">
           <h2 id="new-zone" className="font-semibold">Add a zone</h2>

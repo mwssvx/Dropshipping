@@ -47,6 +47,7 @@ export * from "./buyers";
 export * from "./customers";
 export * from "./tag-rules";
 export * from "./tax-exempt";
+export * from "./delivery-protection";
 export * from "./address-check";
 export * from "./stock";
 export * from "./gallery";
