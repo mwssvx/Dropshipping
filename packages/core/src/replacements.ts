@@ -14,7 +14,8 @@ type Order = typeof schema.orders.$inferSelect;
 const SHIPPED = ["partially_shipped", "shipped", "delivered"] as const;
 
 const replacementInput = z.object({
-  items: z.array(z.object({ lineId: z.string().uuid(), quantity: z.number().int().min(0).max(99) })),
+  // variantId: send another size or colour of the same product instead (an exchange).
+  items: z.array(z.object({ lineId: z.string().uuid(), quantity: z.number().int().min(0).max(99), variantId: z.string().uuid().optional() })),
   note: z.string().trim().max(1000, "Keep the note under 1,000 characters.").optional(),
 });
 export type ReplacementInput = z.input<typeof replacementInput>;
@@ -60,7 +61,16 @@ export async function sendReplacement(ctx: FulfillmentContext, shop: Shop, order
     if (i.quantity > line.quantity) throw new UserError(`The order had ${line.quantity} of ${line.title}.`);
   }
   // What the goods cost now, so the profit report counts the replacement as the loss it is.
-  const variants = await db.query.variants.findMany({ where: inArray(schema.variants.id, lines.map((l) => l.variantId!)) });
+  const variants = await db.query.variants.findMany({ where: inArray(schema.variants.id, [...lines.map((l) => l.variantId!), ...wanted.flatMap((i) => (i.variantId ? [i.variantId] : []))]) });
+  const swaps = new Map<string, { variantId: string; title: string }>();
+  for (const i of wanted.filter((x) => x.variantId && x.variantId !== lines.find((l) => l.id === x.lineId)!.variantId)) {
+    const from = variants.find((v) => v.id === lines.find((l) => l.id === i.lineId)!.variantId);
+    const to = variants.find((v) => v.id === i.variantId);
+    if (!from || !to || to.productId !== from.productId) throw new UserError("An exchange has to be another option of the same product.");
+    const product = await db.query.products.findFirst({ where: and(eq(schema.products.id, to.productId), eq(schema.products.shopId, shop.id)), columns: { title: true } });
+    if (!product) throw new UserError("An exchange has to be another option of the same product.");
+    swaps.set(i.lineId, { variantId: to.id, title: to.title === "Default" ? product.title : `${product.title} – ${to.title}` });
+  }
   const costOf = (variantId: string, fallback: number | null) => variants.find((v) => v.id === variantId)?.costMinor ?? fallback;
   const now = ctx.now?.() ?? new Date();
 
@@ -100,7 +110,9 @@ export async function sendReplacement(ctx: FulfillmentContext, shop: Shop, order
     await tx.insert(schema.orderLines).values(
       wanted.map((i) => {
         const line = lines.find((l) => l.id === i.lineId)!;
-        return { orderId: row!.id, variantId: line.variantId, title: line.title, quantity: i.quantity, unitPriceMinor: 0, unitCostMinor: costOf(line.variantId!, line.unitCostMinor), personalization: line.personalization };
+        const swap = swaps.get(line.id);
+        const variantId = swap?.variantId ?? line.variantId!;
+        return { orderId: row!.id, variantId, title: swap?.title ?? line.title, quantity: i.quantity, unitPriceMinor: 0, unitCostMinor: costOf(variantId, line.unitCostMinor), personalization: line.personalization };
       }),
     );
     return row!;

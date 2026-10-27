@@ -1591,7 +1591,14 @@ export const shippingRates = pgTable(
 // A buyer asking to return items from an order. The merchant approves it (with instructions),
 // refunds it, gives store credit, or declines it.
 export const RETURN_REASONS = ["never_arrived", "damaged", "wrong_item", "not_as_described", "too_small_or_big", "changed_mind", "other"] as const;
-export type ReturnItem = { lineId: string; title: string; quantity: number };
+export type ReturnItem = {
+  lineId: string;
+  title: string;
+  quantity: number;
+  /** Another size or colour of the same product the buyer wants instead of their money back. */
+  exchangeVariantId?: string;
+  exchangeTitle?: string;
+};
 
 export const returnRequests = pgTable(
   "return_requests",
@@ -1599,7 +1606,7 @@ export const returnRequests = pgTable(
     id: id(),
     shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
     orderId: uuid("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
-    status: text("status", { enum: ["requested", "approved", "refunded", "credited", "replaced", "declined"] }).notNull().default("requested"),
+    status: text("status", { enum: ["requested", "approved", "refunded", "credited", "replaced", "exchanged", "declined"] }).notNull().default("requested"),
     reason: text("reason", { enum: RETURN_REASONS }).notNull(),
     note: text("note"),
     items: jsonb("items").$type<ReturnItem[]>().notNull(),
@@ -1609,7 +1616,7 @@ export const returnRequests = pgTable(
     merchantMessage: text("merchant_message"),
     refundId: uuid("refund_id").references(() => refunds.id, { onDelete: "set null" }),
     giftCardId: uuid("gift_card_id").references(() => giftCards.id, { onDelete: "set null" }),
-    // The free order sent instead, when the merchant chose to replace the items.
+    // The free order sent instead, when the merchant chose to replace or exchange the items.
     replacementOrderId: uuid("replacement_order_id").references((): AnyPgColumn => orders.id, { onDelete: "set null" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

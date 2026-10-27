@@ -4,7 +4,7 @@ import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import { returnAction, type ReturnState } from "../../actions";
 
-type Line = { id: string; title: string; quantity: number };
+type Line = { id: string; title: string; quantity: number; swaps: { variantId: string; title: string }[] };
 
 export function ReturnForm({ handle, orderRef, lines, reasons, closes }: { handle: string; orderRef: string; lines: Line[]; reasons: [string, string][]; closes: string | null }) {
   const [state, action] = useActionState(returnAction.bind(null, handle, orderRef), {} as ReturnState);
@@ -16,12 +16,23 @@ export function ReturnForm({ handle, orderRef, lines, reasons, closes }: { handl
         <fieldset className="flex flex-col gap-2">
           <legend className="label mb-1">What do you want to return?</legend>
           {lines.map((l) => (
-            <div key={l.id} className="flex items-center justify-between gap-3 text-sm">
-              <input type="hidden" name="lineId" value={l.id} />
-              <label htmlFor={`qty-${l.id}`}>{l.title}</label>
-              <select className="input w-24 num" id={`qty-${l.id}`} name={`qty-${l.id}`} defaultValue={lines.length === 1 ? l.quantity : 0}>
-                {Array.from({ length: l.quantity + 1 }, (_, n) => <option key={n} value={n}>{n === 0 ? "None" : n}</option>)}
-              </select>
+            <div key={l.id} className="flex flex-col gap-2 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <input type="hidden" name="lineId" value={l.id} />
+                <label htmlFor={`qty-${l.id}`}>{l.title}</label>
+                <select className="input w-24 num" id={`qty-${l.id}`} name={`qty-${l.id}`} defaultValue={lines.length === 1 ? l.quantity : 0}>
+                  {Array.from({ length: l.quantity + 1 }, (_, n) => <option key={n} value={n}>{n === 0 ? "None" : n}</option>)}
+                </select>
+              </div>
+              {l.swaps.length > 0 && (
+                <div className="flex items-center justify-between gap-3 pl-3">
+                  <label htmlFor={`swap-${l.id}`} className="hint">Instead of your money back</label>
+                  <select className="input w-auto" id={`swap-${l.id}`} name={`swap-${l.id}`} defaultValue="">
+                    <option value="">Refund it</option>
+                    {l.swaps.map((s) => <option key={s.variantId} value={s.variantId}>Swap for {s.title}</option>)}
+                  </select>
+                </div>
+              )}
             </div>
           ))}
         </fieldset>
