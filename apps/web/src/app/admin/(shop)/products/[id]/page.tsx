@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts, detailsText, MAX_DETAILS, stockHistory, type StockMovement } from "@sf/core";
+import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts, detailsText, MAX_DETAILS, stockHistory, incomingStock, type StockMovement } from "@sf/core";
 import { requireShop, storeAddress, suppliers } from "@/lib/server";
 import { duplicateProductAction, updateProductAction } from "../../../actions";
 import { setUpsellAction } from "../../../growth-actions";
@@ -60,6 +60,7 @@ export default async function EditProductPage({ params, searchParams }: { params
   const waitingBy = await waitingForProduct(db, shop.id, product.id);
   // The store's own stock keeps a history of every change; imported products follow the supplier.
   const history = !found.sourceUrl && !found.giftCard ? await stockHistory(db, shop.id, found.id) : [];
+  const incoming = !found.sourceUrl && !found.giftCard ? await incomingStock(db, shop.id, found.id) : [];
   const preSold = product.preorder ? await preordersSold(db, product.id) : 0;
   const saves = await savedCount(db, shop.id, product.id);
   const waiting = product.variants.filter((v) => waitingBy.has(v.id)).map((v) => ({ option: v.title, count: waitingBy.get(v.id)! }));
@@ -103,10 +104,24 @@ export default async function EditProductPage({ params, searchParams }: { params
         <WriteListingButton productId={product.id} live={product.status === "active"} />
         <StockPanel productId={product.id} waiting={waiting} linked={!!product.sourceUrl && !product.giftCard}
           checkedAt={product.stockCheckedAt ? product.stockCheckedAt.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : null} />
+        {incoming.length > 0 && (
+          <section className="banner banner-info max-w-3xl" aria-label="On the way">
+            <p className="font-medium">On the way</p>
+            <ul className="text-sm">
+              {incoming.map((i) => (
+                <li key={`${i.restock.id}-${i.variantId}`}>
+                  {i.quantity} {found.variants.length > 1 ? `× ${found.variants.find((v) => v.id === i.variantId)?.title ?? ""} ` : ""}on{" "}
+                  <Link href={`/admin/restock/${i.restock.id}`} className="underline">restock #{i.restock.number}</Link>
+                  {i.restock.expectedOn && <>, expected {new Date(`${i.restock.expectedOn}T12:00:00Z`).toLocaleDateString("en", { month: "short", day: "numeric" })}</>}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         {history.length > 0 && (
           <details className="card p-5 max-w-3xl" id="stock-history">
             <summary className="font-semibold cursor-pointer">Stock history</summary>
-            <p className="hint text-sm mt-2">Every change to your count, newest first: sales, orders cancelled before they shipped, swaps and counts you typed.</p>
+            <p className="hint text-sm mt-2">Every change to your count, newest first: sales, orders cancelled before they shipped, swaps, restocks that arrived and counts you typed.</p>
             <table className="w-full text-sm mt-3">
               <thead className="hint text-left"><tr><th className="font-normal py-1">When</th>{found.variants.length > 1 && <th className="font-normal">Option</th>}<th className="font-normal">Why</th><th className="font-normal text-right">Change</th><th className="font-normal text-right">Left</th></tr></thead>
               <tbody>
@@ -320,5 +335,6 @@ function MovementReason({ m }: { m: StockMovement }) {
     case "returned": return <>Back from {order}, cancelled before it shipped</>;
     case "swap_out": return <>Swapped for another option on {order}</>;
     case "swap_in": return <>Swapped in on {order}</>;
+    case "received": return m.restock ? <>Arrived on <Link href={`/admin/restock/${m.restock.id}`} className="underline">restock #{m.restock.number}</Link></> : <>Arrived on a restock order</>;
   }
 }
