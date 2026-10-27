@@ -3,6 +3,7 @@ import { and, asc, desc, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-or
 import { schema, type Address, type Db } from "@sf/db";
 import { z } from "zod";
 import { BLOCKED_MESSAGE, blockedMatch } from "./blocklist";
+import { tipAmount } from "./tips";
 import { applyDisputeEvent } from "./disputes";
 import { NotFoundError, UserError } from "./errors";
 import type { PaymentEvent, PaymentProvider } from "./payments";
@@ -416,6 +417,8 @@ export async function startCheckout(
     giftWrap?: boolean;
     /** The buyer ticked "I'm N or older" for age-restricted items. */
     ageConfirmed?: boolean;
+    /** The tip percentage the buyer picked at checkout, from the store's choices. */
+    tipPercent?: number | null;
   },
   taxCalculator: TaxCalculator = new BuiltInTaxCalculator(),
 ) {
@@ -495,20 +498,25 @@ export async function startCheckout(
     shop.deliveryProtection && input.protection && !followUp && !repeat && !cart.pickingUp && !cart.deliveringLocally ? protectionFee(shop.deliveryProtection, cart.goodsMinor - cart.discountMinor) : 0;
   // Wrapping is for gifts with something to wrap, at the store's price; never on repeats or offers.
   const giftWrapMinor = shop.giftWrap && input.giftWrap && gift && cart.items.some((i) => !i.giftCard) && !followUp && !repeat ? shop.giftWrap.priceMinor : 0;
+  // A tip is only asked for on the store's own checkout, at one of its own percentages.
+  const tipping = input.storefront && !followUp && !repeat && input.tipPercent ? shop.tipping : null;
+  if (tipping && !tipping.percents.includes(input.tipPercent!)) throw new UserError("Pick one of the tip amounts shown.", "tip_invalid");
+  const tipMinor = tipping ? tipAmount(cart.goodsMinor - cart.discountMinor, input.tipPercent!) : 0;
   const quote = {
     ...cart,
     protectionMinor,
     giftWrapMinor,
+    tipMinor,
     taxMinor: tax.taxMinor,
     taxIncluded: tax.included,
     taxBreakdown: tax.breakdown,
-    totalMinor: cart.subtotalMinor - cart.discountMinor + cart.shippingMinor + protectionMinor + giftWrapMinor + (tax.included ? 0 : tax.taxMinor),
+    totalMinor: cart.subtotalMinor - cart.discountMinor + cart.shippingMinor + protectionMinor + giftWrapMinor + tipMinor + (tax.included ? 0 : tax.taxMinor),
   };
   const giftCardMinor = cart.giftCard ? Math.min(cart.giftCard.balanceMinor, quote.totalMinor) : 0;
   const dueMinor = quote.totalMinor - giftCardMinor;
   // Our fee is on the sale, not on tax the merchant passes on to the government, and not on the
-  // part paid with a gift card: the fee was taken when the gift card was sold.
-  const platformFeeMinor = platformFeeFor(shop.plan, Math.max(0, quote.totalMinor - quote.taxMinor - giftCardMinor));
+  // part paid with a gift card: the fee was taken when the gift card was sold. Tips are all the store's.
+  const platformFeeMinor = platformFeeFor(shop.plan, Math.max(0, quote.totalMinor - quote.taxMinor - giftCardMinor - tipMinor));
   const presentment = fx ? presentQuote({ ...quote, pricesIncludeTax: tax.included }, fx) : null;
 
   // The card is kept for the after-checkout offer and subscriptions, in the store's currency only.
@@ -560,6 +568,7 @@ export async function startCheckout(
         shippingMinor: quote.shippingMinor,
         protectionMinor,
         giftWrapMinor,
+        tipMinor,
         ageConfirmed: quoted.minAge !== null && input.ageConfirmed ? quoted.minAge : null,
         taxMinor: quote.taxMinor,
         taxIncluded: quote.taxIncluded,

@@ -1,6 +1,6 @@
 import { PixelEvent } from "@/components/PixelEvent";
 import { redirect } from "next/navigation";
-import { addonOffer, convertAmount, convertPrice, protectionFee, countryName, fitsWeight, formatMoney, lastCheckoutDetails, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, onHoliday, LOCAL_DELIVERY_RATE_ID, localDeliveryPrice, PICKUP_RATE_ID, storePixels, taxExemptionFor, UserError } from "@sf/core";
+import { addonOffer, convertAmount, convertPrice, protectionFee, countryName, fitsWeight, formatMoney, lastCheckoutDetails, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, onHoliday, LOCAL_DELIVERY_RATE_ID, localDeliveryPrice, PICKUP_RATE_ID, storePixels, taxExemptionFor, tipAmount, UserError } from "@sf/core";
 import { buyerFx } from "@/lib/currency";
 import { currentBuyer } from "@/lib/buyer";
 import { readCart, readDiscountCode, readGiftCardCode } from "@/lib/cart";
@@ -124,6 +124,13 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
         giftWrap={hasGoods && shop.giftWrap ? {
           checkbox: shop.giftWrap.priceMinor ? t.giftWrapFor(money(convertAmount(shop.giftWrap.priceMinor, fx))) : t.giftWrapFree, note: shop.giftWrap.note, summary: t.giftWrap,
           priceLabel: shop.giftWrap.priceMinor ? money(convertAmount(shop.giftWrap.priceMinor, fx)) : t.free, priceMinor: convertAmount(shop.giftWrap.priceMinor, fx),
+        } : null}
+        tips={hasGoods && shop.tipping ? {
+          heading: t.tipHeading, none: t.tipNone, summary: t.tip, note: shop.tipping.note,
+          options: shop.tipping.percents.map((percent) => {
+            const priceMinor = convertAmount(tipAmount(quote.goodsMinor - quote.discountMinor, percent), fx);
+            return { percent, label: `${percent}%`, priceMinor, priceLabel: money(priceMinor) };
+          }),
         } : null}
         ageCheck={quote.minAge ? { checkbox: t.ageConfirm(quote.minAge), note: t.ageNote } : null}
         summary={

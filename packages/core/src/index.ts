@@ -111,6 +111,7 @@ export * from "./own-stock";
 export * from "./local-pickup";
 export * from "./local-delivery";
 export * from "./gift-wrap";
+export * from "./tips";
 export * from "./weight";
 export * from "./restock";
 export * from "./inventory";

@@ -842,3 +842,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Store policies (after launch, part 124)
 
 1. **Policies written from your settings**: the Pages page drafts Returns and refunds, Shipping, Privacy policy and Terms of service from the store's own settings: the return window and instructions, buyer cancelling, each shipping zone's rates, free-shipping amounts and delivery times, processing days, pickup and local delivery, ad tracking and the legal name. The merchant reads each one, ticks the ones they want and adds them as ordinary pages to edit. A page already at /pages/returns (and so on) is never replaced. The returns page also meets the trust checklist's returns item (`packages/core/src/policies.ts`, no migration).
+
+### Tips (after launch, part 125)
+
+1. **Tips at checkout**: from Checkout add-ons, the store can ask for a tip with up to three percentages (10, 15 and 20 to start) and a thank-you line. Checkout shows each with what it comes to in the buyer's currency, and "No tip" is always first and picked. A tip is on the goods after any discount, no tax is added to it and the per-sale fee doesn't touch it. It shows on the receipt email, the order and payment pages, the invoice, the order page in admin, the orders spreadsheet and the API. Payment links, repeat deliveries and after-checkout offers never ask (`packages/core/src/tips.ts`, migration 0107).

@@ -3,6 +3,7 @@ import { requireShop } from "@/lib/server";
 import { deleteAddonAction, toggleAddonAction } from "../../addon-actions";
 import { PageHeader } from "../PageHeader";
 import { AddonForm } from "./AddonForm";
+import { TipsForm } from "./TipsForm";
 
 export const metadata = { title: "Checkout add-ons" };
 
@@ -27,6 +28,14 @@ export default async function AddonsPage() {
           ) : (
             <AddonForm products={choices} />
           )}
+        </section>
+        <section className="card p-5 flex flex-col gap-3" aria-labelledby="tips-heading" id="tips">
+          <h2 id="tips-heading" className="font-semibold">Tips</h2>
+          <p className="text-sm">
+            Let buyers add a tip for you at checkout, as a percentage of what they&apos;re buying. &quot;No tip&quot; is always first and picked, so
+            nobody tips by accident. No tax is added to a tip and we take no fee on it: every cent is yours.
+          </p>
+          <TipsForm tipping={shop.tipping} />
         </section>
         <section className="flex flex-col gap-3" aria-labelledby="list-heading">
           <div className="flex justify-between items-baseline gap-3">
