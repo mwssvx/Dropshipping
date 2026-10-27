@@ -1607,7 +1607,7 @@ export const stockMovements = pgTable(
     orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
     // The restock order it arrived on, for "received".
     restockOrderId: uuid("restock_order_id").references((): AnyPgColumn => restockOrders.id, { onDelete: "set null" }),
-    reason: text("reason", { enum: ["start", "edit", "sale", "returned", "swap_out", "swap_in", "received"] }).notNull(),
+    reason: text("reason", { enum: ["start", "edit", "sale", "returned", "swap_out", "swap_in", "received", "count"] }).notNull(),
     change: integer("change").notNull(),
     // The count after it; null when the option stopped being counted.
     stockAfter: integer("stock_after"),
