@@ -1,4 +1,4 @@
-import { applyAllTagRules, notifySoldOut, publishDueProducts, sendReviewRequests, pruneActivity, sendWeeklySummaries, pruneAuthRecords, pruneBuyerRecords, pruneStockAlerts, sendPriceDrops, sendStockAlerts, syncSupplierStock, pruneInvites, pruneEvents, refreshAllVerified, runWebhooks, routeStuckOrders, sendCampaignBatches, runFakePayouts, notifyNewDisputes, runDueSubscriptions, sendWinbackEmails, notifyCostChanges, notifyLatePreorders, runHealthChecks, runScheduledAgents, sendAbandonedCartEmails, sendAllNotifications, sendReferralRewards, syncTracking } from "@sf/core";
+import { applyAllTagRules, notifyLowStock, notifySoldOut, publishDueProducts, sendReviewRequests, pruneActivity, sendWeeklySummaries, pruneAuthRecords, pruneBuyerRecords, pruneStockAlerts, sendPriceDrops, sendStockAlerts, syncSupplierStock, pruneInvites, pruneEvents, refreshAllVerified, runWebhooks, routeStuckOrders, sendCampaignBatches, runFakePayouts, notifyNewDisputes, runDueSubscriptions, sendWinbackEmails, notifyCostChanges, notifyLatePreorders, runHealthChecks, runScheduledAgents, sendAbandonedCartEmails, sendAllNotifications, sendReferralRewards, syncTracking } from "@sf/core";
 import { agents, campaigns, adminNotices, fulfillment, pushSender, stock, subscriptions, testPayments, webhooks } from "@/lib/server";
 
 /**
@@ -28,6 +28,8 @@ export async function GET(request: Request) {
   const priceRises = await notifyCostChanges(await adminNotices());
   // Products whose every option just ran out at the supplier.
   const soldOut = await notifySoldOut(await adminNotices());
+  // Options of the store's own stock that sold down to its number.
+  const runningLow = await notifyLowStock(await adminNotices());
   // Pre-orders whose stock just came back go to the supplier now; ones past their date get flagged.
   const preorders = { released: (await routeStuckOrders(ctx)).routed, late: (await notifyLatePreorders(await adminNotices())).sent };
   // Subscribe and save: "coming up" emails, then deliveries that are due, after stock is fresh.
@@ -59,5 +61,5 @@ export async function GET(request: Request) {
   await pruneBuyerRecords(ctx.db);
   await pruneStockAlerts(ctx.db);
   await pruneActivity(ctx.db);
-  return Response.json({ published, routed, tracking, referrals, stock: stockSync, priceRises, soldOut, preorders, subscriptions: repeats, restocked, priceDrops, payouts, disputes, health, verified, tagRules, reminders, reviewRequests, campaigns: campaignEmails, winback, summaries, ai, push, webhooks: hooks, pruned });
+  return Response.json({ published, routed, tracking, referrals, stock: stockSync, priceRises, soldOut, runningLow, preorders, subscriptions: repeats, restocked, priceDrops, payouts, disputes, health, verified, tagRules, reminders, reviewRequests, campaigns: campaignEmails, winback, summaries, ai, push, webhooks: hooks, pruned });
 }

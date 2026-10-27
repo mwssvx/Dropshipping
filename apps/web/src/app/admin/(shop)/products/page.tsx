@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { formatMoney, listCollections, listProducts, recentBulkEdits, soldOutAtSupplier } from "@sf/core";
+import { formatMoney, listCollections, listProducts, recentBulkEdits, runningLow, soldOutAtSupplier } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { BulkProducts, type BulkRow } from "./BulkProducts";
 import { LowStockForm } from "./LowStockForm";
+import { RestockAlertForm } from "./RestockAlertForm";
 import { BadgeSettingsForm } from "./BadgeSettingsForm";
 import { SoldOutForm } from "./SoldOutForm";
 
@@ -11,7 +12,7 @@ export const metadata = { title: "Products" };
 
 export default async function ProductsPage() {
   const { shop, db } = await requireShop("products");
-  const [products, collections, recent, soldOut] = await Promise.all([listProducts(db, shop.id), listCollections(db, shop.id), recentBulkEdits(db, shop.id), soldOutAtSupplier(db, shop.id)]);
+  const [products, collections, recent, soldOut, low] = await Promise.all([listProducts(db, shop.id), listCollections(db, shop.id), recentBulkEdits(db, shop.id), soldOutAtSupplier(db, shop.id), runningLow(db, shop.id)]);
   const rows: BulkRow[] = products.map((p) => {
     const v = p.variants[0];
     return {
@@ -52,6 +53,23 @@ export default async function ProductsPage() {
             </ul>
           </section>
         )}
+        {low.length > 0 && (
+          <section id="running-low" className="card p-5 mb-6 flex flex-col gap-3 max-w-3xl scroll-mt-20" aria-labelledby="running-low-heading">
+            <div>
+              <h2 id="running-low-heading" className="font-semibold">Running low</h2>
+              <p className="hint text-sm">Your own stock with {shop.restockAlertAt} or fewer left. Enter the new count on the product page when you restock.</p>
+            </div>
+            <ul className="flex flex-col divide-y divide-border" aria-label="Running low">
+              {low.slice(0, 50).map((r) => (
+                <li key={r.variantId} className="py-2 flex items-center justify-between gap-3">
+                  <Link href={`/admin/products/${r.productId}`} className="underline">{r.title}</Link>
+                  <span className={`text-sm num ${r.stock === 0 ? "text-critical font-semibold" : "hint"}`}>{r.stock === 0 ? "Sold out" : `${r.stock} left`}</span>
+                </li>
+              ))}
+            </ul>
+            {low.length > 50 && <p className="hint text-sm">And {low.length - 50} more.</p>}
+          </section>
+        )}
         {products.length === 0 ? (
           <div className="card p-10 flex flex-col items-center text-center gap-3">
             <h2 className="font-semibold text-lg">Add your first product</h2>
@@ -81,6 +99,16 @@ export default async function ProductsPage() {
             </p>
           </div>
           <LowStockForm value={shop.lowStockNote} />
+        </section>
+        <section className="card p-5 mt-6 flex flex-col gap-3 max-w-3xl" aria-labelledby="restock-alert-heading">
+          <div>
+            <h2 id="restock-alert-heading" className="font-semibold">Running-low email</h2>
+            <p className="hint">
+              For products you added yourself, whose stock goes down as they sell. When an option gets down to this many, everyone who looks after
+              products gets one email, and it shows under Running low at the top of this page. Imported products follow the supplier instead.
+            </p>
+          </div>
+          <RestockAlertForm value={shop.restockAlertAt} />
         </section>
         <section className="card p-5 mt-6 flex flex-col gap-3 max-w-3xl" aria-labelledby="badges-heading">
           <div>

@@ -197,6 +197,8 @@ export const shops = pgTable(
     referralProgram: jsonb("referral_program").$type<ReferralProgram>(),
     // Product pages say "Only 3 left" when an option's real stock is at or below this; 0 turns it off.
     lowStockNote: integer("low_stock_note").notNull().default(5),
+    // The team is emailed when an option of a product added by hand has this many or fewer left; 0 turns it off.
+    restockAlertAt: integer("restock_alert_at").notNull().default(3),
     // Buyers can cancel a paid order from its page in the first hours, until it ships, for a full refund.
     buyerCancel: boolean("buyer_cancel").notNull().default(true),
     // Ad tracking: Meta, TikTok and Google tags, and which visitors are asked before they load.
@@ -332,6 +334,8 @@ export const variants = pgTable(
     compareAtMinor: money("compare_at_minor"),
     costMinor: money("cost_minor"),
     stock: integer("stock"),
+    // When the team was told this option of the store's own stock is running low. Cleared once it's restocked.
+    lowStockNotifiedAt: timestamp("low_stock_notified_at", { withTimezone: true }),
     shipDaysMin: integer("ship_days_min"),
     shipDaysMax: integer("ship_days_max"),
     position: integer("position").notNull().default(0),
