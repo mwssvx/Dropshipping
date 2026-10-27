@@ -9,6 +9,7 @@ import { UserError } from "./errors";
 import { refreshOrderFulfillment, sendOrderEmail, trackingInput, type FulfillmentContext } from "./fulfillment";
 import { csvCell } from "./payouts";
 import { parseCsv } from "./shopify-import";
+import { groupBy } from "./group";
 
 export const MAX_TRACKING_ROWS = 2000;
 
@@ -182,12 +183,13 @@ export async function trackingTemplateCsv(db: Db, shopId: string) {
   const waiting = await ordersWaitingForTracking(db, shopId);
   const ids = waiting.map((o) => o.id);
   const lines = ids.length ? await db.query.orderLines.findMany({ where: inArray(schema.orderLines.orderId, ids) }) : [];
+  const linesOf = groupBy(lines, (l) => l.orderId);
   const header = ["Order", "Name", "Country", "Items", "Carrier", "Tracking number", "Tracking link"];
   const rows = waiting.map((o) => [
     o.number,
     o.shippingAddress.name,
     o.shippingAddress.country,
-    lines.filter((l) => l.orderId === o.id).map((l) => `${l.quantity} × ${l.title}`).join("; "),
+    (linesOf.get(o.id) ?? []).map((l) => `${l.quantity} × ${l.title}`).join("; "),
     null,
     null,
     null,

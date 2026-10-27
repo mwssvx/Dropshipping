@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, type SQL } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
@@ -8,6 +8,7 @@ import { recordStockEdits } from "./own-stock";
 import { uniqueHandle } from "./handles";
 import { editProductPhotos, inheritedPhoto, photoColumns } from "./gallery";
 import { publishDueProducts } from "./publish-later";
+import { groupBy } from "./group";
 
 export const MAX_VARIANTS = 100;
 export const MAX_OPTIONS = 3;
@@ -183,18 +184,24 @@ async function checkBarcodes(db: Db, shopId: string, productId: string, variants
 export async function listProducts(db: Db, shopId: string) {
   // The admin, the app and the API all list from here, so scheduled drafts show as on sale on time.
   await publishDueProducts(db, shopId);
-  const rows = await db.query.products.findMany({
-    where: eq(schema.products.shopId, shopId),
-    orderBy: desc(schema.products.createdAt),
-    with: undefined,
-  });
-  const vs = rows.length
-    ? await db.query.variants.findMany({
-        where: inArray(schema.variants.productId, rows.map((r) => r.id)),
-        orderBy: asc(schema.variants.position),
-      })
-    : [];
-  return rows.map((p) => ({ ...p, variants: vs.filter((v) => v.productId === p.id) }));
+  return productsWithVariants(db, eq(schema.products.shopId, shopId));
+}
+
+/**
+ * Products matching `scope`, newest first, each with its variants. The variants come from a
+ * subquery rather than a list of ids, which Postgres caps at 65,535 parameters, and are matched
+ * up in one pass, so a store with thousands of products lists as fast as one with ten.
+ */
+async function productsWithVariants(db: Db, scope: SQL | undefined) {
+  const rows = await db.query.products.findMany({ where: scope, orderBy: desc(schema.products.createdAt) });
+  if (!rows.length) return [];
+  const vs = await db
+    .select()
+    .from(schema.variants)
+    .where(inArray(schema.variants.productId, db.select({ id: schema.products.id }).from(schema.products).where(scope)))
+    .orderBy(asc(schema.variants.position));
+  const byProduct = groupBy(vs, (v) => v.productId);
+  return rows.map((p) => ({ ...p, variants: byProduct.get(p.id) ?? [] }));
 }
 
 export async function getProduct(db: Db, shopId: string, productId: string) {
@@ -211,7 +218,8 @@ export async function getProduct(db: Db, shopId: string, productId: string) {
 
 /** Storefront: only active products are visible to buyers. */
 export async function listActiveProducts(db: Db, shopId: string) {
-  return (await listProducts(db, shopId)).filter((p) => p.status === "active");
+  await publishDueProducts(db, shopId);
+  return productsWithVariants(db, and(eq(schema.products.shopId, shopId), eq(schema.products.status, "active")));
 }
 
 export async function getActiveProductByHandle(db: Db, shopId: string, handle: string) {

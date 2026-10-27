@@ -8,6 +8,7 @@ import { schema, type Address, type Db } from "@sf/db";
 import { NotFoundError, UserError } from "./errors";
 import { describePersonalization } from "./personalization";
 import { ordersWaitingForTracking } from "./tracking-import";
+import { groupBy } from "./group";
 
 export const MAX_PACKING_SLIP_NOTE = 500;
 /** More than this at once is too many to print in one go. */
@@ -45,13 +46,13 @@ export async function packingSlips(db: Db, shopId: string, scope: { orderId: str
   const skus = new Map(
     (variantIds.length ? await db.query.variants.findMany({ where: inArray(schema.variants.id, variantIds), columns: { id: true, sku: true } }) : []).map((v) => [v.id, v.sku]),
   );
+  const linesOf = groupBy(lines, (l) => l.orderId);
   const slips: PackingSlip[] = orders.map((o) => ({
     orderId: o.id,
     number: o.number,
     placedAt: o.createdAt,
     shipTo: o.shippingAddress,
-    items: lines
-      .filter((l) => l.orderId === o.id)
+    items: (linesOf.get(o.id) ?? [])
       .map((l) => ({
         title: l.title,
         sku: (l.variantId && skus.get(l.variantId)) || null,

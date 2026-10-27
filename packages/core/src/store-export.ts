@@ -26,6 +26,7 @@ import { openPreorder } from "./preorders";
 import { storePixels } from "./pixels";
 import { parseVideo } from "./video";
 import { detailsText, parseDetails } from "./product-details";
+import { groupBy } from "./group";
 
 export const EXPORT_FORMAT = "storefront-store";
 
@@ -36,11 +37,11 @@ function supplierOf(link: typeof schema.suppliers.$inferSelect | undefined, prod
     : { provider: link.provider, product_ref: productRef };
 }
 
-/** The backup supplier's listing, with its options keyed by our option titles. */
+/** The backup supplier's listing, with its options keyed by our option titles. `variants` are the product's own. */
 function backupOf(p: typeof schema.products.$inferSelect, links: (typeof schema.suppliers.$inferSelect)[], variants: (typeof schema.variants.$inferSelect)[]) {
   const link = p.backup && links.find((l) => l.id === p.backup!.supplierId);
   if (!p.backup || !link || link.provider === "email") return null;
-  const options = variants.filter((v) => v.productId === p.id && p.backup!.variants[v.id]).map((v) => [v.title, { ref: p.backup!.variants[v.id]!.ref, cost: p.backup!.variants[v.id]!.costMinor }]);
+  const options = variants.filter((v) => p.backup!.variants[v.id]).map((v) => [v.title, { ref: p.backup!.variants[v.id]!.ref, cost: p.backup!.variants[v.id]!.costMinor }]);
   return { provider: link.provider, url: p.backup.sourceUrl, product_ref: p.backup.productRef, variants: Object.fromEntries(options) };
 }
 
@@ -70,9 +71,11 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
     db.query.savedReplies.findMany({ where: eq(schema.savedReplies.shopId, shopId), orderBy: asc(schema.savedReplies.title) }),
     db.query.customerTagRules.findMany({ where: eq(schema.customerTagRules.shopId, shopId), orderBy: asc(schema.customerTagRules.createdAt) }),
   ]);
+  // Variants of every product in the store, picked by the store rather than a list of ids, which
+  // Postgres caps at 65,535 values.
   const variants = products.length
-    ? await db.query.variants.findMany({ where: inArray(schema.variants.productId, products.map((p) => p.id)), orderBy: asc(schema.variants.position) })
-    : [];
+    ? groupBy(await db.query.variants.findMany({ where: inArray(schema.variants.productId, db.select({ id: schema.products.id }).from(schema.products).where(eq(schema.products.shopId, shopId))), orderBy: asc(schema.variants.position) }), (v) => v.productId)
+    : new Map<string, (typeof schema.variants.$inferSelect)[]>();
   const handleOf = new Map(products.map((p) => [p.id, p.handle]));
   const handleByKind: Record<"product" | "collection" | "page", Map<string, string>> = {
     product: handleOf,
@@ -146,7 +149,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       status: p.status,
       source_url: p.sourceUrl,
       supplier: p.supplierId ? supplierOf(supplierRows.find((s) => s.id === p.supplierId), p.supplierProductRef) : null,
-      backup: backupOf(p, supplierRows, variants),
+      backup: backupOf(p, supplierRows, variants.get(p.id) ?? []),
       goes_well_with: p.upsellProductId ? (handleOf.get(p.upsellProductId) ?? null) : null,
       quantity_breaks: p.quantityBreaks.map((t) => ({ min_qty: t.minQty, percent_off: t.percentOff })),
       personalization: p.personalization.map((f) => ({ label: f.label, required: f.required, max_length: f.maxLength })),
@@ -163,8 +166,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       details: p.details.length ? p.details : undefined,
       badge: p.badge,
       gift_card: p.giftCard,
-      variants: variants
-        .filter((v) => v.productId === p.id)
+      variants: (variants.get(p.id) ?? [])
         .map((v) => ({
           title: v.title,
           options: v.options,
@@ -956,13 +958,12 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
 export async function productsCsv(db: Db, shopId: string) {
   const products = await db.query.products.findMany({ where: eq(schema.products.shopId, shopId), orderBy: asc(schema.products.createdAt) });
   const variants = products.length
-    ? await db.query.variants.findMany({ where: inArray(schema.variants.productId, products.map((p) => p.id)), orderBy: asc(schema.variants.position) })
-    : [];
+    ? groupBy(await db.query.variants.findMany({ where: inArray(schema.variants.productId, db.select({ id: schema.products.id }).from(schema.products).where(eq(schema.products.shopId, shopId))), orderBy: asc(schema.variants.position) }), (v) => v.productId)
+    : new Map<string, (typeof schema.variants.$inferSelect)[]>();
   const major = (m: number | null) => (m === null ? null : (m / 100).toFixed(2));
   const header = ["Handle", "Title", "Status", "Variant", "SKU", "Price", "Compare at price", "Cost", "Stock", "Image URL", "Supplier link"];
   const rows = products.flatMap((p) =>
-    variants
-      .filter((v) => v.productId === p.id)
+    (variants.get(p.id) ?? [])
       .map((v) => [p.handle, p.title, p.status, v.title, v.sku, major(v.priceMinor), major(v.compareAtMinor), major(v.costMinor), v.stock, p.imageUrl, p.sourceUrl]),
   );
   return [header, ...rows].map((r) => r.map((c) => csvCell(c ?? null)).join(",")).join("\n") + "\n";
