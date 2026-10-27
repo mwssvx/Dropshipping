@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts, detailsText, MAX_DETAILS, stockHistory, incomingStock, type StockMovement } from "@sf/core";
+import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts, detailsText, MAX_DETAILS, stockHistory, incomingStock, countryName, type StockMovement } from "@sf/core";
 import { requireShop, storeAddress, suppliers } from "@/lib/server";
 import { duplicateProductAction, updateProductAction } from "../../../actions";
 import { setUpsellAction } from "../../../growth-actions";
@@ -11,6 +11,7 @@ import { QuantityBreaksForm } from "./QuantityBreaksForm";
 import { PersonalizationForm } from "./PersonalizationForm";
 import { PreorderForm } from "./PreorderForm";
 import { PurchaseLimitForm } from "./PurchaseLimitForm";
+import { CustomsForm } from "./CustomsForm";
 import { VideoForm } from "./VideoForm";
 import { DetailsForm } from "./DetailsForm";
 import { BadgeForm } from "./BadgeForm";
@@ -302,6 +303,23 @@ export default async function EditProductPage({ params, searchParams }: { params
             </div>
             {product.purchaseLimit && <p className="text-sm" role="note">Buyers can order {describePurchaseLimit(product.purchaseLimit)}.</p>}
             <PurchaseLimitForm productId={product.id} limit={product.purchaseLimit} />
+          </section>
+        )}
+        {!product.giftCard && (
+          <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="customs-heading">
+            <div>
+              <h2 id="customs-heading" className="font-semibold">Customs</h2>
+              <p className="hint">
+                Printed on the customs form of orders going to another country. The HS code is the tariff number for what this is (look it
+                up in your carrier's or country's tariff finder). The country is where it was made, not where it ships from.
+              </p>
+            </div>
+            {(product.hsCode || product.originCountry) && (
+              <p className="text-sm" role="note">
+                {[product.hsCode && `HS code ${product.hsCode}`, product.originCountry && `made in ${countryName(product.originCountry)}`].filter(Boolean).join(", ")}.
+              </p>
+            )}
+            <CustomsForm productId={product.id} hsCode={product.hsCode} originCountry={product.originCountry} />
           </section>
         )}
         <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="upsell-heading">

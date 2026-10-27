@@ -799,3 +799,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Count the shelf**: "Count stock" on the Inventory page lists every option of the store's own stock with what the count says. The merchant types what they counted; options left empty stay as they are (`recordStockCount` in `packages/core/src/inventory.ts`).
 2. **What changed**: each option that differs is set to the count, and the difference goes in its stock history as "Stock count". The page says how many options changed, how many items went missing and what they were worth at cost, and how many turned up.
+
+### Customs forms (after launch, part 115)
+
+1. **Customs info on products**: a Customs section on the product page takes the HS code (the tariff number, dots allowed) and the two-letter code of the country it was made in (`setCustomsInfo` in `packages/core/src/customs.ts`). Both go along when the store is copied.
+2. **The form**: an order shipping to another country than the store's gets a "Customs form" link next to the packing slip. It prints a declaration with from and to, each item's HS code, origin, quantity, weight and value, the totals, gift or sale, and a line to sign. Products still missing a code are named in a warning that doesn't print.
