@@ -289,8 +289,8 @@ describe("models per agent", () => {
   });
 
   it("records and prices each run on its agent's model", async () => {
-    const f = await makeFixture();
     const demo = new DemoModel();
+    const f = await makeFixture(demo);
     const r = await writeListing({ ...f.ctx, model: demo }, await f.shop(), f.products.stand.id);
     const run = await f.db.query.agentRuns.findFirst({ where: eq(schema.agentRuns.id, r.runId) });
     expect(run!.model).toBe("claude-haiku-5-5");
