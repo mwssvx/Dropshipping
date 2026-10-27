@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
@@ -202,6 +202,43 @@ async function productsWithVariants(db: Db, scope: SQL | undefined) {
     .orderBy(asc(schema.variants.position));
   const byProduct = groupBy(vs, (v) => v.productId);
   return rows.map((p) => ({ ...p, variants: byProduct.get(p.id) ?? [] }));
+}
+
+/** Products on one page of the admin product list. */
+export const PRODUCT_PAGE_SIZE = 100;
+
+/**
+ * One page of the admin product list, newest first, each with its variants, plus how many match
+ * in all. `query` matches the title or an exact SKU.
+ */
+export async function productPage(
+  db: Db,
+  shopId: string,
+  opts: { query?: string; status?: "active" | "draft" | "archived"; page?: number; size?: number } = {},
+) {
+  await publishDueProducts(db, shopId);
+  const size = opts.size ?? PRODUCT_PAGE_SIZE;
+  const page = Math.max(1, Math.floor(opts.page ?? 1));
+  const q = opts.query?.trim().toLowerCase();
+  const where = and(
+    eq(schema.products.shopId, shopId),
+    opts.status ? eq(schema.products.status, opts.status) : undefined,
+    q
+      ? or(
+          sql`lower(${schema.products.title}) like ${`%${q}%`}`,
+          inArray(schema.products.id, db.select({ id: schema.variants.productId }).from(schema.variants).where(sql`lower(${schema.variants.sku}) = ${q}`)),
+        )
+      : undefined,
+  );
+  const [rows, [count]] = await Promise.all([
+    db.select().from(schema.products).where(where).orderBy(desc(schema.products.createdAt), asc(schema.products.id)).limit(size).offset((page - 1) * size),
+    db.select({ n: sql<number>`count(*)::int` }).from(schema.products).where(where),
+  ]);
+  const vs = rows.length
+    ? await db.select().from(schema.variants).where(inArray(schema.variants.productId, rows.map((p) => p.id))).orderBy(asc(schema.variants.position))
+    : [];
+  const byProduct = groupBy(vs, (v) => v.productId);
+  return { products: rows.map((p) => ({ ...p, variants: byProduct.get(p.id) ?? [] })), total: count!.n };
 }
 
 export async function getProduct(db: Db, shopId: string, productId: string) {

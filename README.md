@@ -914,3 +914,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Every customer, in pages (after launch, part 142)
 
 1. **No more cut-off at 500**: the customer list used to show the latest 500 customers and count only those in its "N customers · N bought more than once" line, so a bigger store saw the wrong numbers and couldn't reach older customers except by searching. It now shows 100 at a time with Previous and Next, and the counts cover everyone who matches (`customerTotals` and `listCustomers(…, { offset })` in `packages/core/src/buyers.ts`).
+
+### Search and pages for the product list (after launch, part 143)
+
+1. **Find a product in a big catalog**: the admin product list has a search box (title, or an exact SKU) and On sale, Drafts and Archived filters, and shows 100 products at a time with Previous and Next. Bulk edits work on the products on the page (`productPage` in `packages/core/src/products.ts`).
