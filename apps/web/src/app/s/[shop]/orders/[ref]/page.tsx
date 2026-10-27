@@ -1,6 +1,6 @@
 import { PixelEvent } from "@/components/PixelEvent";
 import { notFound } from "next/navigation";
-import { buyerAmounts, buyerCancelOptions, buyerThread, formatDeliveryDate, formatDeliveryWindow, orderDelivery, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems, formatShipsBy, storePixels } from "@sf/core";
+import { buyerAmounts, buyerCancelOptions, buyerThread, formatDeliveryDate, formatDeliveryWindow, orderDelivery, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems, formatShipsBy, storePixels, surveyFor } from "@sf/core";
 import Link from "next/link";
 import { db, fulfillment, storeAddress } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
@@ -13,15 +13,16 @@ import { QuestionForm } from "./QuestionForm";
 import { ReturnForm } from "./ReturnForm";
 import { PostPurchaseOffer } from "./PostPurchaseOffer";
 import { SubscribeOffer } from "./SubscribeOffer";
+import { SurveyQuestion } from "./SurveyQuestion";
 
 const time = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const utc = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC" });
 
 export const metadata = { title: "Order status", robots: { index: false } };
 
-export default async function OrderStatusPage({ params, searchParams }: { params: Promise<{ shop: string; ref: string }>; searchParams: Promise<{ subscribed?: string }> }) {
+export default async function OrderStatusPage({ params, searchParams }: { params: Promise<{ shop: string; ref: string }>; searchParams: Promise<{ subscribed?: string; answered?: string }> }) {
   const { shop: handle, ref } = await params;
-  const { subscribed: justSubscribed } = await searchParams;
+  const { subscribed: justSubscribed, answered } = await searchParams;
   const shop = await loadShop(handle);
   const order = await getOrderByPaymentIntent(await db(), shop.id, ref).catch((e) => {
     if (e instanceof NotFoundError) notFound();
@@ -57,6 +58,7 @@ export default async function OrderStatusPage({ params, searchParams }: { params
   const subOffer = paid ? await subscriptionOfferFor(await db(), shop, order) : null;
   const subscription = paid ? await subscriptionForOrder(await db(), order.id) : null;
   const partOf = order.subscriptionId ? await (await db()).query.subscriptions.findFirst({ where: (s, { eq }) => eq(s.id, order.subscriptionId!), columns: { token: true, status: true } }) : null;
+  const survey = surveyFor(shop, order);
   const arrives = paid ? await orderDelivery(await db(), shop, order) : null;
   const pickupText = paid && (order.pickup || order.localDelivery) ? await storeT(handle) : null;
   const steps = order.pickup ? [
@@ -100,6 +102,9 @@ export default async function OrderStatusPage({ params, searchParams }: { params
           intervals={subOffer.intervals.map((i) => ({ days: i.days, label: i.label }))}
           items={subOffer.items.map((i) => ({ title: i.title, quantity: i.quantity, price: formatMoney(i.priceMinor, shop.currency), offer: formatMoney(i.offerMinor, shop.currency) }))} />
       )}
+      {/* After the offers, which only last a while. */}
+      {survey && <SurveyQuestion handle={handle} orderRef={ref} question={survey.question} options={survey.options} other={survey.other} />}
+      {answered && order.surveyAnswer && <p className="banner banner-success" role="status">Thanks for telling us.</p>}
       {subscription && subscription.status !== "cancelled" && (
         <p className="banner banner-success" role="status">
           {justSubscribed ? "You're subscribed. " : ""}

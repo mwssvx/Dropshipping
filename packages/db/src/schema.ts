@@ -161,6 +161,8 @@ export const shops = pgTable(
     localDeliveryArea: jsonb("local_delivery_area").$type<LocalDeliveryArea | null>(),
     // Gift wrapping buyers can add to a gift at checkout, or null when the store doesn't wrap.
     giftWrap: jsonb("gift_wrap").$type<GiftWrap | null>(),
+    // "How did you hear about us?" asked on the order page after paying. Null when it's off.
+    survey: jsonb("survey").$type<BuyerSurvey | null>(),
     // Wholesale: approved business buyers pay this much less, on orders of at least the minimum.
     wholesaleEnabled: boolean("wholesale_enabled").notNull().default(false),
     wholesalePercentOff: integer("wholesale_percent_off").notNull().default(20),
@@ -505,6 +507,9 @@ export type LocalPickup = { address: string; instructions: string | null };
 /** The store's gift wrapping: its price and what buyers get ("Kraft paper and a ribbon"). */
 export type GiftWrap = { priceMinor: number; note: string | null };
 
+/** The question buyers answer after paying, its choices, and whether they can type their own. */
+export type BuyerSurvey = { question: string; options: string[]; other: boolean };
+
 export type LocalDeliveryArea = { postalPrefixes: string[]; priceMinor: number; freeOverMinor: number | null; note: string | null };
 
 export type Address = {
@@ -616,6 +621,9 @@ export const orders = pgTable(
     // The age the buyer confirmed at checkout for age-restricted items, so the courier or the
     // merchant knows to check ID. Null when nothing in it was restricted.
     ageConfirmed: integer("age_confirmed"),
+    // The buyer's answer to the store's survey, and what they typed when they picked "Other".
+    surveyAnswer: text("survey_answer"),
+    surveyOther: text("survey_other"),
     // When the buyer was asked to review what they got, once per order.
     reviewRequestedAt: timestamp("review_requested_at", { withTimezone: true }),
     // The merchant's own note and labels ("follow up", "vip"). Never shown to the buyer.
