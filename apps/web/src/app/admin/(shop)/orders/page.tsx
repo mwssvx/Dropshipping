@@ -35,7 +35,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   };
   return (
     <main className="pb-12">
-      <PageHeader title="Orders" actions={<><Link href="/admin/orders/packing-slips" className="btn btn-secondary">Packing slips</Link><Link href="/admin/orders/new" className="btn btn-secondary">Create payment link</Link></>} />
+      <PageHeader title="Orders" actions={<><Link href="/admin/orders/abandoned" className="btn btn-secondary">Abandoned checkouts</Link><Link href="/admin/orders/packing-slips" className="btn btn-secondary">Packing slips</Link><Link href="/admin/orders/new" className="btn btn-secondary">Create payment link</Link></>} />
       <div className="px-4 sm:px-8 flex flex-col gap-4">
         <nav className="flex gap-1" aria-label="Order filters">
           <Link href={href({ show: undefined })} className={`chip text-sm ${!problemsOnly && !heldOnly ? "font-semibold border-accent" : ""}`} aria-current={!problemsOnly && !heldOnly ? "page" : undefined}>All</Link>
