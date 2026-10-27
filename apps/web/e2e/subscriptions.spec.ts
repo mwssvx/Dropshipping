@@ -92,6 +92,18 @@ test("a buyer subscribes to their order and manages it", async ({ page, browser 
   await expect(row.getByText("Placed order #1002.")).toBeVisible();
   await expect(row).toContainText("1 delivery");
   await shot(page, "274-admin-subscriptions");
+  // Filters and search.
+  const filters = page.getByRole("navigation", { name: "Subscription filter" });
+  await filters.getByRole("link", { name: "Cancelled" }).click();
+  await expect(page).toHaveURL(/show=cancelled/);
+  await expect(page.getByText("None here.")).toBeVisible();
+  await filters.getByRole("link", { name: "All" }).click();
+  await expect(page).not.toHaveURL(/show=/);
+  await page.getByLabel("Search subscribers").fill(email.toUpperCase());
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await expect(page).toHaveURL(/q=/);
+  await expect(page.getByText("1 subscription matches")).toBeVisible();
+  await expect(row).toBeVisible();
   await page.goto("/admin/orders");
   await page.goto((await page.getByRole("link", { name: "#1002" }).getAttribute("href"))!);
   await expect(page.getByRole("link", { name: "Subscription", exact: true })).toBeVisible();
