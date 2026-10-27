@@ -37,7 +37,7 @@ export async function inventoryReport(db: Db, shop: { id: string; restockAlertAt
     .select({ variant: schema.variants, product: schema.products.title })
     .from(schema.variants)
     .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
-    .where(and(eq(schema.products.shopId, shop.id), isNull(schema.products.sourceUrl), isNull(schema.products.supplierId), eq(schema.products.giftCard, false), isNotNull(schema.variants.stock)));
+    .where(and(eq(schema.products.shopId, shop.id), isNull(schema.products.sourceUrl), isNull(schema.products.supplierId), eq(schema.products.giftCard, false), eq(schema.products.digital, false), isNotNull(schema.variants.stock)));
   const ids = variants.map((v) => v.variant.id);
   const since = new Date(now.getTime() - DAYS * 86_400_000);
   const [moved, coming] = ids.length

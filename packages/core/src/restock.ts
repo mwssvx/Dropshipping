@@ -22,7 +22,7 @@ export async function restockChoices(db: Db, shopId: string) {
     .select({ variantId: schema.variants.id, option: schema.variants.title, sku: schema.variants.sku, barcode: schema.variants.barcode, location: schema.variants.location, stock: schema.variants.stock, costMinor: schema.variants.costMinor, productId: schema.products.id, product: schema.products.title })
     .from(schema.variants)
     .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
-    .where(and(eq(schema.products.shopId, shopId), isNull(schema.products.sourceUrl), isNull(schema.products.supplierId), eq(schema.products.giftCard, false)))
+    .where(and(eq(schema.products.shopId, shopId), isNull(schema.products.sourceUrl), isNull(schema.products.supplierId), eq(schema.products.giftCard, false), eq(schema.products.digital, false)))
     .orderBy(asc(schema.products.title), asc(schema.variants.position));
   return rows.map((r) => ({ ...r, title: lineTitle(r.product, r.option) }));
 }

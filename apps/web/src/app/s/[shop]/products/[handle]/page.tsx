@@ -145,10 +145,10 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   // "Arrives Oct 18 – Oct 25 to United States", for the visitor's country when the store ships there.
   // Some products can't go to some countries; buyers there are told before they add it.
   const here = await buyerCountry();
-  const cantShipHere = here && !shipsToCountry(product.blockedCountries, here) ? here : null;
+  const cantShipHere = here && !product.digital && !shipsToCountry(product.blockedCountries, here) ? here : null;
   const delivery = buyable.length && !cantShipHere ? await productDelivery(await db(), shop, product.id, { country: await buyerCountry() }) : null;
   // "Shipping to United States: $4.99 · Free on orders of $50 or more", so it isn't a surprise at checkout.
-  const shipping = v && orderable.length && !cantShipHere ? await productShipping(await db(), shop, { priceMinor: v.priceMinor, weightGrams: v.weightGrams, giftCard: product.giftCard }, here) : null;
+  const shipping = v && orderable.length && !cantShipHere ? await productShipping(await db(), shop, { priceMinor: v.priceMinor, weightGrams: v.weightGrams, giftCard: product.giftCard || product.digital }, here) : null;
   const shownMoney = (m: number) => (fx ? formatMoney(convertPrice(m, fx), fx.currency) : formatMoney(m, shop.currency));
   // A reduced price says what the lowest price was in the 30 days before (the EU's rule).
   const lowest = showsLowestPrice(shop.lowestPriceNote, await buyerCountry()) ? await lowestPricesBefore(await db(), shop.id, product, product.sale) : new Map<string, number>();
@@ -283,6 +283,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
         {v && orderable.length > 0 && <StickyBuyBar formId="buy" title={product.title} imageUrl={product.imageUrl} label={preorder && buyable.length === 0 ? t.preorder : t.addToCart} />}
         {v && orderable.length === 0 && <p className="banner banner-info">{t.soldOutForNow}</p>}
         {cantShipHere && <p className="banner banner-warning" role="note">{t.cantShipTo(new Intl.DisplayNames([lang], { type: "region" }).of(cantShipHere) ?? cantShipHere)}</p>}
+        {product.digital && <p id="instant-download" className="text-sm font-medium">{t.instantDownload}</p>}
         {shipping && (
           <p id="shipping-cost" className="text-sm">
             <span className="font-medium">
@@ -358,7 +359,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
             )}
           </form>
         )}
-        {v?.shipDaysMin != null && v.shipDaysMax != null && (
+        {!product.digital && v?.shipDaysMin != null && v.shipDaysMax != null && (
           <p className="text-sm">{t.arrivesIn(v.shipDaysMin, v.shipDaysMax)}</p>
         )}
         {product.descriptionHtml && <div className="text-muted whitespace-pre-line leading-relaxed">{product.descriptionHtml}</div>}

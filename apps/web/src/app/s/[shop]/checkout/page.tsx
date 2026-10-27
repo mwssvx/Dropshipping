@@ -46,7 +46,8 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
   const initial = saved ? { email: saved.email, ...(saved.address ? Object.fromEntries(Object.entries(saved.address).map(([k, v]) => [k, String(v ?? "")])) : {}) } : undefined;
   // Every rate the buyer could pick, priced for this cart in their currency, so the summary
   // follows the country and rate they choose.
-  const hasGoods = quote.items.some((i) => !i.giftCard);
+  // Gift cards and downloads need no address, shipping or delivery add-ons.
+  const hasGoods = quote.needsShipping;
   // Delivery protection, when the store offers it and something ships. Priced on the items after discounts.
   const protectionMinor = hasGoods && shop.deliveryProtection ? protectionFee(shop.deliveryProtection, quote.goodsMinor - quote.discountMinor) : 0;
   const { zones } = await listShippingZones(await db(), shop.id);

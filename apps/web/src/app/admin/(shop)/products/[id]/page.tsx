@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts, detailsText, MAX_DETAILS, stockHistory, incomingStock, countryName, SHIPPING_COUNTRIES, productSwatches, type StockMovement } from "@sf/core";
+import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts, detailsText, MAX_DETAILS, stockHistory, incomingStock, countryName, SHIPPING_COUNTRIES, productSwatches, digitalFileFor, formatFileSize, MAX_DIGITAL_FILE_BYTES, DOWNLOADS_PER_ITEM, type StockMovement } from "@sf/core";
 import { requireShop, storeAddress, suppliers } from "@/lib/server";
 import { duplicateProductAction, updateProductAction } from "../../../actions";
 import { setUpsellAction } from "../../../growth-actions";
@@ -27,6 +27,7 @@ import { VariantPhotosPanel } from "./VariantPhotosPanel";
 import { BackupPanel, type BackupView } from "./BackupPanel";
 import { StockPanel } from "./StockPanel";
 import { WriteListingButton } from "./WriteListingButton";
+import { DigitalFileForm } from "./DigitalFileForm";
 
 const dateIn = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
 const toPrice = (m: number | null | undefined) => (m == null ? "" : (m / 100).toFixed(2));
@@ -64,6 +65,7 @@ export default async function EditProductPage({ params, searchParams }: { params
     : null;
   const waitingBy = await waitingForProduct(db, shop.id, product.id);
   // The store's own stock keeps a history of every change; imported products follow the supplier.
+  const digitalFile = !found.giftCard && !found.supplierId ? await digitalFileFor(db, found.id) : null;
   const history = !found.sourceUrl && !found.giftCard ? await stockHistory(db, shop.id, found.id) : [];
   const incoming = !found.sourceUrl && !found.giftCard ? await incomingStock(db, shop.id, found.id) : [];
   const preSold = product.preorder ? await preordersSold(db, product.id) : 0;
@@ -176,6 +178,15 @@ export default async function EditProductPage({ params, searchParams }: { params
             // Supplier options are tied to the supplier's listing, and gift card options are amounts.
             optionsEditable: !product.giftCard && !product.variants.some((v) => v.supplierVariantRef),
           }} />
+        {!product.giftCard && !product.supplierId && (
+            <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="digital-heading">
+              <div>
+                <h2 id="digital-heading" className="font-semibold">Digital download</h2>
+                <p className="hint">Sell a file instead of a parcel, like an ebook, a pattern or a printable. Buyers get a link as soon as they pay, which works {DOWNLOADS_PER_ITEM} times for each one bought. Nothing is shipped, so there&apos;s no address check or shipping cost. Up to {formatFileSize(MAX_DIGITAL_FILE_BYTES)}.</p>
+              </div>
+              <DigitalFileForm productId={product.id} file={digitalFile ? { name: digitalFile.name, size: formatFileSize(digitalFile.bytes) } : null} />
+            </section>
+        )}
         <PhotosPanel productId={product.id} title={product.title} photos={productPhotos(product)} texts={product.imageAlts} max={MAX_PHOTOS} textMax={PHOTO_TEXT_MAX} />
         {!product.giftCard && (
           <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="video-heading">

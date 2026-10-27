@@ -19,9 +19,9 @@ export async function pickList(db: Db, shopId: string) {
     : [];
   const productIds = [...new Set(rows.map((r) => r.productId))];
   const products = productIds.length
-    ? await db.query.products.findMany({ where: inArray(schema.products.id, productIds), columns: { id: true, sourceUrl: true, supplierId: true, giftCard: true } })
+    ? await db.query.products.findMany({ where: inArray(schema.products.id, productIds), columns: { id: true, sourceUrl: true, supplierId: true, giftCard: true, digital: true } })
     : [];
-  const own = new Set(products.filter((p) => !p.sourceUrl && !p.supplierId && !p.giftCard).map((p) => p.id));
+  const own = new Set(products.filter((p) => !p.sourceUrl && !p.supplierId && !p.giftCard && !p.digital).map((p) => p.id));
   const variants = new Map(rows.map((r) => [r.id, r]));
   const items = new Map<string, PickItem>();
   let fromSuppliers = 0;

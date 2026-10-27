@@ -942,3 +942,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Returns that never go missing (after launch, part 149)
 
 1. **Every open return shows**: the Returns page used to load the newest 200 returns and split them into "Waiting on you" and "Answered", so on a busy store an old return still waiting could drop off the page. Returns waiting on the merchant are now always all listed, and the answered ones come 50 a page with a search by order number or the buyer's email (`listReturns` and `countReturns` in `packages/core/src/returns.ts`).
+
+### Digital downloads (after launch, part 150)
+
+1. **Sell a file instead of a parcel**: a merchant uploads a file (up to 8 MB, like an ebook, a sewing pattern or a printable) in the new **Digital download** section of one of their own products. The product page then says "Instant download after you pay" instead of a shipping cost, checkout skips shipping, delivery protection and gift wrap when nothing in the cart ships, and a download-only order is marked delivered as soon as it's paid (`setDigitalFile`, `takeDownload` and `orderDownloads` in `packages/core/src/digital.ts`, and `needsShipping` from `quoteCart`).
+2. **The buyer's links**: the order confirmation email and the order page list each file. A link works 5 times for each one bought, stops when the order is refunded, and the merchant can **Give downloads back** from the order page. Digital products are left out of stock counts, restock suggestions, pick lists and customs forms. Files are stored in the database (`digital_files`, migration 0114), so there is nothing extra to set up.

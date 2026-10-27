@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { can, countryName, crossesBorder, disputeEvidence, disputeReason, disputesForOrder, formatMoney, getOrder, orderEditOptions, listRefunds, replaceableLines, replacementBlocked, replacementsOf, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode, formatShipsBy, preorderWaitingOn, isOrderBuyerBlocked } from "@sf/core";
+import { can, countryName, crossesBorder, disputeEvidence, disputeReason, disputesForOrder, formatMoney, getOrder, orderEditOptions, listRefunds, replaceableLines, replacementBlocked, replacementsOf, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode, formatShipsBy, preorderWaitingOn, isOrderBuyerBlocked, orderDownloads, DOWNLOADS_PER_ITEM } from "@sf/core";
 import { BlockBuyerForm } from "./BlockBuyerForm";
 import { fulfillment, requireShop, storeAddress, suppliers, testPayments } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
 import { editOrderAction } from "../../../actions";
+import { resetDownloadsAction } from "../../../digital-actions";
 import { PaymentLinkActions } from "./PaymentLinkActions";
 import { CheckTrackingButton, DeliveredButton, ManualTrackingForm, PickupButtons, RetryButton } from "./FulfillmentActions";
 import { RefundForm } from "./RefundForm";
@@ -18,15 +19,16 @@ import { PageHeader } from "../../PageHeader";
 
 const when = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" });
 
-export default async function OrderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ link?: string; replacement?: string }> }) {
+export default async function OrderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ link?: string; replacement?: string; downloads?: string }> }) {
   const { id } = await params;
-  const { link, replacement: justSent } = await searchParams;
+  const { link, replacement: justSent, downloads: downloadsReset } = await searchParams;
   const { shop, db, role } = await requireShop("orders");
   const seesMoney = can(role, "money");
   const order = await getOrder(db, shop.id, id).catch((e) => {
     if (e instanceof NotFoundError) notFound();
     throw e;
   });
+  const downloads = await orderDownloads(db, order.id);
   const money = (m: number) => formatMoney(m, order.currency);
   const cost = order.lines.reduce((s, l) => s + (l.unitCostMinor ?? 0) * l.quantity, 0);
   const knownCost = order.lines.every((l) => l.unitCostMinor != null);
@@ -253,6 +255,26 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
               {f.status === "failed" && can(role, "assistant") && <FixWithAiButton orderId={order.id} />}
             </section>
           ))}
+          {downloads.length > 0 && (
+            <section id="downloads" className="card p-5 flex flex-col gap-3" aria-labelledby="downloads-heading">
+              <h2 id="downloads-heading" className="font-semibold">Downloads</h2>
+              {downloadsReset && <p className="banner banner-success" role="status">Done. Every link on this order works {DOWNLOADS_PER_ITEM} times again for each one bought.</p>}
+              <ul className="text-sm flex flex-col gap-1">
+                {downloads.map((d) => (
+                  <li key={d.lineId} className="flex justify-between gap-2">
+                    <span>{d.title} <span className="hint">· {d.fileName}</span></span>
+                    <span className="num">Downloaded {d.used} of {d.allowed} times</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="hint text-sm">The buyer downloads from their order page and their confirmation email. If they used up their downloads, you can give them back.</p>
+              {downloads.some((d) => d.used > 0) && (
+                <form action={resetDownloadsAction.bind(null, order.id)}>
+                  <button type="submit" className="btn btn-secondary">Give downloads back</button>
+                </form>
+              )}
+            </section>
+          )}
           {order.pickup ? (
             <section className="card p-5 flex flex-col gap-3" aria-labelledby="pickup-heading">
               <h2 id="pickup-heading" className="font-semibold">Picking up</h2>
