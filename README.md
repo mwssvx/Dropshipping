@@ -1124,3 +1124,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Sign-up pop-up (after launch, part 191)
 
 1. **A pop-up for new visitors** (`packages/core/src/signup-popup.ts`, Marketing → Sign-up pop-up): pick whether a small window asking for an email opens 5, 15, 30 or 60 seconds after a visitor arrives, or never. It shows the welcome offer when you have one, opens once per browser, never on the cart, checkout, payment or account pages or over another window, and not again after the visitor closes it, says no thanks or signs up. Signed-in subscribers don't see it. Signups go through the same confirm-by-email step as the home page form, in the store's language. Store files carry the setting.
+
+### Gift cards for someone else (after launch, part 192)
+
+1. **Send a gift card to a friend** (`packages/core/src/gift-cards.ts`, checkout → Send the gift card to someone): a buyer with gift cards in the cart can tick the box and give the recipient's email, their name, who it's from and a message. The code goes straight to the recipient, not the buyer, and the buyer gets an email saying where it went. Picking a day up to 90 days ahead holds the card until then: the daily job emails it that morning (UTC) with a fresh code, once, and tries again the next day if the email fails. Gift cards → the card shows "Sends on" its day until then, and "Send new code" sends it right away.

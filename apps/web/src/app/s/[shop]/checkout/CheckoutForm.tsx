@@ -35,7 +35,8 @@ function Field({ id, label, values, ...rest }: { id: string; label: string; valu
 export type CheckoutText = Record<
   | "checkout" | "orderSummary" | "contact" | "newsAndOffers" | "delivery" | "email" | "fullName" | "address" | "address2" | "city" | "region" | "phone"
   | "postalCode" | "country" | "shipping" | "noShipping" | "placeOrder" | "continueToPayment" | "continuing" | "notAvailable" | "tax"
-  | "giftCheckbox" | "giftFrom" | "giftMessage" | "giftRecipientEmail" | "giftNote" | "orderNote",
+  | "giftCheckbox" | "giftFrom" | "giftMessage" | "giftRecipientEmail" | "giftNote" | "orderNote"
+  | "giftCardTo" | "giftCardEmail" | "giftCardName" | "giftCardFrom" | "giftCardMessage" | "giftCardSendOn" | "giftCardNote",
   string
 >;
 
@@ -64,6 +65,8 @@ type Props = {
   giftWrap?: ExtraChoice | null;
   /** The "I'm old enough" box and its note, when something in the cart has a minimum age. */
   ageCheck?: { checkbox: string; note: string } | null;
+  /** The days a gift card in the cart can be sent on ("2026-10-28"), or null when there's none. */
+  giftCardDays?: { min: string; max: string } | null;
   /** Null when the store doesn't ask for tips, or nothing ships. */
   tips?: TipChoice | null;
   /** The buyer's currency, for the total as it changes. */
@@ -133,7 +136,7 @@ export function Checkout({ summary, footer, taxLabel, totalLabel, totalWithoutSh
 }
 
 function CheckoutForm({
-  handle, text: t, initial, askPhone, paidByGiftCard, countries, zones, country, onCountry, onPostal, rates, rate, onRate, protection, protect, onProtect, giftWrap, ageCheck, gift, onGift, wrap, onWrap, tips, tipPercent, onTip,
+  handle, text: t, initial, askPhone, paidByGiftCard, countries, zones, country, onCountry, onPostal, rates, rate, onRate, protection, protect, onProtect, giftWrap, ageCheck, gift, onGift, wrap, onWrap, tips, tipPercent, onTip, giftCardDays,
 }: Omit<Props, "summary" | "footer" | "taxLabel" | "totalLabel" | "totalWithoutShipping" | "defaultCountry" | "currency"> & {
   country: string;
   onCountry: (c: string) => void;
@@ -221,6 +224,7 @@ function CheckoutForm({
         </label>
       )}
       {zones && <GiftFields t={t} values={v} gift={gift} onGift={onGift} wrapChoice={giftWrap ?? null} wrap={wrap} onWrap={onWrap} />}
+      {giftCardDays && <GiftCardFields t={t} values={v} days={giftCardDays} />}
       {zones && tips && (
         <fieldset className="flex flex-col gap-2">
           <legend className="font-semibold mb-2">{tips.heading}</legend>
@@ -252,6 +256,37 @@ function CheckoutForm({
         {pending ? t.continuing : paidByGiftCard ? t.placeOrder : t.continueToPayment}
       </button>
     </form>
+  );
+}
+
+/** "Send the gift card to someone": who gets the code, who it's from, a message and the day it goes out. */
+function GiftCardFields({ t, values, days }: { t: CheckoutText; values?: Record<string, string>; days: { min: string; max: string } }) {
+  const [on, setOn] = useState(values?.giftCardTo === "on");
+  return (
+    <fieldset className="flex flex-col gap-4">
+      <label className="flex items-center gap-2">
+        <input type="checkbox" name="giftCardTo" checked={on} onChange={(e) => setOn(e.target.checked)} />
+        <span className="font-semibold">{t.giftCardTo}</span>
+      </label>
+      {on && (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field id="giftCardEmail" label={t.giftCardEmail} type="email" required values={values} />
+            <Field id="giftCardName" label={t.giftCardName} maxLength={60} values={values} />
+          </div>
+          <Field id="giftCardFrom" label={t.giftCardFrom} autoComplete="name" required maxLength={60} values={values} />
+          <div className="field">
+            <label className="label" htmlFor="giftCardMessage">{t.giftCardMessage}</label>
+            <textarea className="input" id="giftCardMessage" name="giftCardMessage" rows={3} maxLength={300} defaultValue={values?.giftCardMessage} />
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="giftCardSendOn">{t.giftCardSendOn}</label>
+            <input className="input" type="date" id="giftCardSendOn" name="giftCardSendOn" min={days.min} max={days.max} defaultValue={values?.giftCardSendOn} />
+          </div>
+          <p className="hint text-sm">{t.giftCardNote}</p>
+        </>
+      )}
+    </fieldset>
   );
 }
 

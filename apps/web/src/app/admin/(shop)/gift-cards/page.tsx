@@ -101,7 +101,7 @@ export default async function GiftCardsPage({ searchParams }: { searchParams: Pr
                       </span>
                       <span className="text-sm hint">
                         {c.email} · {c.orderNumber ? `Bought on order #${c.orderNumber}` : "Given by you"} · {date.format(c.createdAt)}
-                        {!c.sentAt && " · Email not sent"}
+                        {!c.sentAt && (c.scheduledFor ? ` · Sends on ${c.scheduledFor.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" })}` : " · Email not sent")}
                       </span>
                     </div>
                     <span className="num text-sm">{money(c.balanceMinor)} left of {money(c.initialMinor)}</span>

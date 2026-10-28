@@ -384,10 +384,32 @@ const giftSchema = z.object({
     .refine((e) => e === null || z.string().email().safeParse(e).success, "Enter the recipient's email, or leave it empty."),
 });
 
+/** How far ahead a gift card can be set to arrive. */
+export const GIFT_CARD_SEND_DAYS = 90;
+const DAY_MS = 86_400_000;
+
+// A gift card bought for someone else: emailed to them now, or on the day picked (UTC). A day
+// already here (or passed, in the buyer's own time zone) sends it now.
+const giftCardDeliverySchema = z.object({
+  email: z.string().trim().toLowerCase().email("Enter the email to send the gift card to."),
+  name: z.string().trim().max(60, "Keep the recipient's name under 60 characters.").optional().transform((n) => n || null),
+  from: z.string().trim().min(1, "Add who the gift card is from.").max(60, "Keep the name under 60 characters."),
+  message: z.string().trim().max(300, "Keep the gift card message under 300 characters.").optional().transform((m) => m || null),
+  sendOn: z
+    .string()
+    .trim()
+    .optional()
+    .transform((d) => d || null)
+    .refine((d) => d === null || (/^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(`${d}T00:00:00Z`)) && new Date(`${d}T00:00:00Z`).toISOString().startsWith(d)), "Pick the day to send the gift card.")
+    .refine((d) => d === null || Date.parse(`${d}T00:00:00Z`) <= Date.now() + GIFT_CARD_SEND_DAYS * DAY_MS, `Gift cards can be sent up to ${GIFT_CARD_SEND_DAYS} days ahead.`)
+    .transform((d) => (d && Date.parse(`${d}T00:00:00Z`) > Date.now() ? d : null)),
+});
+
 const checkoutSchema = z.object({
   email: z.string().trim().toLowerCase().email("Enter a valid email so we can send your receipt."),
   address: addressSchema,
   gift: giftSchema.nullish(),
+  giftCardTo: giftCardDeliverySchema.nullish(),
   note: z.string().trim().max(500, "Keep your note under 500 characters.").nullish().transform((n) => n || null),
 });
 
@@ -413,6 +435,8 @@ export async function startCheckout(
     shippingRateId?: string | null;
     /** The buyer ticked "This order is a gift". */
     gift?: z.input<typeof giftSchema> | null;
+    /** The buyer is sending the gift cards in the cart to someone else. */
+    giftCardTo?: z.input<typeof giftCardDeliverySchema> | null;
     /** "Note for the store", for the merchant. */
     note?: string | null;
     /**
@@ -620,6 +644,7 @@ export async function startCheckout(
         localDelivery: cart.deliveringLocally,
         // Only something that ships can be a gift; gift cards are emailed to the buyer.
         gift: gift && cart.needsShipping ? gift : null,
+        giftCardDelivery: parsed.data.giftCardTo && cart.items.some((i) => i.giftCard) ? parsed.data.giftCardTo : null,
         buyerNote: parsed.data.note,
         taxExemptId,
         ...(followUp ? { source: "post_purchase" as const, parentOrderId: followUp.parentOrderId } : {}),

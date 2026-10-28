@@ -1,6 +1,6 @@
 import { PixelEvent } from "@/components/PixelEvent";
 import { redirect } from "next/navigation";
-import { addonOffer, convertAmount, convertPrice, protectionFee, countryName, fitsWeight, formatMoney, lastCheckoutDetails, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, onHoliday, LOCAL_DELIVERY_RATE_ID, localDeliveryPrice, PICKUP_RATE_ID, storePixels, taxExemptionFor, tipAmount, UserError } from "@sf/core";
+import { addonOffer, convertAmount, convertPrice, protectionFee, countryName, fitsWeight, formatMoney, GIFT_CARD_SEND_DAYS, lastCheckoutDetails, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, onHoliday, LOCAL_DELIVERY_RATE_ID, localDeliveryPrice, PICKUP_RATE_ID, storePixels, taxExemptionFor, tipAmount, UserError } from "@sf/core";
 import { buyerFx } from "@/lib/currency";
 import { currentBuyer } from "@/lib/buyer";
 import { readCart, readDiscountCode, readGiftCardCode } from "@/lib/cart";
@@ -117,7 +117,10 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
           shipping: t.shipping, noShipping: t.noShipping, placeOrder: t.placeOrder, continueToPayment: t.continueToPayment, continuing: t.continuing,
           notAvailable: t.notAvailable, tax: t.tax, giftCheckbox: t.giftCheckbox, giftFrom: t.giftFrom, giftMessage: t.giftMessage,
           giftRecipientEmail: t.giftRecipientEmail, giftNote: t.giftNote, orderNote: t.orderNote,
+          giftCardTo: t.giftCardTo, giftCardEmail: t.giftCardEmail, giftCardName: t.giftCardName, giftCardFrom: t.giftCardFrom,
+          giftCardMessage: t.giftCardMessage, giftCardSendOn: t.giftCardSendOn, giftCardNote: t.giftCardNote,
         }}
+        giftCardDays={quote.items.some((i) => i.giftCard) ? { min: new Date().toISOString().slice(0, 10), max: new Date(Date.now() + GIFT_CARD_SEND_DAYS * 86_400_000).toISOString().slice(0, 10) } : null}
         taxLabel={exempt ? t.taxExempt : quote.pricesIncludeTax ? t.taxIncluded : t.taxNextStep}
         totalLabel={exempt || quote.pricesIncludeTax ? t.total : t.totalBeforeTax}
         totalWithoutShipping={money(withoutShipping.totalMinor)}
