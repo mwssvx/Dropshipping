@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { can, formatMoney, listCollections, PRODUCT_PAGE_SIZE, PRODUCT_SORTS, type ProductStockFilter, productPage, productTags, recentBulkEdits, runningLow, soldOutAtSupplier } from "@sf/core";
+import { can, formatMoney, listCollections, PRODUCT_PAGE_SIZE, PRODUCT_SORTS, type ProductSource, productSources, type ProductStockFilter, productPage, productTags, recentBulkEdits, runningLow, soldOutAtSupplier } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { BulkProducts, type BulkRow } from "./BulkProducts";
@@ -14,6 +14,7 @@ export const metadata = { title: "Products" };
 
 const STATUSES = [["active", "On sale"], ["draft", "Drafts"], ["archived", "Archived"]] as const;
 const STOCK: (readonly [ProductStockFilter, string])[] = [["in_stock", "In stock"], ["low", "Running low"], ["sold_out", "Sold out"]];
+const SOURCES: (readonly [ProductSource, string])[] = [["supplier", "From suppliers"], ["own", "Your own stock"], ["digital", "Downloads"], ["gift_card", "Gift cards"]];
 const SORTS = [
   ["newest", "Newest first"],
   ["oldest", "Oldest first"],
@@ -24,29 +25,33 @@ const SORTS = [
   ["price_desc", "Price, high to low"],
 ] as const;
 
-export default async function ProductsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; tag?: string; stock?: string; sort?: string; page?: string }> }) {
+export default async function ProductsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; tag?: string; stock?: string; source?: string; sort?: string; page?: string }> }) {
   const { shop, db, role } = await requireShop("products");
   const params = await searchParams;
   const q = params.q?.trim() || undefined;
   const status = STATUSES.find(([s]) => s === params.status)?.[0];
   const tag = params.tag?.trim().toLowerCase().slice(0, 30) || undefined;
   const stock = STOCK.find(([s]) => s === params.stock)?.[0];
+  const source = SOURCES.find(([s]) => s === params.source)?.[0];
   // Newest first is the default, so it's left out of links.
   const sort = PRODUCT_SORTS.find((s) => s === params.sort && s !== "newest");
   const page = Math.max(1, Math.min(10_000, Math.floor(Number(params.page)) || 1));
-  const [{ products, total }, collections, recent, soldOut, low, tags] = await Promise.all([
-    productPage(db, shop.id, { query: q, status, tag, stock, sort, page }),
+  const [{ products, total }, collections, recent, soldOut, low, tags, sources] = await Promise.all([
+    productPage(db, shop.id, { query: q, status, tag, stock, source, sort, page }),
     listCollections(db, shop.id),
     recentBulkEdits(db, shop.id),
     soldOutAtSupplier(db, shop.id),
     runningLow(db, shop.id),
     productTags(db, shop.id),
+    productSources(db, shop.id),
   ]);
-  const filtered = !!(q || status || tag || stock);
+  const filtered = !!(q || status || tag || stock || source);
+  // The source filter only shows when the store has products from more than one place.
+  const shownSources = SOURCES.filter(([s]) => sources[s] > 0 || source === s);
   const pages = Math.ceil(total / PRODUCT_PAGE_SIZE);
   // Keeps the other filters when one changes; a new filter starts at page 1.
-  const href = (next: { q?: string; status?: string; tag?: string; stock?: string; page?: number }) => {
-    const merged = { q, status, tag, stock, sort, ...next, page: next.page && next.page > 1 ? String(next.page) : undefined };
+  const href = (next: { q?: string; status?: string; tag?: string; stock?: string; source?: string; page?: number }) => {
+    const merged = { q, status, tag, stock, source, sort, ...next, page: next.page && next.page > 1 ? String(next.page) : undefined };
     const out = new URLSearchParams(Object.entries(merged).filter((e): e is [string, string] => !!e[1]));
     return out.size ? `/admin/products?${out}` : "/admin/products";
   };
@@ -116,6 +121,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
               {status && <input type="hidden" name="status" value={status} />}
               {tag && <input type="hidden" name="tag" value={tag} />}
               {stock && <input type="hidden" name="stock" value={stock} />}
+              {source && <input type="hidden" name="source" value={source} />}
               <button className="btn btn-secondary">Search</button>
               <AutoSubmitSelect id="product-sort" label="Sort products" value={sort ?? "newest"} options={SORTS} />
             </form>
@@ -132,6 +138,16 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                 <Link key={s} href={href({ stock: stock === s ? undefined : s })} className={`chip text-sm ${stock === s ? "font-semibold border-accent" : ""}`} aria-current={stock === s ? "page" : undefined}>{label}</Link>
               ))}
             </nav>
+            {shownSources.length > 1 && (
+              <nav className="flex flex-wrap gap-1 items-center" aria-label="Filter by source">
+                <span className="hint text-sm mr-1">Source</span>
+                {shownSources.map(([s, label]) => (
+                  <Link key={s} href={href({ source: source === s ? undefined : s })} className={`chip text-sm ${source === s ? "font-semibold border-accent" : ""}`} aria-current={source === s ? "page" : undefined}>
+                    {label} <span className="hint num">{sources[s]}</span>
+                  </Link>
+                ))}
+              </nav>
+            )}
             {stock === "low" && <p className="hint text-sm">Still for sale, with an option at {shop.restockAlertAt} or fewer left. Change the number under Running-low email below.</p>}
             {tags.length > 0 && (
               <nav className="flex flex-wrap gap-1 items-center" aria-label="Filter by tag">
@@ -145,7 +161,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
             )}
             {can(role, "export") && (
               <p className="text-sm">
-                <a className="underline" href={`/admin/export/products.csv${filtered ? `?${new URLSearchParams(Object.entries({ q, status, tag, stock }).filter((e): e is [string, string] => !!e[1]))}` : ""}`} download>
+                <a className="underline" href={`/admin/export/products.csv${filtered ? `?${new URLSearchParams(Object.entries({ q, status, tag, stock, source }).filter((e): e is [string, string] => !!e[1]))}` : ""}`} download>
                   Download {filtered ? "these products" : "all products"} as a spreadsheet
                 </a>
               </p>

@@ -1024,3 +1024,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Download the products the list shows (after launch, part 166)
 
 1. **These products**: the Products page has "Download these products as a spreadsheet", which holds only the products its search, status, tags and stock filter show, with every option of each. Filter to Sold out, download, fill in the new stock, and upload it back under "Change prices and stock from a spreadsheet". With no filter it's every product, as before (`productWhere` in `packages/core/src/products.ts`, shared by the list and `productsCsv`; no migration).
+
+### Product source filter (after launch, part 167)
+
+1. **Source**: when a store has products from more than one place, the Products page filters to those a supplier ships, the store's own stock, downloads, or gift cards, with a count on each. It works with the other filters, the sort, pages and the spreadsheet download (`PRODUCT_SOURCES` and `productSources` in `packages/core/src/products.ts`; no migration).

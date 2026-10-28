@@ -1,4 +1,4 @@
-import { PRODUCT_STOCK_FILTERS, productsCsv } from "@sf/core";
+import { PRODUCT_SOURCES, PRODUCT_STOCK_FILTERS, productsCsv } from "@sf/core";
 import { requireShop } from "@/lib/server";
 
 const STATUSES = ["active", "draft", "archived"] as const;
@@ -12,6 +12,7 @@ export async function GET(request: Request) {
     status: STATUSES.find((s) => s === params.get("status")),
     tag: params.get("tag")?.trim().toLowerCase().slice(0, 30) || undefined,
     stock: PRODUCT_STOCK_FILTERS.find((s) => s === params.get("stock")),
+    source: PRODUCT_SOURCES.find((s) => s === params.get("source")),
   };
   return new Response(await productsCsv(db, shop.id, list), {
     headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="${shop.handle}-products.csv"`, "cache-control": "no-store" },
