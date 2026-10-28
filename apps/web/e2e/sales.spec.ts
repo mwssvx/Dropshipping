@@ -68,6 +68,11 @@ test("a merchant runs a sale and ends it", async ({ page, browser }, info) => {
   await buyer.getByRole("button", { name: /^Pay/ }).click();
   await expect(buyer.getByRole("heading", { name: "Thank you, Ada!" })).toBeVisible();
 
+  // Kept on for another week (Cyber Monday too): it now ends June 8.
+  await spring.getByLabel("Keep it on for another").selectOption("7");
+  await spring.getByRole("button", { name: "Keep it on" }).click();
+  await expect(spring).toContainText(/to Jun 8,/);
+
   // Ended: the price goes back.
   await spring.getByRole("button", { name: "End now" }).click();
   await expect(spring).toContainText("Ended");

@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createSale, deleteSale, endEarlyAccess, endSale, giveEarlyAccess, sendPriceDrops, setLowestPriceNote, UserError } from "@sf/core";
+import { createSale, deleteSale, endEarlyAccess, endSale, extendSale, giveEarlyAccess, sendPriceDrops, setLowestPriceNote, UserError } from "@sf/core";
 import { requireShop, stock } from "@/lib/server";
 
 export type SaleState = { error?: string; message?: string; key?: number };
@@ -52,6 +52,17 @@ export async function endSaleAction(id: string) {
   await endSale(db, shop.id, id).catch((e) => {
     if (!(e instanceof UserError)) throw e;
   });
+  refresh(shop.handle);
+}
+
+export async function extendSaleAction(id: string, form: FormData) {
+  const { shop, db } = await requireShop("marketing");
+  try {
+    await extendSale(db, shop.id, id, Number(form.get("days") ?? ""));
+  } catch (e) {
+    if (!(e instanceof UserError)) throw e;
+    redirect(`/admin/sales?error=${encodeURIComponent(e.message)}`);
+  }
   refresh(shop.handle);
 }
 

@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { bundleProductChoices, EARLY_ACCESS_HOURS, formatMoney, listCollections, listSales, MAX_SALES, saleResults, type SaleOutcome } from "@sf/core";
+import { bundleProductChoices, EARLY_ACCESS_HOURS, formatMoney, listCollections, listSales, MAX_SALES, SALE_EXTEND_DAYS, saleResults, type SaleOutcome } from "@sf/core";
 import { requireShop, storeAddress } from "@/lib/server";
-import { deleteSaleAction, endEarlyAccessAction, endSaleAction, giveEarlyAccessAction } from "../../sale-actions";
+import { deleteSaleAction, endEarlyAccessAction, endSaleAction, extendSaleAction, giveEarlyAccessAction } from "../../sale-actions";
 import { PageHeader } from "../PageHeader";
 import { SaleForm } from "./SaleForm";
 import { LowestPriceForm } from "./LowestPriceForm";
@@ -55,6 +55,18 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
                   </form>
                 )}
                 {s.status === "scheduled" && <EarlyAccess sale={s} store={store} />}
+                {s.status !== "ended" && s.endsAt && (
+                  <form action={extendSaleAction.bind(null, s.id)} className="basis-full flex flex-wrap items-end gap-3 border-t border-border pt-3" aria-label={`Keep ${s.title} on longer`}>
+                    <div className="field">
+                      <label className="label" htmlFor={`days-${s.id}`}>Keep it on for another</label>
+                      <select className="input" id={`days-${s.id}`} name="days" defaultValue="1">
+                        {SALE_EXTEND_DAYS.map((d) => <option key={d} value={d}>{d === 7 ? "week" : d === 1 ? "day" : `${d} days`}</option>)}
+                      </select>
+                    </div>
+                    <button className="btn btn-secondary btn-sm">Keep it on</button>
+                    {s.countdown && <p className="hint text-sm basis-full">The countdown on your store moves to the new end. Buyers notice a sale that keeps “ending”, so do this once at most.</p>}
+                  </form>
+                )}
               </li>
             ))}
           </ul>
