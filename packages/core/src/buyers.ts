@@ -160,7 +160,7 @@ export type CustomerFilter = (typeof CUSTOMER_FILTERS)[number];
 /** Days without an order before a buyer counts as lapsed. */
 export const LAPSED_DAYS = 90;
 
-type CustomerQuery = { query?: string; tag?: string; filter?: CustomerFilter; country?: string; now?: Date };
+type CustomerQuery = { query?: string; tag?: string; filter?: CustomerFilter; country?: string; discountId?: string; now?: Date };
 
 /** One row per customer the merchant should see, with what they've bought. */
 function customerRows(db: Db, shopId: string, opts: CustomerQuery) {
@@ -170,6 +170,8 @@ function customerRows(db: Db, shopId: string, opts: CustomerQuery) {
   const since = new Date((opts.now ?? new Date()).getTime() - LAPSED_DAYS * 86_400_000);
   // Bought at least once with delivery to this country (two letters).
   const country = opts.country && /^[A-Z]{2}$/i.test(opts.country) ? opts.country.toUpperCase() : undefined;
+  // Paid for an order with this discount code.
+  const discountId = opts.discountId && /^[0-9a-f-]{36}$/i.test(opts.discountId) ? opts.discountId : undefined;
   const filter =
     opts.filter === "repeat"
       ? sql`${paidCount} > 1`
@@ -208,6 +210,7 @@ function customerRows(db: Db, shopId: string, opts: CustomerQuery) {
         sql`(count(${schema.orders.id}) > 0 or bool_or(${schema.customers.acceptsMarketing}) or max(${schema.customers.lastSignInAt}) is not null or max(${schema.customers.name}) is not null or bool_or(${schema.customers.wholesaleStatus} = 'approved') or max(jsonb_array_length(${schema.customers.tags})) > 0)`,
         filter,
         country ? sql`bool_or(${schema.orders.shippingAddress}->>'country' = ${country} and ${schema.orders.paymentStatus} in ${PAID_SQL})` : undefined,
+        discountId ? sql`bool_or(${schema.orders.discountId} = ${discountId} and ${schema.orders.paymentStatus} in ${PAID_SQL})` : undefined,
       ),
     );
 }

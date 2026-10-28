@@ -78,7 +78,7 @@ export default async function MarketingPage() {
                     <span className="hint num w-full sm:w-auto">
                       Used {d.used} {d.used === 1 ? "time" : "times"}
                       {d.used > 0 && ` · ${money(d.salesMinor)} in sales · ${money(d.discountedMinor)} off`}
-                      {d.used > 0 && <> · <Link href={`/admin/orders?code=${d.id}`} className="underline" aria-label={`See orders that used ${d.code}`}>See orders</Link></>}
+                      {d.used > 0 && <> · <Link href={`/admin/orders?code=${d.id}`} className="underline" aria-label={`See orders that used ${d.code}`}>See orders</Link> · <Link href={`/admin/customers?code=${d.id}`} className="underline" aria-label={`See customers who used ${d.code}`}>See customers</Link></>}
                     </span>
                     <form action={setDiscountActiveAction.bind(null, d.id, !d.active)}>
                       <button className="hint hover:text-ink" aria-label={`${d.active ? "Turn off" : "Turn on"} ${d.code}`}>{d.active ? "Turn off" : "Turn on"}</button>
