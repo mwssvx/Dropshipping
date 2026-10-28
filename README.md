@@ -1112,3 +1112,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Customers who bought a product (after launch, part 188)
 
 1. **See buyers on a product**: a product's page gets "See buyers" next to "See orders". It opens the customer list showing only people who paid for an order with that product in it, so you can tag them or send them a code for something that goes with it. Unpaid orders don't count, and a buyer still shows with all their orders. The list keeps the product when you search, tag everyone, save a view or download the spreadsheet, and "Show everyone" clears it.
+
+### Customers by amount spent (after launch, part 189)
+
+1. **Spent at least**: the customer list gets a menu that shows only people who spent at least $50, $100, $250, $500 or $1,000 with the store (in the store's currency), counting paid orders minus what was refunded. Use it to tag your best buyers as VIPs and send them a code. Like the "Most spent" sort, it's only there for staff who can see money. The list keeps it when you search, tag everyone, save a view or download the spreadsheet.

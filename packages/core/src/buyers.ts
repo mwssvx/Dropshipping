@@ -160,7 +160,13 @@ export type CustomerFilter = (typeof CUSTOMER_FILTERS)[number];
 /** Days without an order before a buyer counts as lapsed. */
 export const LAPSED_DAYS = 90;
 
-type CustomerQuery = { query?: string; tag?: string; filter?: CustomerFilter; country?: string; discountId?: string; productId?: string; now?: Date };
+/** "Spent at least" choices for the customer list, in minor units of the store's currency. */
+export const CUSTOMER_SPENT = [5000, 10000, 25000, 50000, 100000] as const;
+export type CustomerSpent = (typeof CUSTOMER_SPENT)[number];
+/** Reads the list's spent=… value, or undefined when it isn't one of the choices. */
+export const spentParam = (value: string | null | undefined): CustomerSpent | undefined => CUSTOMER_SPENT.find((n) => String(n) === value);
+
+type CustomerQuery = { query?: string; tag?: string; filter?: CustomerFilter; country?: string; discountId?: string; productId?: string; minSpentMinor?: number; now?: Date };
 
 /** One row per customer the merchant should see, with what they've bought. */
 function customerRows(db: Db, shopId: string, opts: CustomerQuery) {
@@ -213,6 +219,9 @@ function customerRows(db: Db, shopId: string, opts: CustomerQuery) {
         filter,
         country ? sql`bool_or(${schema.orders.shippingAddress}->>'country' = ${country} and ${schema.orders.paymentStatus} in ${PAID_SQL})` : undefined,
         discountId ? sql`bool_or(${schema.orders.discountId} = ${discountId} and ${schema.orders.paymentStatus} in ${PAID_SQL})` : undefined,
+        opts.minSpentMinor && opts.minSpentMinor > 0
+          ? sql`coalesce(sum(${schema.orders.totalMinor} - ${schema.orders.refundedMinor}) filter (where ${schema.orders.paymentStatus} in ${PAID_SQL}), 0) >= ${opts.minSpentMinor}`
+          : undefined,
         productId
           ? sql`bool_or(${schema.orders.paymentStatus} in ${PAID_SQL} and exists (select 1 from order_lines ol join variants v on v.id = ol.variant_id where ol.order_id = ${schema.orders.id} and v.product_id = ${productId}))`
           : undefined,

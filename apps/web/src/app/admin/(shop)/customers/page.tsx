@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { can, countryName, CUSTOMER_FILTERS, CUSTOMER_PAGE_SIZE, CUSTOMER_SORTS, LAPSED_DAYS, customerCountries, customerTags, customerTotals, describeTagRule, formatMoney, listCustomers, listSavedViews, listTagRules, productChoices, MAX_TAG_RULES } from "@sf/core";
+import { can, countryName, CUSTOMER_FILTERS, CUSTOMER_PAGE_SIZE, CUSTOMER_SORTS, LAPSED_DAYS, customerCountries, customerTags, customerTotals, describeTagRule, formatMoney, listCustomers, listSavedViews, listTagRules, productChoices, MAX_TAG_RULES, CUSTOMER_SPENT, spentParam } from "@sf/core";
 import { AutoSubmitSelect } from "@/components/AutoSubmitSelect";
 import { SavedViews } from "@/components/SavedViews";
 import { requireShop } from "@/lib/server";
@@ -27,21 +27,23 @@ const FILTERS = [
 
 const date = (d: Date | null) => (d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "No orders yet");
 
-export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string; tag?: string; filter?: string; country?: string; code?: string; product?: string; sort?: string; erased?: string; page?: string }> }) {
+export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string; tag?: string; filter?: string; country?: string; code?: string; product?: string; spent?: string; sort?: string; erased?: string; page?: string }> }) {
   const { shop, db, role } = await requireShop("customers");
-  const { q, tag, filter: filterParam, country: countryParam, code: codeParam, product: productParam, sort: sortParam, erased, page: pageParam } = await searchParams;
+  const { q, tag, filter: filterParam, country: countryParam, code: codeParam, product: productParam, spent: spentValue, sort: sortParam, erased, page: pageParam } = await searchParams;
   const filter = CUSTOMER_FILTERS.find((f) => f === filterParam);
   const country = /^[A-Z]{2}$/.test(countryParam ?? "") ? countryParam : undefined;
   const discountId = /^[0-9a-f-]{36}$/i.test(codeParam ?? "") ? codeParam : undefined;
   const productId = /^[0-9a-f-]{36}$/i.test(productParam ?? "") ? productParam : undefined;
   const seesMoney = can(role, "money");
+  // Like the "Most spent" sort, only for staff who see money.
+  const spent = seesMoney ? spentParam(spentValue) : undefined;
   // Staff who can't see money can't rank customers by it either. The default is left out of links.
   const sorts = SORTS.filter(([s]) => seesMoney || s !== "spent");
   const sort = CUSTOMER_SORTS.find((s) => s === sortParam && s !== "recent" && sorts.some(([x]) => x === s));
   const page = Math.max(1, Math.min(10_000, Math.floor(Number(pageParam)) || 1));
   const [customers, totals, tags, rules, products, views, countries, discount, bought] = await Promise.all([
-    listCustomers(db, shop.id, { query: q, tag, filter, country, discountId, productId, sort, limit: CUSTOMER_PAGE_SIZE, offset: (page - 1) * CUSTOMER_PAGE_SIZE }),
-    customerTotals(db, shop.id, { query: q, tag, filter, country, discountId, productId }),
+    listCustomers(db, shop.id, { query: q, tag, filter, country, discountId, productId, minSpentMinor: spent, sort, limit: CUSTOMER_PAGE_SIZE, offset: (page - 1) * CUSTOMER_PAGE_SIZE }),
+    customerTotals(db, shop.id, { query: q, tag, filter, country, discountId, productId, minSpentMinor: spent }),
     customerTags(db, shop.id),
     listTagRules(db, shop.id),
     productChoices(db, shop.id),
@@ -50,10 +52,10 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
     discountId ? db.query.discounts.findFirst({ where: (d, { and, eq }) => and(eq(d.id, discountId), eq(d.shopId, shop.id)), columns: { id: true, code: true } }) : null,
     productId ? db.query.products.findFirst({ where: (p, { and, eq }) => and(eq(p.id, productId), eq(p.shopId, shop.id)), columns: { id: true, title: true } }) : null,
   ]);
-  const filtered = !!(q || tag || filter || country || discountId || productId);
+  const filtered = !!(q || tag || filter || country || discountId || productId || spent);
   /** A link to the list with some of the search, tag, filter and sort changed; a change goes back to page 1. */
-  const listHref = (next: { q?: string; tag?: string; filter?: string; country?: string; code?: string; product?: string; sort?: string; page?: number }) => {
-    const merged = { q, tag, filter, country, code: discountId, product: productId, sort, ...next, page: next.page && next.page > 1 ? String(next.page) : undefined };
+  const listHref = (next: { q?: string; tag?: string; filter?: string; country?: string; code?: string; product?: string; spent?: string; sort?: string; page?: number }) => {
+    const merged = { q, tag, filter, country, code: discountId, product: productId, spent: spent ? String(spent) : undefined, sort, ...next, page: next.page && next.page > 1 ? String(next.page) : undefined };
     const params = new URLSearchParams(Object.entries(merged).filter((e): e is [string, string] => !!e[1]));
     return params.size ? `/admin/customers?${params}` : "/admin/customers";
   };
@@ -75,7 +77,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             {totals.customers.toLocaleString("en-US")} {totals.customers === 1 ? "customer" : "customers"} · {totals.repeat.toLocaleString("en-US")} bought more than once · {totals.accounts.toLocaleString("en-US")} signed in to their account
           </p>
         )}
-        <SavedViews list="customers" views={views} params={{ q, tag, filter, country, code: discountId, product: productId, sort }} />
+        <SavedViews list="customers" views={views} params={{ q, tag, filter, country, code: discountId, product: productId, spent: spent ? String(spent) : undefined, sort }} />
         <form className="flex flex-wrap gap-2 max-w-2xl" role="search">
           <label className="sr-only" htmlFor="q">Search customers</label>
           <input className="input flex-1 min-w-40" id="q" name="q" type="search" defaultValue={q} placeholder="Name or email" />
@@ -85,6 +87,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
           {productId && <input type="hidden" name="product" value={productId} />}
           <button className="btn btn-secondary">Search</button>
           {(countries.length > 1 || country) && <AutoSubmitSelect id="customer-country" name="country" label="Bought for delivery to" value={country ?? ""} options={[["", "Every country"], ...countries.map((c) => [c.country, `${countryName(c.country)} (${c.count.toLocaleString("en-US")})`] as const)]} />}
+          {seesMoney && <AutoSubmitSelect id="customer-spent" name="spent" label="Spent at least" value={spent ? String(spent) : ""} options={[["", "Any amount"], ...CUSTOMER_SPENT.map((n) => [String(n), `${formatMoney(n, shop.currency)} or more`] as const)]} />}
           <AutoSubmitSelect id="customer-sort" label="Sort customers" value={sort ?? "recent"} options={sorts} />
         </form>
         {discountId && (
@@ -121,12 +124,12 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         {(filtered || totals.customers > 0) && (
           <details className="text-sm">
             <summary className="cursor-pointer underline w-fit">Tag {filtered ? "these customers" : "all customers"}</summary>
-            <TagEveryoneForm count={totals.customers} q={q} tag={tag} filter={filter} country={country} code={discountId} product={productId} tags={tags.map((t) => t.tag)} />
+            <TagEveryoneForm count={totals.customers} q={q} tag={tag} filter={filter} country={country} code={discountId} product={productId} spent={spent} tags={tags.map((t) => t.tag)} />
           </details>
         )}
         {totals.customers > 0 && (
           <p className="text-sm">
-            <a className="underline" href={`/admin/customers/export.csv${filtered ? `?${new URLSearchParams({ ...(q ? { q } : {}), ...(tag ? { tag } : {}), ...(filter ? { filter } : {}), ...(country ? { country } : {}), ...(discountId ? { code: discountId } : {}), ...(productId ? { product: productId } : {}) })}` : ""}`} download>
+            <a className="underline" href={`/admin/customers/export.csv${filtered ? `?${new URLSearchParams({ ...(q ? { q } : {}), ...(tag ? { tag } : {}), ...(filter ? { filter } : {}), ...(country ? { country } : {}), ...(discountId ? { code: discountId } : {}), ...(productId ? { product: productId } : {}), ...(spent ? { spent: String(spent) } : {}) })}` : ""}`} download>
               Download {filtered ? "these customers" : "all customers"} as a spreadsheet
             </a>
           </p>
