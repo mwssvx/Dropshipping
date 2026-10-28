@@ -42,6 +42,17 @@ export const SECTION_FIELDS: Record<SectionType, Field[]> = {
   featured_products: [
     { key: "heading", label: "Heading", kind: "text", max: 120 },
     { key: "collectionId", label: "Products from", kind: "collection" },
+    {
+      key: "show",
+      label: "Which products",
+      kind: "select",
+      options: [
+        { value: "listed", label: "In the collection's order" },
+        { value: "best_selling", label: "Best sellers first" },
+        { value: "newest", label: "Newest first" },
+        { value: "on_sale", label: "Only products on sale" },
+      ],
+    },
     { key: "limit", label: "How many to show", kind: "number", min: 2, max: 12 },
   ],
   collection_list: [

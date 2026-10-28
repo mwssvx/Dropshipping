@@ -101,7 +101,8 @@ function variantMatches(v: Variant, chosen: [string, Set<string>][]) {
 }
 
 /** Units sold per product, from paid orders. */
-async function unitsSold(db: Db, shopId: string, productIds: string[]) {
+/** Units of each product sold in paid orders. */
+export async function unitsSold(db: Db, shopId: string, productIds: string[]) {
   if (!productIds.length) return new Map<string, number>();
   const rows = await db
     .select({ productId: schema.variants.productId, units: sql<number>`sum(${schema.orderLines.quantity})::int` })
