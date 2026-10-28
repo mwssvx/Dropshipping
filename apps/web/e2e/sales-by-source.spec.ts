@@ -47,6 +47,15 @@ test("a sale from a tagged Instagram link shows under Sales by source", async ({
   await page.getByRole("navigation", { name: "Period" }).getByRole("link", { name: "7 days" }).click();
   await expect(page).toHaveURL(/days=7&compare=year/);
   await expect(page.getByRole("navigation", { name: "Compare with" }).getByRole("link", { name: "Same days last year" })).toHaveAttribute("aria-current", "page");
+  // When buyers buy, in the store's time zone (New York for a US store), or one picked.
+  const when = page.getByRole("region", { name: "When buyers buy" });
+  const weekday = (timeZone: string) => new Date().toLocaleDateString("en-US", { weekday: "long", timeZone });
+  await expect(when).toContainText("The busiest time shows once there are 10 orders in the period.");
+  await expect(when.getByRole("listitem", { name: `${weekday("America/New_York")}: 1 order` })).toBeVisible();
+  await when.getByLabel("Time zone").selectOption("Australia/Sydney");
+  await when.getByRole("button", { name: "Show" }).click();
+  await expect(page).toHaveURL(/days=7&compare=year&tz=Australia%2FSydney/);
+  await expect(page.getByRole("region", { name: "When buyers buy" }).getByRole("listitem", { name: `${weekday("Australia/Sydney")}: 1 order` })).toBeVisible();
   await page.goto("/admin/orders");
   await page.getByRole("link", { name: "#1001" }).first().click();
   await expect(page.getByText("The buyer came from instagram.")).toBeVisible();
