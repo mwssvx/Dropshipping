@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { bundleProductChoices, EARLY_ACCESS_HOURS, formatMoney, listCollections, listSales, LAST_CHANCE_MS, MAX_SALES, SALE_EXTEND_DAYS, saleResults, type SaleOutcome } from "@sf/core";
+import { bundleProductChoices, EARLY_ACCESS_HOURS, formatMoney, listCollections, listSales, defaultCutoffZone, LAST_CHANCE_MS, MAX_SALES, SALE_EXTEND_DAYS, saleResults, upcomingSaleDates, type SaleOutcome } from "@sf/core";
 import { requireShop, storeAddress } from "@/lib/server";
 import { deleteSaleAction, endEarlyAccessAction, endSaleAction, extendSaleAction, giveEarlyAccessAction } from "../../sale-actions";
 import { PageHeader } from "../PageHeader";
@@ -11,10 +11,27 @@ export const metadata = { title: "Sales" };
 const when = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC", timeZoneName: "short" });
 const STATUS = { running: { label: "On now", pill: "pill-success" }, scheduled: { label: "Scheduled", pill: "pill-info" }, ended: { label: "Ended", pill: "pill-neutral" } } as const;
 
-export default async function SalesPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+const calendarDay = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+const onDay = (d: string) => calendarDay.format(new Date(`${d}T00:00:00Z`));
+const saleDays = (d: { id: string; start: string; end: string }) => {
+  const last = new Date(Date.parse(`${d.end}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+  if (d.id === "black-friday") return "A sale from Black Friday through Cyber Monday";
+  return last === d.start ? `A one-day sale on ${onDay(d.start)}` : `A sale ${onDay(d.start)} to ${onDay(last)}`;
+};
+
+export default async function SalesPage({ searchParams }: { searchParams: Promise<{ error?: string; plan?: string }> }) {
   const { shop, db } = await requireShop("marketing");
-  const { error } = await searchParams;
+  const { error, plan } = await searchParams;
   const [sales, products, collections, store] = await Promise.all([listSales(db, shop.id), bundleProductChoices(db, shop.id), listCollections(db, shop.id), storeAddress(shop)]);
+  // The shopping dates coming up, each with the sale already planned for it, if any.
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: shop.shipCutoff?.timeZone ?? defaultCutoffZone(shop.country) });
+  const ahead = upcomingSaleDates(shop.country, today).map((d) => ({
+    ...d,
+    // Days on the calendar against exact times: a day either side is close enough to match.
+    planned: sales.find((s) => s.status !== "ended" && s.startsAt.getTime() < Date.parse(`${d.end}T00:00:00Z`) + 86_400_000 && (!s.endsAt || s.endsAt.getTime() > Date.parse(`${d.start}T00:00:00Z`) - 86_400_000)) ?? null,
+  }));
+  const picked = ahead.find((d) => d.id === plan && !d.planned);
+  const daysTo = (d: string) => Math.round((Date.parse(`${d}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
   const results = await saleResults(db, shop.id, sales);
   return (
     <main className="pb-12">
@@ -26,9 +43,43 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
           off the sale price; if sales overlap, a product gets the biggest one.
         </p>
         {error && <p role="alert" className="banner banner-critical">{error}</p>}
+        {ahead.length > 0 && (
+          <section className="card p-5 flex flex-col gap-3" aria-labelledby="ahead-heading">
+            <h2 id="ahead-heading" className="font-semibold">Dates coming up</h2>
+            <ul className="flex flex-col divide-y divide-border">
+              {ahead.map((d) => {
+                const away = daysTo(d.day);
+                return (
+                  <li key={d.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2" aria-label={d.name}>
+                    <div className="flex-1 min-w-48">
+                      <p className="font-medium">{d.name} <span className="hint text-sm">· {onDay(d.day)}{away > 0 ? `, in ${away === 1 ? "1 day" : `${away} days`}` : away === 0 ? ", today" : ""}</span></p>
+                      <p className="hint text-sm">{saleDays(d)}</p>
+                    </div>
+                    {d.planned ? (
+                      <span className="pill pill-success">Planned: {d.planned.title}</span>
+                    ) : (
+                      <a href={`/admin/sales?plan=${d.id}#new-heading`} className="btn btn-secondary btn-sm">Plan a sale</a>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
         <section className="card p-5 flex flex-col gap-4" aria-labelledby="new-heading">
           <h2 id="new-heading" className="font-semibold">New sale</h2>
-          {products.length === 0 ? <p className="hint">Add a product first.</p> : <SaleForm products={products} collections={collections.map((c) => ({ id: c.id, title: c.title }))} />}
+          {picked && <p className="hint text-sm">Filled in for {picked.name}. Pick the discount and what&apos;s on sale, then add it.</p>}
+          {products.length === 0 ? (
+            <p className="hint">Add a product first.</p>
+          ) : (
+            <SaleForm
+              key={picked?.id ?? "new"}
+              products={products}
+              collections={collections.map((c) => ({ id: c.id, title: c.title }))}
+              // Already under way (Halloween week): it starts when it's added.
+              plan={picked ? { title: picked.saleTitle, starts: picked.start > today ? `${picked.start}T00:00` : "", ends: `${picked.end}T00:00` } : null}
+            />
+          )}
         </section>
         <section className="flex flex-col gap-3" aria-labelledby="list-heading">
           <div className="flex justify-between items-baseline gap-3">
