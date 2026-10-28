@@ -366,11 +366,34 @@ export async function productMargins(db: Db, shopId: string) {
   return Object.fromEntries(PRODUCT_MARGINS.map((m) => [m, Number(row?.[m] ?? 0)])) as Record<ProductMargin, number>;
 }
 
+/** Products not sold in the last 30 or 90 days: worth a sale, a better photo, or archiving. */
+export const PRODUCT_UNSOLD = ["30", "90"] as const;
+export type ProductUnsold = (typeof PRODUCT_UNSOLD)[number];
+
+/**
+ * No unit in a paid order over the window. Products added within it haven't had their chance yet,
+ * so they never count.
+ */
+function unsoldWhere(days: ProductUnsold) {
+  const p = schema.products;
+  const since = sql`now() - make_interval(days => ${Number(days)})`;
+  return sql`(${p.createdAt} < ${since} and not exists (select 1 from order_lines ol join variants v on v.id = ol.variant_id join orders o on o.id = ol.order_id where v.product_id = ${p.id} and o.payment_status in ('paid', 'partially_refunded') and o.paid_at >= ${since}))`;
+}
+
+/** How many products on sale went unsold, for the list's filter. */
+export async function productUnsold(db: Db, shopId: string) {
+  const [row] = await db
+    .select(Object.fromEntries(PRODUCT_UNSOLD.map((d) => [d, sql<number>`count(*) filter (where ${unsoldWhere(d)})::int`])) as Record<ProductUnsold, SQL<number>>)
+    .from(schema.products)
+    .where(and(eq(schema.products.shopId, shopId), eq(schema.products.status, "active")));
+  return Object.fromEntries(PRODUCT_UNSOLD.map((d) => [d, Number(row?.[d] ?? 0)])) as Record<ProductUnsold, number>;
+}
+
 /** The product list's search and filters, shared by the page and its spreadsheet download. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** collection: a hand-picked collection's id; products in it. missing: products that lack this. margin: products that earn little. */
-export type ProductQuery = { query?: string; status?: "active" | "draft" | "archived"; tag?: string; stock?: ProductStockFilter; source?: ProductSource; collection?: string; missing?: ProductGap; margin?: ProductMargin };
+/** collection: a hand-picked collection's id; products in it. missing: products that lack this. margin: products that earn little. unsold: products on sale with no sale in that many days. */
+export type ProductQuery = { query?: string; status?: "active" | "draft" | "archived"; tag?: string; stock?: ProductStockFilter; source?: ProductSource; collection?: string; missing?: ProductGap; margin?: ProductMargin; unsold?: ProductUnsold };
 
 export function productWhere(db: Db, shopId: string, opts: ProductQuery) {
   const q = opts.query?.trim().toLowerCase();
@@ -386,6 +409,8 @@ export function productWhere(db: Db, shopId: string, opts: ProductQuery) {
     // Archived products aren't worth finishing, so they're left out unless asked for, as in the counts.
     opts.missing && PRODUCT_GAPS.includes(opts.missing) ? and(gapWhere(opts.missing), opts.status ? undefined : ne(schema.products.status, "archived")) : undefined,
     opts.margin && PRODUCT_MARGINS.includes(opts.margin) ? and(marginWhere(opts.margin), opts.status ? undefined : ne(schema.products.status, "archived")) : undefined,
+    // Only what's on sale can go unsold, unless another status is asked for.
+    opts.unsold && PRODUCT_UNSOLD.includes(opts.unsold) ? and(unsoldWhere(opts.unsold), opts.status ? undefined : eq(schema.products.status, "active")) : undefined,
     q
       ? or(
           sql`lower(${schema.products.title}) like ${`%${q}%`}`,
@@ -408,6 +433,7 @@ export function parseProductQuery(get: (key: string) => string | null | undefine
     collection: UUID.test(get("collection") ?? "") ? get("collection")! : undefined,
     missing: PRODUCT_GAPS.find((g) => g === get("missing")),
     margin: PRODUCT_MARGINS.find((m) => m === get("margin")),
+    unsold: PRODUCT_UNSOLD.find((d) => d === get("unsold")),
   };
 }
 

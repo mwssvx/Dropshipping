@@ -1096,3 +1096,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Recent sales on product pages (after launch, part 184)
 
 1. **"12 sold in the last 7 days"**: a switch on the Products page (off by default) makes product pages say how many of a product sold in the last week. It counts units in paid orders and leaves out refunds, so it's always true, unlike the fake "23 people are looking at this" apps Shopify stores install. It only shows once a product has sold 3 or more that week, and it's in the store's language (`recentSalesCount` and `setRecentSales` in `packages/core/src/badges.ts`; migration `0125_recent_sales` adds `shops.recent_sales`).
+
+### Products that aren't selling (after launch, part 185)
+
+1. **Not sold in 30 or 90 days**: the product list gets a "Not sold in" row that shows the products on sale with no paid order in that time, with how many each. Products added within that time haven't had their chance yet, so they never count, and refunded orders aren't sales. It works with the other product filters, and the spreadsheet download, changing every product in the list and saved views keep it. Put them on sale, give them a better photo, or archive them in one go (`PRODUCT_UNSOLD` and `productUnsold` in `packages/core/src/products.ts`; no migration).
