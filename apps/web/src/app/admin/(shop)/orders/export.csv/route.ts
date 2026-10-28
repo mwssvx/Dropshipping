@@ -1,4 +1,4 @@
-import { fulfillmentParam, ordersCsv, paymentParam, placedSince } from "@sf/core";
+import { fulfillmentParam, ordersCsv, paymentParam, placedSince, totalParam } from "@sf/core";
 import { requireShop } from "@/lib/server";
 
 const day = (s: string | null) => (s && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s)) ? new Date(`${s}T00:00:00Z`) : undefined);
@@ -23,6 +23,7 @@ export async function GET(request: Request) {
     productId: p.get("product") ?? undefined,
     country: p.get("country") ?? undefined,
     discountId: p.get("code") ?? undefined,
+    total: totalParam(p.get("total")),
     from,
     to,
   });

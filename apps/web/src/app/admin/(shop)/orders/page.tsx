@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BANK_DETAILS_MAX, BUYER_EDIT_HOURS, can, countOrders, countryName, formatMoney, listSavedViews, orderCountries, orderPage, orderTags, ORDER_PLACED_DAYS, placedSince, fulfillmentParam, paymentParam, RISK_HOLD_LABELS, TRANSFER_DAYS } from "@sf/core";
+import { BANK_DETAILS_MAX, BUYER_EDIT_HOURS, can, countOrders, countryName, formatMoney, listSavedViews, orderCountries, orderPage, orderTags, ORDER_PLACED_DAYS, placedSince, fulfillmentParam, paymentParam, RISK_HOLD_LABELS, TRANSFER_DAYS, ORDER_TOTALS, totalParam, type OrderTotalRange } from "@sf/core";
 import { AutoSubmitSelect } from "@/components/AutoSubmitSelect";
 import { SavedViews } from "@/components/SavedViews";
 import { requireShop } from "@/lib/server";
@@ -14,10 +14,18 @@ import { bulkOrdersAction } from "../../bulk-order-actions";
 
 export const metadata = { title: "Orders" };
 
+/** "Under $25.00", "$25.00 to $100.00", "$250.00 or more", in the store's currency. */
+function totalLabel(range: OrderTotalRange, currency: string) {
+  const [min, max] = ORDER_TOTALS[range];
+  const from = min === null ? null : formatMoney(min, currency);
+  const to = max === null ? null : formatMoney(max, currency);
+  return from && to ? `${from} to ${to}` : to ? `Under ${to}` : `${from} or more`;
+}
+
 const dateFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
-export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ show?: string; q?: string; tag?: string; product?: string; country?: string; code?: string; placed?: string; status?: string; payment?: string; bulk?: string; before?: string }> }) {
-  const { show, q, tag, product: productParam, country: countryParam, code: codeParam, placed: placedParam, status: statusParam, payment: paymentParamValue, bulk, before: beforeParam } = await searchParams;
+export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ show?: string; q?: string; tag?: string; product?: string; country?: string; code?: string; total?: string; placed?: string; status?: string; payment?: string; bulk?: string; before?: string }> }) {
+  const { show, q, tag, product: productParam, country: countryParam, code: codeParam, total: totalValue, placed: placedParam, status: statusParam, payment: paymentParamValue, bulk, before: beforeParam } = await searchParams;
   const productId = /^[0-9a-f-]{36}$/i.test(productParam ?? "") ? productParam : undefined;
   const country = /^[A-Z]{2}$/.test(countryParam ?? "") ? countryParam : undefined;
   const discountId = /^[0-9a-f-]{36}$/i.test(codeParam ?? "") ? codeParam : undefined;
@@ -27,12 +35,13 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   // "problem" has its own tab.
   const status = fulfillmentParam(statusParam) === "problem" ? undefined : fulfillmentParam(statusParam);
   const payment = paymentParam(paymentParamValue);
+  const total = totalParam(totalValue);
   const problemsOnly = show === "problems";
   const heldOnly = show === "held";
   const transfersOnly = show === "transfers";
   const { shop, db, role } = await requireShop("orders");
   const [{ orders, older }, problems, held, transfers, tags, countries, product, views, discount] = await Promise.all([
-    orderPage(db, shop.id, { ...(problemsOnly ? { fulfillmentStatus: "problem" as const } : heldOnly ? { held: true } : transfersOnly ? { transfer: true } : {}), ...(status && !problemsOnly ? { fulfillmentStatus: status } : {}), paymentStatus: payment, query: q, tag, productId, country, discountId, from }, { before }),
+    orderPage(db, shop.id, { ...(problemsOnly ? { fulfillmentStatus: "problem" as const } : heldOnly ? { held: true } : transfersOnly ? { transfer: true } : {}), ...(status && !problemsOnly ? { fulfillmentStatus: status } : {}), paymentStatus: payment, query: q, tag, productId, country, discountId, total, from }, { before }),
     countOrders(db, shop.id, { fulfillmentStatus: "problem" }),
     countOrders(db, shop.id, { held: true }),
     countOrders(db, shop.id, { transfer: true }),
@@ -44,10 +53,10 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   ]);
   // On hold the same way the On hold tab counts it: held for the risk check and not refunded.
   const onHold = (o: (typeof orders)[number]) => !!o.heldAt && (o.paymentStatus === "paid" || o.paymentStatus === "partially_refunded");
-  const filtered = !!(q || tag || productId || country || discountId || placed || status || payment);
+  const filtered = !!(q || tag || productId || country || discountId || total || placed || status || payment);
   // Keeps the other filters when one changes.
-  const href = (next: { show?: string; q?: string; tag?: string; product?: string; country?: string; code?: string; placed?: string; status?: string; payment?: string; before?: string }) => {
-    const params = new URLSearchParams(Object.entries({ show, q, tag, product: productId, country, code: discountId, placed, status, payment, ...next }).filter((e): e is [string, string] => !!e[1]));
+  const href = (next: { show?: string; q?: string; tag?: string; product?: string; country?: string; code?: string; total?: string; placed?: string; status?: string; payment?: string; before?: string }) => {
+    const params = new URLSearchParams(Object.entries({ show, q, tag, product: productId, country, code: discountId, total, placed, status, payment, ...next }).filter((e): e is [string, string] => !!e[1]));
     return params.size ? `/admin/orders?${params}` : "/admin/orders";
   };
   return (
@@ -66,7 +75,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             Bank transfers {transfers > 0 && <span className="pill pill-info">{transfers}</span>}
           </Link>
         </nav>
-        <SavedViews list="orders" views={views} params={{ show: problemsOnly || heldOnly || transfersOnly ? show : undefined, q, tag, product: productId, country, code: discountId, placed, status, payment }} />
+        <SavedViews list="orders" views={views} params={{ show: problemsOnly || heldOnly || transfersOnly ? show : undefined, q, tag, product: productId, country, code: discountId, total, placed, status, payment }} />
         <form className="flex flex-wrap gap-2 max-w-4xl" role="search">
           <label className="sr-only" htmlFor="q">Search orders</label>
           <input className="input flex-1 min-w-40" id="q" name="q" type="search" defaultValue={q} placeholder="Order number, name or email" />
@@ -77,6 +86,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           {countries.length > 1 && <AutoSubmitSelect id="order-country" name="country" label="Ship-to country" value={country ?? ""} options={[["", "Every country"], ...countries.map((c) => [c.country, `${countryName(c.country)} (${c.count.toLocaleString("en-US")})`] as const)]} />}
           {!problemsOnly && <AutoSubmitSelect id="order-status" name="status" label="Delivery status" value={status ?? ""} options={[["", "Any delivery status"], ...Object.entries(FULFILMENT).filter(([k]) => k !== "problem").map(([k, [label]]) => [k, label] as const)]} />}
           <AutoSubmitSelect id="order-payment" name="payment" label="Payment status" value={payment ?? ""} options={[["", "Any payment status"], ...Object.entries(PAYMENT).map(([k, [label]]) => [k, label] as const)]} />
+          <AutoSubmitSelect id="order-total" name="total" label="Order total" value={total ?? ""} options={[["", "Any total"], ...(Object.keys(ORDER_TOTALS) as OrderTotalRange[]).map((k) => [k, totalLabel(k, shop.currency)] as const)]} />
           <AutoSubmitSelect id="order-placed" name="placed" label="Placed in" value={placed ?? ""} options={[["", "Any time"], ...ORDER_PLACED_DAYS.map((d) => [String(d), d === 365 ? "The last 12 months" : `The last ${d} days`] as const)]} />
           <button className="btn btn-secondary">Search</button>
         </form>
@@ -119,6 +129,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             {productId && <input type="hidden" name="product" value={productId} />}
             {country && <input type="hidden" name="country" value={country} />}
             {discountId && <input type="hidden" name="code" value={discountId} />}
+            {total && <input type="hidden" name="total" value={total} />}
             {placed && <input type="hidden" name="placed" value={placed} />}
             {status && <input type="hidden" name="status" value={status} />}
             {payment && <input type="hidden" name="payment" value={payment} />}
@@ -180,6 +191,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             {productId && <input type="hidden" name="keep-product" value={productId} />}
             {country && <input type="hidden" name="keep-country" value={country} />}
             {discountId && <input type="hidden" name="keep-code" value={discountId} />}
+            {total && <input type="hidden" name="keep-total" value={total} />}
             {before && <input type="hidden" name="keep-before" value={before} />}
             <div className="field">
               <label className="label" htmlFor="bulk-tag">Tag for the picked orders</label>

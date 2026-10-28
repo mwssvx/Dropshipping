@@ -16,7 +16,7 @@ const NAME_MAX = 40;
 /** The link parameters each list understands, in the order a view's link writes them. */
 export const VIEW_PARAMS: Record<SavedViewList, readonly string[]> = {
   products: ["q", "status", "tag", "stock", "source", "collection", "missing", "margin", "sort"],
-  orders: ["show", "q", "tag", "product", "country", "code", "placed", "status", "payment"],
+  orders: ["show", "q", "tag", "product", "country", "code", "total", "placed", "status", "payment"],
   customers: ["q", "tag", "filter", "sort"],
 };
 

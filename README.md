@@ -1084,3 +1084,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Orders that used a code (after launch, part 181)
 
 1. **See orders for a discount code**: each code on the Marketing page that has been used gets a "See orders" link, which opens the order list showing only the orders that used it ("Orders that used ADA10 · Show all orders"). It works with the other order filters, and the spreadsheet download, working on many orders at once and saved views keep it. It helps check what a code given to a creator or posted on social media really sold (`OrderFilter.discountId` in `packages/core/src/orders.ts`, `code` on the order list; no migration).
+
+### Orders by total (after launch, part 182)
+
+1. **Order total filter**: the order list has an "Order total" menu (Under $25.00, $25.00 to $100.00, $100.00 to $250.00, $250.00 or more, in the store's currency). It works with the other order filters, and the spreadsheet download, working on many orders at once and saved views keep it. It helps find the big orders worth a thank-you note or a closer look, or the small ones that cost more to ship than they earn (`ORDER_TOTALS` and `OrderFilter.total` in `packages/core/src/orders.ts`, `total` on the order list; no migration).
