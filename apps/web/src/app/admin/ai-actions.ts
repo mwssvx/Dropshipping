@@ -153,6 +153,7 @@ export async function saveAiSettingsAction(_: AgentState, form: FormData): Promi
       shopper: form.get("shopper") === "on",
       weeklyReview: form.get("weeklyReview") === "on",
       dailyWatch: form.get("dailyWatch") === "on",
+      memory: String(form.get("memory") ?? "").split("\n"),
       brand: normalizeBrandRules({
         voice: String(form.get("brandVoice") ?? ""),
         banned: String(form.get("brandBanned") ?? ""),

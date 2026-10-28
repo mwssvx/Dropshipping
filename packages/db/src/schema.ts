@@ -143,6 +143,8 @@ export const shops = pgTable(
     aiDailyWatch: boolean("ai_daily_watch").notNull().default(true),
     // Assistant skills the merchant switched off (names from core's SKILLS).
     aiSkillsOff: jsonb("ai_skills_off").$type<string[]>().notNull().default([]),
+    /** Notes the owner asked the assistant to remember, used in every chat. */
+    aiMemory: jsonb("ai_memory").$type<string[]>().notNull().default([]),
     // Writing rules for the AI helpers (voice, banned words, language, title length); see core's ai/brand.ts.
     aiBrand: jsonb("ai_brand").$type<{ voice?: string; banned?: string[]; language?: string | null; titleMax?: number | null }>(),
     // Remind buyers who started checkout but didn't pay (one email, an hour later).

@@ -386,6 +386,11 @@ function assistant(s: State, req: ModelRequest): BetaContentBlock[] {
     return toolCall("find_trends", focus ? { focus } : {});
   };
   if (!s.called.length) {
+    const original = s.prompt.split("\n\n(Today is")[0]!.trim();
+    const forget = original.match(/^(?:please\s+)?forget(?: that| about)?\s+(.{3,200})$/i);
+    if (forget) return [toolCall("forget", { note: forget[1]!.replace(/[.!]+$/, "") })];
+    const remember = original.match(/^(?:please\s+)?(?:remember|note)(?: that)?[:,]?\s+(.{3,200})$/i);
+    if (remember) return [toolCall("remember", { note: remember[1]!.replace(/[.!]+$/, "").replace(/^\w/, (ch) => ch.toUpperCase()) })];
     if (/\b(human|person|support team|ticket|payout|hold|frozen|bug)\b/.test(ask)) {
       return [toolCall("open_ticket", { subject: ask.slice(0, 80).replace(/^\w/, (c) => c.toUpperCase()), details: `The merchant asked: “${ask.slice(0, 1500)}”. Please get in touch with them.` })];
     }
@@ -414,6 +419,10 @@ function assistant(s: State, req: ModelRequest): BetaContentBlock[] {
   if (c.isError) return [text(`I couldn't do that: ${strip(c.result)}`)];
   const r = c.result;
   switch (c.name) {
+    case "remember":
+      return [text(`Got it, I'll remember that: “${c.input.note}”. You can see and edit what I remember in AI settings.`)];
+    case "forget":
+      return [text(`Done, I've forgotten “${r.forgot}”.`)];
     case "use_skill":
       return [c.input.skill === "trend_research" ? trends() : toolCall("review_store", {})];
     case "review_store":

@@ -1,4 +1,4 @@
-import { aiBudget, BUYER_TOPICS, formatMoney, listAgentActivity, listShopperChats, LANGUAGES, MODEL_LABEL, SKILL_NAMES, SKILLS, type BrandRules } from "@sf/core";
+import { aiBudget, BUYER_TOPICS, formatMoney, listAgentActivity, listShopperChats, LANGUAGES, MEMORY_MAX_NOTES, MODEL_LABEL, SKILL_NAMES, SKILLS, type BrandRules } from "@sf/core";
 import { aiModel, requireShop } from "@/lib/server";
 import { AGENT_LABEL } from "@/lib/agent-labels";
 import { PageHeader } from "../PageHeader";
@@ -63,6 +63,8 @@ export default async function AiSettingsPage() {
               weeklyReview={shop.aiWeeklyReview}
               dailyWatch={shop.aiDailyWatch}
               brand={brandFields(shop.aiBrand as BrandRules | null)}
+              memory={shop.aiMemory.join("\n")}
+              memoryMax={MEMORY_MAX_NOTES}
               languages={Object.entries(LANGUAGES).map(([code, l]) => ({ code, name: l.english }))}
               skills={SKILL_NAMES.map((key) => ({ key, title: SKILLS[key].title, when: SKILLS[key].when, on: !shop.aiSkillsOff.includes(key) }))}
             />
