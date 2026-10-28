@@ -22,6 +22,7 @@ import { UnitPrice } from "@/components/UnitPrice";
 import type { Contents } from "@sf/db";
 import { PixelEvent } from "@/components/PixelEvent";
 import { StickyBuyBar } from "@/components/StickyBuyBar";
+import { HolidayDeadline } from "@/components/HolidayDeadline";
 
 async function load(shopHandle: string, handle: string, count = true) {
   const shop = await loadShop(shopHandle);
@@ -316,15 +317,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                 className="text-accent font-medium num"
               />
             )}
-            {delivery.holiday && (
-              <span id="holiday-deadline" className={delivery.holiday.orderBy ? "text-accent font-medium" : "hint"}>
-                {!delivery.holiday.orderBy
-                  ? t.holidayTooLate(delivery.holiday.name)
-                  : delivery.holiday.today
-                    ? t.holidayOrderToday(delivery.holiday.name)
-                    : t.holidayOrderBy(dayFormat.format(delivery.holiday.orderBy), delivery.holiday.name)}
-              </span>
-            )}
+            {delivery.holiday && <HolidayDeadline id="holiday-deadline" holiday={delivery.holiday} t={t} day={(d) => dayFormat.format(d)} />}
           </p>
         )}
         {chart && (

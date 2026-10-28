@@ -6,6 +6,7 @@ import { schema, type Db, type ShipCutoff } from "@sf/db";
 import { z } from "zod";
 import { UserError } from "./errors";
 import { holidayOrderBy } from "./holiday-deadline";
+import { preorderDeadline } from "./preorders";
 import { nextCutoff, shipDay } from "./ship-cutoff";
 import { fitsWeight, listShippingZones, zoneFor, type Rate } from "./shipping";
 
@@ -93,6 +94,37 @@ export async function productDelivery(db: Db, shop: Shop, productId: string, opt
   const cutoff = next && next.msLeft <= DAY ? next : null;
   const window = deliveryWindow(now, shop.processingDays, transit.min, transit.max, shop.shipCutoff);
   return { ...window, country, cutoff, holiday: holidayOrderBy(shop.holidayDeadline, window, shop.shipCutoff, now) };
+}
+
+/**
+ * When the cart would arrive if paid for now, for the cart page: the slowest of its items, with the
+ * cheapest rate to the buyer's country (or the store's). A cart with a pre-order counts from the
+ * latest date one is promised to ship by, and then has no holiday order-by date. Null when the
+ * store has dates off, nothing in the cart ships, or nothing says how long.
+ */
+export async function cartDelivery(
+  db: Db,
+  shop: Shop,
+  items: { variantId: string; giftCard?: boolean; digital?: boolean; preorderShipsBy?: string | null }[],
+  opts: { country?: string | null; now?: Date } = {},
+) {
+  if (!shop.deliveryEstimates) return null;
+  const goods = items.filter((i) => !i.giftCard && !i.digital);
+  if (!goods.length) return null;
+  const { country, rates } = await ratesFor(db, shop, opts.country ?? null);
+  if (!rates.length) return null;
+  const variants = await db.query.variants.findMany({ where: inArray(schema.variants.id, goods.map((i) => i.variantId)), columns: { shipDaysMin: true, shipDaysMax: true } });
+  const transit = transitDays(variants, cheapest(rates));
+  if (!transit) return null;
+  const now = opts.now ?? new Date();
+  const preorder = goods.reduce<Date | null>((latest, i) => {
+    if (!i.preorderShipsBy) return latest;
+    const d = preorderDeadline({ shipsBy: i.preorderShipsBy, limit: null });
+    return !latest || d > latest ? d : latest;
+  }, null);
+  if (preorder && preorder > now) return { ...deliveryWindow(preorder, 0, transit.min, transit.max), country, holiday: null };
+  const window = deliveryWindow(now, shop.processingDays, transit.min, transit.max, shop.shipCutoff);
+  return { ...window, country, holiday: holidayOrderBy(shop.holidayDeadline, window, shop.shipCutoff, now) };
 }
 
 /**

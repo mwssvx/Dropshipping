@@ -1149,3 +1149,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **"Order by Dec 15 to get it in time for Christmas"** (`packages/core/src/holiday-deadline.ts`, Shipping → Delivery dates → Holiday order-by date): name a holiday and the last day orders can arrive, and product pages say the last day to order, under the delivery estimate, in the store's language. It's counted back from the slowest date the page shows (processing days, then the longest transit), and a day only counts if an order placed at any time that day makes it, so with a same-day cutoff it's judged as if the order came in after the cutoff, weekends included.
 2. **Honest when it's late**: once that day has passed the page says "Ordered now, it may not arrive in time for Christmas", and after the arrive-by date the line goes away by itself. The Shipping page previews the order-by date for one product, and store files carry the setting.
+
+### Delivery dates in the cart (after launch, part 198)
+
+1. **Before checkout** (`cartDelivery` in `packages/core/src/delivery.ts`): under the cart's items, buyers see when everything would arrive if they paid now ("Arrives Nov 3 – Nov 12 to United States"), from the slowest item, with the cheapest rate to their country. Gift cards and downloads don't count, and a cart with a pre-order counts from the latest date one is promised to ship by.
+2. **The holiday line too**: when the store has a holiday order-by date (part 197), the cart repeats it under the dates, so a gift buyer knows before paying.
