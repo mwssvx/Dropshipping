@@ -3,6 +3,7 @@ import type { BetaContentBlock, BetaMessageParam, BetaToolResultBlockParam } fro
 import { schema, type AgentName, type Db } from "@sf/db";
 import { NotFoundError, UserError } from "../errors";
 import type { AgentContext, Decision, RunScope, Shop } from "./context";
+import { learnFromEdit } from "./examples";
 import { costMicros } from "./model";
 import { AGENT_TOOLS, findTool, PLAN_AI_BUDGET_MINOR, toolSpecs } from "./tools";
 
@@ -276,6 +277,11 @@ export async function decideAction(ctx: AgentContext, shopId: string, actionId: 
   try {
     const result = await t.run({ ...parsed.data, ...(input.message_id ? { message_id: input.message_id } : {}) }, scope);
     await db.update(schema.agentActions).set({ input, result: (result ?? null) as never }).where(eq(schema.agentActions.id, action.id));
+    // The owner rewrote a buyer reply before sending it: the helper learns how they write.
+    const drafted = action.input.message;
+    if (action.tool === "send_reply" && typeof drafted === "string" && typeof input.message === "string") {
+      await learnFromEdit(db, shopId, { topic: String(input.topic ?? ""), draft: drafted, sent: input.message });
+    }
     return { status: "approved" as const, result };
   } catch (e) {
     await db.update(schema.agentActions).set({ status: "failed", error: errText(e) }).where(eq(schema.agentActions.id, action.id));

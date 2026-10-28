@@ -864,7 +864,7 @@ export async function thinMargins(run: Pick<RunScope, "ctx" | "shop">, minPct = 
 export async function setAiSettings(
   db: RunScope["ctx"]["db"],
   shop: Pick<RunScope["shop"], "id" | "plan">,
-  s: { budgetMinor?: number | null; autoReplyTopics?: string[]; autoPause?: boolean; shopper?: boolean; weeklyReview?: boolean; dailyWatch?: boolean; watchEmail?: boolean; memory?: string[]; skillsOff?: string[]; brand?: BrandRules | null },
+  s: { budgetMinor?: number | null; autoReplyTopics?: string[]; autoPause?: boolean; shopper?: boolean; weeklyReview?: boolean; dailyWatch?: boolean; watchEmail?: boolean; replyExamples?: []; memory?: string[]; skillsOff?: string[]; brand?: BrandRules | null },
 ) {
   const max = PLAN_AI_BUDGET_MINOR[shop.plan];
   if (s.budgetMinor !== undefined && s.budgetMinor !== null && (!Number.isFinite(s.budgetMinor) || s.budgetMinor < 0 || s.budgetMinor > max)) {
@@ -881,6 +881,7 @@ export async function setAiSettings(
       ...(s.weeklyReview !== undefined ? { aiWeeklyReview: s.weeklyReview } : {}),
       ...(s.dailyWatch !== undefined ? { aiDailyWatch: s.dailyWatch } : {}),
       ...(s.watchEmail !== undefined ? { aiWatchEmail: s.watchEmail } : {}),
+      ...(s.replyExamples ? { aiReplyExamples: [] } : {}),
       ...(s.memory !== undefined ? { aiMemory: normalizeMemory(s.memory) } : {}),
       ...(s.brand !== undefined ? { aiBrand: s.brand } : {}),
       ...(s.skillsOff ? { aiSkillsOff: SKILL_NAMES.filter((n) => s.skillsOff!.includes(n)) } : {}),

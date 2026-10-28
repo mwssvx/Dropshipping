@@ -5,6 +5,7 @@ import { NotFoundError, UserError } from "../errors";
 import type { AgentContext, RunScope, Shop } from "./context";
 import { untrusted } from "./context";
 import { memoryInstructions } from "./memory";
+import { exampleInstructions } from "./examples";
 import { addMessage, assistantConversation, BUYER_TOPICS, startBuyerMessage } from "./conversations";
 import { aiBudget, runAgent, type AgentSpec, type RunResult } from "./runtime";
 import { REVIEW_MAX_ITEMS, REVIEW_SUMMARY_MIN, thinMargins, TRENDS_MAX_ITEMS, TRENDS_MAX_SEARCHES, replyVerdicts, watchSignals } from "./tools";
@@ -66,7 +67,7 @@ Then do exactly one of these:
 - send_reply, if the order data and policies answer the question. Write as the store: greet the buyer by first name, answer in a few sentences, sign off as "${shop.name}". Pick the topic that matches the question (${Object.keys(BUYER_TOPICS).join(", ")}).
 - hand_over, if they want a refund, cancellation, address change or exchange, if they're upset or complaining, if the answer isn't in the data, or if the message is unclear.
 Never promise refunds, discounts, replacements or delivery dates the data doesn't give. Your final text is a private note for the merchant, not sent to the buyer: one sentence on what you did.
-${RULES}${brandRules(shop)}`,
+${RULES}${brandRules(shop)}${exampleInstructions(shop.aiReplyExamples)}`,
   },
   fulfilment: {
     agent: "fulfilment",
