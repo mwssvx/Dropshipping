@@ -1032,3 +1032,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Change every product in a list (after launch, part 168)
 
 1. **Select all in this list**: when every product on a page of the product list is ticked and the list goes on to more pages, "Select all 230 in this list" picks every product its search and filters show, so one bulk change (status, prices, "was" price, collection, tag) covers all of them, up to 500 at a time. Unticking any product goes back to just the ticked ones (`productIds` and `parseProductQuery` in `packages/core/src/products.ts`; no migration).
+
+### Saved views (after launch, part 169)
+
+1. **Views**: on the Products, Orders and Customers lists, "Save this view" names the current search, filters and sort ("Restock these", "Rush orders to the UK", "Lapsed VIPs"). Saved views show as links above the list for everyone on the team, the one you're on is marked, and × removes one. Saving the same name again changes it, and a list can have up to 20. Only the list's own link parameters are kept, never the page number (`packages/core/src/saved-views.ts`; migration `0121_saved_views`).

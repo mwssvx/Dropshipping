@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { can, formatMoney, listCollections, MAX_BULK_PRODUCTS, PRODUCT_PAGE_SIZE, PRODUCT_SORTS, type ProductSource, productSources, type ProductStockFilter, productPage, productTags, recentBulkEdits, runningLow, soldOutAtSupplier } from "@sf/core";
+import { can, formatMoney, listCollections, listSavedViews, MAX_BULK_PRODUCTS, PRODUCT_PAGE_SIZE, PRODUCT_SORTS, type ProductSource, productSources, type ProductStockFilter, productPage, productTags, recentBulkEdits, runningLow, soldOutAtSupplier } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { BulkProducts, type BulkRow } from "./BulkProducts";
@@ -9,6 +9,7 @@ import { BadgeSettingsForm } from "./BadgeSettingsForm";
 import { SoldOutForm } from "./SoldOutForm";
 import { PriceImportForm } from "./PriceImportForm";
 import { AutoSubmitSelect } from "@/components/AutoSubmitSelect";
+import { SavedViews } from "@/components/SavedViews";
 
 export const metadata = { title: "Products" };
 
@@ -36,7 +37,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   // Newest first is the default, so it's left out of links.
   const sort = PRODUCT_SORTS.find((s) => s === params.sort && s !== "newest");
   const page = Math.max(1, Math.min(10_000, Math.floor(Number(params.page)) || 1));
-  const [{ products, total }, collections, recent, soldOut, low, tags, sources] = await Promise.all([
+  const [{ products, total }, collections, recent, soldOut, low, tags, sources, views] = await Promise.all([
     productPage(db, shop.id, { query: q, status, tag, stock, source, sort, page }),
     listCollections(db, shop.id),
     recentBulkEdits(db, shop.id),
@@ -44,6 +45,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
     runningLow(db, shop.id),
     productTags(db, shop.id),
     productSources(db, shop.id),
+    listSavedViews(db, shop.id, "products"),
   ]);
   const filtered = !!(q || status || tag || stock || source);
   // The source filter only shows when the store has products from more than one place.
@@ -113,7 +115,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
             {low.length > 50 && <p className="hint text-sm">And {low.length - 50} more.</p>}
           </section>
         )}
-        {(total > 0 || filtered || page > 1) && (
+        {(total > 0 || filtered || page > 1 || views.length > 0) && (
           <div className="flex flex-col gap-3 mb-4">
             <form className="flex flex-wrap gap-2 max-w-2xl" role="search">
               <label className="sr-only" htmlFor="product-q">Search products</label>
@@ -125,6 +127,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
               <button className="btn btn-secondary">Search</button>
               <AutoSubmitSelect id="product-sort" label="Sort products" value={sort ?? "newest"} options={SORTS} />
             </form>
+            <SavedViews list="products" views={views} params={{ q, status, tag, stock, source, sort }} />
             <nav className="flex flex-wrap gap-1" aria-label="Product filters">
               <Link href={href({ status: undefined })} className={`chip text-sm ${!status ? "font-semibold border-accent" : ""}`} aria-current={!status ? "page" : undefined}>All</Link>
               {STATUSES.map(([s, label]) => (

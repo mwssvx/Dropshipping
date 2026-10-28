@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { can, CUSTOMER_FILTERS, CUSTOMER_PAGE_SIZE, CUSTOMER_SORTS, LAPSED_DAYS, customerTags, customerTotals, describeTagRule, formatMoney, listCustomers, listTagRules, productChoices, MAX_TAG_RULES } from "@sf/core";
+import { can, CUSTOMER_FILTERS, CUSTOMER_PAGE_SIZE, CUSTOMER_SORTS, LAPSED_DAYS, customerTags, customerTotals, describeTagRule, formatMoney, listCustomers, listSavedViews, listTagRules, productChoices, MAX_TAG_RULES } from "@sf/core";
 import { AutoSubmitSelect } from "@/components/AutoSubmitSelect";
+import { SavedViews } from "@/components/SavedViews";
 import { requireShop } from "@/lib/server";
 import { deleteTagRuleAction } from "../../tag-rule-actions";
 import { PageHeader } from "../PageHeader";
@@ -35,12 +36,13 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   const sorts = SORTS.filter(([s]) => seesMoney || s !== "spent");
   const sort = CUSTOMER_SORTS.find((s) => s === sortParam && s !== "recent" && sorts.some(([x]) => x === s));
   const page = Math.max(1, Math.min(10_000, Math.floor(Number(pageParam)) || 1));
-  const [customers, totals, tags, rules, products] = await Promise.all([
+  const [customers, totals, tags, rules, products, views] = await Promise.all([
     listCustomers(db, shop.id, { query: q, tag, filter, sort, limit: CUSTOMER_PAGE_SIZE, offset: (page - 1) * CUSTOMER_PAGE_SIZE }),
     customerTotals(db, shop.id, { query: q, tag, filter }),
     customerTags(db, shop.id),
     listTagRules(db, shop.id),
     productChoices(db, shop.id),
+    listSavedViews(db, shop.id, "customers"),
   ]);
   const filtered = !!(q || tag || filter);
   /** A link to the list with some of the search, tag, filter and sort changed; a change goes back to page 1. */
@@ -67,6 +69,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             {totals.customers.toLocaleString("en-US")} {totals.customers === 1 ? "customer" : "customers"} · {totals.repeat.toLocaleString("en-US")} bought more than once · {totals.accounts.toLocaleString("en-US")} signed in to their account
           </p>
         )}
+        <SavedViews list="customers" views={views} params={{ q, tag, filter, sort }} />
         <form className="flex flex-wrap gap-2 max-w-2xl" role="search">
           <label className="sr-only" htmlFor="q">Search customers</label>
           <input className="input flex-1 min-w-40" id="q" name="q" type="search" defaultValue={q} placeholder="Name or email" />
