@@ -334,6 +334,30 @@ export function productWhere(db: Db, shopId: string, opts: ProductQuery) {
   );
 }
 
+const QUERY_STATUSES = ["active", "draft", "archived"] as const;
+
+/** Reads the list's search and filters from a link or form, dropping anything unknown. */
+export function parseProductQuery(get: (key: string) => string | null | undefined): ProductQuery {
+  return {
+    query: get("q")?.trim() || undefined,
+    status: QUERY_STATUSES.find((s) => s === get("status")),
+    tag: get("tag")?.trim().toLowerCase().slice(0, 30) || undefined,
+    stock: PRODUCT_STOCK_FILTERS.find((s) => s === get("stock")),
+    source: PRODUCT_SOURCES.find((s) => s === get("source")),
+  };
+}
+
+/** Ids of the products a list shows, newest first, up to a limit. */
+export async function productIds(db: Db, shopId: string, list: ProductQuery, limit: number) {
+  const rows = await db
+    .select({ id: schema.products.id })
+    .from(schema.products)
+    .where(productWhere(db, shopId, list))
+    .orderBy(desc(schema.products.createdAt), asc(schema.products.id))
+    .limit(limit);
+  return rows.map((r) => r.id);
+}
+
 export async function productPage(db: Db, shopId: string, opts: ProductQuery & { sort?: ProductSort; page?: number; size?: number } = {}) {
   await publishDueProducts(db, shopId);
   const size = opts.size ?? PRODUCT_PAGE_SIZE;

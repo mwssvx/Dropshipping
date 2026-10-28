@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { applyBulkEdit, previewBulkEdit, sendPriceDrops, undoBulkEdit, UserError, type BulkEditInput } from "@sf/core";
+import { applyBulkEdit, MAX_BULK_PRODUCTS, parseProductQuery, previewBulkEdit, productIds, sendPriceDrops, undoBulkEdit, UserError, type BulkEditInput } from "@sf/core";
 import { logged, requireShop, stock } from "@/lib/server";
 
 export type BulkState = {
@@ -44,10 +44,15 @@ function actionFrom(form: FormData): BulkEditInput {
 export async function bulkEditAction(_: BulkState, form: FormData): Promise<BulkState> {
   const { shop, db, user } = await requireShop("products");
   const key = String(form.get("key") ?? "");
-  const ids = form.getAll("ids").map(String);
+  let ids = form.getAll("ids").map(String);
   let input: BulkEditInput;
   let preview: BulkState["preview"];
   try {
+    // "Select all in this list" sends the list's search and filters instead of ids.
+    if (form.get("all") === "1") {
+      ids = await productIds(db, shop.id, parseProductQuery((k) => form.get(`list.${k}`)?.toString()), MAX_BULK_PRODUCTS + 1);
+      if (ids.length > MAX_BULK_PRODUCTS) throw new UserError(`That's more than ${MAX_BULK_PRODUCTS} products. Narrow the list with a search or filter first.`);
+    }
     input = actionFrom(form);
     preview = await previewBulkEdit(db, shop, ids, input);
     if (form.get("intent") !== "apply") return { key, preview };

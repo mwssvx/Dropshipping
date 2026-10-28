@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { can, formatMoney, listCollections, PRODUCT_PAGE_SIZE, PRODUCT_SORTS, type ProductSource, productSources, type ProductStockFilter, productPage, productTags, recentBulkEdits, runningLow, soldOutAtSupplier } from "@sf/core";
+import { can, formatMoney, listCollections, MAX_BULK_PRODUCTS, PRODUCT_PAGE_SIZE, PRODUCT_SORTS, type ProductSource, productSources, type ProductStockFilter, productPage, productTags, recentBulkEdits, runningLow, soldOutAtSupplier } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { BulkProducts, type BulkRow } from "./BulkProducts";
@@ -193,6 +193,9 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
             collections={collections.filter((c) => !c.rules).map((c) => ({ id: c.id, title: c.title }))}
             tags={tags.map((t) => t.tag)}
             recent={recent.map((r) => ({ id: r.id, summary: r.summary, when: when(r.createdAt), undone: !!r.undoneAt, canUndo: r.canUndo }))}
+            total={total}
+            list={Object.fromEntries(Object.entries({ q, status, tag, stock, source }).filter((e): e is [string, string] => !!e[1]))}
+            maxAll={MAX_BULK_PRODUCTS}
           />
         )}
         {pages > 1 && products.length > 0 && (
