@@ -8,7 +8,7 @@ import { schema, type Db } from "@sf/db";
 import { z } from "zod";
 import type { Mailer } from "./email";
 import { NotFoundError, UserError } from "./errors";
-import { formatMoney } from "./money";
+import { formatMoney, parseMoney } from "./money";
 
 type Shop = typeof schema.shops.$inferSelect;
 type GiftCard = typeof schema.giftCards.$inferSelect;
@@ -18,6 +18,8 @@ export type GiftCardContext = { db: Db; mailer: Mailer; storeAddress: (shop: Sho
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const LENGTH = 16;
 export const MAX_GIFT_CARD_MINOR = 1_000_000;
+/** How far ahead a gift card can be set to arrive. */
+export const GIFT_CARD_SEND_DAYS = 90;
 
 export function newGiftCardCode() {
   const raw = Array.from({ length: LENGTH }, () => ALPHABET[randomInt(ALPHABET.length)]).join("");
@@ -192,11 +194,119 @@ export async function sendScheduledGiftCards(ctx: GiftCardContext, opts: { now?:
       .where(and(eq(g.id, card.id), isNull(g.sentAt)))
       .returning();
     if (!claimed) continue;
-    const ok = await sendCode(ctx, shop, claimed, code, giftIntro(shop, delivery?.from ?? shop.name), delivery ? { name: delivery.name, from: delivery.from } : undefined);
+    const from = claimed.fromName ?? delivery?.from ?? null;
+    const gift = from ? { name: claimed.recipientName ?? delivery?.name ?? null, from } : undefined;
+    const ok = await sendCode(ctx, shop, claimed, code, giftIntro(shop, from ?? shop.name), gift);
     if (ok) sent++;
     else await ctx.db.update(g).set({ sentAt: null }).where(eq(g.id, card.id));
   }
   return { sent };
+}
+
+/** At most this many gift cards in one bulk send. */
+export const BULK_GIFT_CARD_MAX = 500;
+
+export type BulkGiftCardRow = { email: string; amountMinor: number; name: string | null };
+
+/** One pasted row's cells: split by tabs (copied from a spreadsheet), else semicolons, else commas outside quotes. */
+function cellsOf(line: string) {
+  const sep = line.includes("\t") ? "\t" : line.includes(";") ? ";" : ",";
+  const cells: string[] = [];
+  let cell = "";
+  let quoted = false;
+  for (const ch of line) {
+    if (ch === '"') quoted = !quoted;
+    else if (ch === sep && !quoted) {
+      cells.push(cell.trim());
+      cell = "";
+    } else cell += ch;
+  }
+  cells.push(cell.trim());
+  return cells;
+}
+
+/**
+ * Reads pasted spreadsheet rows, one gift card each: email, amount, and an optional name. A first
+ * row that doesn't start with an email is taken as headings.
+ */
+export function parseBulkGiftCards(text: string): BulkGiftCardRow[] {
+  const lines = text.split(/\r?\n/).map((l, i) => ({ n: i + 1, cells: cellsOf(l) })).filter((l) => l.cells.some(Boolean));
+  if (lines.length && !lines[0]!.cells[0]!.includes("@")) lines.shift();
+  if (!lines.length) throw new UserError("Paste at least one row: an email and an amount.");
+  if (lines.length > BULK_GIFT_CARD_MAX) throw new UserError(`Send up to ${BULK_GIFT_CARD_MAX} gift cards at a time.`);
+  return lines.map(({ n, cells: [email = "", amount = "", name = ""] }) => {
+    const address = email.toLowerCase();
+    if (!z.string().email().safeParse(address).success) throw new UserError(`Row ${n}: "${email || "(empty)"}" isn't an email.`);
+    let amountMinor: number;
+    try {
+      const bare = amount.replace(/^[^\d]+/, "").replace(/[^\d.,]+$/, "");
+      // "25,50" is 25.50 where commas mark decimals.
+      amountMinor = parseMoney(/^\d+,\d{1,2}$/.test(bare) ? bare.replace(",", ".") : bare);
+    } catch {
+      throw new UserError(`Row ${n}: enter the amount like 50 or 25.00.`);
+    }
+    if (amountMinor < 100 || amountMinor > MAX_GIFT_CARD_MINOR) throw new UserError(`Row ${n}: gift cards go from 1.00 to 10,000.00.`);
+    if (name.length > 60) throw new UserError(`Row ${n}: keep the name under 60 characters.`);
+    return { email: address, amountMinor, name: name || null };
+  });
+}
+
+const bulkSchema = z.object({
+  from: z.string().trim().max(60, "Keep who it's from under 60 characters.").optional().transform((f) => f || null),
+  message: z.string().trim().max(300, "Keep the message under 300 characters.").optional().transform((m) => m || null),
+  sendOn: z
+    .string()
+    .trim()
+    .optional()
+    .transform((d) => d || null)
+    .refine((d) => d === null || (/^\d{4}-\d{2}-\d{2}$/.test(d) && new Date(`${d}T00:00:00Z`).toISOString().startsWith(d)), "Pick the day to send them.")
+    .refine((d) => d === null || Date.parse(`${d}T00:00:00Z`) <= Date.now() + GIFT_CARD_SEND_DAYS * 86_400_000, `Gift cards can be sent up to ${GIFT_CARD_SEND_DAYS} days ahead.`),
+});
+
+export type BulkGiftCardInput = { rows: string; from?: string; message?: string; sendOn?: string };
+
+/** Checks a bulk send before it goes: the rows, who it's from, the message and the day. */
+export function checkBulkGiftCards(input: BulkGiftCardInput, now = new Date()) {
+  const parsed = bulkSchema.safeParse(input);
+  if (!parsed.success) throw new UserError(parsed.error.issues[0]!.message);
+  const rows = parseBulkGiftCards(input.rows);
+  const { from, message, sendOn } = parsed.data;
+  // A day that has already come sends now.
+  const scheduledFor = sendOn && Date.parse(`${sendOn}T00:00:00Z`) > now.getTime() ? new Date(`${sendOn}T00:00:00Z`) : null;
+  return { rows, from, message, scheduledFor, totalMinor: rows.reduce((s, r) => s + r.amountMinor, 0) };
+}
+
+/**
+ * Gives a gift card to each pasted row, for a company's team or a list of winners: the codes are
+ * emailed now, or on the day picked (each gets a fresh code that morning). With a "from", each
+ * email reads as a gift from them, with the person's name and the message.
+ */
+export async function issueBulkGiftCards(ctx: GiftCardContext, shop: Shop, input: BulkGiftCardInput & { userId?: string | null }, now = new Date()) {
+  const { rows, from, message, scheduledFor, totalMinor } = checkBulkGiftCards(input, now);
+  let issued = 0;
+  let sent = 0;
+  for (const row of rows) {
+    const made = await insertCard(ctx.db, {
+      shopId: shop.id,
+      currency: shop.currency,
+      initialMinor: row.amountMinor,
+      balanceMinor: row.amountMinor,
+      email: row.email,
+      note: message,
+      recipientName: row.name,
+      fromName: from,
+      createdBy: input.userId ?? null,
+      scheduledFor,
+    });
+    if (!made) continue;
+    issued++;
+    if (scheduledFor) continue;
+    const ok = from
+      ? await sendCode(ctx, shop, made.card, made.code, giftIntro(shop, from), { name: row.name, from })
+      : await sendCode(ctx, shop, made.card, made.code, `${shop.name} sent you a gift card.`);
+    if (ok) sent++;
+  }
+  return { issued, sent, scheduledFor, totalMinor };
 }
 
 /** Replaces a card's code (lost email, or a code someone shouldn't have). The old code stops working. */

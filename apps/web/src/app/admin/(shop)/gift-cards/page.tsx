@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { formatMoney, GIFT_CARD_PAGE_SIZE, giftCardProduct, listGiftCards, type GiftCardStatus } from "@sf/core";
+import { formatMoney, GIFT_CARD_PAGE_SIZE, GIFT_CARD_SEND_DAYS, giftCardProduct, listGiftCards, type GiftCardStatus } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
-import { CardActions, IssueForm, SellForm } from "./GiftCardForms";
+import { BulkForm, CardActions, IssueForm, SellForm } from "./GiftCardForms";
 
 export const metadata = { title: "Gift cards" };
 
@@ -17,6 +17,8 @@ const FILTERS: { key?: GiftCardStatus; label: string }[] = [
 
 export default async function GiftCardsPage({ searchParams }: { searchParams: Promise<{ q?: string; show?: string; page?: string }> }) {
   const { shop, db } = await requireShop("gift_cards");
+  const day = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+  const sendDays = { min: day(0), max: day(GIFT_CARD_SEND_DAYS) };
   const params = await searchParams;
   const q = params.q?.trim().slice(0, 100) || undefined;
   const status = FILTERS.find((f) => f.key && f.key === params.show)?.key;
@@ -63,6 +65,16 @@ export default async function GiftCardsPage({ searchParams }: { searchParams: Pr
           </div>
           <IssueForm />
         </section>
+        <section className="card p-5 flex flex-col gap-3" aria-labelledby="gc-bulk">
+          <div>
+            <h2 id="gc-bulk" className="font-semibold">Give gift cards to many people</h2>
+            <p className="text-sm hint">
+              When a company buys gift cards for its team or clients, or for prize winners: paste everyone in, check the total, and each gets
+              their own code by email, now or on the day you pick. Take payment from the company first, for example by invoice.
+            </p>
+          </div>
+          <BulkForm days={sendDays} />
+        </section>
         <section className="flex flex-col gap-3" aria-labelledby="gc-list">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 id="gc-list" className="font-semibold">Gift cards</h2>
@@ -100,7 +112,7 @@ export default async function GiftCardsPage({ searchParams }: { searchParams: Pr
                         ···· {c.last4} <span className={`ml-1 pill ${status === "Active" ? "pill-success" : "pill-neutral"}`}>{status}</span>
                       </span>
                       <span className="text-sm hint">
-                        {c.email} · {c.orderNumber ? `Bought on order #${c.orderNumber}` : "Given by you"} · {date.format(c.createdAt)}
+                        {c.email} · {c.orderNumber ? `Bought on order #${c.orderNumber}` : c.fromName ? `Given by you, from ${c.fromName}` : "Given by you"} · {date.format(c.createdAt)}
                         {!c.sentAt && (c.scheduledFor ? ` · Sends on ${c.scheduledFor.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" })}` : " · Email not sent")}
                       </span>
                     </div>

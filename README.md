@@ -1164,3 +1164,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **How things moved** (`periodTotals` and `comparisonRange` in `packages/core/src/analytics.ts`): each headline number on Analytics (sales, orders, average order, visitors, conversion) now says how it moved, "Up 18% vs the 30 days before", in green or red. Conversion moves in percentage points. Numbers that had nothing before say "New".
 2. **Or the same days last year**: "Compare with" switches to the same days a year earlier, which is the fair comparison around Black Friday and the holidays. Visitor counts are kept about 13 months, so when last year's days start before that, visitors and conversion aren't compared rather than shown wrong.
+
+### Gift cards for many people (after launch, part 201)
+
+1. **Paste a list** (`issueBulkGiftCards` in `packages/core/src/gift-cards.ts`, Gift cards → Give gift cards to many people): for a company buying cards for its team or clients, or for prize winners. Paste rows of email, amount and an optional name straight from a spreadsheet (tabs, semicolons or commas, with or without a heading row, up to 500). "Check" shows how many and the total, and any row that's wrong by number; changing anything asks for another check before "Send".
+2. **Each their own code**: everyone gets their own gift card by email now, or on a day up to 90 days ahead (a fresh code that morning). With "From", the email reads as a gift ("Acme Inc sent you a $50.00 gift card for …", "Hi Sam,", and the message), and the gift card list shows who it's from. The store takes payment from the company itself, for example by invoice.

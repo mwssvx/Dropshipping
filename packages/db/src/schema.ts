@@ -1641,6 +1641,9 @@ export const giftCards = pgTable(
     balanceMinor: money("balance_minor").notNull(),
     email: text("email").notNull(),
     note: text("note"),
+    // Sent in bulk as a gift (a company's cards for its team): who it's for and who it's from.
+    recipientName: text("recipient_name"),
+    fromName: text("from_name"),
     // Bought on the store (with the line it came from), or given by the merchant.
     sourceOrderId: uuid("source_order_id").references((): AnyPgColumn => orders.id, { onDelete: "set null" }),
     sourceIndex: integer("source_index"),

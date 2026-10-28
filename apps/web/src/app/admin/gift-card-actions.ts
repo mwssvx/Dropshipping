@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { createGiftCardProduct, formatMoney, issueGiftCard, parseMoney, resendGiftCard, setGiftCardDisabled, UserError } from "@sf/core";
+import { checkBulkGiftCards, createGiftCardProduct, formatMoney, issueBulkGiftCards, issueGiftCard, parseMoney, resendGiftCard, setGiftCardDisabled, UserError } from "@sf/core";
 import { campaigns, logged, requireShop } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -59,4 +59,28 @@ export async function setGiftCardDisabledAction(id: string, disabled: boolean, _
     const card = await db.query.giftCards.findFirst({ where: (g, { and, eq }) => and(eq(g.id, id), eq(g.shopId, shop.id)), columns: { last4: true } });
     await logged({ shop, user, db }, `${disabled ? "Turned off" : "Turned back on"} the gift card ending ${card?.last4 ?? "…"}`, { href: "/admin/gift-cards" });
   });
+}
+
+export type BulkGiftCardState = { error?: string; preview?: { count: number; total: string; sendOn: string | null }; done?: { issued: number; sent: number; total: string; sendOn: string | null } };
+
+const sendDay = (d: Date | null) => (d ? d.toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" }) : null);
+
+/** Checks pasted rows (step "check"), then gives everyone their gift card (step "send"). */
+export async function bulkGiftCardsAction(_: BulkGiftCardState, form: FormData): Promise<BulkGiftCardState> {
+  const { shop, user, db } = await requireShop("gift_cards");
+  const input = { rows: String(form.get("rows") ?? ""), from: String(form.get("from") ?? ""), message: String(form.get("message") ?? ""), sendOn: String(form.get("sendOn") ?? "") };
+  try {
+    if (form.get("step") !== "send") {
+      const checked = checkBulkGiftCards(input);
+      return { preview: { count: checked.rows.length, total: formatMoney(checked.totalMinor, shop.currency), sendOn: sendDay(checked.scheduledFor) } };
+    }
+    const done = await issueBulkGiftCards(await campaigns(), shop, { ...input, userId: user.id });
+    const total = formatMoney(done.totalMinor, shop.currency);
+    await logged({ shop, user, db }, `Gave ${done.issued} gift cards (${total} in all)${done.scheduledFor ? `, sending on ${sendDay(done.scheduledFor)}` : ""}`, { href: "/admin/gift-cards" });
+    revalidatePath("/admin/gift-cards");
+    return { done: { issued: done.issued, sent: done.sent, total, sendOn: sendDay(done.scheduledFor) } };
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
 }
