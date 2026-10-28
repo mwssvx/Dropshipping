@@ -790,7 +790,7 @@ export async function sendOrderEmail(ctx: FulfillmentContext, orderId: string, k
 }
 
 /** Records an order's email once per kind and ref, then sends it; a repeat is skipped. */
-async function deliverOrderEmail(ctx: FulfillmentContext, shop: Shop, order: Order, kind: EmailKind, ref: string, email: { to: string; subject: string; text: string }) {
+export async function deliverOrderEmail(ctx: FulfillmentContext, shop: Shop, order: Order, kind: EmailKind, ref: string, email: { to: string; subject: string; text: string }) {
   const { db } = ctx;
   const { to, subject, text } = email;
   const [row] = await db

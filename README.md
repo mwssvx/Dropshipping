@@ -1193,3 +1193,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **How many order again** (`repeatBuyers` in `packages/core/src/analytics.ts`, Analytics → Buyers who come back): for each of the last six months, how many people bought for the first time and how many of them ordered again within 90 days, with the share over the months that have had their full 90 days and the average days to the second order. Months still inside their 90 days say "so far".
 2. **Counted fairly**: buyers are told apart by email in any case, a buyer whose first order was before the months shown isn't counted as new, and free replacements aren't a second order.
+
+### Orders running late (after launch, part 207)
+
+1. **Before they wonder** (`sendLateOrderEmails` in `packages/core/src/late-orders.ts`, Shipping → Delivery dates → Orders running late): when an order still hasn't shipped 3, 5, 7, 10 or 14 days after paying (the store picks), the buyer gets one email, "Your order #1001 from Your Store is taking a little longer", saying it hasn't been forgotten and tracking follows when it ships, with a few words of the store's own if it adds them. Buyers who hear first rarely open a dispute.
+2. **Only where it fits**: orders on hold, pre-orders (they have their own date), local pickup and delivery, free replacements and orders already on their way are left out, and orders far past their day when it's turned on don't get one. Each buyer hears once; it shows on the order's timeline as "Running late". The daily job sends them, and store files carry the setting (migration 0136).

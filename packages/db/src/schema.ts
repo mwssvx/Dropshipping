@@ -151,6 +151,8 @@ export const shops = pgTable(
     reviewsAutoPublish: boolean("reviews_auto_publish").notNull().default(false),
     // Buyers are emailed asking for a review this many days after their order arrives; 0 turns it off.
     reviewRequestDays: integer("review_request_days").notNull().default(7),
+    // Buyers whose order still hasn't shipped this many days after paying get one email saying so.
+    lateOrderNotice: jsonb("late_order_notice").$type<LateOrderNotice | null>(),
     // Extra currencies buyers can shop in, converted from the store's own currency at today's rate.
     presentmentCurrencies: jsonb("presentment_currencies").$type<string[]>().notNull().default([]),
     // Round converted prices up to end in .99 (shipping and tax are never rounded).
@@ -810,7 +812,7 @@ export const emails = pgTable(
     id: id(),
     shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
     orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
-    kind: text("kind", { enum: ["order_confirmation", "shipping_update", "delivered", "refund", "support_reply", "abandoned_cart", "payment_link", "gift_shipped", "order_link", "order_updated", "abandoned_cart_offer", "pickup_ready", "bank_transfer", "bank_transfer_lapsed", "order_news"] }).notNull(),
+    kind: text("kind", { enum: ["order_confirmation", "shipping_update", "delivered", "refund", "support_reply", "abandoned_cart", "payment_link", "gift_shipped", "order_link", "order_updated", "abandoned_cart_offer", "pickup_ready", "bank_transfer", "bank_transfer_lapsed", "order_news", "order_late"] }).notNull(),
     // Tells apart emails of a kind that can repeat (one per refund). Empty for once-only kinds.
     ref: text("ref").notNull().default(""),
     to: text("to").notNull(),
@@ -1707,6 +1709,8 @@ export const shippingRates = pgTable(
 export const RETURN_REASONS = ["never_arrived", "damaged", "wrong_item", "not_as_described", "too_small_or_big", "changed_mind", "other"] as const;
 /** Holiday returns: orders paid from `from` to `to` (YYYY-MM-DD, inclusive) can be returned until `until`. */
 export type HolidayReturns = { from: string; to: string; until: string };
+/** "Running late" emails: after `days` without shipping, with the merchant's own words added when set. */
+export type LateOrderNotice = { days: number; message: string | null };
 
 export type ReturnItem = {
   lineId: string;

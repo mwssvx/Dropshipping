@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseKg, parseMoney, setCheckoutPhone, setDeliveryEstimates, setDeliveryProtection, setGiftWrap, setHolidayDeadline, setLocalDelivery, setLocalPickup, setMinOrder, setShipCutoff, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
+import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseKg, parseMoney, setCheckoutPhone, setDeliveryEstimates, setDeliveryProtection, setGiftWrap, setHolidayDeadline, setLateOrderNotice, setLocalDelivery, setLocalPickup, setMinOrder, setShipCutoff, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
 import { logged, requireShop } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -279,5 +279,22 @@ export async function setHolidayDeadlineAction(_: HolidayDeadlineState, form: Fo
   await logged({ shop, user, db }, saved ? `Set an order-by date for ${saved.name}` : "Removed the holiday order-by date", { href: "/admin/shipping#holiday-heading" });
   revalidatePath("/admin/shipping");
   revalidatePath(`/s/${shop.handle}`, "layout");
+  return { saved };
+}
+
+export type LateOrderState = { error?: string; saved?: { days: number; message: string | null } | null };
+
+/** Turns the "running late" email to buyers on or off. */
+export async function setLateOrderAction(_: LateOrderState, form: FormData): Promise<LateOrderState> {
+  const { shop, db, user } = await requireShop("shipping");
+  let saved: LateOrderState["saved"] = null;
+  try {
+    saved = await setLateOrderNotice(db, shop.id, form.get("enabled") === "on" ? { days: Number(form.get("days") ?? ""), message: String(form.get("message") ?? "") } : null);
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  await logged({ shop, user, db }, saved ? `Turned on "running late" emails after ${saved.days} days` : `Turned off "running late" emails`, { href: "/admin/shipping#late-heading" });
+  revalidatePath("/admin/shipping");
   return { saved };
 }
