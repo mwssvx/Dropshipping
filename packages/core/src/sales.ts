@@ -6,6 +6,7 @@ import { and, asc, count, countDistinct, eq, gt, gte, inArray, isNull, lt, lte, 
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
 import { collectionMembership } from "./collections";
+import { createDiscount, setDiscountActive } from "./discounts";
 import { NotFoundError, UserError } from "./errors";
 import { percentOff } from "./wholesale";
 
@@ -84,8 +85,66 @@ export async function endSale(db: Db, shopId: string, saleId: string, now = new 
 }
 
 export async function deleteSale(db: Db, shopId: string, saleId: string) {
-  const [row] = await db.delete(schema.sales).where(and(eq(schema.sales.id, saleId), eq(schema.sales.shopId, shopId))).returning({ id: schema.sales.id });
+  const [row] = await db
+    .delete(schema.sales)
+    .where(and(eq(schema.sales.id, saleId), eq(schema.sales.shopId, shopId)))
+    .returning({ id: schema.sales.id, earlyDiscountId: schema.sales.earlyDiscountId });
   if (!row) throw new NotFoundError("Sale");
+  // Its early access code would otherwise keep giving a sale that's no longer coming.
+  if (row.earlyDiscountId) await setDiscountActive(db, shopId, row.earlyDiscountId, false);
+}
+
+/** How long before the sale its early access code starts working. 0: as soon as it's made. */
+export const EARLY_ACCESS_HOURS = [0, 24, 48, 72] as const;
+
+/** "Black Friday!" becomes EARLY-BLACKFRIDAY, with a number after it if that code is taken. */
+async function earlyCode(db: Db, shopId: string, title: string) {
+  const base = `EARLY-${title.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 20) || "ACCESS"}`;
+  const taken = new Set(
+    (await db.query.discounts.findMany({ where: and(eq(schema.discounts.shopId, shopId), sql`${schema.discounts.code} like ${`${base}%`}`), columns: { code: true } })).map((d) => d.code),
+  );
+  for (let n = 1; ; n++) {
+    const code = n === 1 ? base : `${base}${n}`;
+    if (!taken.has(code)) return code;
+  }
+}
+
+/**
+ * Gives a scheduled sale an early access code: the same percentage off the same products, from now
+ * (or `hours` before the sale) until the sale starts, when everyone gets the price. With
+ * `customerTag`, only customers with that tag can use it ("vip"); otherwise anyone with the link.
+ * The merchant sends the link (<store>/discount/CODE) to their list or posts it.
+ */
+export async function giveEarlyAccess(db: Db, shopId: string, saleId: string, opts: { hours?: number; customerTag?: string | null } = {}, now = new Date()) {
+  const sale = await db.query.sales.findFirst({ where: and(eq(schema.sales.id, saleId), eq(schema.sales.shopId, shopId)) });
+  if (!sale) throw new NotFoundError("Sale");
+  if (sale.startsAt <= now) throw new UserError("This sale has already started, so everyone has the price.");
+  if (sale.earlyDiscountId) {
+    const existing = await db.query.discounts.findFirst({ where: eq(schema.discounts.id, sale.earlyDiscountId), columns: { active: true } });
+    if (existing?.active) throw new UserError("This sale already has early access.");
+  }
+  const hours = opts.hours ?? 0;
+  if (!(EARLY_ACCESS_HOURS as readonly number[]).includes(hours)) throw new UserError("Pick when early access starts.");
+  const startsAt = hours ? new Date(Math.max(now.getTime(), sale.startsAt.getTime() - hours * 3_600_000)) : now;
+  const d = await createDiscount(db, shopId, {
+    code: await earlyCode(db, shopId, sale.title),
+    kind: "percent",
+    value: sale.percentOff,
+    productIds: sale.scope === "products" ? sale.productIds : [],
+    collectionId: sale.scope === "collection" ? sale.collectionId : null,
+    customerTag: opts.customerTag ?? null,
+    startsAt,
+    endsAt: sale.startsAt,
+  });
+  await db.update(schema.sales).set({ earlyDiscountId: d.id, updatedAt: now }).where(eq(schema.sales.id, sale.id));
+  return d;
+}
+
+/** Stops a sale's early access code now. */
+export async function endEarlyAccess(db: Db, shopId: string, saleId: string) {
+  const sale = await db.query.sales.findFirst({ where: and(eq(schema.sales.id, saleId), eq(schema.sales.shopId, shopId)), columns: { earlyDiscountId: true } });
+  if (!sale) throw new NotFoundError("Sale");
+  if (sale.earlyDiscountId) await setDiscountActive(db, shopId, sale.earlyDiscountId, false);
 }
 
 export type SaleStatus = "scheduled" | "running" | "ended";
@@ -100,11 +159,20 @@ export async function listSales(db: Db, shopId: string, now = new Date()) {
     ? await db.query.collections.findMany({ where: inArray(schema.collections.id, collectionIds), columns: { id: true, title: true } })
     : [];
   const names = new Map(collections.map((c) => [c.id, c.title]));
+  const earlyIds = rows.map((r) => r.earlyDiscountId).filter((d): d is string => !!d);
+  const early = new Map(
+    (earlyIds.length
+      ? await db.query.discounts.findMany({ where: inArray(schema.discounts.id, earlyIds), columns: { id: true, code: true, customerTag: true, startsAt: true, active: true } })
+      : []
+    ).map((d) => [d.id, d]),
+  );
   const order: Record<SaleStatus, number> = { running: 0, scheduled: 1, ended: 2 };
   return rows
     .map((r) => ({
       ...r,
       status: saleStatus(r, now),
+      // Only while it can still be used: once the sale starts, it has done its job.
+      early: r.startsAt > now && r.earlyDiscountId && early.get(r.earlyDiscountId)?.active ? early.get(r.earlyDiscountId)! : null,
       covers:
         r.scope === "all"
           ? "Everything except gift cards"
