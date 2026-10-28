@@ -30,6 +30,7 @@ export type Proposal = { id: string; agent: string; summary: string; reason: str
  */
 export function ProposalCard({ action, onDone }: { action: Proposal; onDone: (outcome: string) => void }) {
   const draft = typeof action.input.message === "string" ? (action.input.message as string) : null;
+  const preview = Array.isArray(action.input.preview) ? (action.input.preview as unknown[]).filter((l): l is string => typeof l === "string") : [];
   const [message, setMessage] = useState(draft ?? "");
   const [busy, setBusy] = useState<"yes" | "no" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +71,9 @@ export function ProposalCard({ action, onDone }: { action: Proposal; onDone: (ou
           <Pill label={AGENT_LABEL[action.agent] ?? action.agent} tone="info" />
           <Text style={{ fontSize: 16, fontWeight: "600", color: color.ink }}>{action.summary}</Text>
           {action.reason ? <Body muted>Needs your OK: {action.reason.charAt(0).toLowerCase() + action.reason.slice(1)}</Body> : null}
+          {preview.map((line, k) => (
+            <Body key={k}>• {line}</Body>
+          ))}
           {draft !== null ? <Field label="Message to the buyer" value={message} onChangeText={setMessage} multiline /> : null}
           {error ? <Banner tone="critical">{error}</Banner> : null}
           <View style={{ flexDirection: "row", gap: space(2), flexWrap: "wrap" }}>

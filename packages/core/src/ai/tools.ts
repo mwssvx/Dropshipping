@@ -28,6 +28,8 @@ import type { WatchSignal } from "../watch";
 import { AUTO, blocked, needsOk, untrusted, type Decision, type RunScope } from "./context";
 import { enabledSkills, SKILL_NAMES, SKILLS } from "./skills";
 import { brandProblems, type BrandRules } from "./brand";
+import { createDiscount } from "../discounts";
+import { createCollection } from "../collections";
 import { findNote, MEMORY_MAX_NOTES, MEMORY_NOTE_MAX, normalizeMemory } from "./memory";
 import { addMessage, BUYER_TOPICS, discardDrafts, sendBuyerMessage, setConversationStatus, type BuyerTopic } from "./conversations";
 
@@ -1547,6 +1549,116 @@ const skillTools = [
   }),
 ];
 
+/* ───────────── Assistant: discounts and collections, with a preview to approve ───────────── */
+
+const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+type DiscountAsk = { code: string; kind: "percent" | "amount" | "free_shipping"; value: number; min_order: number | null; days: number | null; usage_limit: number | null; once_per_customer: boolean };
+
+function describeDiscount(run: RunScope, i: DiscountAsk) {
+  const off = i.kind === "percent" ? `${i.value}% off` : i.kind === "amount" ? `${money(run, Math.round(i.value * 100))} off` : "free shipping";
+  return `${off}${i.min_order ? ` orders over ${money(run, Math.round(i.min_order * 100))}` : i.kind === "free_shipping" ? "" : " everything"}`;
+}
+
+/** What the owner sees before saying yes: the terms in plain words, and what it does to their margins. */
+async function discountPreview(run: RunScope, i: DiscountAsk, now = new Date()) {
+  const lines = [`Buyers who enter ${i.code.toUpperCase()} get ${describeDiscount(run, i)}.`];
+  lines.push(i.days ? `It lasts ${plural(i.days, "day")} from when you approve it (until ${shortDate.format(new Date(now.getTime() + i.days * DAY))} if you approve today).` : "It has no end date; you can end it any time under Discounts and offers.");
+  const limits = [i.usage_limit ? `${plural(i.usage_limit, "use")} in total` : null, i.once_per_customer ? "once per customer" : null].filter(Boolean);
+  if (limits.length) lines.push(`Limited to ${limits.join(", ")}.`);
+  if (i.kind === "free_shipping") {
+    lines.push("You pay the shipping on orders that use it.");
+    return lines;
+  }
+  // Each product on its own, as if bought alone, which is the worst case for a minimum-free code.
+  const rows = (await productMargins(run)).filter((r) => r.on_sale && r.supplier_cost_minor !== null);
+  // One line per product, at its option that loses the most.
+  const worst = new Map<string, { product: string; after: number; left: number }>();
+  if (!i.min_order) {
+    for (const r of rows) {
+      const after = i.kind === "percent" ? Math.round(r.price_minor * (1 - i.value / 100)) : Math.max(0, r.price_minor - Math.round(i.value * 100));
+      const left = after - r.supplier_cost_minor! - estimateProcessingFee(after) - platformFeeFor(run.shop.plan, after);
+      if (left < 0 && left < (worst.get(r.product_id)?.left ?? 0)) worst.set(r.product_id, { product: r.product, after, left });
+    }
+  }
+  const losing = [...worst.values()].map((w) => `${w.product} could sell for ${money(run, w.after)}, ${money(run, -w.left)} below what it costs you`);
+  if (losing.length) lines.push(`With the code, ${plural(losing.length, "product")} would sell at a loss: ${losing.slice(0, 3).join("; ")}${losing.length > 3 ? "; and more" : ""}.`);
+  else if (rows.length && !i.min_order) lines.push("Every product still makes money with the code.");
+  return lines;
+}
+
+const chatShopTools = [
+  tool({
+    name: "create_discount",
+    kind: "change",
+    description:
+      "Create a discount code. The owner sees a preview (the terms, and any product that would sell at a loss with it) and approves it first. Money is in the store's currency, e.g. 5 for $5.",
+    input: z.object({
+      code: z.string().regex(/^[A-Za-z0-9_-]{3,30}$/).describe("3 to 30 letters, numbers, dashes or underscores"),
+      kind: z.enum(["percent", "amount", "free_shipping"]),
+      value: z.number().min(0).max(10_000).describe("The percentage (1 to 100) or the amount off; 0 for free shipping"),
+      min_order: z.number().min(0).max(100_000).nullable().describe("Smallest order the code works on, or null"),
+      days: z.number().int().min(1).max(365).nullable().describe("How many days it lasts from now, or null for no end"),
+      usage_limit: z.number().int().min(1).max(100_000).nullable(),
+      once_per_customer: z.boolean(),
+    }),
+    policy: () => needsOk("New discount codes start only with your OK."),
+    summary: (i) => `New discount code ${i.code.toUpperCase()}: ${i.kind === "percent" ? `${i.value}% off` : i.kind === "amount" ? `${i.value} off` : "free shipping"}${i.min_order ? ` over ${i.min_order}` : ""}`,
+    async propose(i, run) {
+      if (i.kind === "percent" && (i.value < 1 || i.value > 100)) throw new UserError("A percentage is between 1 and 100.");
+      if (i.kind === "amount" && i.value <= 0) throw new UserError("Say how much to take off.");
+      const taken = await run.ctx.db.query.discounts.findFirst({ where: and(eq(schema.discounts.shopId, run.shop.id), eq(schema.discounts.code, i.code.toUpperCase())), columns: { id: true } });
+      if (taken) throw new UserError(`The store already has a code called ${i.code.toUpperCase()}; pick another.`);
+      return { ...i, code: i.code.toUpperCase(), preview: await discountPreview(run, i) };
+    },
+    async run(i: DiscountAsk, run) {
+      const d = await createDiscount(run.ctx.db, run.shop.id, {
+        code: i.code,
+        kind: i.kind,
+        value: i.kind === "percent" ? Math.round(i.value) : i.kind === "amount" ? Math.round(i.value * 100) : 0,
+        minSubtotalMinor: i.min_order ? Math.round(i.min_order * 100) : 0,
+        usageLimit: i.usage_limit,
+        oncePerCustomer: i.once_per_customer,
+        endsAt: i.days ? new Date(Date.now() + i.days * DAY) : null,
+      });
+      return { created: true, code: d.code, manage_at: "/admin/marketing" };
+    },
+  }),
+  tool({
+    name: "create_collection",
+    kind: "change",
+    description:
+      "Create a collection (a page of chosen products, like \"Gifts under $30\") from products you found with find_products. The owner sees the products and approves it first.",
+    input: z.object({
+      title: z.string().min(2).max(120),
+      description: z.string().max(1000).describe("A sentence or two for the top of the collection page"),
+      product_ids: z.array(z.string().uuid()).min(1).max(100),
+    }),
+    policy: () => needsOk("New collections go on your store only with your OK."),
+    summary: (i) => `New collection “${i.title}” with ${plural(new Set(i.product_ids).size, "product")}`,
+    check: (i, run) => brandProblems(brand(run), [{ name: "collection title", text: i.title, isTitle: true }, { name: "collection description", text: i.description }]),
+    async propose(i, run) {
+      const ids = [...new Set(i.product_ids)];
+      const found = await run.ctx.db.query.products.findMany({ where: and(eq(schema.products.shopId, run.shop.id), inArray(schema.products.id, ids)), columns: { id: true, title: true, status: true } });
+      if (found.length !== ids.length) throw new UserError("Some of those products aren't in this store. Use the product_id values from find_products.");
+      const byId = new Map(found.map((p) => [p.id, p]));
+      const drafts = found.filter((p) => p.status !== "active").length;
+      const preview = [
+        `${plural(ids.length, "product")}: ${ids.slice(0, 8).map((id) => byId.get(id)!.title).join(", ")}${ids.length > 8 ? `, and ${ids.length - 8} more` : ""}.`,
+        ...(i.description ? [`Page text: “${i.description}”`] : []),
+        ...(drafts ? [`${plural(drafts, "of them is", "of them are")} not on sale yet, so ${drafts === 1 ? "it won't" : "they won't"} show until you publish ${drafts === 1 ? "it" : "them"}.`] : []),
+        "It won't be in your store menu until you add it there.",
+      ];
+      return { ...i, product_ids: ids, preview };
+    },
+    async run(i, run) {
+      const c = await createCollection(run.ctx.db, run.shop.id, { title: i.title, description: i.description, productIds: i.product_ids });
+      return { created: true, handle: c.handle, url: `/collections/${c.handle}`, manage_at: `/admin/collections/${c.id}` };
+    },
+  }),
+];
+
 /* ───────────── Assistant memory ───────────── */
 
 async function currentMemory(run: RunScope) {
@@ -1616,7 +1728,7 @@ const checkerTools = [
 
 export const AGENT_TOOLS: Record<AgentName, AgentTool[]> = {
   listing: listingTools,
-  assistant: [...assistantTools, ...skillTools, ...memoryTools],
+  assistant: [...assistantTools, ...skillTools, ...memoryTools, ...chatShopTools],
   buyer_support: buyerTools,
   fulfilment: fulfilmentTools,
   margin: marginTools,

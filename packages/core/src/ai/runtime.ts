@@ -214,7 +214,16 @@ async function callTool(scope: RunScope, name: string, id: string, rawInput: unk
       await log({ tool: name, input, summary, status: "blocked", reason: "Too many requests for approval in one go" });
       return reply("Not allowed: you've already asked the merchant to approve several things. Stop and summarise.", true);
     }
-    if (t.propose) input = await t.propose(input, scope);
+    if (t.propose) {
+      try {
+        input = await t.propose(input, scope);
+      } catch (e) {
+        // A proposal that can't be made (a code that's taken, a product that isn't there) goes back to the model to fix.
+        if (!(e instanceof UserError)) throw e;
+        await log({ tool: name, input, summary, status: "failed", error: e.message });
+        return reply(e.message, true);
+      }
+    }
     const [row] = await log({ tool: name, input, summary, status: "pending", reason: decision.reason });
     return reply({ status: "waiting_for_merchant", why: decision.reason, action_id: row!.id, note: "Don't try another way to do this. Tell the merchant what you proposed." });
   }

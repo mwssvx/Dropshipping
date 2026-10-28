@@ -391,6 +391,17 @@ function assistant(s: State, req: ModelRequest): BetaContentBlock[] {
     if (forget) return [toolCall("forget", { note: forget[1]!.replace(/[.!]+$/, "") })];
     const remember = original.match(/^(?:please\s+)?(?:remember|note)(?: that)?[:,]?\s+(.{3,200})$/i);
     if (remember) return [toolCall("remember", { note: remember[1]!.replace(/[.!]+$/, "").replace(/^\w/, (ch) => ch.toUpperCase()) })];
+    const code = original.match(/\b(?:code|coupon|discount)\s+(?:called\s+|named\s+)?([A-Z0-9_-]{3,30})\b/)?.[1];
+    const pct = ask.match(/(\d{1,3})\s*%/)?.[1];
+    if (code && (pct || /free shipping/.test(ask))) {
+      const over = ask.match(/\b(?:over|above|of at least)\s+\$?(\d+(?:\.\d+)?)/)?.[1];
+      const days = ask.match(/\b(?:for|lasts?)\s+(\d{1,3})\s+days?\b/)?.[1] ?? (/\b(this|for a|one) week\b/.test(ask) ? "7" : null);
+      return [
+        toolCall("create_discount", { code, kind: pct ? "percent" : "free_shipping", value: pct ? Number(pct) : 0, min_order: over ? Number(over) : null, days: days ? Number(days) : null, usage_limit: null, once_per_customer: /once (per|a) (customer|buyer)/.test(ask) }),
+      ];
+    }
+    const coll = ask.match(/\b(?:collection|page) (?:of|for|with) (?:all )?(?:my |the |our )?([a-z0-9 '&-]{3,40}?)s?(?: products)?(?: called ["“]?([^"”]{2,60})["”]?)?[.!]?$/);
+    if (coll && /\b(make|create|add|start|build)\b/.test(ask)) return [toolCall("find_products", { search: coll[1]!.trim() })];
     if (/\b(human|person|support team|ticket|payout|hold|frozen|bug)\b/.test(ask)) {
       return [toolCall("open_ticket", { subject: ask.slice(0, 80).replace(/^\w/, (c) => c.toUpperCase()), details: `The merchant asked: “${ask.slice(0, 1500)}”. Please get in touch with them.` })];
     }
@@ -419,6 +430,9 @@ function assistant(s: State, req: ModelRequest): BetaContentBlock[] {
   if (c.isError) return [text(`I couldn't do that: ${strip(c.result)}`)];
   const r = c.result;
   switch (c.name) {
+    case "create_discount":
+    case "create_collection":
+      return [text(waiting(c) ? `I've set that up; it's waiting for your OK next to this chat, with a preview of what it will do.` : `Done.`)];
     case "remember":
       return [text(`Got it, I'll remember that: “${c.input.note}”. You can see and edit what I remember in AI settings.`)];
     case "forget":
@@ -488,8 +502,14 @@ function assistant(s: State, req: ModelRequest): BetaContentBlock[] {
       ];
     }
     case "find_products": {
-      const rows = r as { product: string; option: string; price: string; margin_pct: number | null; on_sale: boolean }[];
-      if (!rows.length) return [text("You don't have any products yet. Import one from a supplier link to get started.")];
+      const rows = r as { product_id: string; product: string; option: string; price: string; margin_pct: number | null; on_sale: boolean }[];
+      if (!rows.length) return [text(c.input.search ? `I couldn't find products matching “${c.input.search}”.` : "You don't have any products yet. Import one from a supplier link to get started.")];
+      if (/\b(collection|page) (of|for|with)\b/.test(ask) && /\b(make|create|add|start|build)\b/.test(ask)) {
+        const named = s.prompt.match(/called ["“]?([^"”\n]{2,60}?)["”]?[.!]?(?:\n|$)/)?.[1];
+        const term = String(c.input.search ?? "");
+        const title = named ?? `${term.charAt(0).toUpperCase()}${term.slice(1)}s`;
+        return [toolCall("create_collection", { title, description: `Our ${term}s, all in one place.`, product_ids: [...new Set(rows.map((x) => x.product_id))] })];
+      }
       const worst = [...rows].filter((x) => x.margin_pct !== null).sort((a, b) => a.margin_pct! - b.margin_pct!)[0];
       return [
         text(
