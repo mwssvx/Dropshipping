@@ -36,6 +36,10 @@ const discountInput = z
       if (!d.getQty || d.getQty < 1 || d.getQty > 20) ctx.addIssue({ code: "custom", message: "Say how many they get, from 1 to 20." });
       if (d.value < 1 || d.value > 100) ctx.addIssue({ code: "custom", message: "The items they get are 1 to 100% off (100 is free)." });
     }
+    if (d.kind === "free_shipping" && d.productIds.length) ctx.addIssue({ code: "custom", message: "Free shipping is for the whole order. Pick products for money off instead." });
+    if (d.automatic && (d.kind === "percent" || d.kind === "amount") && d.productIds.length) {
+      ctx.addIssue({ code: "custom", message: "Money off without a code is for the whole order. Give it a code to limit it to some products." });
+    }
     if (d.automatic && d.kind === "free_shipping") ctx.addIssue({ code: "custom", message: "Free shipping over an amount is set under Shipping instead." });
     // Money off without a code needs a minimum order ("Spend more, save more"); money off everything is a sale.
     if (d.automatic && (d.kind === "percent" || d.kind === "amount") && d.minSubtotalMinor < 1) {
@@ -53,7 +57,8 @@ export async function createDiscount(db: Db, shopId: string, input: DiscountInpu
   const existing = await db.query.discounts.findFirst({ where: and(eq(schema.discounts.shopId, shopId), eq(schema.discounts.code, d.code)) });
   if (existing) throw new UserError(`You already have a code called ${d.code}.`);
   const bxgy = d.kind === "bxgy";
-  const productIds = bxgy ? [...new Set(d.productIds)] : [];
+  // Buy X get Y counts these products; money off takes them off only these.
+  const productIds = d.kind === "free_shipping" ? [] : [...new Set(d.productIds)];
   if (productIds.length) {
     const found = await db.query.products.findMany({ where: and(eq(schema.products.shopId, shopId), inArray(schema.products.id, productIds)), columns: { id: true } });
     if (found.length !== productIds.length) throw new NotFoundError("Product");
@@ -110,6 +115,7 @@ export function describeDiscount(d: Describable, currency: string) {
     return [what, d.productIds?.length ? "on selected products" : null, d.minSubtotalMinor ? `on orders over ${formatMoney(d.minSubtotalMinor, currency)}` : null].filter(Boolean).join(" ");
   }
   const what = d.kind === "percent" ? `${d.value}% off` : d.kind === "amount" ? `${formatMoney(d.value, currency)} off` : "Free shipping";
+  if (d.kind !== "free_shipping" && d.productIds?.length) return `${what} selected products${d.minSubtotalMinor ? ` on orders over ${formatMoney(d.minSubtotalMinor, currency)}` : ""}`;
   return d.minSubtotalMinor ? `${what} orders over ${formatMoney(d.minSubtotalMinor, currency)}` : what;
 }
 
@@ -195,8 +201,15 @@ export async function findUsableDiscount(db: Db, shop: Shop, code: string, cart:
 export function applyDiscount(d: Pick<Discount, "kind" | "value"> & Partial<Bxgy>, subtotalMinor: number, shippingMinor: number, units: OfferUnit[] = []) {
   if (d.kind === "free_shipping") return { discountMinor: 0, shippingMinor: 0 };
   if (d.kind === "bxgy") return { discountMinor: Math.min(subtotalMinor, bxgyDiscount({ value: d.value, buyQty: d.buyQty ?? 1, getQty: d.getQty ?? 1, productIds: d.productIds ?? [] }, units)), shippingMinor };
-  const off = d.kind === "percent" ? Math.floor((subtotalMinor * d.value) / 100) : Math.min(d.value, subtotalMinor);
+  // A code for chosen products takes off only what those cost.
+  const base = d.productIds?.length ? Math.min(subtotalMinor, eligibleMinor(d.productIds, units)) : subtotalMinor;
+  const off = d.kind === "percent" ? Math.floor((base * d.value) / 100) : Math.min(d.value, base);
   return { discountMinor: off, shippingMinor };
+}
+
+/** What the cart's chosen products cost before discounts. */
+export function eligibleMinor(productIds: string[], units: OfferUnit[]) {
+  return units.filter((u) => productIds.includes(u.productId)).reduce((sum, u) => sum + u.unitMinor * u.quantity, 0);
 }
 
 /** Spreads a discount over the lines in proportion, for tax. Leftover cents go to the largest remainders. */
@@ -215,4 +228,13 @@ export function spreadDiscount(lines: number[], discountMinor: number) {
     }
   }
   return lines.map((l, i) => l - shares[i]!);
+}
+
+/** Like spreadDiscount, over only the lines the discount was for (a code for chosen products). */
+export function spreadDiscountOver(lines: number[], eligible: boolean[], discountMinor: number) {
+  const within = lines.map((l, i) => (eligible[i] ? l : 0));
+  // Should the chosen lines not cover it (they always do), spread it over everything as before.
+  if (within.reduce((s, l) => s + l, 0) < discountMinor) return spreadDiscount(lines, discountMinor);
+  const spread = spreadDiscount(within, discountMinor);
+  return lines.map((l, i) => (eligible[i] ? spread[i]! : l));
 }

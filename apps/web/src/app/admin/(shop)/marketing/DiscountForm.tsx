@@ -62,6 +62,17 @@ export function DiscountForm({ currency, products }: { currency: string; product
           )}
         </div>
       )}
+      {(kind === "percent" || kind === "amount") && products.length > 0 && (
+        <fieldset className="flex flex-col gap-1">
+          <legend className="label mb-1">Products it&apos;s for (none ticked means the whole order)</legend>
+          <div className="max-h-40 overflow-y-auto flex flex-col gap-1 text-sm">
+            {products.map((p) => (
+              <label key={p.id} className="flex items-center gap-2"><input type="checkbox" name="productIds" value={p.id} /> {p.title}</label>
+            ))}
+          </div>
+          <span className="hint">Only those come down in price, so a code like SUMMER20 can be for your summer range alone.</span>
+        </fieldset>
+      )}
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="field">
           <label className="label" htmlFor="minSubtotal">Minimum order ({symbol})</label>
