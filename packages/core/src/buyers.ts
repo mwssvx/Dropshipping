@@ -150,10 +150,31 @@ export async function reorderLines(db: Db, shopId: string, buyerEmail: string, o
 
 const PAID_SQL = sql`('paid', 'partially_refunded', 'refunded')`;
 
+/**
+ * Quick filters for the customer list: subscribed to emails, bought more than once, bought before
+ * but not in the last 90 days, or never bought (signed up, asked a question, or tagged).
+ */
+export const CUSTOMER_FILTERS = ["subscribed", "repeat", "lapsed", "never"] as const;
+export type CustomerFilter = (typeof CUSTOMER_FILTERS)[number];
+/** Days without an order before a buyer counts as lapsed. */
+export const LAPSED_DAYS = 90;
+
+type CustomerQuery = { query?: string; tag?: string; filter?: CustomerFilter; now?: Date };
+
 /** One row per customer the merchant should see, with what they've bought. */
-function customerRows(db: Db, shopId: string, opts: { query?: string; tag?: string }) {
+function customerRows(db: Db, shopId: string, opts: CustomerQuery) {
   const q = opts.query?.trim().toLowerCase();
   const tag = opts.tag?.trim().toLowerCase();
+  const paidCount = sql`count(${schema.orders.id}) filter (where ${schema.orders.paymentStatus} in ${PAID_SQL})`;
+  const since = new Date((opts.now ?? new Date()).getTime() - LAPSED_DAYS * 86_400_000);
+  const filter =
+    opts.filter === "repeat"
+      ? sql`${paidCount} > 1`
+      : opts.filter === "lapsed"
+        ? sql`${paidCount} > 0 and max(${schema.orders.paidAt}) < ${since}`
+        : opts.filter === "never"
+          ? sql`${paidCount} = 0`
+          : undefined;
   return db
     .select({
       id: schema.customers.id,
@@ -174,11 +195,17 @@ function customerRows(db: Db, shopId: string, opts: { query?: string; tag?: stri
         eq(schema.customers.shopId, shopId),
         q ? sql`(lower(${schema.customers.email}) like ${`%${q}%`} or lower(coalesce(${schema.customers.name}, '')) like ${`%${q}%`})` : undefined,
         tag ? sql`${schema.customers.tags} @> ${JSON.stringify([tag])}::jsonb` : undefined,
+        opts.filter === "subscribed" ? eq(schema.customers.acceptsMarketing, true) : undefined,
       ),
     )
     .groupBy(schema.customers.id)
-    // Leaves out addresses that only asked for the newsletter and never confirmed or bought.
-    .having(sql`count(${schema.orders.id}) > 0 or bool_or(${schema.customers.acceptsMarketing}) or max(${schema.customers.lastSignInAt}) is not null or max(${schema.customers.name}) is not null or bool_or(${schema.customers.wholesaleStatus} = 'approved') or max(jsonb_array_length(${schema.customers.tags})) > 0`);
+    .having(
+      and(
+        // Leaves out addresses that only asked for the newsletter and never confirmed or bought.
+        sql`(count(${schema.orders.id}) > 0 or bool_or(${schema.customers.acceptsMarketing}) or max(${schema.customers.lastSignInAt}) is not null or max(${schema.customers.name}) is not null or bool_or(${schema.customers.wholesaleStatus} = 'approved') or max(jsonb_array_length(${schema.customers.tags})) > 0)`,
+        filter,
+      ),
+    );
 }
 
 /** Customers on one page of the customer list. */
@@ -207,7 +234,7 @@ function customerOrder(sort: CustomerSort) {
 }
 
 /** Customers for the merchant: who bought, how often, how much and when last. Latest buyers first. */
-export async function listCustomers(db: Db, shopId: string, opts: { query?: string; tag?: string; sort?: CustomerSort; limit?: number; offset?: number } = {}) {
+export async function listCustomers(db: Db, shopId: string, opts: CustomerQuery & { sort?: CustomerSort; limit?: number; offset?: number } = {}) {
   return customerRows(db, shopId, opts)
     .orderBy(...customerOrder(opts.sort ?? "recent"), desc(schema.customers.createdAt), schema.customers.id)
     .limit(opts.limit ?? 500)
@@ -215,7 +242,7 @@ export async function listCustomers(db: Db, shopId: string, opts: { query?: stri
 }
 
 /** How many customers match, how many bought more than once and how many signed in, over all of them, not one page. */
-export async function customerTotals(db: Db, shopId: string, opts: { query?: string; tag?: string } = {}) {
+export async function customerTotals(db: Db, shopId: string, opts: CustomerQuery = {}) {
   const rows = customerRows(db, shopId, opts).as("c");
   const [row] = await db
     .select({
