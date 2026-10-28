@@ -1,9 +1,10 @@
 // Holiday checklist: the season's settings in one place, each ticked from the store's own state,
 // so a merchant getting ready for Black Friday and Christmas finds what's there and what's left:
-// delivery dates and an order-by date, longer returns for gifts, gift cards and wrapping, a sale,
+// delivery dates and an order-by date, longer returns for gifts, gift cards, gift guides and wrapping, a sale,
 // checkout reminders, a sign-up offer, "running late" emails, and backup suppliers for best sellers.
 import { and, desc, eq, gte, inArray, isNotNull, isNull, ne, or, gt, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
+import { existingGiftGuides, giftGuideTitles } from "./gift-guides";
 import { holidayReturnsDates } from "./holiday-returns";
 
 type Shop = typeof schema.shops.$inferSelect;
@@ -23,9 +24,10 @@ export function holidaySeason(now = new Date()) {
 export async function holidayChecklist(db: Db, shop: Shop, now = new Date()): Promise<HolidayCheck[]> {
   const today = now.toISOString().slice(0, 10);
   const o = schema.orders;
-  const [giftCards, sale, best] = await Promise.all([
+  const [giftCards, sale, guides, best] = await Promise.all([
     db.query.products.findFirst({ where: and(eq(schema.products.shopId, shop.id), eq(schema.products.giftCard, true), eq(schema.products.status, "active")), columns: { id: true } }),
     db.query.sales.findFirst({ where: and(eq(schema.sales.shopId, shop.id), or(isNull(schema.sales.endsAt), gt(schema.sales.endsAt, now))), columns: { id: true } }),
+    existingGiftGuides(db, shop),
     db
       .select({ id: schema.products.id, title: schema.products.title, backup: schema.products.backup })
       .from(schema.orderLines)
@@ -83,6 +85,15 @@ export async function holidayChecklist(db: Db, shop: Shop, now = new Date()): Pr
       done: !!giftCards,
       detail: giftCards ? "Your gift cards are on sale, for the buyer or sent to someone on a day they pick." : "The last-minute gift that never ships late.",
       href: "/admin/gift-cards#gc-sell",
+    },
+    {
+      key: "gift-guides",
+      title: "Make gift guides",
+      done: guides.length === giftGuideTitles(shop.currency).length,
+      detail: guides.length
+        ? `You have ${guides.map((g) => g.title).join(", ")}.`
+        : `${giftGuideTitles(shop.currency).join(", ")}: collections that fill themselves from your prices and stock.`,
+      href: "/admin/collections#gift-guides",
     },
     {
       key: "gift-wrap",

@@ -1208,3 +1208,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Results on the Sales page** (`saleResults` in `packages/core/src/sales.ts`): every sale that has started shows its orders, items on sale sold and what they brought in ("Over 3 days: 42 orders, 61 items on sale, $1,830.00"), so far for one still running.
 2. **Against the days before**: the same number of days just before the sale, for the same products, gives "3.2× the 3 days before" in green or "Down 20% on the 3 days before" in red, which tells a merchant whether this Black Friday's discount was worth it. The newest 10 sales get results, and a collection sale counts what's in the collection now.
+
+### Gift guides (after launch, part 210)
+
+1. **In one click** (`createGiftGuides` in `packages/core/src/gift-guides.ts`, Collections → Gift guides): makes "Gifts under $25", "Gifts under $50" and "Gifts under $100" (in the store's currency), each filling itself by rules with what's in stock at that price or less, best sellers first, so they stay right as prices and stock change. Only the missing ones are made, and the card goes away once all three exist.
+2. **On the holiday checklist**: "Make gift guides" is now one of its eleven lines, ticked once all three exist.

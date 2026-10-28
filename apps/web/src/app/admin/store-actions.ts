@@ -5,6 +5,7 @@ import {
   addDomain,
   checkDomain,
   createCollection,
+  createGiftGuides,
   rulesFromForm,
   createPage,
   deleteCollection,
@@ -82,6 +83,16 @@ export async function createCollectionAction(_: FormState, form: FormData): Prom
   if ("error" in r) return r;
   refreshStore(shop.handle);
   redirect(`/admin/collections/${r.ok.id}?saved=1`);
+}
+
+/** Makes the "Gifts under $25 / $50 / $100" collections the store doesn't have yet. */
+export async function createGiftGuidesAction() {
+  const { shop, db, user } = await requireShop("collections");
+  const made = await createGiftGuides(db, shop);
+  if (made.length) await logged({ shop, user, db }, `Made gift guides: ${made.map((c) => c.title).join(", ")}`, { href: "/admin/collections" });
+  refreshStore(shop.handle);
+  revalidatePath("/admin/collections");
+  redirect(`/admin/collections?guides=${made.length}`);
 }
 
 export async function updateCollectionAction(id: string, _: FormState, form: FormData): Promise<FormState> {
