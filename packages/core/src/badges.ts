@@ -16,6 +16,27 @@ export function productSoldOut(p: Parameters<typeof openPreorder>[0] & { variant
   return !openPreorder(p, now) && p.variants.length > 0 && p.variants.every((v) => v.stock !== null && v.stock <= 0);
 }
 
+/**
+ * The one option a product card can add to the cart straight away, or null when the buyer has
+ * something to choose or type first: more than one option, personalisation, at least two to order,
+ * or none left to sell.
+ */
+export function quickAddVariant(p: {
+  variants: { id: string; stock: number | null }[];
+  personalization?: unknown[] | null;
+  purchaseLimit?: { min: number | null } | null;
+}) {
+  const [only, ...rest] = p.variants;
+  if (!only || rest.length || p.personalization?.length || (p.purchaseLimit?.min ?? 1) > 1) return null;
+  return only.stock === null || only.stock > 0 ? only.id : null;
+}
+
+/** Whether product cards carry an "Add to cart" button for products with nothing to choose. */
+export async function setCardQuickAdd(db: Db, shopId: string, on: boolean) {
+  await db.update(schema.shops).set({ cardQuickAdd: on, updatedAt: new Date() }).where(eq(schema.shops.id, shopId));
+  return on;
+}
+
 /** Which automatic badges the store's product cards show. */
 export async function setBadgeSettings(db: Db, shopId: string, input: BadgeSettings) {
   const newDays = Number(input.newDays);

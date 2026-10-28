@@ -6,6 +6,7 @@ import { buyerFx } from "@/lib/currency";
 import { BrowseBar, browseOptions, type BrowseParams } from "@/theme/Browse";
 import { ProductGrid } from "@/theme/Sections";
 import { loadShop, localProducts, storeBase, storeT } from "../data";
+import { addToCartAction } from "../actions";
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<BrowseParams> }) {
   const { q } = await searchParams;
@@ -34,7 +35,7 @@ export default async function SearchPage({ params, searchParams }: { params: Pro
       {showingFor && <p className="hint" role="status">{t.showingFor(showingFor)}</p>}
       <BrowseBar action={`${base}/search`} params={query} sort={sort} currency={fx.currency} search count={compact.length} facets={facets} t={t} />
       {compact.length ? (
-        <ProductGrid products={compact} data={{ base, currency: shop.currency, fx, t, badges: shop.productBadges, catalog: { products: compact, collections: [] } }} />
+        <ProductGrid products={compact} data={{ base, currency: shop.currency, fx, t, badges: shop.productBadges, quickAdd: shop.cardQuickAdd ? addToCartAction.bind(null, param) : undefined, catalog: { products: compact, collections: [] } }} />
       ) : (
         <p className="hint">
           {t.nothingMatches(q ?? null)} {t.tryFewer} <Link href={`${base}/collections/all`} className="underline">{t.seeEverything}</Link>.

@@ -7,6 +7,7 @@ import { LowStockForm } from "./LowStockForm";
 import { RestockAlertForm } from "./RestockAlertForm";
 import { BadgeSettingsForm } from "./BadgeSettingsForm";
 import { SoldOutForm } from "./SoldOutForm";
+import { QuickAddForm } from "./QuickAddForm";
 import { PriceImportForm } from "./PriceImportForm";
 import { AutoSubmitSelect } from "@/components/AutoSubmitSelect";
 import { SavedViews } from "@/components/SavedViews";
@@ -250,6 +251,16 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
             </p>
           </div>
           <SoldOutForm value={shop.soldOutProducts} />
+        </section>
+        <section className="card p-5 mt-6 flex flex-col gap-3 max-w-3xl" aria-labelledby="quick-add-heading">
+          <div>
+            <h2 id="quick-add-heading" className="font-semibold">Add to cart from product cards</h2>
+            <p className="hint">
+              Shoppers can add a product straight from collections, search and your home page, without opening its page. Only products with
+              nothing to choose get the button: one option, nothing to type, and in stock. The rest still open their page.
+            </p>
+          </div>
+          <QuickAddForm on={shop.cardQuickAdd} />
         </section>
       </div>
     </main>

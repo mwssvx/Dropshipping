@@ -7,6 +7,7 @@ import { storeText, type StoreText } from "@/lib/store-text";
 import type { DisplayFx } from "@sf/core/money";
 import { Price } from "@/components/Price";
 import { UnitPrice } from "@/components/UnitPrice";
+import { SubmitButton } from "@/components/SubmitButton";
 import { storeHref } from "./style";
 
 /*
@@ -17,6 +18,7 @@ import { storeHref } from "./style";
 /**
  * fx: the buyer's currency when they picked another one.
  * signup: the email signup form's server action and what happened last time (absent in the editor preview).
+ * quickAdd: adds a card's product to the cart; cards have no button when it's left out.
  */
 export type SectionData = {
   base: string;
@@ -24,6 +26,7 @@ export type SectionData = {
   fx?: DisplayFx;
   catalog: StorefrontCatalog;
   signup?: { action: (form: FormData) => Promise<void>; status: "sent" | "invalid" | null; offerPercent?: number | null };
+  quickAdd?: (form: FormData) => Promise<void>;
   /** The store's fixed words in the buyer's language; English when left out. */
   t?: StoreText;
   /** Which automatic badges product cards show; the defaults when left out. */
@@ -79,7 +82,7 @@ export function badgeLabel(b: Badge, t: StoreText) {
   return b.kind === "custom" ? b.text : b.kind === "sold_out" ? t.soldOut : b.kind === "sale" ? t.badgeSale(b.percent) : t.badgeNew;
 }
 
-type GridProduct = Omit<StorefrontCatalog["products"][number], "badge" | "createdAt" | "soldOut" | "swatches" | "contents"> & BadgeFacts & Partial<Pick<StorefrontCatalog["products"][number], "swatches" | "contents">>;
+type GridProduct = Omit<StorefrontCatalog["products"][number], "badge" | "createdAt" | "soldOut" | "swatches" | "contents" | "quickAdd"> & BadgeFacts & Partial<Pick<StorefrontCatalog["products"][number], "swatches" | "contents" | "quickAdd">>;
 
 export function ProductGrid({ products, data }: { products: GridProduct[]; data: SectionData }) {
   const t = data.t ?? storeText(null);
@@ -89,8 +92,8 @@ export function ProductGrid({ products, data }: { products: GridProduct[]; data:
       {products.map((p) => {
         const badges = cardBadges(data.badges, p, now);
         return (
-        <li key={p.id}>
-          <Link href={`${data.base}/products/${p.handle}`} className="sf-card group flex flex-col gap-2 h-full">
+        <li key={p.id} className="flex flex-col gap-2">
+          <Link href={`${data.base}/products/${p.handle}`} className="sf-card group flex flex-col gap-2 flex-1">
             <div className="sf-media relative aspect-square rounded-lg bg-sunken overflow-hidden">
               {p.imageUrl && (
                 <img src={p.imageUrl} alt={p.title} width={600} height={600} loading="lazy" decoding="async"
@@ -118,6 +121,15 @@ export function ProductGrid({ products, data }: { products: GridProduct[]; data:
               </span>
             )}
           </Link>
+          {data.quickAdd && p.quickAdd && (
+            <form action={data.quickAdd}>
+              <input type="hidden" name="variantId" value={p.quickAdd} />
+              <SubmitButton className="sf-quick-add btn btn-secondary w-full text-sm" pendingText={t.adding}>
+                <span aria-hidden="true">{t.addToCart}</span>
+                <span className="sr-only">{`${t.addToCart}: ${p.title}`}</span>
+              </SubmitButton>
+            </form>
+          )}
         </li>
         );
       })}
