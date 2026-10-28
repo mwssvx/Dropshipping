@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { can, formatMoney, listCollections, PRODUCT_PAGE_SIZE, productPage, productTags, recentBulkEdits, runningLow, soldOutAtSupplier } from "@sf/core";
+import { can, formatMoney, listCollections, PRODUCT_PAGE_SIZE, PRODUCT_SORTS, productPage, productTags, recentBulkEdits, runningLow, soldOutAtSupplier } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { BulkProducts, type BulkRow } from "./BulkProducts";
@@ -8,20 +8,23 @@ import { RestockAlertForm } from "./RestockAlertForm";
 import { BadgeSettingsForm } from "./BadgeSettingsForm";
 import { SoldOutForm } from "./SoldOutForm";
 import { PriceImportForm } from "./PriceImportForm";
+import { SortSelect } from "./SortSelect";
 
 export const metadata = { title: "Products" };
 
 const STATUSES = [["active", "On sale"], ["draft", "Drafts"], ["archived", "Archived"]] as const;
 
-export default async function ProductsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; tag?: string; page?: string }> }) {
+export default async function ProductsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; tag?: string; sort?: string; page?: string }> }) {
   const { shop, db, role } = await requireShop("products");
   const params = await searchParams;
   const q = params.q?.trim() || undefined;
   const status = STATUSES.find(([s]) => s === params.status)?.[0];
   const tag = params.tag?.trim().toLowerCase().slice(0, 30) || undefined;
+  // Newest first is the default, so it's left out of links.
+  const sort = PRODUCT_SORTS.find((s) => s === params.sort && s !== "newest");
   const page = Math.max(1, Math.min(10_000, Math.floor(Number(params.page)) || 1));
   const [{ products, total }, collections, recent, soldOut, low, tags] = await Promise.all([
-    productPage(db, shop.id, { query: q, status, tag, page }),
+    productPage(db, shop.id, { query: q, status, tag, sort, page }),
     listCollections(db, shop.id),
     recentBulkEdits(db, shop.id),
     soldOutAtSupplier(db, shop.id),
@@ -32,7 +35,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   const pages = Math.ceil(total / PRODUCT_PAGE_SIZE);
   // Keeps the other filters when one changes; a new filter starts at page 1.
   const href = (next: { q?: string; status?: string; tag?: string; page?: number }) => {
-    const merged = { q, status, tag, ...next, page: next.page && next.page > 1 ? String(next.page) : undefined };
+    const merged = { q, status, tag, sort, ...next, page: next.page && next.page > 1 ? String(next.page) : undefined };
     const out = new URLSearchParams(Object.entries(merged).filter((e): e is [string, string] => !!e[1]));
     return out.size ? `/admin/products?${out}` : "/admin/products";
   };
@@ -96,12 +99,13 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         )}
         {(total > 0 || filtered || page > 1) && (
           <div className="flex flex-col gap-3 mb-4">
-            <form className="flex gap-2 max-w-md" role="search">
+            <form className="flex flex-wrap gap-2 max-w-2xl" role="search">
               <label className="sr-only" htmlFor="product-q">Search products</label>
-              <input className="input" id="product-q" name="q" type="search" defaultValue={q} placeholder="Title or SKU" />
+              <input className="input flex-1 min-w-40" id="product-q" name="q" type="search" defaultValue={q} placeholder="Title or SKU" />
               {status && <input type="hidden" name="status" value={status} />}
               {tag && <input type="hidden" name="tag" value={tag} />}
               <button className="btn btn-secondary">Search</button>
+              <SortSelect value={sort ?? "newest"} />
             </form>
             <nav className="flex flex-wrap gap-1" aria-label="Product filters">
               <Link href={href({ status: undefined })} className={`chip text-sm ${!status ? "font-semibold border-accent" : ""}`} aria-current={!status ? "page" : undefined}>All</Link>
