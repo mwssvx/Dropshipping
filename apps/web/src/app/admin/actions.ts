@@ -129,6 +129,7 @@ function readProduct(form: FormData): ProductInput {
     descriptionHtml: String(form.get("description") ?? ""),
     imageUrl: form.has("imageUrl") ? String(form.get("imageUrl")) : undefined,
     status: form.get("status") === "active" ? "active" : "draft",
+    tags: form.has("tags") ? String(form.get("tags")) : undefined,
     variants,
   };
 }

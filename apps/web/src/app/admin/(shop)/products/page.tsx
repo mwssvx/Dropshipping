@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { can, formatMoney, listCollections, PRODUCT_PAGE_SIZE, productPage, recentBulkEdits, runningLow, soldOutAtSupplier } from "@sf/core";
+import { can, formatMoney, listCollections, PRODUCT_PAGE_SIZE, productPage, productTags, recentBulkEdits, runningLow, soldOutAtSupplier } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { BulkProducts, type BulkRow } from "./BulkProducts";
@@ -13,24 +13,26 @@ export const metadata = { title: "Products" };
 
 const STATUSES = [["active", "On sale"], ["draft", "Drafts"], ["archived", "Archived"]] as const;
 
-export default async function ProductsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; page?: string }> }) {
+export default async function ProductsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; tag?: string; page?: string }> }) {
   const { shop, db, role } = await requireShop("products");
   const params = await searchParams;
   const q = params.q?.trim() || undefined;
   const status = STATUSES.find(([s]) => s === params.status)?.[0];
+  const tag = params.tag?.trim().toLowerCase().slice(0, 30) || undefined;
   const page = Math.max(1, Math.min(10_000, Math.floor(Number(params.page)) || 1));
-  const [{ products, total }, collections, recent, soldOut, low] = await Promise.all([
-    productPage(db, shop.id, { query: q, status, page }),
+  const [{ products, total }, collections, recent, soldOut, low, tags] = await Promise.all([
+    productPage(db, shop.id, { query: q, status, tag, page }),
     listCollections(db, shop.id),
     recentBulkEdits(db, shop.id),
     soldOutAtSupplier(db, shop.id),
     runningLow(db, shop.id),
+    productTags(db, shop.id),
   ]);
-  const filtered = !!(q || status);
+  const filtered = !!(q || status || tag);
   const pages = Math.ceil(total / PRODUCT_PAGE_SIZE);
   // Keeps the other filters when one changes; a new filter starts at page 1.
-  const href = (next: { q?: string; status?: string; page?: number }) => {
-    const merged = { q, status, ...next, page: next.page && next.page > 1 ? String(next.page) : undefined };
+  const href = (next: { q?: string; status?: string; tag?: string; page?: number }) => {
+    const merged = { q, status, tag, ...next, page: next.page && next.page > 1 ? String(next.page) : undefined };
     const out = new URLSearchParams(Object.entries(merged).filter((e): e is [string, string] => !!e[1]));
     return out.size ? `/admin/products?${out}` : "/admin/products";
   };
@@ -98,6 +100,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
               <label className="sr-only" htmlFor="product-q">Search products</label>
               <input className="input" id="product-q" name="q" type="search" defaultValue={q} placeholder="Title or SKU" />
               {status && <input type="hidden" name="status" value={status} />}
+              {tag && <input type="hidden" name="tag" value={tag} />}
               <button className="btn btn-secondary">Search</button>
             </form>
             <nav className="flex flex-wrap gap-1" aria-label="Product filters">
@@ -106,6 +109,16 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                 <Link key={s} href={href({ status: s })} className={`chip text-sm ${status === s ? "font-semibold border-accent" : ""}`} aria-current={status === s ? "page" : undefined}>{label}</Link>
               ))}
             </nav>
+            {tags.length > 0 && (
+              <nav className="flex flex-wrap gap-1 items-center" aria-label="Filter by tag">
+                <span className="hint text-sm mr-1">Tags</span>
+                {tags.slice(0, 30).map((t) => (
+                  <Link key={t.tag} href={href({ tag: tag === t.tag ? undefined : t.tag })} className={`chip text-sm ${tag === t.tag ? "font-semibold border-accent" : ""}`} aria-current={tag === t.tag ? "page" : undefined}>
+                    {t.tag} <span className="hint num">{t.count}</span>
+                  </Link>
+                ))}
+              </nav>
+            )}
             <details className="text-sm">
               <summary className="cursor-pointer underline w-fit">Change prices and stock from a spreadsheet</summary>
               <PriceImportForm canDownload={can(role, "export")} />

@@ -9,9 +9,11 @@ import { uniqueHandle } from "./handles";
 import { editProductPhotos, inheritedPhoto, photoColumns } from "./gallery";
 import { publishDueProducts } from "./publish-later";
 import { groupBy } from "./group";
+import { normalizeTags } from "./customers";
 
 export const MAX_VARIANTS = 100;
 export const MAX_OPTIONS = 3;
+export const MAX_PRODUCT_TAGS = 20;
 
 const variantInput = z.object({
   /** An existing option of this product, to edit it in place; leave out to add one. */
@@ -55,6 +57,8 @@ const productInput = z.object({
     .or(z.literal("").transform(() => null)),
   status: z.enum(["draft", "active", "archived"]).default("draft"),
   variants: z.array(variantInput).min(1, "Add at least one price.").max(MAX_VARIANTS, `A product can have up to ${MAX_VARIANTS} options.`),
+  /** "summer, gift idea" or a list; left out, the product keeps the tags it has. */
+  tags: z.union([z.string(), z.array(z.string())]).optional(),
 });
 
 export type ProductInput = z.input<typeof productInput>;
@@ -62,7 +66,8 @@ export type ProductInput = z.input<typeof productInput>;
 function parse(input: ProductInput) {
   const parsed = productInput.safeParse(input);
   if (!parsed.success) throw new UserError(parsed.error.issues[0]!.message);
-  return parsed.data;
+  const { tags, ...data } = parsed.data;
+  return { ...data, ...(tags === undefined ? {} : { tags: normalizeTags(tags, "A product", MAX_PRODUCT_TAGS) }) };
 }
 
 export async function createProduct(db: Db, shopId: string, input: ProductInput) {
@@ -242,7 +247,7 @@ export const PRODUCT_PAGE_SIZE = 100;
 export async function productPage(
   db: Db,
   shopId: string,
-  opts: { query?: string; status?: "active" | "draft" | "archived"; page?: number; size?: number } = {},
+  opts: { query?: string; status?: "active" | "draft" | "archived"; tag?: string; page?: number; size?: number } = {},
 ) {
   await publishDueProducts(db, shopId);
   const size = opts.size ?? PRODUCT_PAGE_SIZE;
@@ -251,6 +256,7 @@ export async function productPage(
   const where = and(
     eq(schema.products.shopId, shopId),
     opts.status ? eq(schema.products.status, opts.status) : undefined,
+    opts.tag ? sql`${schema.products.tags} @> ${JSON.stringify([opts.tag.trim().toLowerCase()])}::jsonb` : undefined,
     q
       ? or(
           sql`lower(${schema.products.title}) like ${`%${q}%`}`,
@@ -267,6 +273,18 @@ export async function productPage(
     : [];
   const byProduct = groupBy(vs, (v) => v.productId);
   return { products: rows.map((p) => ({ ...p, variants: byProduct.get(p.id) ?? [] })), total: count!.n };
+}
+
+/** Every tag the store's products use, most used first, to filter the product list. */
+export async function productTags(db: Db, shopId: string) {
+  const rows = await db
+    .select({ tag: sql<string>`t.tag`, n: sql<number>`count(*)::int` })
+    .from(sql`${schema.products}, jsonb_array_elements_text(${schema.products.tags}) as t(tag)`)
+    .where(eq(schema.products.shopId, shopId))
+    .groupBy(sql`t.tag`)
+    .orderBy(sql`count(*) desc`, sql`t.tag`)
+    .limit(100);
+  return rows.map((r) => ({ tag: r.tag, count: r.n }));
 }
 
 export async function getProduct(db: Db, shopId: string, productId: string) {

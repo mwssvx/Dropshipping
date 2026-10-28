@@ -978,3 +978,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Change many prices at once**: Products → "Change prices and stock from a spreadsheet". Download the products file, change the Price, Compare at price, Cost or Stock columns in any spreadsheet, and upload it. Rows are found by SKU, or by Handle and Variant, and Shopify's column names work too ("Variant Price", "Cost per item", "Variant Inventory Qty"). Prices can be written "12.99", "$12.99", "€12,99" or "1.299,00" (`importPrices` and `readSheetPrice` in `packages/core/src/price-import.ts`).
 2. **Safe to upload twice**: an empty cell leaves a value as it is, so the same file changes nothing the second time. 0 or "-" in Compare at price takes it off, and a new price at or above the old compare-at price takes that off too, so a "sale" never shows that isn't one. Stock changes only for stock the store keeps itself and goes in the stock history as a count; a supplier product's stock comes from the supplier. Every row that wasn't used is listed with its line and why. Price changes land in the price history, so the EU lowest-price note stays right. No migration.
+
+### Product tags (after launch, part 157)
+
+1. **Your own labels**: a product has Tags ("summer, gift idea"), cleaned to lowercase like customer tags, up to 20. The product list shows the tags in use with how many products have each, and a tag narrows the list (it works with search and the status filters). Saving a product from the API without tags leaves them as they are (`tags` in `packages/core/src/products.ts`, `productTags`; migration `0119_product_tags`).
+2. **Collections by tag**: "Is tagged" is a rule for collections that fill themselves, so tagging a product puts it in the collection at once (`collection-rules.ts`).
+3. **Carried over**: store files keep product tags, and the Shopify products import brings Shopify's Tags column.

@@ -178,6 +178,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       swatches: Object.keys(p.swatches).length ? p.swatches : undefined,
       details: p.details.length ? p.details : undefined,
       badge: p.badge,
+      tags: p.tags.length ? p.tags : undefined,
       gift_card: p.giftCard,
       variants: (variants.get(p.id) ?? [])
         .map((v) => ({
@@ -405,6 +406,7 @@ const importSchema = z.object({
         video_url: z.string().max(2000).nullable().optional(),
         details: z.array(z.object({ label: z.string().max(200), value: z.string().max(1000) })).max(100).optional(),
         badge: z.string().max(20).nullable().optional(),
+        tags: z.array(z.string().max(30)).max(20).optional(),
         hs_code: z.string().max(20).nullable().optional(),
         min_age: z.number().int().nullable().optional(),
         reorder_days: z.number().int().nullable().optional(),
@@ -634,6 +636,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
           // Read like the merchant's own text, so lines that wouldn't save here are dropped.
           details: x.details ? parseDetails(detailsText(x.details)) : [],
           badge: x.badge?.trim() || null,
+          tags: [...new Set((x.tags ?? []).map((t) => t.trim().toLowerCase().replace(/\s+/g, " ")).filter(Boolean))],
           // A pre-order whose date has passed isn't brought over.
           preorder: x.preorder && openPreorder({ preorder: { shipsBy: x.preorder.ships_by, limit: x.preorder.limit } }) ? { shipsBy: x.preorder.ships_by, limit: x.preorder.limit } : null,
         })

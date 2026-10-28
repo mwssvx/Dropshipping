@@ -14,12 +14,12 @@ const TAG_LENGTH = 30;
 const UNFINISHED = ["unfulfilled", "sent_to_supplier", "partially_shipped", "problem"] as const;
 
 /** "VIP, wholesale lead ,vip" → ["vip", "wholesale lead"]. */
-export function normalizeTags(input: string | string[], owner = "A customer"): string[] {
+export function normalizeTags(input: string | string[], owner = "A customer", max = MAX_TAGS): string[] {
   const raw = Array.isArray(input) ? input : input.split(",");
   const tags = [...new Set(raw.map((t) => t.trim().toLowerCase().replace(/\s+/g, " ")).filter(Boolean))];
   const long = tags.find((t) => t.length > TAG_LENGTH);
   if (long) throw new UserError(`Keep each tag to ${TAG_LENGTH} characters ("${long.slice(0, 20)}…" is longer).`);
-  if (tags.length > MAX_TAGS) throw new UserError(`${owner} can have up to ${MAX_TAGS} tags.`);
+  if (tags.length > max) throw new UserError(`${owner} can have up to ${max} tags.`);
   return tags;
 }
 

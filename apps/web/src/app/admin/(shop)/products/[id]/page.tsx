@@ -161,6 +161,7 @@ export default async function EditProductPage({ params, searchParams }: { params
             title: product.title,
             description: product.descriptionHtml,
             status: product.status,
+            tags: product.tags.join(", "),
             variants: product.variants.map((v) => ({
               id: v.id,
               title: v.title,

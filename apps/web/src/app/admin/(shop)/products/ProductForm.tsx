@@ -66,6 +66,8 @@ type Values = {
   /** Only when adding a product; after that, photos have their own editor. */
   imageUrl?: string;
   status: "draft" | "active" | "archived";
+  /** "summer, gift idea" */
+  tags: string;
   variants: VariantValues[];
   /** Shown when the product came from a supplier. */
   supplier?: { label: string; sourceUrl: string | null };
@@ -160,6 +162,11 @@ export function ProductForm({
             <option value="active">Active: buyers can see it</option>
             <option value="draft">Draft: hidden</option>
           </select>
+        </div>
+        <div className="field">
+          <label className="label" htmlFor="tags">Tags</label>
+          <input className="input" id="tags" name="tags" defaultValue={initial.tags} placeholder="summer, gift idea" maxLength={700} />
+          <span className="hint">Your own labels, split by commas. Find products by tag, or make a collection that fills itself with a tag.</span>
         </div>
         <SubmitButton>{submitLabel}</SubmitButton>
       </aside>
