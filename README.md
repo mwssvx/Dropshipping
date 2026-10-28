@@ -1016,3 +1016,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **By product**: a product's page has "See orders", which lists every order with that product in it. Handy when a supplier says something is wrong with one item (`productId` in `OrderFilter`, `packages/core/src/orders.ts`).
 2. **By country**: when orders go to more than one country, the order list has a ship-to country menu, showing how many orders each has (`orderCountries`).
 3. Both work with the search, tabs, tags, pages, bulk actions and the spreadsheet download. No migration.
+
+### Product stock filter (after launch, part 165)
+
+1. **Stock**: the Products page filters to products that are sold out (every option has a count and none are left), running low (still for sale, with an option at or under the running-low email's number), or in stock (at least one option can be bought). Options without a stock count always count as in stock. The filter works with the search, status, tags, sort and pages (`PRODUCT_STOCK_FILTERS` in `packages/core/src/products.ts`; no migration).

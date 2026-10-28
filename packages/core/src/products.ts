@@ -270,10 +270,35 @@ function productOrder(sort: ProductSort) {
   }
 }
 
+export const PRODUCT_STOCK_FILTERS = ["in_stock", "low", "sold_out"] as const;
+export type ProductStockFilter = (typeof PRODUCT_STOCK_FILTERS)[number];
+
+/**
+ * Sold out: every option has a stock count and none are left. Running low: still for sale, but an
+ * option is at or under the store's running-low number. In stock: at least one option can be bought.
+ * Options without a stock count are always in stock.
+ */
+function stockWhere(shopId: string, filter: ProductStockFilter) {
+  const v = schema.variants;
+  const options = (cond: SQL) => sql`exists (select 1 from ${v} where ${v.productId} = ${schema.products.id} and ${cond})`;
+  const available = options(sql`(${v.stock} is null or ${v.stock} > 0)`);
+  switch (filter) {
+    case "in_stock":
+      return available;
+    case "sold_out":
+      return sql`(${options(sql`true`)} and not ${available})`;
+    case "low":
+      return and(
+        available,
+        options(sql`${v.stock} is not null and ${v.stock} <= (select ${schema.shops.restockAlertAt} from ${schema.shops} where ${schema.shops.id} = ${shopId})`),
+      );
+  }
+}
+
 export async function productPage(
   db: Db,
   shopId: string,
-  opts: { query?: string; status?: "active" | "draft" | "archived"; tag?: string; sort?: ProductSort; page?: number; size?: number } = {},
+  opts: { query?: string; status?: "active" | "draft" | "archived"; tag?: string; stock?: ProductStockFilter; sort?: ProductSort; page?: number; size?: number } = {},
 ) {
   await publishDueProducts(db, shopId);
   const size = opts.size ?? PRODUCT_PAGE_SIZE;
@@ -283,6 +308,7 @@ export async function productPage(
     eq(schema.products.shopId, shopId),
     opts.status ? eq(schema.products.status, opts.status) : undefined,
     opts.tag ? sql`${schema.products.tags} @> ${JSON.stringify([opts.tag.trim().toLowerCase()])}::jsonb` : undefined,
+    opts.stock ? stockWhere(shopId, opts.stock) : undefined,
     q
       ? or(
           sql`lower(${schema.products.title}) like ${`%${q}%`}`,
