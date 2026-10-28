@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne, or, sql, type SQL } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
@@ -314,11 +314,43 @@ export async function productSources(db: Db, shopId: string) {
   return Object.fromEntries(PRODUCT_SOURCES.map((s) => [s, rows.find((r) => r.source === s)?.n ?? 0])) as Record<ProductSource, number>;
 }
 
+/** Things a product still lacks that buyers, shipping rates or customs need. */
+export const PRODUCT_GAPS = ["photo", "description", "weight", "customs"] as const;
+export type ProductGap = (typeof PRODUCT_GAPS)[number];
+
+/**
+ * Weight and customs only count for products that ship: downloads and gift cards need neither.
+ * A description of only tags or spaces counts as none.
+ */
+function gapWhere(gap: ProductGap) {
+  const p = schema.products;
+  const ships = sql`not ${p.digital} and not ${p.giftCard}`;
+  switch (gap) {
+    case "photo":
+      return sql`${p.imageUrl} is null`;
+    case "description":
+      return sql`regexp_replace(regexp_replace(${p.descriptionHtml}, '<[^>]*>', '', 'g'), '&nbsp;|[[:space:]]', '', 'g') = ''`;
+    case "weight":
+      return sql`${ships} and exists (select 1 from ${schema.variants} v where v.product_id = ${p.id} and v.weight_grams is null)`;
+    case "customs":
+      return sql`${ships} and (${p.hsCode} is null or ${p.originCountry} is null)`;
+  }
+}
+
+/** How many products not archived lack each thing, for the list's filter. */
+export async function productGaps(db: Db, shopId: string) {
+  const [row] = await db
+    .select(Object.fromEntries(PRODUCT_GAPS.map((g) => [g, sql<number>`count(*) filter (where ${gapWhere(g)})::int`])) as Record<ProductGap, SQL<number>>)
+    .from(schema.products)
+    .where(and(eq(schema.products.shopId, shopId), ne(schema.products.status, "archived")));
+  return Object.fromEntries(PRODUCT_GAPS.map((g) => [g, Number(row?.[g] ?? 0)])) as Record<ProductGap, number>;
+}
+
 /** The product list's search and filters, shared by the page and its spreadsheet download. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** collection: a hand-picked collection's id; products in it. */
-export type ProductQuery = { query?: string; status?: "active" | "draft" | "archived"; tag?: string; stock?: ProductStockFilter; source?: ProductSource; collection?: string };
+/** collection: a hand-picked collection's id; products in it. missing: products that lack this. */
+export type ProductQuery = { query?: string; status?: "active" | "draft" | "archived"; tag?: string; stock?: ProductStockFilter; source?: ProductSource; collection?: string; missing?: ProductGap };
 
 export function productWhere(db: Db, shopId: string, opts: ProductQuery) {
   const q = opts.query?.trim().toLowerCase();
@@ -331,6 +363,8 @@ export function productWhere(db: Db, shopId: string, opts: ProductQuery) {
     opts.collection && UUID.test(opts.collection)
       ? inArray(schema.products.id, db.select({ id: schema.collectionProducts.productId }).from(schema.collectionProducts).where(eq(schema.collectionProducts.collectionId, opts.collection)))
       : undefined,
+    // Archived products aren't worth finishing, so they're left out unless asked for, as in the counts.
+    opts.missing && PRODUCT_GAPS.includes(opts.missing) ? and(gapWhere(opts.missing), opts.status ? undefined : ne(schema.products.status, "archived")) : undefined,
     q
       ? or(
           sql`lower(${schema.products.title}) like ${`%${q}%`}`,
@@ -351,6 +385,7 @@ export function parseProductQuery(get: (key: string) => string | null | undefine
     stock: PRODUCT_STOCK_FILTERS.find((s) => s === get("stock")),
     source: PRODUCT_SOURCES.find((s) => s === get("source")),
     collection: UUID.test(get("collection") ?? "") ? get("collection")! : undefined,
+    missing: PRODUCT_GAPS.find((g) => g === get("missing")),
   };
 }
 
