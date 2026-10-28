@@ -750,6 +750,13 @@
       "when": 1793182657356,
       "tag": "0106_ai_watch",
       "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1793184496511,
+      "tag": "0107_ai_memory",
+      "breakpoints": true
     }
   ]
 }

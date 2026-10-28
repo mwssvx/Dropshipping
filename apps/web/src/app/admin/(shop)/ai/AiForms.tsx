@@ -4,7 +4,7 @@ import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import { marginCheckAction, saveAiSettingsAction } from "../../ai-actions";
 
-export function AiSettingsForm(props: { budget: string; planMax: string; topics: { key: string; label: string; on: boolean }[]; autoPause: boolean; shopper: boolean; weeklyReview: boolean; dailyWatch: boolean; skills: { key: string; title: string; when: string; on: boolean }[]; brand: { voice: string; banned: string; language: string; titleMax: string }; languages: { code: string; name: string }[] }) {
+export function AiSettingsForm(props: { budget: string; planMax: string; topics: { key: string; label: string; on: boolean }[]; autoPause: boolean; shopper: boolean; weeklyReview: boolean; dailyWatch: boolean; skills: { key: string; title: string; when: string; on: boolean }[]; brand: { voice: string; banned: string; language: string; titleMax: string }; languages: { code: string; name: string }[]; memory: string; memoryMax: number }) {
   const [state, action] = useActionState(saveAiSettingsAction, {});
   return (
     <form action={action} className="flex flex-col gap-5">
@@ -82,6 +82,11 @@ export function AiSettingsForm(props: { budget: string; planMax: string; topics:
           </div>
         </div>
       </fieldset>
+      <div className="flex flex-col gap-1">
+        <label className="label" htmlFor="memory">What the Assistant remembers</label>
+        <span className="hint" id="memory-hint">Tell the Assistant &ldquo;remember that…&rdquo; in the chat, or write notes here, one per line (up to {props.memoryMax}). It reads them in every chat. Buyers&apos; helpers never see them.</span>
+        <textarea className="input min-h-24" id="memory" name="memory" aria-describedby="memory-hint" defaultValue={props.memory} placeholder={"We only ship from the US warehouse\nWhen I ask how I'm doing, lead with profit"} />
+      </div>
       <fieldset className="flex flex-col gap-2">
         <legend className="label mb-1">Skills the Assistant uses</legend>
         <div className="flex flex-col gap-2">
