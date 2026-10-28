@@ -5,6 +5,7 @@ import {
   decideAction,
   fixProblemOrder,
   merchantReply,
+  reviewStoreWithAi,
   runMarginWatch,
   setAiSettings,
   setReviewSummary,
@@ -86,6 +87,19 @@ export async function saveReviewSummaryAction(productId: string, _: AgentState, 
   return { saved: true, message: text.trim() ? "Saved. It shows above the reviews on the product page." : "Removed from the product page." };
 }
 
+export async function reviewStoreAction(_: AgentState): Promise<AgentState> {
+  const { shop } = await requireShop("analytics");
+  try {
+    const run = await reviewStoreWithAi(await agents(), shop);
+    revalidatePath("/admin/insights");
+    if (run.status === "over_budget") return { error: "This month's AI budget is used up. You can raise it in AI settings." };
+    if (!run.report) return { error: run.error ?? "The review couldn't be finished. Try again later." };
+    return { saved: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
 export async function fixOrderAction(orderId: string, _: AgentState): Promise<AgentState> {
   const { shop } = await requireShop("orders");
   try {
@@ -121,6 +135,7 @@ export async function saveAiSettingsAction(_: AgentState, form: FormData): Promi
       autoReplyTopics: form.getAll("topics").map(String),
       autoPause: form.get("autoPause") === "on",
       shopper: form.get("shopper") === "on",
+      weeklyReview: form.get("weeklyReview") === "on",
     });
   } catch (e) {
     return fail(e);

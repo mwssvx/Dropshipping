@@ -16,6 +16,7 @@ export const AGENT_LABEL: Record<string, string> = {
   sizer: "Size chart drafter",
   shopper: "Shopping assistant",
   summarizer: "Review summarizer",
+  analyst: "Business analyst",
 };
 
 export type Proposal = { id: string; agent: string; summary: string; reason: string | null; input: Record<string, unknown> };

@@ -3,20 +3,7 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { FormError } from "@/components/FormError";
 import { decideAgentAction } from "@/app/admin/ai-actions";
-
-export const AGENT_LABEL: Record<string, string> = {
-  listing: "Listing writer",
-  assistant: "Assistant",
-  buyer_support: "Buyer support",
-  fulfilment: "Order fixer",
-  margin: "Margin watch",
-  writer: "Blog writer",
-  translator: "Translator",
-  answerer: "Question answerer",
-  sizer: "Size chart drafter",
-  shopper: "Shopping assistant",
-  summarizer: "Review summarizer",
-};
+import { AGENT_LABEL } from "@/lib/agent-labels";
 
 export type PendingAction = { id: string; agent: string; tool: string; summary: string; reason: string | null; input: Record<string, unknown> };
 

@@ -4,7 +4,7 @@ import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import { marginCheckAction, saveAiSettingsAction } from "../../ai-actions";
 
-export function AiSettingsForm(props: { budget: string; planMax: string; topics: { key: string; label: string; on: boolean }[]; autoPause: boolean; shopper: boolean }) {
+export function AiSettingsForm(props: { budget: string; planMax: string; topics: { key: string; label: string; on: boolean }[]; autoPause: boolean; shopper: boolean; weeklyReview: boolean }) {
   const [state, action] = useActionState(saveAiSettingsAction, {});
   return (
     <form action={action} className="flex flex-col gap-5">
@@ -38,6 +38,13 @@ export function AiSettingsForm(props: { budget: string; planMax: string; topics:
         <span>
           <span className="font-medium">Show the shopping assistant on your store</span>
           <span className="hint block">Shoppers can ask it about your products, sizes, delivery and returns. It only reads what your store already shows, can&apos;t see orders or change anything, and uses at most half of your monthly AI budget.</span>
+        </span>
+      </label>
+      <label className="flex items-start gap-3 text-sm">
+        <input type="checkbox" name="weeklyReview" defaultChecked={props.weeklyReview} className="mt-1 size-4" />
+        <span>
+          <span className="font-medium">Review my store every Monday</span>
+          <span className="hint block">The business analyst reads last month&apos;s numbers and leaves a few suggestions on the Insights page. Each review uses a few cents of your AI budget.</span>
         </span>
       </label>
       <div><SubmitButton>Save</SubmitButton></div>

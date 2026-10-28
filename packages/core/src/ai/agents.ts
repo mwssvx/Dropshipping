@@ -6,7 +6,7 @@ import type { AgentContext, Shop } from "./context";
 import { untrusted } from "./context";
 import { addMessage, assistantConversation, BUYER_TOPICS, startBuyerMessage } from "./conversations";
 import { aiBudget, runAgent, type AgentSpec, type RunResult } from "./runtime";
-import { REVIEW_SUMMARY_MIN, thinMargins } from "./tools";
+import { REVIEW_MAX_ITEMS, REVIEW_SUMMARY_MIN, thinMargins } from "./tools";
 import { LANGUAGES, shopLanguages, untranslated, type Language } from "../languages";
 import { shopperLinks } from "../shopper-links";
 
@@ -125,6 +125,22 @@ ${RULES}`,
     system: (shop) => `You summarize what buyers say about a product in their reviews for ${shop.name}, an online store. The summary shows above the reviews as "What buyers say".
 Call read_reviews, then save_review_summary once, then tell the merchant in one sentence what you wrote.
 Write two or three short sentences in plain text: what most buyers like, and any complaint several of them share. Be fair: if reviews are mixed, say so. Only say what the reviews say, in your own words; don't quote names, don't invent details, and don't add advice or marketing. No links.
+${RULES}`,
+  },
+  analyst: {
+    agent: "analyst",
+    effort: "medium",
+    maxTokens: 8192,
+    system: (shop) => `You are the business analyst for ${shop.name}, an online store selling to ${shop.country === "US" ? "the US" : shop.country}. You review how the store is doing and tell the owner what to do next.
+Read the numbers first: read_sales and read_profit for the last 30 days (90 when there were fewer than 10 orders), read_product_funnel, read_customers, read_returns, read_shopper_interest, and read_stock if the store keeps its own stock. Then call save_review once.
+Pick at most ${REVIEW_MAX_ITEMS} suggestions, the ones most likely to bring in more profit for the least work, most important first. Each one has:
+- finding: what the numbers show, with the actual figures ("38 visitors looked at the Galaxy lamp, 1 added it to the cart").
+- action: one concrete thing to do this week, in the admin where possible ("Add a second photo and the delivery time to the top of the description", "Start a 10% win-back offer for the 24 lapsed buyers").
+- impact: high, medium or low, from how much money is at stake.
+- area: where in the admin to do it, or null.
+Good things to look for: products that lose money or whose ads cost more than they bring; products viewed a lot but rarely added to the cart (price, photos, description, delivery time); carts that don't turn into orders (shipping costs, checkout); searches that found nothing (products to add or search fixes); few buyers coming back (win-back, email campaigns, bundles); a return reason that keeps coming up; stock about to run out.
+Only suggest what the numbers support, and say so plainly when there's too little data yet; then suggest how to get the first visitors and sales. Don't invent figures, don't promise results, and don't suggest anything illegal or misleading (fake reviews, fake countdowns, fake "only 2 left").
+The summary is two or three sentences on how the store is doing. Your final message to the owner is one sentence.
 ${RULES}`,
   },
   shopper: {
@@ -369,6 +385,31 @@ export async function summarizeReviewsWithAi(ctx: AgentContext, shop: Shop, prod
   });
 }
 
+/** A store review takes a while and costs a little, and the numbers don't change by the hour. */
+export const REVIEW_COOLDOWN_HOURS = 12;
+
+/**
+ * The business analyst reads the store's numbers and saves a review with a few suggestions.
+ * Returns the run and the saved report, if any.
+ */
+export async function reviewStoreWithAi(ctx: AgentContext, shop: Shop, trigger: "merchant" | "schedule" = "merchant", now = new Date()) {
+  const recent = await ctx.db.query.aiReports.findFirst({
+    where: and(eq(schema.aiReports.shopId, shop.id), eq(schema.aiReports.kind, "review"), gte(schema.aiReports.createdAt, new Date(now.getTime() - REVIEW_COOLDOWN_HOURS * 3_600_000))),
+  });
+  if (recent && trigger === "merchant") throw new UserError(`You got a store review in the last ${REVIEW_COOLDOWN_HOURS} hours. The numbers won't have changed much yet.`);
+  const run = await runAgent(ctx, AGENT_SPECS.analyst, shop, {
+    trigger,
+    messages: [{ role: "user", content: `Review the store and save your suggestions. Today is ${now.toISOString().slice(0, 10)}.` }],
+  });
+  const report = await ctx.db.query.aiReports.findFirst({ where: eq(schema.aiReports.runId, run.runId) });
+  return { ...run, report: report ?? null };
+}
+
+/** The store's latest AI reports, newest first. */
+export async function listAiReports(db: Db, shopId: string, kind: "review", limit = 6) {
+  return db.query.aiReports.findMany({ where: and(eq(schema.aiReports.shopId, shopId), eq(schema.aiReports.kind, kind)), orderBy: desc(schema.aiReports.createdAt), limit });
+}
+
 /** A buyer asked a question on their order page. The agent answers, drafts, or hands it over. */
 export async function handleBuyerMessage(ctx: AgentContext, input: { shopId: string; paymentIntentId: string; body: string }) {
   const { conversation, order } = await startBuyerMessage(ctx.db, input);
@@ -418,8 +459,8 @@ export async function runMarginWatch(ctx: AgentContext, shop: Shop, trigger: "me
 }
 
 /**
- * Scheduled work: problem orders the agent hasn't looked at in a day, and a daily margin check per
- * store. Stores without AI budget left are skipped.
+ * Scheduled work: problem orders the agent hasn't looked at in a day, a daily margin check per
+ * store, and on Mondays the weekly store review where it's on. Stores without AI budget left are skipped.
  */
 export async function runScheduledAgents(ctx: AgentContext, now = new Date()) {
   const { db } = ctx;
@@ -452,7 +493,19 @@ export async function runScheduledAgents(ctx: AgentContext, now = new Date()) {
     if (skip.has(shop.id) || !(await aiBudget(db, shop, now)).left) continue;
     if (await runMarginWatch(ctx, shop)) margins++;
   }
-  return { problemOrders: fixed, marginChecks: margins };
+  // The weekly store review, on Mondays, for stores that turned it on.
+  let reviews = 0;
+  if (now.getUTCDay() === 1) {
+    const weekAgo = new Date(now.getTime() - 6 * 86_400_000);
+    for (const shop of shops) {
+      if (!shop.aiWeeklyReview || !(await aiBudget(db, shop, now)).left) continue;
+      const done = await db.query.aiReports.findFirst({ where: and(eq(schema.aiReports.shopId, shop.id), eq(schema.aiReports.kind, "review"), gte(schema.aiReports.createdAt, weekAgo)) });
+      if (done) continue;
+      await reviewStoreWithAi(ctx, shop, "schedule", now);
+      reviews++;
+    }
+  }
+  return { problemOrders: fixed, marginChecks: margins, storeReviews: reviews };
 }
 
 /** How each agent did this month, for the AI settings page. */

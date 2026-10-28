@@ -49,6 +49,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <nav className="flex lg:flex-col gap-1 px-2 pb-3 overflow-x-auto" aria-label="Admin">
           <NavLink href="/admin" exact>Home</NavLink>
           {show("analytics") && <NavLink href="/admin/analytics">Analytics</NavLink>}
+          {show("analytics") && <NavLink href="/admin/insights">Insights</NavLink>}
           {show("assistant") && <NavLink href="/admin/assistant">Assistant{approvals ? <span className="ml-2 pill pill-warning">{approvals}</span> : null}</NavLink>}
           {show("orders") && <NavLink href="/admin/orders">Orders</NavLink>}
           {show("returns") && <NavLink href="/admin/returns">Returns{returns ? <span className="ml-2 pill pill-warning">{returns}</span> : null}</NavLink>}

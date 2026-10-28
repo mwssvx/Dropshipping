@@ -248,8 +248,8 @@ describe("margin watch", () => {
     await f.outOfStockOrder();
     const [v] = await f.variants(f.products.lamp.id);
     await f.db.update(schema.variants).set({ priceMinor: v!.costMinor! + 50 }).where(eq(schema.variants.id, v!.id));
-    expect(await runScheduledAgents(f.ctx)).toEqual({ problemOrders: 1, marginChecks: 1 });
-    expect(await runScheduledAgents(f.ctx)).toEqual({ problemOrders: 0, marginChecks: 0 });
+    expect(await runScheduledAgents(f.ctx)).toMatchObject({ problemOrders: 1, marginChecks: 1 });
+    expect(await runScheduledAgents(f.ctx)).toMatchObject({ problemOrders: 0, marginChecks: 0 });
   });
 });
 
