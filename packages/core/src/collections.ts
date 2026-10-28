@@ -8,6 +8,7 @@ import { listActiveProducts } from "./products";
 import { placeSoldOut, productSoldOut, quickAddVariant, soldOutDisplay } from "./badges";
 import { cardSwatches } from "./swatches";
 import { storeReviews } from "./reviews";
+import { unitsSold } from "./search";
 
 /** "all" is every active product. It isn't stored, so no collection can take that handle. */
 export const ALL_COLLECTION = "all";
@@ -168,6 +169,7 @@ export async function storefrontCatalog(db: Db, shopId: string) {
   const now = new Date();
   const soldOut = new Set(all.filter((p) => productSoldOut(p, now)).map((p) => p.id));
   const active = placeSoldOut(all, mode, (p) => soldOut.has(p.id));
+  const units = await unitsSold(db, shopId, active.map((p) => p.id));
   const products = active.map((p) => ({
     id: p.id,
     title: p.title,
@@ -181,6 +183,7 @@ export async function storefrontCatalog(db: Db, shopId: string) {
     soldOut: soldOut.has(p.id),
     swatches: cardSwatches(p),
     quickAdd: quickAddVariant(p),
+    sold: units.get(p.id) ?? 0,
   }));
   const rows = await db.query.collections.findMany({ where: eq(schema.collections.shopId, shopId), orderBy: asc(schema.collections.title) });
   const links = rows.length

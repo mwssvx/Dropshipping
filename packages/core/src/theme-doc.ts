@@ -42,6 +42,35 @@ const link = z.string().trim().max(500).refine(isSafeLink, "Links must start wit
 export const TRUST_ICONS = ["shipping", "returns", "secure", "support", "quality", "eco"] as const;
 export type TrustIcon = (typeof TRUST_ICONS)[number];
 
+/** What a featured products grid shows from its collection: its own order, or a pick from it. */
+export const FEATURED_SHOWS = ["listed", "best_selling", "newest", "on_sale"] as const;
+export type FeaturedShow = (typeof FEATURED_SHOWS)[number];
+
+type Pickable = { id: string; priceMinor: number; compareAtMinor: number | null; soldOut?: boolean; sold?: number; createdAt?: Date | string };
+
+/**
+ * The products a featured grid shows, before the limit. Best sellers and newest keep the
+ * collection's order for ties; any pick puts sold out products after the rest.
+ */
+export function pickFeatured<T extends Pickable>(list: T[], show: FeaturedShow): T[] {
+  if (show === "listed") return list;
+  const at = (p: T) => (p.createdAt ? new Date(p.createdAt).getTime() : 0);
+  const pool = show === "on_sale" ? list.filter((p) => p.compareAtMinor !== null && p.compareAtMinor > p.priceMinor) : list;
+  const order = new Map(pool.map((p, i) => [p.id, i]));
+  return [...pool].sort(
+    (a, b) =>
+      Number(!!a.soldOut) - Number(!!b.soldOut) ||
+      (show === "best_selling" ? (b.sold ?? 0) - (a.sold ?? 0) : show === "newest" ? at(b) - at(a) : 0) ||
+      order.get(a.id)! - order.get(b.id)!,
+  );
+}
+
+/** Where a featured grid's "View all" goes, so the full list matches the pick. */
+export function featuredViewAll(handle: string, show: FeaturedShow) {
+  const path = `/collections/${handle}`;
+  return show === "best_selling" ? `${path}?sort=best_selling` : show === "newest" ? `${path}?sort=newest` : show === "on_sale" ? `${path}?sale=1` : path;
+}
+
 const menuItem = z.object({ label: z.string().trim().min(1, "Every menu item needs a label.").max(40), href: link });
 
 const sectionSchemas = {
@@ -59,6 +88,7 @@ const sectionSchemas = {
     heading: text(120),
     collectionId: z.string().uuid().nullable().default(null),
     limit: z.number().int().min(2).max(12).default(8),
+    show: z.enum(FEATURED_SHOWS).default("listed"),
   }),
   collection_list: z.object({ heading: text(120), collectionIds: z.array(z.string().uuid()).max(12).default([]) }),
   image_with_text: z.object({

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { Section, SectionSettings, TrustIcon } from "@sf/core/theme";
+import { featuredViewAll, pickFeatured, type Section, type SectionSettings, type TrustIcon } from "@sf/core/theme";
 import type { StorefrontCatalog } from "@sf/core";
 import { cardBadges, type Badge, type BadgeFacts } from "@sf/core/badges";
 import type { BadgeSettings } from "@sf/db";
@@ -24,8 +24,8 @@ export type SectionData = {
   base: string;
   currency: string;
   fx?: DisplayFx;
-  /** Reviews are left out where no section shows them. */
-  catalog: Omit<StorefrontCatalog, "reviews"> & Partial<Pick<StorefrontCatalog, "reviews">>;
+  /** Reviews and units sold are left out where no section shows them. */
+  catalog: Omit<StorefrontCatalog, "reviews" | "products"> & Partial<Pick<StorefrontCatalog, "reviews">> & { products: CatalogProduct[] };
   signup?: { action: (form: FormData) => Promise<void>; status: "sent" | "invalid" | null; offerPercent?: number | null };
   quickAdd?: (form: FormData) => Promise<void>;
   /** The store's fixed words in the buyer's language; English when left out. */
@@ -83,7 +83,8 @@ export function badgeLabel(b: Badge, t: StoreText) {
   return b.kind === "custom" ? b.text : b.kind === "sold_out" ? t.soldOut : b.kind === "sale" ? t.badgeSale(b.percent) : t.badgeNew;
 }
 
-type GridProduct = Omit<StorefrontCatalog["products"][number], "badge" | "createdAt" | "soldOut" | "swatches" | "contents" | "quickAdd"> & BadgeFacts & Partial<Pick<StorefrontCatalog["products"][number], "swatches" | "contents" | "quickAdd">>;
+type CatalogProduct = Omit<StorefrontCatalog["products"][number], "sold"> & { sold?: number };
+type GridProduct = Omit<StorefrontCatalog["products"][number], "badge" | "createdAt" | "soldOut" | "swatches" | "contents" | "quickAdd" | "sold"> & BadgeFacts & Partial<Pick<StorefrontCatalog["products"][number], "swatches" | "contents" | "quickAdd" | "sold">>;
 
 export function ProductGrid({ products, data }: { products: GridProduct[]; data: SectionData }) {
   const t = data.t ?? storeText(null);
@@ -154,10 +155,13 @@ function FeaturedProducts({ s, data }: Props<"featured_products">) {
   const list = collection
     ? collection.productIds.map((id) => products.find((p) => p.id === id)).filter((p) => !!p)
     : products;
-  const shown = list.slice(0, s.limit);
+  const show = s.show ?? "listed";
+  const shown = pickFeatured(list, show).slice(0, s.limit);
+  // A sale grid with nothing on sale is left out, not shown as "coming soon".
+  if (!shown.length && show === "on_sale") return null;
   return (
     <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12 flex flex-col gap-6">
-      <SectionHeading text={s.heading} base={data.base} link={`/collections/${collection?.handle ?? "all"}`} viewAll={(data.t ?? storeText(null)).viewAll} />
+      <SectionHeading text={s.heading} base={data.base} link={featuredViewAll(collection?.handle ?? "all", show)} viewAll={(data.t ?? storeText(null)).viewAll} />
       {shown.length ? <ProductGrid products={shown} data={data} /> : <p className="hint">{(data.t ?? storeText(null)).productsComing}</p>}
     </section>
   );
