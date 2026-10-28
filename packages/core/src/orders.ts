@@ -771,8 +771,19 @@ export function placedSince(days: string | number | null | undefined, now = new 
   return (ORDER_PLACED_DAYS as readonly number[]).includes(n) ? new Date(now.getTime() - n * 86_400_000) : undefined;
 }
 
+/** A delivery status from a link (the order list's filter), or undefined when it isn't one. */
+export function fulfillmentParam(value: string | null | undefined) {
+  return (schema.orders.fulfillmentStatus.enumValues as readonly string[]).includes(value ?? "") ? (value as Order["fulfillmentStatus"]) : undefined;
+}
+
+/** A payment status from a link, or undefined when it isn't one. */
+export function paymentParam(value: string | null | undefined) {
+  return (schema.orders.paymentStatus.enumValues as readonly string[]).includes(value ?? "") ? (value as Order["paymentStatus"]) : undefined;
+}
+
 export type OrderFilter = {
   fulfillmentStatus?: Order["fulfillmentStatus"];
+  paymentStatus?: Order["paymentStatus"];
   held?: boolean;
   transfer?: boolean;
   tag?: string;
@@ -792,6 +803,7 @@ function orderWhere(shopId: string, filter: OrderFilter) {
   return and(
     eq(schema.orders.shopId, shopId),
     filter.fulfillmentStatus ? eq(schema.orders.fulfillmentStatus, filter.fulfillmentStatus) : undefined,
+    filter.paymentStatus ? eq(schema.orders.paymentStatus, filter.paymentStatus) : undefined,
     // Held for the risk check and still worth sending (a refunded one is settled).
     filter.held ? and(isNotNull(schema.orders.heldAt), inArray(schema.orders.paymentStatus, ["paid", "partially_refunded"])) : undefined,
     // Waiting for the buyer's bank transfer.
