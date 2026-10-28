@@ -76,6 +76,7 @@ export * from "./bundles";
 export * from "./rewards";
 export * from "./invoices";
 export * from "./sales";
+export * from "./sale-calendar";
 export * from "./addons";
 export * from "./feeds";
 export * from "./welcome";

@@ -1234,3 +1234,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Written for you** (`saleEmail` in `packages/core/src/sales.ts`, Sales → a running sale → Email your subscribers): opens a campaign that says the sale is on, what's in it and until when, with a "Shop the sale" button to the collection or product on sale (or the home page). No code needed, since the prices are already lower.
 2. **Last chance**: in a sale's last two days the button reads "Email: last chance" and the email says when it ends, in the store's time zone: tonight, today, tomorrow or on Thursday.
+
+### Dates coming up (after launch, part 215)
+
+1. **What's next on the calendar** (`upcomingSaleDates` in `packages/core/src/sale-calendar.ts`, top of the Sales page): the next four shopping dates for the store's country in the coming four months, like Halloween, Singles' Day, Black Friday through Cyber Monday, Boxing Day (UK, Ireland, Canada, Australia, New Zealand) or the after-Christmas sale elsewhere, Valentine's Day, and Mother's and Father's Day on each country's own date (Mothering Sunday in the UK is three weeks before Easter).
+2. **Plan a sale**: fills in the sale form with the name and the days, so only the discount and what's on sale are left. A date with a sale already covering it says "Planned". The holiday checklist's Black Friday line opens it filled in.

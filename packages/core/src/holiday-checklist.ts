@@ -107,7 +107,7 @@ export async function holidayChecklist(db: Db, shop: Shop, now = new Date()): Pr
       title: "Plan a Black Friday sale",
       done: !!sale,
       detail: sale ? "You have a sale running or coming up." : "Schedule it now; it starts and ends by itself, with a countdown if you like.",
-      href: "/admin/sales",
+      href: "/admin/sales?plan=black-friday#new-heading",
     },
     {
       key: "reminders",

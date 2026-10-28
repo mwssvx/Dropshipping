@@ -7,15 +7,21 @@ import { createSaleAction, type SaleState } from "../../sale-actions";
 /** A datetime-local value read in the merchant's own time zone, sent as an exact time. */
 const iso = (local: string) => (local ? new Date(local).toISOString() : "");
 
-export function SaleForm({ products, collections }: { products: { id: string; title: string }[]; collections: { id: string; title: string }[] }) {
+/** A sale filled in from a date ahead (Black Friday): its name and local start and end times. */
+export type SalePlan = { title: string; starts: string; ends: string };
+
+type Props = { products: { id: string; title: string }[]; collections: { id: string; title: string }[]; plan?: SalePlan | null };
+
+export function SaleForm(props: Props) {
   const [state, action] = useActionState(createSaleAction, {} as SaleState);
-  return <Fields key={state.key} state={state} action={action} products={products} collections={collections} />;
+  // Filled in from a date ahead only until that sale is added.
+  return <Fields key={state.key} state={state} action={action} {...props} plan={state.key ? null : props.plan} />;
 }
 
-function Fields({ state, action, products, collections }: { state: SaleState; action: (f: FormData) => void; products: { id: string; title: string }[]; collections: { id: string; title: string }[] }) {
+function Fields({ state, action, products, collections, plan }: Props & { state: SaleState; action: (f: FormData) => void }) {
   const [scope, setScope] = useState("all");
-  const [starts, setStarts] = useState("");
-  const [ends, setEnds] = useState("");
+  const [starts, setStarts] = useState(plan?.starts ?? "");
+  const [ends, setEnds] = useState(plan?.ends ?? "");
   return (
     <form action={action} className="flex flex-col gap-4">
       <FormError message={state.error} />
@@ -23,7 +29,7 @@ function Fields({ state, action, products, collections }: { state: SaleState; ac
       <div className="grid sm:grid-cols-[1fr_10rem] gap-3">
         <div className="field">
           <label className="label" htmlFor="title">Name</label>
-          <input className="input" id="title" name="title" maxLength={60} required placeholder="Summer sale" />
+          <input className="input" id="title" name="title" maxLength={60} required placeholder="Summer sale" defaultValue={plan?.title} />
         </div>
         <div className="field">
           <label className="label" htmlFor="percentOff">Discount (%)</label>
