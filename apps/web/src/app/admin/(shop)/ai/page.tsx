@@ -1,4 +1,4 @@
-import { aiBudget, BUYER_TOPICS, formatMoney, listAgentActivity, listShopperChats, MODEL_LABEL, SKILL_NAMES, SKILLS } from "@sf/core";
+import { aiBudget, BUYER_TOPICS, formatMoney, listAgentActivity, listShopperChats, LANGUAGES, MODEL_LABEL, SKILL_NAMES, SKILLS, type BrandRules } from "@sf/core";
 import { aiModel, requireShop } from "@/lib/server";
 import { AGENT_LABEL } from "@/lib/agent-labels";
 import { PageHeader } from "../PageHeader";
@@ -59,6 +59,8 @@ export default async function AiSettingsPage() {
               autoPause={shop.aiAutoPause}
               shopper={shop.aiShopper}
               weeklyReview={shop.aiWeeklyReview}
+              brand={brandFields(shop.aiBrand as BrandRules | null)}
+              languages={Object.entries(LANGUAGES).map(([code, l]) => ({ code, name: l.english }))}
               skills={SKILL_NAMES.map((key) => ({ key, title: SKILLS[key].title, when: SKILLS[key].when, on: !shop.aiSkillsOff.includes(key) }))}
             />
           </section>
@@ -116,4 +118,8 @@ export default async function AiSettingsPage() {
       </div>
     </main>
   );
+}
+
+function brandFields(b: BrandRules | null) {
+  return { voice: b?.voice ?? "", banned: (b?.banned ?? []).join(", "), language: b?.language ?? "", titleMax: b?.titleMax ? String(b.titleMax) : "" };
 }

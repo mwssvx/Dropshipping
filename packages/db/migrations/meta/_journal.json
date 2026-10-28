@@ -736,6 +736,13 @@
       "when": 1793166862439,
       "tag": "0104_ai_skills",
       "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1793181437774,
+      "tag": "0105_ai_brand",
+      "breakpoints": true
     }
   ]
 }

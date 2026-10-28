@@ -141,6 +141,8 @@ export const shops = pgTable(
     aiWeeklyReview: boolean("ai_weekly_review").notNull().default(false),
     // Assistant skills the merchant switched off (names from core's SKILLS).
     aiSkillsOff: jsonb("ai_skills_off").$type<string[]>().notNull().default([]),
+    // Writing rules for the AI helpers (voice, banned words, language, title length); see core's ai/brand.ts.
+    aiBrand: jsonb("ai_brand").$type<{ voice?: string; banned?: string[]; language?: string | null; titleMax?: number | null }>(),
     // Remind buyers who started checkout but didn't pay (one email, an hour later).
     abandonedCartEmails: boolean("abandoned_cart_emails").notNull().default(true),
     // A phone number at checkout, for the courier: not asked, optional, or required.
