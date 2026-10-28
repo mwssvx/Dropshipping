@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { abandonedCartStats, customerTags, describeDiscount, listCodeBatches, MAX_BATCH, formatMoney, listDiscounts, productChoices, POST_PURCHASE_MINUTES, postPurchaseStats, referralStats, SUBSCRIBE_WITHIN_DAYS, subscriptionStats, welcomeOfferStats, winbackDueCount, winbackStats } from "@sf/core";
+import { abandonedCartStats, birthdaysKnown, birthdayStats, customerTags, describeDiscount, listCodeBatches, MAX_BATCH, formatMoney, listDiscounts, productChoices, POST_PURCHASE_MINUTES, postPurchaseStats, referralStats, SUBSCRIBE_WITHIN_DAYS, subscriptionStats, welcomeOfferStats, winbackDueCount, winbackStats } from "@sf/core";
 import { requireShop, testPayments } from "@/lib/server";
 import { sendOffersNowAction, sendRemindersNowAction, setDiscountActiveAction, setRemindersAction } from "../../growth-actions";
 import { ReminderOfferForm } from "./ReminderOfferForm";
@@ -9,6 +9,7 @@ import { CodeBatchForm } from "./CodeBatchForm";
 import { setCodeBatchActiveAction } from "../../code-batch-actions";
 import { WelcomeOfferForm } from "./WelcomeOfferForm";
 import { WinbackForm } from "./WinbackForm";
+import { BirthdayForm } from "./BirthdayForm";
 import { ReferralForm } from "./ReferralForm";
 import { PostPurchaseForm } from "./PostPurchaseForm";
 import { SubscriptionOfferForm } from "./SubscriptionOfferForm";
@@ -20,7 +21,7 @@ const date = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "
 
 export default async function MarketingPage() {
   const { shop, db } = await requireShop("marketing");
-  const [discounts, stats, welcome, referrals, products, afterCheckout, subs, winback, winbackDue, batches, tags, collections] = await Promise.all([
+  const [discounts, stats, welcome, referrals, products, afterCheckout, subs, winback, winbackDue, batches, tags, collections, birthdays, birthdayKnown] = await Promise.all([
     listDiscounts(db, shop.id),
     abandonedCartStats(db, shop.id, new Date(Date.now() - 30 * DAY)),
     welcomeOfferStats(db, shop.id),
@@ -33,6 +34,8 @@ export default async function MarketingPage() {
     listCodeBatches(db, shop.id),
     customerTags(db, shop.id),
     db.query.collections.findMany({ where: (c, { eq }) => eq(c.shopId, shop.id), columns: { id: true, title: true }, orderBy: (c, { asc }) => asc(c.title) }),
+    birthdayStats(db, shop.id),
+    birthdaysKnown(db, shop.id),
   ]);
   const collectionTitle = new Map(collections.map((c) => [c.id, c.title]));
   const money = (m: number) => formatMoney(m, shop.currency);
@@ -164,6 +167,23 @@ export default async function MarketingPage() {
             <div><dt className="hint">Codes sent</dt><dd className="text-lg font-semibold num">{winback.sent}</dd></div>
             <div><dt className="hint">Came back</dt><dd className="text-lg font-semibold num">{winback.used}</dd></div>
             <div><dt className="hint">Sales</dt><dd className="text-lg font-semibold num">{money(winback.salesMinor)}</dd></div>
+          </dl>
+        </section>
+
+        <section className="card p-5 flex flex-col gap-3" aria-labelledby="birthday-heading">
+          <h2 id="birthday-heading" className="font-semibold">Birthday codes</h2>
+          <p className="text-sm">
+            Buyers can add their birthday (just the month and day) on their account page. On the day, everyone who said yes to your
+            emails gets a code of their own, good once, only with their email. Each person gets one a year.
+          </p>
+          <BirthdayForm offer={shop.birthdayOffer} />
+          <p className="text-sm hint" role="note">
+            {birthdayKnown === 0 ? "No subscriber has added their birthday yet." : `${birthdayKnown} ${birthdayKnown === 1 ? "subscriber has" : "subscribers have"} added their birthday.`}
+          </p>
+          <dl className="grid grid-cols-3 gap-3 border-t border-border pt-3 text-sm" aria-label="Birthday code results">
+            <div><dt className="hint">Codes sent</dt><dd className="text-lg font-semibold num">{birthdays.sent}</dd></div>
+            <div><dt className="hint">Used</dt><dd className="text-lg font-semibold num">{birthdays.used}</dd></div>
+            <div><dt className="hint">Sales</dt><dd className="text-lg font-semibold num">{money(birthdays.salesMinor)}</dd></div>
           </dl>
         </section>
 

@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { createDiscount, moderateReview, parseMoney, sendAbandonedCartEmails, setAbandonedCartOffer, setDiscountActive, setGrowthSettings, setPostPurchaseOffer, setReferralProgram, setReviewRequestDays, setSubscriptionOffer, setUpsell, setWelcomeOffer, setWinbackOffer, UserError } from "@sf/core";
+import { createDiscount, moderateReview, parseMoney, sendAbandonedCartEmails, setAbandonedCartOffer, setDiscountActive, setBirthdayOffer, setGrowthSettings, setPostPurchaseOffer, setReferralProgram, setReviewRequestDays, setSubscriptionOffer, setUpsell, setWelcomeOffer, setWinbackOffer, UserError } from "@sf/core";
 import { fulfillment, logged, requireShop, testPayments } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -232,4 +232,17 @@ export async function setUpsellAction(productId: string, form: FormData) {
   const id = String(form.get("upsellProductId") ?? "");
   await setUpsell(db, shop.id, productId, id || null);
   revalidatePath(`/admin/products/${productId}`);
+}
+
+export async function setBirthdayOfferAction(_: FormState, form: FormData): Promise<FormState> {
+  const { shop, db } = await requireShop("marketing");
+  try {
+    const int = (name: string) => Number.parseInt(String(form.get(name) ?? "").trim() || "NaN", 10);
+    await setBirthdayOffer(db, shop.id, form.get("on") === "on" ? { percentOff: int("percentOff"), days: int("days") } : null);
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath("/admin/marketing");
+  return { saved: true };
 }

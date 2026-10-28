@@ -178,6 +178,7 @@ export async function exportCustomerData(db: Db, shop: { id: string; name: strin
       last_sign_in_at: customer.lastSignInAt?.toISOString() ?? null,
       accepts_marketing: customer.acceptsMarketing,
       price_drop_emails: customer.priceAlerts,
+      birthday: customer.birthday,
       marketing_consent_at: customer.marketingConsentAt?.toISOString() ?? null,
       unsubscribed_at: customer.unsubscribedAt?.toISOString() ?? null,
       wholesale: customer.wholesaleStatus === "none" ? null : { status: customer.wholesaleStatus, company: customer.wholesaleCompany, tax_id: customer.wholesaleTaxId, message: customer.wholesaleMessage },

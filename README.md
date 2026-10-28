@@ -1116,3 +1116,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Customers by amount spent (after launch, part 189)
 
 1. **Spent at least**: the customer list gets a menu that shows only people who spent at least $50, $100, $250, $500 or $1,000 with the store (in the store's currency), counting paid orders minus what was refunded. Use it to tag your best buyers as VIPs and send them a code. Like the "Most spent" sort, it's only there for staff who can see money. The list keeps it when you search, tag everyone, save a view or download the spreadsheet.
+
+### Birthday codes (after launch, part 190)
+
+1. **A code on their birthday** (`packages/core/src/birthday.ts`, Marketing → Birthday codes): turn it on, pick 5% to 50% off and how many days the code lasts. Buyers add their birthday on their store account (just the month and day; no year is asked for), and the daily job emails everyone who said yes to your emails a code of their own on that day (UTC), good once, only with their email. Each person gets one a year, and February 29 birthdays get theirs on the 28th in other years. The Marketing page shows how many subscribers gave their birthday, and the codes sent, used and sales they brought in. The customer's page shows their birthday, their data download includes it, and store files carry the setting.
