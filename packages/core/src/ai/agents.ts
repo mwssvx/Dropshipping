@@ -8,6 +8,7 @@ import { addMessage, assistantConversation, BUYER_TOPICS, startBuyerMessage } fr
 import { aiBudget, runAgent, type AgentSpec, type RunResult } from "./runtime";
 import { REVIEW_MAX_ITEMS, REVIEW_SUMMARY_MIN, thinMargins, TRENDS_MAX_ITEMS, TRENDS_MAX_SEARCHES } from "./tools";
 import { skillMenu } from "./skills";
+import { brandInstructions, type BrandRules } from "./brand";
 import { LANGUAGES, shopLanguages, untranslated, type Language } from "../languages";
 import { shopperLinks } from "../shopper-links";
 
@@ -17,6 +18,12 @@ const RULES = `Rules that always apply:
 - Some actions wait for the merchant's OK. When a tool says it's waiting, don't look for another way to do the same thing.
 - Amounts ending in _minor are in cents (1999 means 19.99).
 - Write plainly and briefly, like a helpful person, without markdown headings.`;
+
+/** The store's writing rules for a helper that writes for it, or nothing. */
+const brandRules = (shop: Shop) => {
+  const b = brandInstructions(shop.aiBrand as BrandRules | null);
+  return b ? `\n${b}` : "";
+};
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -30,7 +37,7 @@ Call get_product, then save_listing once with a better title and description, th
 A good title names the product the way a buyer would search for it, under 70 characters, without supplier filler like "hot sale", "2024 new", "free shipping" or model codes.
 A good description opens with one or two sentences on what it is and why someone would want it, then 3 to 6 bullet lines starting with "• " covering what the data actually supports (size options, what's in the box, delivery time). Don't claim materials, certifications, dimensions or benefits the data doesn't mention.
 Also give a search_description: one or two plain sentences under 160 characters that make someone searching want to click.
-${RULES}`,
+${RULES}${brandRules(shop)}`,
   },
   assistant: {
     agent: "assistant",
@@ -54,7 +61,7 @@ Then do exactly one of these:
 - send_reply, if the order data and policies answer the question. Write as the store: greet the buyer by first name, answer in a few sentences, sign off as "${shop.name}". Pick the topic that matches the question (${Object.keys(BUYER_TOPICS).join(", ")}).
 - hand_over, if they want a refund, cancellation, address change or exchange, if they're upset or complaining, if the answer isn't in the data, or if the message is unclear.
 Never promise refunds, discounts, replacements or delivery dates the data doesn't give. Your final text is a private note for the merchant, not sent to the buyer: one sentence on what you did.
-${RULES}`,
+${RULES}${brandRules(shop)}`,
   },
   fulfilment: {
     agent: "fulfilment",
@@ -66,7 +73,7 @@ ${RULES}`,
 - Address the supplier can't ship to: message_buyer asking them to confirm or change the address, and propose_refund in case they can't.
 - Anything else: don't act; explain what the merchant should do.
 Finish with two or three sentences for the merchant: what went wrong and what you did or proposed.
-${RULES}`,
+${RULES}${brandRules(shop)}`,
   },
   margin: {
     agent: "margin",
@@ -98,7 +105,7 @@ Call save_translations once with every item, then say in one sentence what you t
 Translate the meaning naturally, the way a shop in that country would write it, in a friendly, plain voice. Keep product names, brand names, sizes, measurements, model numbers, prices and links as they are. Keep the layout: line breaks, lines starting with "• ", and "## " subheadings. Don't add or leave out claims. Short menu and button texts stay short.
 For items of kind "theme", each field's key is the original text: translate the value and keep the key exactly as given.
 A product's "details" field has one fact per line as "Label: value": translate both sides and keep the colon and the same lines.
-${RULES}`,
+${RULES}${brandRules(shop)}`,
   },
   answerer: {
     agent: "answerer",
@@ -109,7 +116,7 @@ Call read_question first, and read_store_policies if the question is about deliv
 Write as the store, warm and short: one to four sentences that answer the question directly, without a greeting or sign-off, since the answer is also shown on the product page.
 If the data doesn't answer the question (materials, measurements, plugs, certifications and so on that the listing doesn't mention), don't guess: start the draft with "[Check: " and what the merchant needs to find out, then "]", and write the rest as an answer they can complete.
 Your final text is for the merchant: one sentence on what you drafted.
-${RULES}`,
+${RULES}${brandRules(shop)}`,
   },
   sizer: {
     agent: "sizer",

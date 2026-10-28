@@ -5,6 +5,7 @@ import {
   decideAction,
   fixProblemOrder,
   merchantReply,
+  normalizeBrandRules,
   reviewStoreWithAi,
   findTrendsWithAi,
   runMarginWatch,
@@ -151,6 +152,12 @@ export async function saveAiSettingsAction(_: AgentState, form: FormData): Promi
       autoPause: form.get("autoPause") === "on",
       shopper: form.get("shopper") === "on",
       weeklyReview: form.get("weeklyReview") === "on",
+      brand: normalizeBrandRules({
+        voice: String(form.get("brandVoice") ?? ""),
+        banned: String(form.get("brandBanned") ?? ""),
+        language: String(form.get("brandLanguage") ?? ""),
+        titleMax: String(form.get("brandTitleMax") ?? ""),
+      }),
       skillsOff: SKILL_NAMES.filter((n) => !form.getAll("skills").includes(n)),
     });
   } catch (e) {

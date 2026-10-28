@@ -26,6 +26,7 @@ import { profitReport } from "../profit";
 import { customerReport, productFunnel, returnsReport } from "../insights";
 import { AUTO, blocked, needsOk, untrusted, type Decision, type RunScope } from "./context";
 import { enabledSkills, SKILL_NAMES, SKILLS } from "./skills";
+import { brandProblems, type BrandRules } from "./brand";
 import { addMessage, BUYER_TOPICS, discardDrafts, sendBuyerMessage, setConversationStatus, type BuyerTopic } from "./conversations";
 
 export type AgentTool<I = any> = {
@@ -39,10 +40,15 @@ export type AgentTool<I = any> = {
   summary: (input: I, run: RunScope) => Promise<string> | string;
   /** Called when a change has to wait: lets a tool leave a draft and remember it in the input. */
   propose?: (input: I, run: RunScope) => Promise<I>;
+  /** Problems with a draft (the store's writing rules); any problem refuses the call before it's saved or proposed. */
+  check?: (input: I, run: RunScope) => Promise<string[]> | string[];
   run: (input: I, run: RunScope) => Promise<unknown>;
 };
 
 const tool = <I>(t: AgentTool<I>) => t;
+const brand = (run: RunScope) => run.shop.aiBrand as BrandRules | null;
+/** Buyer messages quote order numbers and dates, so only the banned words apply to them. */
+const bannedOnly = (run: RunScope, name: string, text: string) => brandProblems({ banned: brand(run)?.banned }, [{ name, text }]);
 const money = (run: RunScope, minor: number) => formatMoney(minor, run.shop.currency);
 const DAY = 86_400_000;
 
@@ -149,6 +155,16 @@ const listingTools = [
       return p?.status === "draft" ? AUTO : needsOk("This product is on sale, so you see the new wording before buyers do.");
     },
     summary: (i) => `New title and description: “${i.title}”`,
+    check: (i, run) =>
+      brandProblems(
+        brand(run),
+        [
+          { name: "title", text: i.title, isTitle: true },
+          { name: "description", text: i.description },
+          { name: "search description", text: i.search_description ?? "" },
+        ],
+        { facts: run.facts },
+      ),
     async run(i, run) {
       if (/<[a-z/][^>]*>/i.test(i.description)) throw new UserError("The description must be plain text, without HTML tags.");
       const [p] = await run.ctx.db
@@ -220,6 +236,16 @@ const writerTools = [
     }),
     policy: () => AUTO,
     summary: (i) => `Drafted a blog post: “${i.title}”`,
+    check: (i, run) =>
+      brandProblems(
+        brand(run),
+        [
+          { name: "title", text: i.title },
+          { name: "excerpt", text: i.excerpt },
+          { name: "post", text: i.body },
+        ],
+        { facts: run.facts },
+      ),
     async run(i, run) {
       const post = await createPost(
         run.ctx.db,
@@ -536,6 +562,7 @@ const buyerTools = [
       return AUTO;
     },
     summary: (i) => `Reply to the buyer about ${BUYER_TOPICS[i.topic].toLowerCase()}`,
+    check: (i, run) => bannedOnly(run, "reply", i.message),
     async propose(i, run) {
       // Leave the reply as a draft in the inbox so the merchant can edit it before it goes.
       const m = await addMessage(run.ctx.db, run.conversationId!, { author: "agent", body: i.message, status: "draft", topic: i.topic });
@@ -678,6 +705,7 @@ const fulfilmentTools = [
     input: z.object({ message: z.string().min(20).max(2000) }),
     policy: () => needsOk("It writes to a buyer about a problem."),
     summary: () => "Email the buyer about the problem",
+    check: (i, run) => bannedOnly(run, "message", i.message),
     async propose(i, run) {
       const conversationId = await buyerConversationFor(run);
       const m = await addMessage(run.ctx.db, conversationId, { author: "agent", body: i.message, status: "draft", topic: "order_status" });
@@ -827,7 +855,7 @@ export async function thinMargins(run: Pick<RunScope, "ctx" | "shop">, minPct = 
 export async function setAiSettings(
   db: RunScope["ctx"]["db"],
   shop: Pick<RunScope["shop"], "id" | "plan">,
-  s: { budgetMinor?: number | null; autoReplyTopics?: string[]; autoPause?: boolean; shopper?: boolean; weeklyReview?: boolean; skillsOff?: string[] },
+  s: { budgetMinor?: number | null; autoReplyTopics?: string[]; autoPause?: boolean; shopper?: boolean; weeklyReview?: boolean; skillsOff?: string[]; brand?: BrandRules | null },
 ) {
   const max = PLAN_AI_BUDGET_MINOR[shop.plan];
   if (s.budgetMinor !== undefined && s.budgetMinor !== null && (!Number.isFinite(s.budgetMinor) || s.budgetMinor < 0 || s.budgetMinor > max)) {
@@ -842,6 +870,7 @@ export async function setAiSettings(
       ...(s.autoPause !== undefined ? { aiAutoPause: s.autoPause } : {}),
       ...(s.shopper !== undefined ? { aiShopper: s.shopper } : {}),
       ...(s.weeklyReview !== undefined ? { aiWeeklyReview: s.weeklyReview } : {}),
+      ...(s.brand !== undefined ? { aiBrand: s.brand } : {}),
       ...(s.skillsOff ? { aiSkillsOff: SKILL_NAMES.filter((n) => s.skillsOff!.includes(n)) } : {}),
       updatedAt: new Date(),
     })
@@ -941,6 +970,7 @@ const answererTools = [
     }),
     policy: () => AUTO,
     summary: () => "Drafted an answer to a shopper's question",
+    check: (i, run) => bannedOnly(run, "answer", i.answer),
     async run(i, run) {
       await saveQuestionDraft(run.ctx.db, run.shop.id, i.question_id, i.answer);
       return { saved: true };

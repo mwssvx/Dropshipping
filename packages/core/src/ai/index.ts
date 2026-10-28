@@ -8,6 +8,7 @@ export * from "./tools";
 export * from "./runtime";
 export * from "./agents";
 export * from "./skills";
+export * from "./brand";
 export { DemoModel } from "./demo";
 
 /** Claude when ANTHROPIC_API_KEY is set (models per agent, see agentModelsFromEnv), otherwise the built-in demo brain. */

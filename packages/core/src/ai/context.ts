@@ -16,6 +16,8 @@ export type RunScope = {
   conversationId: string | null;
   orderId: string | null;
   productId: string | null;
+  /** What the run's read tools returned so far, for checking drafts against (see brand.ts). */
+  facts?: string[];
 };
 
 /**

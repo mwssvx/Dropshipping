@@ -90,7 +90,7 @@ export async function runAgent(ctx: AgentContext, spec: AgentSpec, shop: Shop, i
     return { runId: run!.id, status: "over_budget", text: "", actions: [], error: "This month's AI budget is used up." };
   }
   const [run] = await db.insert(schema.agentRuns).values(base).returning();
-  const scope: RunScope = { ctx, shop, runId: run!.id, agent: spec.agent, conversationId: base.conversationId, orderId: base.orderId, productId: base.productId };
+  const scope: RunScope = { ctx, shop, runId: run!.id, agent: spec.agent, conversationId: base.conversationId, orderId: base.orderId, productId: base.productId, facts: [] };
   const messages = [...input.messages];
   const tools = toolSpecs(spec.agent);
   const system = spec.system(shop);
@@ -191,6 +191,11 @@ async function callTool(scope: RunScope, name: string, id: string, rawInput: unk
   let decision: Decision;
   try {
     summary = await t.summary(input, scope);
+    const problems = t.check ? await t.check(input, scope) : [];
+    if (problems.length) {
+      await log({ tool: name, input, summary, status: "blocked", reason: `Broke the store's writing rules: ${problems.join("; ")}` });
+      return reply(`Not saved, because ${problems.join("; ")}. Fix that and call ${name} again.`, true);
+    }
     decision = t.kind === "read" ? { mode: "auto" } : t.policy ? await t.policy(input, scope) : { mode: "approval", reason: "It changes the store." };
   } catch (e) {
     return reply(errText(e), true);
@@ -216,6 +221,7 @@ async function callTool(scope: RunScope, name: string, id: string, rawInput: unk
 
   try {
     const result = await t.run(input, scope);
+    if (t.kind === "read") scope.facts?.push(typeof result === "string" ? result : JSON.stringify(result ?? null));
     await log({ tool: name, input, summary, status: "done", result: t.kind === "read" ? null : (result ?? null) });
     return reply(result ?? { done: true });
   } catch (e) {

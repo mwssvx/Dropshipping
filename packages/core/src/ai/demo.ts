@@ -70,10 +70,26 @@ const minor = (n: number) => `$${(n / 100).toFixed(2)}`;
 
 const JUNK = /\b(hot sale|new arrival|20\d\d new|free shipping|dropshipping|wholesale|high quality|best seller|cheap|factory)\b/gi;
 
-function listing(s: State): BetaContentBlock[] {
+/** The demo's rewrite after a draft broke the store's writing rules: drop banned words and the lines with made-up numbers. */
+function keepToRules(req: ModelRequest, refused: Called) {
+  const banned = [...(req.system.match(/Never use these words or phrases: (.*)\./)?.[1] ?? "").matchAll(/"([^"]+)"/g)].map((m) => m[1]!);
+  const max = Number(req.system.match(/Product titles are at most (\d+) characters/)?.[1] ?? 120);
+  const made = [...(strip(refused.result).match(/has ((?:"\d+"(?:, )?)+), which/)?.[1] ?? "").matchAll(/"(\d+)"/g)].map((m) => m[1]!);
+  const clean = (t: unknown) =>
+    banned.reduce((acc, w) => acc.replace(new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "gi"), ""), String(t ?? "")).replace(/[ \t]{2,}/g, " ").replace(/ ([,.:])/g, "$1").trim();
+  const lines = (t: unknown) => String(t ?? "").split("\n").filter((l) => !made.some((n) => new RegExp(`\\b${n}\\b`).test(l))).join("\n");
+  const i = refused.input;
+  return { title: clean(i.title).slice(0, max).trim(), description: clean(lines(i.description)), search_description: clean(lines(i.search_description)) };
+}
+
+function listing(s: State, req: ModelRequest): BetaContentBlock[] {
   const product = s.has("get_product");
   if (!product) return [toolCall("get_product", {})];
   const saved = s.has("save_listing");
+  if (saved?.isError) {
+    if (s.called.filter((c) => c.name === "save_listing").length < 2) return [toolCall("save_listing", keepToRules(req, saved))];
+    return [text(`I couldn't write a listing that keeps to your writing rules (${strip(saved.result)}). Nothing was changed.`)];
+  }
   if (!saved) {
     const p = product.result;
     const source = p.supplier_listing && typeof p.supplier_listing === "object" ? p.supplier_listing : null;

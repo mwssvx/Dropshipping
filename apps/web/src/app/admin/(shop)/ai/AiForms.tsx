@@ -4,7 +4,7 @@ import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import { marginCheckAction, saveAiSettingsAction } from "../../ai-actions";
 
-export function AiSettingsForm(props: { budget: string; planMax: string; topics: { key: string; label: string; on: boolean }[]; autoPause: boolean; shopper: boolean; weeklyReview: boolean; skills: { key: string; title: string; when: string; on: boolean }[] }) {
+export function AiSettingsForm(props: { budget: string; planMax: string; topics: { key: string; label: string; on: boolean }[]; autoPause: boolean; shopper: boolean; weeklyReview: boolean; skills: { key: string; title: string; when: string; on: boolean }[]; brand: { voice: string; banned: string; language: string; titleMax: string }; languages: { code: string; name: string }[] }) {
   const [state, action] = useActionState(saveAiSettingsAction, {});
   return (
     <form action={action} className="flex flex-col gap-5">
@@ -47,6 +47,34 @@ export function AiSettingsForm(props: { budget: string; planMax: string; topics:
           <span className="hint block">The business analyst reads last month&apos;s numbers and leaves a few suggestions on the Insights page. Each review uses a few cents of your AI budget.</span>
         </span>
       </label>
+      <fieldset className="flex flex-col gap-3">
+        <legend className="label mb-1">Writing rules</legend>
+        <span className="hint">Every helper that writes for your store follows these, and each draft is checked against them before it&apos;s saved. Drafts that add numbers, codes or specs that aren&apos;t in the product data are refused too.</span>
+        <div className="field">
+          <label className="label" htmlFor="brandVoice">How your store sounds</label>
+          <textarea className="input" id="brandVoice" name="brandVoice" rows={2} maxLength={400} defaultValue={props.brand.voice} placeholder="Warm and playful, short sentences, never pushy" />
+        </div>
+        <div className="field">
+          <label className="label" htmlFor="brandBanned">Words never to use</label>
+          <input className="input" id="brandBanned" name="brandBanned" defaultValue={props.brand.banned} placeholder="cheap, best ever, guaranteed" />
+          <span className="hint">Separate them with commas.</span>
+        </div>
+        <div className="flex flex-wrap gap-4">
+          <div className="field">
+            <label className="label" htmlFor="brandLanguage">Write for buyers in</label>
+            <select className="input" id="brandLanguage" name="brandLanguage" defaultValue={props.brand.language}>
+              <option value="">English</option>
+              {props.languages.map((l) => (
+                <option key={l.code} value={l.code}>{l.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="field max-w-40">
+            <label className="label" htmlFor="brandTitleMax">Longest product title</label>
+            <input className="input num" id="brandTitleMax" name="brandTitleMax" inputMode="numeric" defaultValue={props.brand.titleMax} placeholder="70" />
+          </div>
+        </div>
+      </fieldset>
       <fieldset className="flex flex-col gap-2">
         <legend className="label mb-1">Skills the Assistant uses</legend>
         <div className="flex flex-col gap-2">
