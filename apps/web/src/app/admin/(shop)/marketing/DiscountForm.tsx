@@ -4,9 +4,20 @@ import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import { createDiscountAction } from "../../growth-actions";
 
-export function DiscountForm({ currency, products, tags }: { currency: string; products: { id: string; title: string }[]; tags: string[] }) {
+export function DiscountForm({ currency, products, tags, collections = [] }: { currency: string; products: { id: string; title: string }[]; tags: string[]; collections?: { id: string; title: string }[] }) {
   const [state, action] = useActionState(createDiscountAction, {});
   const [kind, setKind] = useState("percent");
+  const [collectionId, setCollectionId] = useState("");
+  const collectionPicker = collections.length > 0 && (
+    <div className="field">
+      <label className="label" htmlFor="collectionId">Collection it&apos;s for</label>
+      <select className="input sm:max-w-xs" id="collectionId" name="collectionId" value={collectionId} onChange={(e) => setCollectionId(e.target.value)}>
+        <option value="">{kind === "bxgy" ? "Any product" : "None (whole order or the products below)"}</option>
+        {collections.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+      </select>
+      <span className="hint">Products added to the collection later are included, and ones taken out stop counting.</span>
+    </div>
+  );
   const symbol = new Intl.NumberFormat("en-US", { style: "currency", currency }).formatToParts(0).find((p) => p.type === "currency")?.value ?? "";
   return (
     <form action={action} className="flex flex-col gap-3">
@@ -50,7 +61,8 @@ export function DiscountForm({ currency, products, tags }: { currency: string; p
               <span className="hint">100 makes them free. The cheapest items in the cart are the ones discounted.</span>
             </div>
           </div>
-          {products.length > 0 && (
+          {collectionPicker}
+          {products.length > 0 && !collectionId && (
             <fieldset className="flex flex-col gap-1">
               <legend className="label mb-1">Products it counts (none ticked means all)</legend>
               <div className="max-h-40 overflow-y-auto flex flex-col gap-1 text-sm">
@@ -62,7 +74,8 @@ export function DiscountForm({ currency, products, tags }: { currency: string; p
           )}
         </div>
       )}
-      {(kind === "percent" || kind === "amount") && products.length > 0 && (
+      {(kind === "percent" || kind === "amount") && collectionPicker}
+      {(kind === "percent" || kind === "amount") && products.length > 0 && !collectionId && (
         <fieldset className="flex flex-col gap-1">
           <legend className="label mb-1">Products it&apos;s for (none ticked means the whole order)</legend>
           <div className="max-h-40 overflow-y-auto flex flex-col gap-1 text-sm">

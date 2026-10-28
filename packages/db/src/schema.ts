@@ -1181,6 +1181,10 @@ export const discounts = pgTable(
     // Only buyers whose customer record has this tag (say "vip") can use the code. Checked at
     // checkout, against the email they check out with.
     customerTag: text("customer_tag"),
+    // Money off (or buy X get Y) only on products in this collection, as it is at checkout, so
+    // products added to it later are included. Not a foreign key: a deleted collection makes the
+    // code stop working instead of turning it into a code for everything.
+    collectionId: uuid("collection_id"),
     startsAt: timestamp("starts_at", { withTimezone: true }),
     endsAt: timestamp("ends_at", { withTimezone: true }),
     active: boolean("active").notNull().default(true),

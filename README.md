@@ -989,3 +989,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Many at once**: tick products on the Products page and pick "Add a tag" or "Remove a tag". The preview shows each product's tags before and after, products that already have 20 tags are left out, and the change can be undone for 7 days like other bulk edits. Undo only puts that one tag back the way it was, so tags changed by hand since stay (`kind: "tag"` in `packages/core/src/bulk-edit.ts`; no migration).
 2. **In the download**: the products CSV has a Tags column, so tags can be sorted and filtered in a spreadsheet (`productsCsv`).
+
+### Codes for a collection (after launch, part 159)
+
+1. **A code for a range**: percent, amount and buy X get Y codes can be for one collection, like SUMMER20 for the Summer collection. Only what's in the collection comes down in price, and the code follows the collection as it is at checkout, so products added later are included. That works for collections that fill themselves too, so "20% off everything tagged summer" needs no upkeep (`collectionId` in `packages/core/src/discounts.ts`; migration `0120_collection_codes`).
+2. **Never wider than meant**: a code whose collection is empty or deleted stops working, rather than coming off the whole order. The codes list says when a code's collection was deleted, and store files bring codes over with their collection.

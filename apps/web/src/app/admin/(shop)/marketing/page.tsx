@@ -20,7 +20,7 @@ const date = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "
 
 export default async function MarketingPage() {
   const { shop, db } = await requireShop("marketing");
-  const [discounts, stats, welcome, referrals, products, afterCheckout, subs, winback, winbackDue, batches, tags] = await Promise.all([
+  const [discounts, stats, welcome, referrals, products, afterCheckout, subs, winback, winbackDue, batches, tags, collections] = await Promise.all([
     listDiscounts(db, shop.id),
     abandonedCartStats(db, shop.id, new Date(Date.now() - 30 * DAY)),
     welcomeOfferStats(db, shop.id),
@@ -32,7 +32,9 @@ export default async function MarketingPage() {
     shop.winbackOffer ? winbackDueCount(db, shop, shop.winbackOffer) : null,
     listCodeBatches(db, shop.id),
     customerTags(db, shop.id),
+    db.query.collections.findMany({ where: (c, { eq }) => eq(c.shopId, shop.id), columns: { id: true, title: true }, orderBy: (c, { asc }) => asc(c.title) }),
   ]);
+  const collectionTitle = new Map(collections.map((c) => [c.id, c.title]));
   const money = (m: number) => formatMoney(m, shop.currency);
   const now = new Date();
   const state = (d: (typeof discounts)[number]) =>
@@ -62,8 +64,9 @@ export default async function MarketingPage() {
                   <li key={d.id} className="py-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
                     <span className="font-mono font-semibold">{d.code}</span>
                     <span className="flex-1 min-w-40">
-                      {describeDiscount(d, shop.currency)}
+                      {describeDiscount({ ...d, collectionTitle: d.collectionId ? (collectionTitle.get(d.collectionId) ?? "a deleted collection") : null }, shop.currency)}
                       <span className="hint">
+                        {d.collectionId && !collectionTitle.has(d.collectionId) && " · stopped working when its collection was deleted"}
                         {d.usageLimit !== null && ` · ${d.usageLimit} uses`}
                         {d.oncePerCustomer && " · once per buyer"}
                         {d.customerTag && ` · customers tagged “${d.customerTag}”`}
@@ -88,7 +91,7 @@ export default async function MarketingPage() {
           )}
           <div className="flex flex-col gap-3 border-t border-border pt-4">
             <h3 className="font-medium text-sm">New code</h3>
-            <DiscountForm currency={shop.currency} products={products.filter((p) => !p.giftCard && p.status !== "archived").map((p) => ({ id: p.id, title: p.title }))} tags={tags.map((t) => t.tag)} />
+            <DiscountForm currency={shop.currency} products={products.filter((p) => !p.giftCard && p.status !== "archived").map((p) => ({ id: p.id, title: p.title }))} tags={tags.map((t) => t.tag)} collections={collections} />
           </div>
         </section>
 

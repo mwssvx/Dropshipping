@@ -1,6 +1,7 @@
 import { and, count, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
+import { collectionProducts } from "./collections";
 import { NotFoundError, UserError } from "./errors";
 import { formatMoney } from "./money";
 
@@ -21,6 +22,7 @@ const discountInput = z
     buyQty: z.number().int().nullish(),
     getQty: z.number().int().nullish(),
     productIds: z.array(z.string().uuid()).max(100, "Pick up to 100 products.").default([]),
+    collectionId: z.string().uuid().nullish(),
     automatic: z.boolean().default(false),
     minSubtotalMinor: z.number().int().min(0).default(0),
     usageLimit: z.number().int().min(1, "The limit must be at least 1.").nullish(),
@@ -42,7 +44,9 @@ const discountInput = z
       if (d.value < 1 || d.value > 100) ctx.addIssue({ code: "custom", message: "The items they get are 1 to 100% off (100 is free)." });
     }
     if (d.kind === "free_shipping" && d.productIds.length) ctx.addIssue({ code: "custom", message: "Free shipping is for the whole order. Pick products for money off instead." });
-    if (d.automatic && (d.kind === "percent" || d.kind === "amount") && d.productIds.length) {
+    if (d.collectionId && d.productIds.length) ctx.addIssue({ code: "custom", message: "Pick products or a collection, not both." });
+    if (d.collectionId && d.kind === "free_shipping") ctx.addIssue({ code: "custom", message: "Free shipping is for the whole order. Pick a collection for money off instead." });
+    if (d.automatic && (d.kind === "percent" || d.kind === "amount") && (d.productIds.length || d.collectionId)) {
       ctx.addIssue({ code: "custom", message: "Money off without a code is for the whole order. Give it a code to limit it to some products." });
     }
     if (d.automatic && d.customerTag) ctx.addIssue({ code: "custom", message: "Money off without a code is for everyone. Give it a code to limit it to tagged customers." });
@@ -69,6 +73,11 @@ export async function createDiscount(db: Db, shopId: string, input: DiscountInpu
     const found = await db.query.products.findMany({ where: and(eq(schema.products.shopId, shopId), inArray(schema.products.id, productIds)), columns: { id: true } });
     if (found.length !== productIds.length) throw new NotFoundError("Product");
   }
+  const collectionId = d.kind === "free_shipping" ? null : (d.collectionId ?? null);
+  if (collectionId) {
+    const found = await db.query.collections.findFirst({ where: and(eq(schema.collections.shopId, shopId), eq(schema.collections.id, collectionId)), columns: { id: true } });
+    if (!found) throw new NotFoundError("Collection");
+  }
   const [row] = await db
     .insert(schema.discounts)
     .values({
@@ -77,6 +86,7 @@ export async function createDiscount(db: Db, shopId: string, input: DiscountInpu
       buyQty: bxgy ? d.buyQty! : null,
       getQty: bxgy ? d.getQty! : null,
       productIds,
+      collectionId,
       automatic: d.kind !== "free_shipping" && d.automatic,
       usageLimit: d.usageLimit ?? null,
       startsAt: d.startsAt ?? null,
@@ -113,14 +123,15 @@ export async function setDiscountActive(db: Db, shopId: string, id: string, acti
   return row;
 }
 
-type Describable = Pick<Discount, "kind" | "value" | "minSubtotalMinor"> & Partial<Pick<Discount, "buyQty" | "getQty" | "productIds">>;
+type Describable = Pick<Discount, "kind" | "value" | "minSubtotalMinor"> & Partial<Pick<Discount, "buyQty" | "getQty" | "productIds">> & { collectionTitle?: string | null };
 
 export function describeDiscount(d: Describable, currency: string) {
   if (d.kind === "bxgy") {
     const what = `Buy ${d.buyQty}, get ${d.getQty} ${d.value >= 100 ? "free" : `${d.value}% off`}`;
-    return [what, d.productIds?.length ? "on selected products" : null, d.minSubtotalMinor ? `on orders over ${formatMoney(d.minSubtotalMinor, currency)}` : null].filter(Boolean).join(" ");
+    return [what, d.collectionTitle ? `from ${d.collectionTitle}` : d.productIds?.length ? "on selected products" : null, d.minSubtotalMinor ? `on orders over ${formatMoney(d.minSubtotalMinor, currency)}` : null].filter(Boolean).join(" ");
   }
   const what = d.kind === "percent" ? `${d.value}% off` : d.kind === "amount" ? `${formatMoney(d.value, currency)} off` : "Free shipping";
+  if (d.kind !== "free_shipping" && d.collectionTitle) return `${what} ${d.collectionTitle}${d.minSubtotalMinor ? ` on orders over ${formatMoney(d.minSubtotalMinor, currency)}` : ""}`;
   if (d.kind !== "free_shipping" && d.productIds?.length) return `${what} selected products${d.minSubtotalMinor ? ` on orders over ${formatMoney(d.minSubtotalMinor, currency)}` : ""}`;
   return d.minSubtotalMinor ? `${what} orders over ${formatMoney(d.minSubtotalMinor, currency)}` : what;
 }
@@ -171,8 +182,24 @@ export async function automaticOffers(db: Db, shopId: string, now = new Date()) 
 
 /** The automatic offers a product page should mention. */
 export async function productOffers(db: Db, shop: Shop, productId: string, now = new Date()) {
-  const offers = await automaticOffers(db, shop.id, now);
-  return offers.filter((d) => !d.productIds.length || d.productIds.includes(productId)).map((d) => describeDiscount({ ...d, productIds: [] }, shop.currency));
+  const offers = await Promise.all((await automaticOffers(db, shop.id, now)).map((d) => withCollection(db, shop.id, d)));
+  return offers
+    .filter((d): d is UsableDiscount => !!d && (!d.productIds.length || d.productIds.includes(productId)))
+    .map((d) => describeDiscount({ ...d, productIds: [], collectionTitle: null }, shop.currency));
+}
+
+export type UsableDiscount = Discount & { collectionTitle: string | null };
+
+/**
+ * A code for a collection with that collection's products in productIds, as it is now. Null when
+ * the collection was deleted or has nothing in it, so the code can't widen to everything.
+ */
+async function withCollection(db: Db, shopId: string, d: Discount): Promise<UsableDiscount | null> {
+  if (!d.collectionId) return { ...d, collectionTitle: null };
+  const c = await db.query.collections.findFirst({ where: and(eq(schema.collections.id, d.collectionId), eq(schema.collections.shopId, shopId)), columns: { id: true, title: true, rules: true } });
+  if (!c) return null;
+  const ids = (await collectionProducts(db, shopId, c.id, undefined, c.rules)).map((p) => p.id);
+  return ids.length ? { ...d, productIds: ids, collectionTitle: c.title } : null;
 }
 
 /**
@@ -205,7 +232,9 @@ export async function findUsableDiscount(db: Db, shop: Shop, code: string, cart:
     const [u] = await db.select({ n: count() }).from(schema.orders).where(and(paidWith, eq(schema.orders.email, cart.email.trim().toLowerCase())));
     if (Number(u?.n ?? 0) > 0) throw new UserError(`You've already used ${clean}.`, "discount_invalid");
   }
-  return d;
+  const usable = await withCollection(db, shop.id, d);
+  if (!usable) throw new UserError(`"${clean}" isn't a valid code.`, "discount_invalid");
+  return usable;
 }
 
 /** What a discount takes off. Percentages round down so the buyer never pays less than shown. */

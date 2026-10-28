@@ -8,7 +8,7 @@ import { blockedItemMessage } from "./country-limits";
 import { applyDisputeEvent } from "./disputes";
 import { NotFoundError, UserError } from "./errors";
 import type { PaymentEvent, PaymentProvider } from "./payments";
-import { applyDiscount, automaticOffers, bxgyMissing, describeDiscount, findUsableDiscount, spreadDiscountOver, type Discount, type OfferUnit } from "./discounts";
+import { applyDiscount, automaticOffers, bxgyMissing, describeDiscount, findUsableDiscount, spreadDiscountOver, type Discount, type OfferUnit, type UsableDiscount } from "./discounts";
 import { applyMoneyEvent } from "./payouts";
 import { estimateProcessingFee, platformFeeFor } from "./plans";
 import { BuiltInTaxCalculator, listTaxRegistrations, type TaxCalculator, type TaxResult } from "./tax";
@@ -258,7 +258,7 @@ export async function quoteCart(
       throw new UserError(`${d.code} is for "${describeDiscount(d, shop.currency)}". Add more to your cart to use it.`, "discount_invalid");
     }
     if ((d.kind === "percent" || d.kind === "amount") && d.productIds.length && !applied.discountMinor) {
-      throw new UserError(`${d.code} is for some products only, and none of them are in your cart.`, "discount_invalid");
+      throw new UserError(d.collectionTitle ? `${d.code} is for ${d.collectionTitle}, and nothing from it is in your cart.` : `${d.code} is for some products only, and none of them are in your cart.`, "discount_invalid");
     }
     if (bundle && bundle.discountMinor > applied.discountMinor + (shippingMinor - applied.shippingMinor)) {
       codeNotUsed = d.code;
@@ -270,12 +270,14 @@ export async function quoteCart(
     let best: { d: Discount; applied: { discountMinor: number; shippingMinor: number } } | null = null;
     const offers = await automaticOffers(db, shop.id);
     const tiers: Discount[] = [];
-    for (const d of offers) {
+    for (const offer of offers) {
+      let d: UsableDiscount;
       try {
-        await findUsableDiscount(db, shop, d.code, { subtotalMinor: goodsMinor, email: opts.email });
+        // With a collection's products filled in.
+        d = await findUsableDiscount(db, shop, offer.code, { subtotalMinor: goodsMinor, email: opts.email });
       } catch (e) {
         if (!(e instanceof UserError)) throw e;
-        if (d.kind !== "bxgy" && goodsMinor < d.minSubtotalMinor) tiers.push(d);
+        if (offer.kind !== "bxgy" && goodsMinor < offer.minSubtotalMinor) tiers.push(offer);
         continue;
       }
       const applied = applyDiscount(d, goodsMinor, shippingMinor, units);
