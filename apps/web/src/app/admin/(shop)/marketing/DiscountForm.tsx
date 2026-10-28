@@ -115,9 +115,14 @@ export function DiscountForm({ currency, products, tags, collections = [] }: { c
           <label className="label" htmlFor="usageLimit">Total uses</label>
           <input className="input num" id="usageLimit" name="usageLimit" inputMode="numeric" placeholder="No limit" />
         </div>
-        <label className="flex items-center gap-2 text-sm sm:col-span-2 pb-2">
-          <input type="checkbox" name="oncePerCustomer" /> Once per buyer
-        </label>
+        <div className="flex flex-wrap gap-x-4 gap-y-2 sm:col-span-2 pb-2">
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="oncePerCustomer" /> Once per buyer
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="firstOrderOnly" /> First order only
+          </label>
+        </div>
       </div>
       {kind !== "bxgy" && (
         <div className="field">

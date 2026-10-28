@@ -73,6 +73,7 @@ export default async function MarketingPage() {
                         {d.collectionId && !collectionTitle.has(d.collectionId) && " · stopped working when its collection was deleted"}
                         {d.usageLimit !== null && ` · ${d.usageLimit} uses`}
                         {d.oncePerCustomer && " · once per buyer"}
+                        {d.firstOrderOnly && " · first orders only"}
                         {d.customerTag && ` · customers tagged “${d.customerTag}”`}
                         {d.automatic && " · automatic, no code needed"}
                         {d.endsAt && ` · until ${date(d.endsAt)}`}

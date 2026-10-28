@@ -1,0 +1,1 @@
+ALTER TABLE "discounts" ADD COLUMN "first_order_only" boolean DEFAULT false NOT NULL;
