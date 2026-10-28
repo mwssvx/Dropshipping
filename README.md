@@ -1173,3 +1173,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Holiday date in cart reminders (after launch, part 202)
 
 1. **A reason to finish now** (`holidayReminder` in `packages/core/src/fulfillment.ts`): while the store has a holiday order-by date (part 197), the abandoned cart reminder and the follow-up with a code add "Order by Dec 15 to get it in time for Christmas.", worked out for that cart and the buyer's country the same way the cart page does. Once it's too late the line is left out, so a reminder never promises what the store can't keep.
+
+### Email the buyers (after launch, part 203)
+
+1. **One update to many buyers** (`emailOrderUpdate` in `packages/core/src/fulfillment.ts`, Orders → tick orders → "Email the buyers"): when a supplier runs late, an item is missing, or the store takes a week off, write the update once in your own words. Each buyer gets it greeted by first name, with their order number and a link to their order, from "An update on your order #1001 from Your Store". It shows on each order's timeline as "Update from you", and failed sends show there too.
+2. **No double sends**: only paid orders get it (unpaid and refunded ones are left out, and the page says how many before you send). Pressing send twice, or a retried request, doesn't email anyone again. Up to 250 orders at a time, 1,000 characters.

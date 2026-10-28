@@ -205,7 +205,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             <button className="btn btn-secondary" name="op" value="add">Add tag</button>
             <button className="btn btn-secondary" name="op" value="remove">Remove tag</button>
             <button className="btn btn-secondary" name="op" value="slips">Packing slips</button>
-            <p className="hint w-full">Tick orders below, then tag them or print their packing slips together.</p>
+            <button className="btn btn-secondary" name="op" value="email">Email the buyers</button>
+            <p className="hint w-full">Tick orders below, then tag them, print their packing slips together, or email their buyers an update.</p>
           </form>
           <div className="card overflow-x-auto">
             <table className="table min-w-[680px]">
@@ -259,6 +260,15 @@ function BulkResult({ value }: { value: string }) {
   const orders = n === 1 ? "1 order" : `${n} orders`;
   const noRoom = full ? ` ${full === 1 ? "1 order already has" : `${full} orders already have`} 10 tags, so ${full === 1 ? "it was" : "they were"} left as ${full === 1 ? "it was" : "they were"}.` : "";
   if (kind === "tagged") return <p role="status" className={`banner ${n ? "banner-success" : "banner-warning"}`}>{n ? `Tagged ${orders} “${tag}”.` : full ? "" : `Those orders were already tagged “${tag}”.`}{noRoom}</p>;
+  if (kind === "emailed") {
+    const [sent, skipped, failed] = rest.map(Number);
+    const parts = [
+      sent ? `Emailed the buyers of ${sent === 1 ? "1 order" : `${sent} orders`}.` : "No one was emailed.",
+      skipped ? `${skipped === 1 ? "1 order was" : `${skipped} orders were`} skipped: unpaid, refunded or already sent this update.` : "",
+      failed ? `${failed === 1 ? "1 email" : `${failed} emails`} didn't go out; the order page shows which.` : "",
+    ];
+    return <p role="status" className={`banner ${sent && !failed ? "banner-success" : "banner-warning"}`}>{parts.filter(Boolean).join(" ")}</p>;
+  }
   if (kind === "untagged") return <p role="status" className="banner banner-success">{n ? `Took “${tag}” off ${orders}.` : `None of those orders were tagged “${tag}”.`}</p>;
   return null;
 }

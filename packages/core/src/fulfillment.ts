@@ -1,5 +1,6 @@
 import { and, asc, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { schema, type Db, type PersonalizationValue } from "@sf/db";
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { cartDelivery, formatDeliveryWindow, orderDelivery } from "./delivery";
 import { NotFoundError, UserError } from "./errors";
@@ -17,6 +18,7 @@ import { checkOrderRisk } from "./risk";
 import { takeOrderStock } from "./own-stock";
 import { describePersonalization } from "./personalization";
 import { formatShipsBy, preorderWaitingOn } from "./preorders";
+import { MAX_BULK_ORDERS } from "./orders";
 
 /** A personalised item's text, under it in emails. */
 /**
@@ -781,8 +783,16 @@ export async function sendOrderEmail(ctx: FulfillmentContext, orderId: string, k
   const shop = (await db.query.shops.findFirst({ where: eq(schema.shops.id, order.shopId) }))!;
   if (kind === "gift_shipped" && !order.gift?.recipientEmail) return { status: "not_needed" as const };
   const email = await buildEmail(ctx, order, shop, kind, ref);
-  const { subject, text } = email;
-  const to = ("to" in email && email.to) || order.email;
+  const result = await deliverOrderEmail(ctx, shop, order, kind, ref, { to: ("to" in email && email.to) || order.email, subject: email.subject, text: email.text });
+  // The gift's recipient hears once, when the buyer does.
+  if (result.status === "sent" && kind === "shipping_update" && order.gift?.recipientEmail) await sendOrderEmail(ctx, order.id, "gift_shipped");
+  return result;
+}
+
+/** Records an order's email once per kind and ref, then sends it; a repeat is skipped. */
+async function deliverOrderEmail(ctx: FulfillmentContext, shop: Shop, order: Order, kind: EmailKind, ref: string, email: { to: string; subject: string; text: string }) {
+  const { db } = ctx;
+  const { to, subject, text } = email;
   const [row] = await db
     .insert(schema.emails)
     .values({ shopId: shop.id, orderId: order.id, kind, ref, to, subject, bodyText: text })
@@ -792,8 +802,6 @@ export async function sendOrderEmail(ctx: FulfillmentContext, orderId: string, k
   try {
     const { id } = await ctx.mailer.send({ to, subject, text });
     await db.update(schema.emails).set({ status: "sent", providerMessageId: id, sentAt: now(ctx) }).where(eq(schema.emails.id, row.id));
-    // The gift's recipient hears once, when the buyer does.
-    if (kind === "shipping_update" && order.gift?.recipientEmail) await sendOrderEmail(ctx, order.id, "gift_shipped");
     return { status: "sent" as const };
   } catch (e) {
     await db
@@ -802,4 +810,46 @@ export async function sendOrderEmail(ctx: FulfillmentContext, orderId: string, k
       .where(eq(schema.emails.id, row.id));
     return { status: "failed" as const };
   }
+}
+
+/** The longest update a merchant can email to buyers. */
+export const ORDER_UPDATE_MAX = 1000;
+
+/**
+ * Emails the buyers of the picked orders the same update in the merchant's words, say that the
+ * supplier is running late or that the shop is closed for a week. Each email greets the buyer by
+ * name, names their order and links to it, and shows on the order's timeline. Only paid orders that
+ * weren't fully refunded get one; the rest are counted as skipped.
+ */
+export async function emailOrderUpdate(ctx: FulfillmentContext, shopId: string, orderIds: string[], input: { message: string }) {
+  const message = input.message.trim().replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n");
+  if (!message) throw new UserError("Write the update for your buyers.");
+  if (message.length > ORDER_UPDATE_MAX) throw new UserError(`Keep the update under ${ORDER_UPDATE_MAX.toLocaleString("en-US")} characters.`);
+  const ids = [...new Set(orderIds)].filter((id) => z.string().uuid().safeParse(id).success);
+  if (!ids.length) throw new UserError("Pick at least one order.");
+  if (ids.length > MAX_BULK_ORDERS) throw new UserError(`Pick up to ${MAX_BULK_ORDERS} orders at a time.`);
+  const shop = await ctx.db.query.shops.findFirst({ where: eq(schema.shops.id, shopId) });
+  if (!shop) throw new NotFoundError("Store");
+  const orders = await ctx.db.query.orders.findMany({ where: and(eq(schema.orders.shopId, shopId), inArray(schema.orders.id, ids)), orderBy: asc(schema.orders.number) });
+  // One ref for the whole send, so a retried request doesn't email anyone twice.
+  const ref = `update-${createHash("sha256").update(`${message}\n${[...ids].sort().join(",")}`).digest("hex").slice(0, 16)}`;
+  let sent = 0;
+  let failed = 0;
+  let skipped = ids.length - orders.length;
+  for (const order of orders) {
+    if (!order.paidAt || !["paid", "partially_refunded"].includes(order.paymentStatus)) {
+      skipped++;
+      continue;
+    }
+    const first = order.shippingAddress.name.split(" ")[0];
+    const result = await deliverOrderEmail(ctx, shop, order, "order_news", ref, {
+      to: order.email,
+      subject: `An update on your order #${order.number} from ${shop.name}`,
+      text: [`Hi ${first},`, ``, message, ``, `Your order #${order.number}: ${await ctx.orderStatusUrl(shop, order)}`, ``, `Reply to this email if you have a question.`].join("\n"),
+    });
+    if (result.status === "sent") sent++;
+    else if (result.status === "failed") failed++;
+    else skipped++;
+  }
+  return { sent, failed, skipped };
 }
