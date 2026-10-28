@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { analyticsReport, formatMoney, searchReport } from "@sf/core";
+import { analyticsReport, comparisonRange, formatMoney, periodChange, periodTotals, searchReport, type Comparison } from "@sf/core";
 import { requireShop, storeAddress } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 
@@ -8,14 +8,36 @@ export const metadata = { title: "Analytics" };
 const DAY = 86_400_000;
 const RANGES = [7, 30, 90] as const;
 
-export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<{ days?: string }> }) {
+/** "Up 18%", "Down 5%" or "Same", or "New" when there was nothing before; null when there's nothing either side. */
+function changeLabel(now: number, before: number) {
+  const c = periodChange(now, before);
+  if (c === null) return now > 0 ? "New" : null;
+  const p = Math.round(Math.abs(c) * 100);
+  return p === 0 ? "Same" : `${c > 0 ? "Up" : "Down"} ${p}%`;
+}
+
+/** Conversion moves in percentage points: "Up 0.4 pts". */
+function pointsLabel(now: number | null, before: number | null) {
+  if (now === null || before === null) return null;
+  const pts = Math.round((now - before) * 1000) / 10;
+  return pts === 0 ? "Same" : `${pts > 0 ? "Up" : "Down"} ${Math.abs(pts)} pts`;
+}
+
+export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<{ days?: string; compare?: string }> }) {
   const { shop, db } = await requireShop("analytics");
-  const wanted = (await searchParams).days;
+  const { days: wanted, compare: wantedCompare } = await searchParams;
   const days = RANGES.find((d) => String(d) === wanted) ?? 30;
+  const compare: Comparison = wantedCompare === "year" ? "year" : "previous";
   const now = new Date();
   const to = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) + DAY;
   const range = { from: new Date(to - days * DAY), to: new Date(to) };
-  const [r, searches, store] = await Promise.all([analyticsReport(db, shop.id, range), searchReport(db, shop.id, range), storeAddress(shop)]);
+  const [r, before, searches, store] = await Promise.all([
+    analyticsReport(db, shop.id, range),
+    periodTotals(db, shop.id, comparisonRange(range, compare), now),
+    searchReport(db, shop.id, range),
+    storeAddress(shop),
+  ]);
+  const versus = compare === "year" ? "vs the same days last year" : `vs the ${days} days before`;
   const searchLink = (term: string) => `${store}/search?q=${encodeURIComponent(term)}`;
   const money = (m: number) => formatMoney(m, shop.currency);
   const pct = (x: number | null) => (x === null ? "–" : `${(x * 100).toFixed(x < 0.1 ? 1 : 0)}%`);
@@ -30,7 +52,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         actions={
           <nav className="flex gap-1" aria-label="Period">
             {RANGES.map((d) => (
-              <Link key={d} href={`/admin/analytics?days=${d}`} aria-current={d === days ? "page" : undefined} className={`btn ${d === days ? "btn-primary" : "btn-secondary"}`}>
+              <Link key={d} href={`/admin/analytics?days=${d}${compare === "year" ? "&compare=year" : ""}`} aria-current={d === days ? "page" : undefined} className={`btn ${d === days ? "btn-primary" : "btn-secondary"}`}>
                 {d} days
               </Link>
             ))}
@@ -38,17 +60,28 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         }
       />
       <div className="px-4 sm:px-8 flex flex-col gap-6 max-w-5xl">
+        <nav className="flex flex-wrap items-center gap-2 text-sm" aria-label="Compare with">
+          <span className="hint">Compare with</span>
+          {(["previous", "year"] as const).map((c) => (
+            <Link key={c} href={`/admin/analytics?days=${days}&compare=${c}`} aria-current={c === compare ? "page" : undefined} className={`pill ${c === compare ? "pill-success" : ""}`}>
+              {c === "year" ? "Same days last year" : `The ${days} days before`}
+            </Link>
+          ))}
+        </nav>
         <dl className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          {[
-            ["Sales", money(r.salesMinor)],
-            ["Orders", String(r.orders)],
-            ["Average order", r.orders ? money(r.averageOrderMinor) : "–"],
-            ["Visitors", String(r.visitors)],
-            ["Conversion", pct(r.conversion)],
-          ].map(([k, v]) => (
+          {(
+            [
+              ["Sales", money(r.salesMinor), changeLabel(r.salesMinor, before.salesMinor)],
+              ["Orders", String(r.orders), changeLabel(r.orders, before.orders)],
+              ["Average order", r.orders ? money(r.averageOrderMinor) : "–", r.orders && before.orders ? changeLabel(r.averageOrderMinor, before.averageOrderMinor) : null],
+              ["Visitors", String(r.visitors), before.visitors === null ? null : changeLabel(r.visitors, before.visitors)],
+              ["Conversion", pct(r.conversion), pointsLabel(r.conversion, before.conversion)],
+            ] as const
+          ).map(([k, v, c]) => (
             <div key={k} className="card p-4">
               <dt className="hint">{k}</dt>
               <dd className="text-xl font-semibold num">{v}</dd>
+              {c && <dd className={`text-xs num ${c.startsWith("Up") || c === "New" ? "text-success" : c.startsWith("Down") ? "text-critical" : "hint"}`}>{c} <span className="hint">{versus}</span></dd>}
             </div>
           ))}
         </dl>

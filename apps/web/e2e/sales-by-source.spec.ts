@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 // Sales by source: an order remembers where its visit came from (a site, or the link's
-// utm_source), and Analytics adds up what each source sold.
+// utm_source), and Analytics adds up what each source sold. Its headline numbers compare with an earlier period.
 
 test("a sale from a tagged Instagram link shows under Sales by source", async ({ page, browser }, info) => {
   const id = `${info.project.name}-${Date.now()}`;
@@ -37,6 +37,16 @@ test("a sale from a tagged Instagram link shows under Sales by source", async ({
   await page.goto("/admin/analytics");
   const bySource = page.getByRole("region", { name: "Sales by source" });
   await expect(bySource.getByRole("row", { name: /instagram/ })).toContainText("1");
+  // The headline numbers say how they moved since the period before: this store had nothing then.
+  const card = (name: string) => page.locator("dl > div").filter({ has: page.getByText(name, { exact: true }) });
+  await expect(card("Sales")).toContainText("New vs the 30 days before");
+  await expect(card("Orders")).toContainText("New vs the 30 days before");
+  await page.getByRole("navigation", { name: "Compare with" }).getByRole("link", { name: "Same days last year" }).click();
+  await expect(page).toHaveURL(/compare=year/);
+  await expect(card("Sales")).toContainText("New vs the same days last year");
+  await page.getByRole("navigation", { name: "Period" }).getByRole("link", { name: "7 days" }).click();
+  await expect(page).toHaveURL(/days=7&compare=year/);
+  await expect(page.getByRole("navigation", { name: "Compare with" }).getByRole("link", { name: "Same days last year" })).toHaveAttribute("aria-current", "page");
   await page.goto("/admin/orders");
   await page.getByRole("link", { name: "#1001" }).first().click();
   await expect(page.getByText("The buyer came from instagram.")).toBeVisible();

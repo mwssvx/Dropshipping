@@ -56,6 +56,47 @@ export function sourceOf(referrer: string | null | undefined, ownHost: string | 
 
 export type AnalyticsRange = { from: Date; to: Date };
 
+export type Comparison = "previous" | "year";
+
+/** The period to compare a range with: the same number of days just before it, or the same days a year earlier. */
+export function comparisonRange(range: AnalyticsRange, kind: Comparison): AnalyticsRange {
+  if (kind === "previous") {
+    const length = range.to.getTime() - range.from.getTime();
+    return { from: new Date(range.from.getTime() - length), to: new Date(range.from) };
+  }
+  const yearBack = (d: Date) => {
+    const t = new Date(d);
+    t.setUTCFullYear(t.getUTCFullYear() - 1);
+    return t;
+  };
+  return { from: yearBack(range.from), to: yearBack(range.to) };
+}
+
+/**
+ * Sales after refunds, orders and visitors in a range, counted the same way as the report, for
+ * comparing two periods. Visitors (and so conversion) are null when the range starts before visitor
+ * events are kept, since part of them is gone.
+ */
+export async function periodTotals(db: Db, shopId: string, range: AnalyticsRange, now = new Date()) {
+  const o = schema.orders;
+  const e = schema.storefrontEvents;
+  const [[sales], [visits]] = await Promise.all([
+    db
+      .select({ sales: sql<number>`coalesce(sum(${o.totalMinor} - ${o.refundedMinor}), 0)::bigint`, orders: count() })
+      .from(o)
+      .where(and(eq(o.shopId, shopId), inArray(o.paymentStatus, [...PAID]), ne(o.source, "replacement"), gte(o.paidAt, range.from), lt(o.paidAt, range.to))),
+    db.select({ n: countDistinct(e.sessionId) }).from(e).where(and(eq(e.shopId, shopId), gte(e.createdAt, range.from), lt(e.createdAt, range.to))),
+  ]);
+  const salesMinor = Number(sales?.sales ?? 0);
+  const orders = Number(sales?.orders ?? 0);
+  const kept = range.from.getTime() >= now.getTime() - EVENTS_KEPT_DAYS * DAY;
+  const visitors = kept ? Number(visits?.n ?? 0) : null;
+  return { salesMinor, orders, averageOrderMinor: orders ? Math.round(salesMinor / orders) : 0, visitors, conversion: visitors ? Math.min(1, orders / visitors) : null };
+}
+
+/** The change from `before` to `now` as a fraction (0.18 is 18% up), or null when there was nothing before to compare with. */
+export const periodChange = (now: number, before: number) => (before > 0 ? (now - before) / before : null);
+
 /** Sales by day, the visitor funnel, best sellers and where visitors came from. `to` is exclusive. */
 export async function analyticsReport(db: Db, shopId: string, range: AnalyticsRange) {
   const inRange = (col: typeof schema.orders.paidAt | typeof schema.storefrontEvents.createdAt) => and(gte(col, range.from), lt(col, range.to));
@@ -154,9 +195,12 @@ function withDirect(list: { source: string; visitors: number }[], direct: number
   return (direct > 0 ? [...list, { source: "Direct", visitors: direct }] : list).sort((a, b) => b.visitors - a.visitors);
 }
 
+/** How long visitor events are kept. */
+export const EVENTS_KEPT_DAYS = 400;
+
 /** Deletes visitor events and search counts older than about 13 months, so the tables don't grow forever. */
 export async function pruneEvents(db: Db, now = new Date()) {
-  const cutoff = new Date(now.getTime() - 400 * DAY);
+  const cutoff = new Date(now.getTime() - EVENTS_KEPT_DAYS * DAY);
   const gone = await db.delete(schema.storefrontEvents).where(lt(schema.storefrontEvents.createdAt, cutoff)).returning({ id: schema.storefrontEvents.id });
   return gone.length + (await pruneSearchTerms(db, now));
 }
