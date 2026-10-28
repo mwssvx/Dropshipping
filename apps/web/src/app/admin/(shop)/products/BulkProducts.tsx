@@ -17,10 +17,12 @@ const KINDS = [
   ["clear_compare_at", "Remove the \"was\" price"],
   ["add", "Add to a collection"],
   ["remove", "Take out of a collection"],
+  ["add_tag", "Add a tag"],
+  ["remove_tag", "Remove a tag"],
 ] as const;
 type Kind = (typeof KINDS)[number][0];
 
-export function BulkProducts({ rows, collections, recent }: { rows: BulkRow[]; collections: { id: string; title: string }[]; recent: RecentEdit[] }) {
+export function BulkProducts({ rows, collections, tags = [], recent }: { rows: BulkRow[]; collections: { id: string; title: string }[]; tags?: string[]; recent: RecentEdit[] }) {
   const [state, action] = useActionState(bulkEditAction, {} as BulkState);
   // Controlled, because React clears a form's own fields after each submit.
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -28,11 +30,12 @@ export function BulkProducts({ rows, collections, recent }: { rows: BulkRow[]; c
   const [percent, setPercent] = useState("10");
   const [ending, setEnding] = useState("none");
   const [collectionId, setCollectionId] = useState(collections[0]?.id ?? "");
+  const [tag, setTag] = useState("");
   const [belowCost, setBelowCost] = useState(false);
   const toggle = (id: string) => setPicked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const all = picked.size === rows.length && rows.length > 0;
   // A preview is for the products and change it was made from; touching either asks again.
-  const key = JSON.stringify([[...picked].sort(), kind, percent, ending, collectionId]);
+  const key = JSON.stringify([[...picked].sort(), kind, percent, ending, collectionId, tag]);
   const preview = state.preview && state.key === key ? state.preview : null;
   const needsCollection = kind === "add" || kind === "remove";
 
@@ -44,6 +47,7 @@ export function BulkProducts({ rows, collections, recent }: { rows: BulkRow[]; c
         <input type="hidden" name="percent" value={percent} />
         <input type="hidden" name="ending" value={ending} />
         <input type="hidden" name="collectionId" value={collectionId} />
+        <input type="hidden" name="tag" value={tag} />
         <input type="hidden" name="key" value={key} />
         {belowCost && <input type="hidden" name="belowCost" value="on" />}
         {state.done && (
@@ -88,13 +92,20 @@ export function BulkProducts({ rows, collections, recent }: { rows: BulkRow[]; c
                   <p className="hint self-center">No collections yet. <Link href="/admin/collections/new" className="underline">Make one</Link>.</p>
                 )
               )}
+              {(kind === "add_tag" || kind === "remove_tag") && (
+                <div className="field">
+                  <label className="label" htmlFor="bulk-tag">Tag</label>
+                  <input className="input w-40" id="bulk-tag" list="bulk-tags" value={tag} maxLength={30} onChange={(e) => setTag(e.target.value)} placeholder="summer" />
+                  <datalist id="bulk-tags">{tags.map((t) => <option key={t} value={t} />)}</datalist>
+                </div>
+              )}
               <button type="submit" className="btn btn-secondary" name="intent" value="preview">Preview</button>
             </div>
             <FormError message={state.key === key ? state.error : undefined} />
             {preview && (
               <div className="flex flex-col gap-3">
                 {preview.changes.length === 0 ? (
-                  <p className="hint">Nothing to change: those products already look like that.</p>
+                  <p className="hint">{preview.full > 0 ? "Nothing to change: those products already have that tag or 20 tags." : "Nothing to change: those products already look like that."}</p>
                 ) : (
                   <>
                     <div className="overflow-x-auto max-h-72">
@@ -113,6 +124,7 @@ export function BulkProducts({ rows, collections, recent }: { rows: BulkRow[]; c
                     </div>
                     {preview.changes.length > 50 && <p className="hint">And {preview.changes.length - 50} more.</p>}
                     {preview.skipped > 0 && <p className="hint">Gift cards keep their prices ({preview.skipped} skipped).</p>}
+                    {preview.full > 0 && <p className="hint">{preview.full === 1 ? "1 product already has" : `${preview.full} products already have`} 20 tags, so {preview.full === 1 ? "it was" : "they were"} left out.</p>}
                     {preview.belowCost > 0 && (
                       <label className="flex items-center gap-2 text-sm">
                         <input type="checkbox" checked={belowCost} onChange={(e) => setBelowCost(e.target.checked)} /> Sell below cost ({preview.belowCost === 1 ? "1 option" : `${preview.belowCost} options`})

@@ -236,7 +236,7 @@ describe("store export", () => {
     const f = await makeFixture(new DemoModel());
     const csv = await productsCsv(f.db, (await f.shop()).id);
     const rows = csv.trim().split("\n");
-    expect(rows[0]).toBe("Handle,Title,Status,Variant,SKU,Price,Compare at price,Cost,Stock,Image URL,Supplier link");
+    expect(rows[0]).toBe("Handle,Title,Status,Variant,SKU,Price,Compare at price,Cost,Stock,Image URL,Supplier link,Tags");
     expect(rows.some((r) => r.startsWith("sunset-projection-lamp,Sunset Projection Lamp,active,"))).toBe(true);
   });
 });

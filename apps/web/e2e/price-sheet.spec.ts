@@ -28,7 +28,7 @@ test("a merchant changes prices by uploading their products file", async ({ page
   // The download, with the apron's price changed and a row the store doesn't have.
   const file = await (await page.request.get("/admin/export/products.csv")).text();
   const lines = file.trim().split("\n");
-  expect(lines[0]).toBe("Handle,Title,Status,Variant,SKU,Price,Compare at price,Cost,Stock,Image URL,Supplier link");
+  expect(lines[0]).toBe("Handle,Title,Status,Variant,SKU,Price,Compare at price,Cost,Stock,Image URL,Supplier link,Tags");
   const edited = [...lines.map((l) => (l.startsWith("linen-apron,") ? l.replace(",20.00,", ",24.50,") : l)), "no-such-thing,Ghost,active,Default,,9.00,,,,,"].join("\n");
   expect(edited).toContain(",24.50,");
 

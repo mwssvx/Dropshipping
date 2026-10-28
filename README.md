@@ -984,3 +984,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Your own labels**: a product has Tags ("summer, gift idea"), cleaned to lowercase like customer tags, up to 20. The product list shows the tags in use with how many products have each, and a tag narrows the list (it works with search and the status filters). Saving a product from the API without tags leaves them as they are (`tags` in `packages/core/src/products.ts`, `productTags`; migration `0119_product_tags`).
 2. **Collections by tag**: "Is tagged" is a rule for collections that fill themselves, so tagging a product puts it in the collection at once (`collection-rules.ts`).
 3. **Carried over**: store files keep product tags, and the Shopify products import brings Shopify's Tags column.
+
+### Tags in bulk (after launch, part 158)
+
+1. **Many at once**: tick products on the Products page and pick "Add a tag" or "Remove a tag". The preview shows each product's tags before and after, products that already have 20 tags are left out, and the change can be undone for 7 days like other bulk edits. Undo only puts that one tag back the way it was, so tags changed by hand since stay (`kind: "tag"` in `packages/core/src/bulk-edit.ts`; no migration).
+2. **In the download**: the products CSV has a Tags column, so tags can be sorted and filtered in a spreadsheet (`productsCsv`).

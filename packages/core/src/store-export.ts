@@ -1003,10 +1003,10 @@ export async function productsCsv(db: Db, shopId: string) {
     ? groupBy(await db.query.variants.findMany({ where: inArray(schema.variants.productId, db.select({ id: schema.products.id }).from(schema.products).where(eq(schema.products.shopId, shopId))), orderBy: asc(schema.variants.position) }), (v) => v.productId)
     : new Map<string, (typeof schema.variants.$inferSelect)[]>();
   const major = (m: number | null) => (m === null ? null : (m / 100).toFixed(2));
-  const header = ["Handle", "Title", "Status", "Variant", "SKU", "Price", "Compare at price", "Cost", "Stock", "Image URL", "Supplier link"];
+  const header = ["Handle", "Title", "Status", "Variant", "SKU", "Price", "Compare at price", "Cost", "Stock", "Image URL", "Supplier link", "Tags"];
   const rows = products.flatMap((p) =>
     (variants.get(p.id) ?? [])
-      .map((v) => [p.handle, p.title, p.status, v.title, v.sku, major(v.priceMinor), major(v.compareAtMinor), major(v.costMinor), v.stock, p.imageUrl, p.sourceUrl]),
+      .map((v) => [p.handle, p.title, p.status, v.title, v.sku, major(v.priceMinor), major(v.compareAtMinor), major(v.costMinor), v.stock, p.imageUrl, p.sourceUrl, p.tags.join(", ")]),
   );
   return [header, ...rows].map((r) => r.map((c) => csvCell(c ?? null)).join(",")).join("\n") + "\n";
 }
