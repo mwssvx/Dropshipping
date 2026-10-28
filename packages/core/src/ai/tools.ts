@@ -560,7 +560,10 @@ const buyerTools = [
       if (c?.status === "needs_merchant" || c?.status === "escalated") return needsOk("This conversation was handed to a person.");
       if (await promisesMoney(run, i.message)) return needsOk("The reply mentions a refund, discount or something free.");
       if (!run.shop.aiAutoReplyTopics.includes(i.topic)) return needsOk(`You haven't let the assistant answer “${BUYER_TOPICS[i.topic].toLowerCase()}” questions on its own.`);
-      return AUTO;
+      // Before anything goes out on its own, a second model reads it against the facts.
+      const { checkReply } = await import("./agents");
+      const held = await checkReply(run, i.message);
+      return held ? needsOk(held) : AUTO;
     },
     summary: (i) => `Reply to the buyer about ${BUYER_TOPICS[i.topic].toLowerCase()}`,
     check: (i, run) => bannedOnly(run, "reply", i.message),
@@ -1542,6 +1545,29 @@ const skillTools = [
   }),
 ];
 
+/* ───────────── Reply checker: a second look before a buyer reply goes out on its own ───────────── */
+
+/** Each checker run's verdict, by run id, for the reply it was asked about. */
+export const replyVerdicts = new Map<string, { safe: boolean; problems: string[] }>();
+
+const checkerTools = [
+  tool({
+    name: "give_verdict",
+    kind: "change",
+    description: "Your verdict on the reply. safe=true only if it could go to the buyer as it is. Call it once.",
+    input: z.object({
+      safe: z.boolean(),
+      problems: z.array(z.string().min(5).max(200)).max(3).describe("What's wrong, in a few words each, for the store owner. Empty when safe."),
+    }),
+    policy: () => AUTO,
+    summary: (i) => (i.safe ? "The reply looked right" : `Held the reply: ${i.problems.join("; ")}`),
+    async run(i, run) {
+      replyVerdicts.set(run.runId, { safe: i.safe && !i.problems.length, problems: i.problems });
+      return { recorded: true };
+    },
+  }),
+];
+
 export const AGENT_TOOLS: Record<AgentName, AgentTool[]> = {
   listing: listingTools,
   assistant: [...assistantTools, ...skillTools],
@@ -1557,6 +1583,7 @@ export const AGENT_TOOLS: Record<AgentName, AgentTool[]> = {
   analyst: analystTools,
   scout: scoutTools,
   watch: watchTools,
+  reply_checker: checkerTools,
 };
 
 export function findTool(agent: AgentName, name: string) {

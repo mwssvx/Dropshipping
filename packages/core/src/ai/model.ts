@@ -70,6 +70,7 @@ export const AGENT_MODELS: Record<AgentName, string> = {
   analyst: "claude-sonnet-5-5",
   scout: "claude-sonnet-5-5",
   watch: "claude-haiku-5-5",
+  reply_checker: "claude-haiku-5-5",
   buyer_support: "claude-sonnet-5-5",
   fulfilment: "claude-sonnet-5-5",
   assistant: "claude-opus-5-5",
@@ -173,6 +174,8 @@ export class ScriptedModel implements ModelClient {
   readonly live = false;
   readonly requests: ModelRequest[] = [];
   private i = 0;
+  /** How the reply checker answers: passes by default, a function's verdict, or "scripted" to use the steps. */
+  checker: "pass" | "scripted" | ((req: ModelRequest) => { safe: boolean; problems: string[] }) = "pass";
 
   constructor(
     private readonly steps: (ScriptStep | BetaContentBlock[])[],
@@ -185,6 +188,13 @@ export class ScriptedModel implements ModelClient {
   }
 
   async create(req: ModelRequest): Promise<ModelResponse> {
+    // Tests script the helper they're about; the reply checker passes replies unless a test
+    // sets `checker` to script it too.
+    if (req.agent === "reply_checker" && this.checker !== "scripted") {
+      const done = req.messages.some((m) => Array.isArray(m.content) && m.content.some((b) => b.type === "tool_result"));
+      const content = done ? [text("Checked.")] : [toolCall("give_verdict", typeof this.checker === "function" ? this.checker(req) : { safe: true, problems: [] })];
+      return { content, stopReason: done ? "end_turn" : "tool_use", usage: this.usagePerCall, model: req.model };
+    }
     this.requests.push(structuredClone(req));
     const step = this.steps[this.i++];
     const out = step === undefined ? [text("Done.")] : typeof step === "function" ? step(req) : step;

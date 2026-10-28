@@ -25,6 +25,7 @@ const WHAT = {
   answerer: "Drafts answers to shoppers' product questions when you press “Draft with AI” on the Questions page. Nothing is sent until you send it.",
   summarizer: "Writes “What buyers say” above a product's reviews when you press “Summarize with AI” on the product page. You can edit or remove it.",
   analyst: "Reviews your sales, profit, customers, returns and searches when you press “Review my store” on the Insights page (or every Monday if you turn it on below), and suggests what to do next.",
+  reply_checker: "Reads every reply the buyer helper would send on its own, against what it read and your policies. If a reply says something the data doesn’t back up, misses the question or promises too much, it waits in the inbox for you instead.",
   watch: "Each morning, compares yesterday’s sales, visitors, checkouts and refunds with the four weeks before. Only when something moved out of line does it explain the likely cause and what to do, on Today and the Insights page.",
   scout: "Searches the web for products that are taking off and suit your store when you press “Find trending products” on the Insights page. Saves ideas with their sources; it never adds products by itself.",
   shopper: "Answers shoppers' questions about your products, delivery and returns, on your store's pages, when you turn it on below. It only reads what your store already shows.",
