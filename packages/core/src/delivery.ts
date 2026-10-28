@@ -5,6 +5,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { schema, type Db, type ShipCutoff } from "@sf/db";
 import { z } from "zod";
 import { UserError } from "./errors";
+import { holidayOrderBy } from "./holiday-deadline";
 import { nextCutoff, shipDay } from "./ship-cutoff";
 import { fitsWeight, listShippingZones, zoneFor, type Rate } from "./shipping";
 
@@ -74,7 +75,8 @@ const cheapest = (rates: Rate[]) => [...rates].sort((a, b) => a.priceMinor - b.p
 
 /**
  * When a product would arrive if bought now, with the cheapest rate to the buyer's country (or the
- * store's, when it doesn't ship to theirs). Null when the store has dates off or nothing says how long.
+ * store's, when it doesn't ship to theirs), with the last day to order for the store's holiday. Null
+ * when the store has dates off or nothing says how long.
  */
 export async function productDelivery(db: Db, shop: Shop, productId: string, opts: { country?: string | null; now?: Date } = {}) {
   if (!shop.deliveryEstimates) return null;
@@ -89,7 +91,8 @@ export async function productDelivery(db: Db, shop: Shop, productId: string, opt
   // The countdown shows once the cutoff is less than a day away.
   const next = shop.shipCutoff ? nextCutoff(now, shop.processingDays, shop.shipCutoff) : null;
   const cutoff = next && next.msLeft <= DAY ? next : null;
-  return { ...deliveryWindow(now, shop.processingDays, transit.min, transit.max, shop.shipCutoff), country, cutoff };
+  const window = deliveryWindow(now, shop.processingDays, transit.min, transit.max, shop.shipCutoff);
+  return { ...window, country, cutoff, holiday: holidayOrderBy(shop.holidayDeadline, window, shop.shipCutoff, now) };
 }
 
 /**

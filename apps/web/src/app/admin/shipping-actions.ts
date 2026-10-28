@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseKg, parseMoney, setCheckoutPhone, setDeliveryEstimates, setDeliveryProtection, setGiftWrap, setLocalDelivery, setLocalPickup, setMinOrder, setShipCutoff, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
+import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseKg, parseMoney, setCheckoutPhone, setDeliveryEstimates, setDeliveryProtection, setGiftWrap, setHolidayDeadline, setLocalDelivery, setLocalPickup, setMinOrder, setShipCutoff, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
 import { logged, requireShop } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -261,5 +261,23 @@ export async function setShipCutoffAction(_: ShipCutoffState, form: FormData): P
   }
   await logged({ shop, user, db }, saved ? "Set a same-day shipping cutoff" : "Turned off the same-day shipping cutoff", { href: "/admin/shipping#cutoff-heading" });
   revalidatePath("/admin/shipping");
+  return { saved };
+}
+
+export type HolidayDeadlineState = { error?: string; saved?: { name: string; arriveBy: string } | null };
+
+/** Sets the holiday product pages give an order-by date for, or removes it. */
+export async function setHolidayDeadlineAction(_: HolidayDeadlineState, form: FormData): Promise<HolidayDeadlineState> {
+  const { shop, db, user } = await requireShop("shipping");
+  let saved: HolidayDeadlineState["saved"] = null;
+  try {
+    saved = await setHolidayDeadline(db, shop.id, form.get("enabled") === "on" ? { name: String(form.get("name") ?? ""), arriveBy: String(form.get("arriveBy") ?? "") } : null);
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  await logged({ shop, user, db }, saved ? `Set an order-by date for ${saved.name}` : "Removed the holiday order-by date", { href: "/admin/shipping#holiday-heading" });
+  revalidatePath("/admin/shipping");
+  revalidatePath(`/s/${shop.handle}`, "layout");
   return { saved };
 }

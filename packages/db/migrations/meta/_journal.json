@@ -925,6 +925,13 @@
       "when": 1793183293545,
       "tag": "0132_chat_buttons",
       "breakpoints": true
+    },
+    {
+      "idx": 132,
+      "version": "7",
+      "when": 1793184148000,
+      "tag": "0133_holiday_deadline",
+      "breakpoints": true
     }
   ]
 }

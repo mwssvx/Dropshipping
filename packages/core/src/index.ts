@@ -94,6 +94,7 @@ export * from "./birthday";
 export * from "./signup-popup";
 export * from "./thank-you";
 export * from "./chat-buttons";
+export * from "./holiday-deadline";
 export * from "./price-watch";
 export * from "./preorders";
 export * from "./supplier-scores";

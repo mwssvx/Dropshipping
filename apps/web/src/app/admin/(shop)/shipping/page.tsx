@@ -1,10 +1,11 @@
-import { countryName, describeRate, EVERYWHERE_ELSE, formatDeliveryWindow, formatMoney, listShippingZones, sampleProduct, productDelivery, rateDays, rateWeight, SHIPPING_COUNTRIES, CUTOFF_TIME_ZONES, defaultCutoffZone } from "@sf/core";
+import { countryName, describeRate, EVERYWHERE_ELSE, formatDeliveryWindow, formatMoney, listShippingZones, sampleProduct, productDelivery, rateDays, rateWeight, SHIPPING_COUNTRIES, CUTOFF_TIME_ZONES, defaultCutoffZone, HOLIDAY_DAYS_AHEAD } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { setCheckoutPhoneAction } from "../../shipping-actions";
 import { DeliveryEstimatesForm } from "./DeliveryEstimatesForm";
 import { DeliveryProtectionForm } from "./DeliveryProtectionForm";
 import { ShipCutoffForm } from "./ShipCutoffForm";
+import { HolidayDeadlineForm } from "./HolidayDeadlineForm";
 import { GiftWrapForm } from "./GiftWrapForm";
 import { LocalDeliveryForm } from "./LocalDeliveryForm";
 import { LocalPickupForm } from "./LocalPickupForm";
@@ -25,6 +26,8 @@ export default async function ShippingPage() {
   // An example from the store's own catalog, so the merchant sees what buyers see.
   const example = await sampleProduct(db, shop.id);
   const preview = example ? await productDelivery(db, shop, example.id) : null;
+  const dayAfter = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+  const holidayDays = { min: dayAfter(1), max: dayAfter(HOLIDAY_DAYS_AHEAD) };
   const money = (m: number) => formatMoney(m, shop.currency);
   const symbol = money(0).replace(/[\d.,\s]/g, "");
   const all = [EVERYWHERE_ELSE, ...[...SHIPPING_COUNTRIES].sort((a, b) => countryName(a).localeCompare(countryName(b)))];
@@ -110,10 +113,24 @@ export default async function ShippingPage() {
             </p>
             <ShipCutoffForm cutoff={shop.shipCutoff} zones={CUTOFF_TIME_ZONES} defaultZone={defaultCutoffZone(shop.country)} />
           </div>
+          <div className="border-t border-border pt-3 flex flex-col gap-2">
+            <h3 id="holiday-heading" className="font-medium">Holiday order-by date</h3>
+            <p className="text-sm hint">
+              Before a holiday, product pages can say the last day to order (&quot;Order by Dec 15 to get it in time for Christmas&quot;),
+              counted back from the slowest delivery date they show. After that day they say an order may not arrive in time, and once the
+              holiday has passed the line goes away by itself.
+            </p>
+            <HolidayDeadlineForm deadline={shop.holidayDeadline} days={holidayDays} />
+          </div>
           {example && (
             <p className="text-sm border-t border-border pt-3" role="note">
               {preview
-                ? <>Today, {example.title} shows <strong>{formatDeliveryWindow(preview)}</strong> to {countryName(preview.country)}.</>
+                ? <>
+                    Today, {example.title} shows <strong>{formatDeliveryWindow(preview)}</strong> to {countryName(preview.country)}.
+                    {preview.holiday && (preview.holiday.orderBy
+                      ? <> Order by <strong>{formatDeliveryWindow({ from: preview.holiday.orderBy, to: preview.holiday.orderBy })}</strong> for {preview.holiday.name}.</>
+                      : <> It&apos;s too late to order it for {preview.holiday.name}.</>)}
+                  </>
                 : shop.deliveryEstimates
                   ? `${example.title} shows no date: its supplier doesn't say how long shipping takes and the rate has no days. Add days to the rate to show one.`
                   : "Delivery dates are off."}

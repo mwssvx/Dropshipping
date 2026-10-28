@@ -173,6 +173,8 @@ export const shops = pgTable(
     bankTransfer: jsonb("bank_transfer").$type<BankTransfer | null>(),
     // Orders in by this hour (store time) start that shipping day, or null when there's no cutoff.
     shipCutoff: jsonb("ship_cutoff").$type<ShipCutoff | null>(),
+    // "Order by Dec 15 to get it in time for Christmas": a day orders must arrive by, or null.
+    holidayDeadline: jsonb("holiday_deadline").$type<HolidayDeadline | null>(),
     // The tip percentages buyers can pick at checkout, or null when the store doesn't ask.
     tipping: jsonb("tipping").$type<Tipping | null>(),
     // "How did you hear about us?" asked on the order page after paying. Null when it's off.
@@ -570,6 +572,9 @@ export type BankTransfer = { details: string; days: number };
 
 /** Same-day cutoff: the hour (1 to 23) in the store's time zone, and whether it ships at weekends. */
 export type ShipCutoff = { hour: number; timeZone: string; weekends: boolean };
+
+/** A holiday orders should arrive in time for: its name ("Christmas") and the last day they can arrive (YYYY-MM-DD). */
+export type HolidayDeadline = { name: string; arriveBy: string };
 
 /** Tips at checkout: the percentages offered, smallest first, and a thank-you line. */
 export type Tipping = { percents: number[]; note: string | null };
