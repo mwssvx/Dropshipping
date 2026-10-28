@@ -1100,3 +1100,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Products that aren't selling (after launch, part 185)
 
 1. **Not sold in 30 or 90 days**: the product list gets a "Not sold in" row that shows the products on sale with no paid order in that time, with how many each. Products added within that time haven't had their chance yet, so they never count, and refunded orders aren't sales. It works with the other product filters, and the spreadsheet download, changing every product in the list and saved views keep it. Put them on sale, give them a better photo, or archive them in one go (`PRODUCT_UNSOLD` and `productUnsold` in `packages/core/src/products.ts`; no migration).
+
+### First orders and returning buyers (after launch, part 186)
+
+1. **New or returning buyers**: the order list gets a menu that shows only first orders (the buyer's first paid order with the store) or only orders from buyers who had paid for one before, matched by email whatever its capitals. Unpaid tries don't count as an earlier order. It works with the other order filters, and the spreadsheet download, working on many orders at once and saved views keep it. It shows whether a campaign brought new people or the same ones (`ORDER_BUYERS` and `OrderFilter.buyer` in `packages/core/src/orders.ts`; no migration).

@@ -795,6 +795,15 @@ export function totalParam(value: string | null | undefined) {
   return Object.hasOwn(ORDER_TOTALS, value ?? "") ? (value as OrderTotalRange) : undefined;
 }
 
+/** First orders from new buyers, or orders from buyers who ordered before. */
+export const ORDER_BUYERS = ["new", "returning"] as const;
+export type OrderBuyer = (typeof ORDER_BUYERS)[number];
+
+/** A buyer filter from a link, or undefined when it isn't one. */
+export function buyerParam(value: string | null | undefined) {
+  return ORDER_BUYERS.find((b) => b === value);
+}
+
 export type OrderFilter = {
   fulfillmentStatus?: Order["fulfillmentStatus"];
   paymentStatus?: Order["paymentStatus"];
@@ -810,6 +819,8 @@ export type OrderFilter = {
   discountId?: string;
   /** Orders whose total falls in this range. */
   total?: OrderTotalRange;
+  /** new: the buyer's first order with the store; returning: they ordered before. */
+  buyer?: OrderBuyer;
   from?: Date;
   to?: Date;
 };
@@ -817,6 +828,14 @@ export type OrderFilter = {
 function totalWhere(range: OrderTotalRange | undefined) {
   const [min, max] = range && totalParam(range) ? ORDER_TOTALS[range] : [null, null];
   return [min !== null ? gte(schema.orders.totalMinor, min) : undefined, max !== null ? lt(schema.orders.totalMinor, max) : undefined];
+}
+
+/** An earlier order by the same email (any case) that was paid; unpaid tries don't make a buyer. */
+function buyerWhere(buyer: OrderBuyer) {
+  const o = schema.orders;
+  // Plain names inside: the relational query renames every column to the orders table.
+  const earlier = sql`exists (select 1 from orders e where e.shop_id = ${o.shopId} and lower(e.email) = lower(${o.email}) and e.created_at < ${o.createdAt} and e.payment_status in ('paid', 'partially_refunded', 'refunded'))`;
+  return buyer === "returning" ? earlier : sql`not ${earlier}`;
 }
 
 function orderWhere(shopId: string, filter: OrderFilter) {
@@ -844,6 +863,7 @@ function orderWhere(shopId: string, filter: OrderFilter) {
     filter.country && /^[A-Z]{2}$/i.test(filter.country) ? sql`${schema.orders.shippingAddress}->>'country' = ${filter.country.toUpperCase()}` : undefined,
     filter.discountId && /^[0-9a-f-]{36}$/i.test(filter.discountId) ? eq(schema.orders.discountId, filter.discountId) : undefined,
     ...totalWhere(filter.total),
+    filter.buyer && buyerParam(filter.buyer) ? buyerWhere(filter.buyer) : undefined,
     // Placed in this range (from inclusive, to exclusive).
     filter.from ? gte(schema.orders.createdAt, filter.from) : undefined,
     filter.to ? lt(schema.orders.createdAt, filter.to) : undefined,
