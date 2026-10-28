@@ -38,7 +38,7 @@ describe("emailing an update to the buyers of picked orders", () => {
     expect(await emailOrderUpdate(f.ctx, shop.id, [a.id], { message: "One more thing: tracking is on its way." })).toEqual({ sent: 1, failed: 0, skipped: 0 });
 
     // When the mail server is down, the order page shows the email as not sent.
-    const failing = { ...f.ctx, mailer: { send: async () => { throw new Error("Mail server down"); } } } as typeof f.ctx;
+    const failing = { ...f.ctx, mailer: { name: "log" as const, send: async (): Promise<{ id: string }> => { throw new Error("Mail server down"); } } };
     expect(await emailOrderUpdate(failing, shop.id, [a.id, b.id], { message: "Sorry, one more update." })).toEqual({ sent: 0, failed: 2, skipped: 0 });
     const failed = await f.db.query.emails.findMany({ where: eq(schema.emails.status, "failed") });
     expect(failed.map((e) => e.error)).toEqual(["Mail server down", "Mail server down"]);
