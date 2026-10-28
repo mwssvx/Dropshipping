@@ -232,6 +232,8 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       ends_at: iso(d.endsAt),
       active: d.active,
       ...(d.productIds.length ? { products: d.productIds.map((id) => handleOf.get(id)).filter((h): h is string => !!h) } : {}),
+      // Null when the collection is gone: the code is for nothing then, and isn't brought over.
+      ...(d.collectionId ? { collection: handleByKind.collection.get(d.collectionId) ?? null } : {}),
       automatic: d.automatic,
       ...(d.kind === "bxgy" ? { buy_qty: d.buyQty, get_qty: d.getQty } : {}),
     })),
@@ -536,6 +538,7 @@ const importSchema = z.object({
         buy_qty: z.number().int().min(1).max(20).nullable().optional(),
         get_qty: z.number().int().min(1).max(20).nullable().optional(),
         products: z.array(z.string()).max(100).default([]),
+        collection: z.string().max(200).nullable().optional(),
         automatic: z.boolean().default(false),
         min_subtotal: money.default(0),
         usage_limit: z.number().int().min(1).nullable().optional(),
@@ -721,6 +724,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
         })),
       );
     }
+    const codeCollections = new Map((await tx.query.collections.findMany({ where: eq(schema.collections.shopId, shopId), columns: { id: true, handle: true } })).map((x) => [x.handle, x.id]));
     for (const d of data.discount_codes) {
       // A buy X get Y offer without its quantities can't work, so it's left out.
       const bxgy = d.kind === "bxgy";
@@ -728,6 +732,9 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
       if (bxgy && (!d.buy_qty || !d.get_qty)) continue;
       // Nor one whose products aren't in the file: it would widen to every product.
       if (d.kind !== "free_shipping" && d.products.length && !scope.length) continue;
+      // Likewise one for a collection the file doesn't have.
+      const collectionId = d.collection === undefined || d.kind === "free_shipping" ? null : codeCollections.get(d.collection ?? "");
+      if (collectionId === undefined) continue;
       await tx
         .insert(schema.discounts)
         .values({
@@ -744,9 +751,10 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
           active: d.active,
           buyQty: bxgy ? d.buy_qty! : null,
           getQty: bxgy ? d.get_qty! : null,
-          productIds: d.kind === "free_shipping" ? [] : scope,
+          productIds: d.kind === "free_shipping" || collectionId ? [] : scope,
+          collectionId,
           // Automatic money off is for the whole order and everyone, as createDiscount allows.
-          automatic: d.automatic && (bxgy || ((d.kind === "percent" || d.kind === "amount") && d.min_subtotal > 0 && !scope.length && !d.customer_tag)),
+          automatic: d.automatic && (bxgy || ((d.kind === "percent" || d.kind === "amount") && d.min_subtotal > 0 && !scope.length && !collectionId && !d.customer_tag)),
         })
         .onConflictDoNothing();
     }
