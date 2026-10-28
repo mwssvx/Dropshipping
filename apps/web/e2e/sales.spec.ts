@@ -57,10 +57,22 @@ test("a merchant runs a sale and ends it", async ({ page, browser }, info) => {
   await expect(buyer.getByText("Spring sale: 25% off")).toBeVisible();
   await expect(buyer.getByText("$10.49").first()).toBeVisible();
   await shot(buyer, "140-sale-in-cart");
+  await buyer.getByRole("link", { name: "Check out" }).click();
+  await buyer.getByRole("textbox", { name: "Email" }).fill(`sale-buyer-${id}@example.com`);
+  await buyer.getByLabel("Full name").fill("Ada Lovelace");
+  await buyer.getByLabel("Address", { exact: true }).fill("1 Main St");
+  await buyer.getByLabel("City").fill("Austin");
+  await buyer.getByLabel("State or region").fill("TX");
+  await buyer.getByLabel("Postal code").fill("78701");
+  await buyer.getByRole("button", { name: "Continue to payment" }).click();
+  await buyer.getByRole("button", { name: /^Pay/ }).click();
+  await expect(buyer.getByRole("heading", { name: "Thank you, Ada!" })).toBeVisible();
 
   // Ended: the price goes back.
   await spring.getByRole("button", { name: "End now" }).click();
   await expect(spring).toContainText("Ended");
+  // What it sold.
+  await expect(spring.getByLabel("Results of Spring sale")).toHaveText("Over 1 day: 1 order, 1 item on sale, $10.49");
   await buyer.goto(lamp);
   await expect(buyer.getByRole("button", { name: "Add to cart" })).toBeVisible();
   await expect(buyer.getByText(/On sale:/)).toHaveCount(0);

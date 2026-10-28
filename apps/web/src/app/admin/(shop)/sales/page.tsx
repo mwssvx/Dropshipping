@@ -1,4 +1,4 @@
-import { bundleProductChoices, listCollections, listSales, MAX_SALES } from "@sf/core";
+import { bundleProductChoices, formatMoney, listCollections, listSales, MAX_SALES, saleResults, type SaleOutcome } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { deleteSaleAction, endSaleAction } from "../../sale-actions";
 import { PageHeader } from "../PageHeader";
@@ -13,6 +13,7 @@ const STATUS = { running: { label: "On now", pill: "pill-success" }, scheduled: 
 export default async function SalesPage() {
   const { shop, db } = await requireShop("marketing");
   const [sales, products, collections] = await Promise.all([listSales(db, shop.id), bundleProductChoices(db, shop.id), listCollections(db, shop.id)]);
+  const results = await saleResults(db, shop.id, sales);
   return (
     <main className="pb-12">
       <PageHeader title="Sales" />
@@ -38,6 +39,7 @@ export default async function SalesPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium">{s.title} <span className="hint">· {s.percentOff}% off</span></p>
                   <p className="hint text-sm">{s.covers} · {s.endsAt ? `${when.format(s.startsAt)} to ${when.format(s.endsAt)}` : `From ${when.format(s.startsAt)}, until you end it`}{s.countdown ? " · counts down on the store" : ""}</p>
+                  {results.has(s.id) && <SaleResult title={s.title} running={s.status === "running"} result={results.get(s.id)!} currency={shop.currency} />}
                 </div>
                 <span className={`pill ${STATUS[s.status].pill}`}>{STATUS[s.status].label}</span>
                 {s.status === "running" ? (
@@ -66,5 +68,20 @@ export default async function SalesPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+const days = (n: number) => (n === 1 ? "1 day" : `${n} days`);
+
+/** "Over 3 days: 42 orders, 61 items on sale, $1,830.00 · 3.2× the 3 days before". */
+function SaleResult({ title, running, result: r, currency }: { title: string; running: boolean; result: SaleOutcome; currency: string }) {
+  const up = r.lift !== null && r.lift >= 1.05;
+  const down = r.lift !== null && r.lift <= 0.95;
+  const vs = r.lift === null ? null : up ? `${r.lift.toFixed(1)}× the ${days(r.days)} before` : down ? `Down ${Math.round((1 - r.lift) * 100)}% on the ${days(r.days)} before` : `About the same as the ${days(r.days)} before`;
+  return (
+    <p className="text-sm num mt-1" aria-label={`Results of ${title}`}>
+      {running ? `${days(r.days)} so far` : `Over ${days(r.days)}`}: {r.orders === 1 ? "1 order" : `${r.orders} orders`}, {r.units === 1 ? "1 item" : `${r.units} items`} on sale, {formatMoney(r.salesMinor, currency)}
+      {vs && <span className={up ? "text-success" : down ? "text-critical" : "hint"}> · {vs}</span>}
+    </p>
   );
 }
