@@ -211,6 +211,8 @@ export const shops = pgTable(
     winbackOffer: jsonb("winback_offer").$type<WinbackOffer>(),
     // Birthday codes: subscribers who gave their birthday get a code of their own that day. Null when off.
     birthdayOffer: jsonb("birthday_offer").$type<BirthdayOffer>(),
+    // The sign-up pop-up: shown once to new visitors this many seconds after they arrive. Null when off.
+    signupPopupSeconds: integer("signup_popup_seconds"),
     holdRiskyOrders: text("hold_risky_orders", { enum: ["off", "medium", "high"] }).notNull().default("high"),
     postPurchaseOffer: jsonb("post_purchase_offer").$type<PostPurchaseOffer>(),
     subscriptionOffer: jsonb("subscription_offer").$type<SubscriptionOffer>(),

@@ -317,6 +317,18 @@ export async function newsletterAction(handle: string, form: FormData) {
   redirect(`${(await storeBase(handle)) || "/"}?signup=${status}#signup`);
 }
 
+/** The sign-up pop-up: the same confirm-by-email signup as the home page form, answered in place. */
+export async function popupSignupAction(handle: string, _: { status?: "sent" | "invalid" }, form: FormData): Promise<{ status: "sent" | "invalid" }> {
+  const shop = await loadShop(handle);
+  try {
+    await requestNewsletterSignup(await campaigns(), shop, String(form.get("email") ?? ""));
+  } catch (e) {
+    if (!(e instanceof UserError)) throw e;
+    return { status: "invalid" };
+  }
+  return { status: "sent" };
+}
+
 /** The password page: lets a visitor in for 30 days when the password is right. */
 export async function storePasswordAction(handle: string, form: FormData) {
   const shop = await loadShop(handle);

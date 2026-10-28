@@ -1120,3 +1120,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Birthday codes (after launch, part 190)
 
 1. **A code on their birthday** (`packages/core/src/birthday.ts`, Marketing → Birthday codes): turn it on, pick 5% to 50% off and how many days the code lasts. Buyers add their birthday on their store account (just the month and day; no year is asked for), and the daily job emails everyone who said yes to your emails a code of their own on that day (UTC), good once, only with their email. Each person gets one a year, and February 29 birthdays get theirs on the 28th in other years. The Marketing page shows how many subscribers gave their birthday, and the codes sent, used and sales they brought in. The customer's page shows their birthday, their data download includes it, and store files carry the setting.
+
+### Sign-up pop-up (after launch, part 191)
+
+1. **A pop-up for new visitors** (`packages/core/src/signup-popup.ts`, Marketing → Sign-up pop-up): pick whether a small window asking for an email opens 5, 15, 30 or 60 seconds after a visitor arrives, or never. It shows the welcome offer when you have one, opens once per browser, never on the cart, checkout, payment or account pages or over another window, and not again after the visitor closes it, says no thanks or signs up. Signed-in subscribers don't see it. Signups go through the same confirm-by-email step as the home page form, in the store's language. Store files carry the setting.
