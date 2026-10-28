@@ -104,7 +104,7 @@ function EarlyAccess({ sale: s, store }: { sale: Awaited<ReturnType<typeof listS
     <form action={giveEarlyAccessAction.bind(null, s.id)} className="basis-full flex flex-wrap items-end gap-3 border-t border-border pt-3" aria-label={`Early access to ${s.title}`}>
       <p className="hint text-sm basis-full">Let subscribers or your best customers in first: a code with the same {s.percentOff}% off that stops when the sale starts.</p>
       <div className="field">
-        <label className="label" htmlFor={`hours-${s.id}`}>Early access starts</label>
+        <label className="label" htmlFor={`hours-${s.id}`}>Early access from</label>
         <select className="input" id={`hours-${s.id}`} name="hours" defaultValue="0">
           {EARLY_ACCESS_HOURS.map((h) => <option key={h} value={h}>{BEFORE[h]}</option>)}
         </select>

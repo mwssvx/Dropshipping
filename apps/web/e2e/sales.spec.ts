@@ -80,7 +80,7 @@ test("a merchant runs a sale and ends it", async ({ page, browser }, info) => {
 
   // Early access to the summer sale: a code with its 10% off until it starts, sent as a link.
   const summer = page.getByRole("listitem", { name: "Summer sale" });
-  await summer.getByLabel("Early access starts").selectOption("24");
+  await summer.getByLabel("Early access from").selectOption("24");
   await summer.getByRole("button", { name: "Give early access" }).click();
   const early = summer.getByLabel("Early access to Summer sale");
   await expect(early).toContainText("Early access with the code EARLY-SUMMERSALE, from Jun 30");
