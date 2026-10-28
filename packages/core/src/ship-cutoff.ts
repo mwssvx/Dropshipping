@@ -111,3 +111,13 @@ export function nextCutoff(at: Date, processingDays: number, c: ShipCutoff) {
   for (let i = 0; i < processingDays; i++) leaves = nextShipDay(leaves, c);
   return { deadline, shipsOn: new Date(leaves), today: leaves === now.day, msLeft: deadline.getTime() - at.getTime() };
 }
+
+/** The local date at an instant in the store's time zone, as midnight UTC of that date. */
+export const localDay = (at: Date, c: ShipCutoff) => local(at, c.timeZone).day;
+
+/** The day an order placed late on a local day, after its cutoff, leaves: as midnight UTC of that date. */
+export function lateShipDay(day: number, processingDays: number, c: ShipCutoff) {
+  let leaves = nextShipDay(day, c);
+  for (let i = 0; i < processingDays; i++) leaves = nextShipDay(leaves, c);
+  return new Date(leaves);
+}

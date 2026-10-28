@@ -1144,3 +1144,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Chat buttons (after launch, part 196)
 
 1. **WhatsApp and Telegram buttons** (`packages/core/src/chat-buttons.ts`, Inbox → Chat buttons): add your WhatsApp number (with its country code) and/or Telegram username, and a small button in the corner of every store page opens a chat with you. On WhatsApp the first message is filled in with the page the shopper was on ("Hi! I have a question about this: …/products/lamp"), in the store's language. The buttons stay off the checkout and payment pages, and store files carry them.
+
+### Holiday order-by date (after launch, part 197)
+
+1. **"Order by Dec 15 to get it in time for Christmas"** (`packages/core/src/holiday-deadline.ts`, Shipping → Delivery dates → Holiday order-by date): name a holiday and the last day orders can arrive, and product pages say the last day to order, under the delivery estimate, in the store's language. It's counted back from the slowest date the page shows (processing days, then the longest transit), and a day only counts if an order placed at any time that day makes it, so with a same-day cutoff it's judged as if the order came in after the cutoff, weekends included.
+2. **Honest when it's late**: once that day has passed the page says "Ordered now, it may not arrive in time for Christmas", and after the arrive-by date the line goes away by itself. The Shipping page previews the order-by date for one product, and store files carry the setting.
