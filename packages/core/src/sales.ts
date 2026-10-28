@@ -180,6 +180,52 @@ export async function earlyAccessEmail(db: Db, shop: { id: string; country: stri
   };
 }
 
+/** A running sale that ends within this long gets a "last chance" email instead of "it's on". */
+export const LAST_CHANCE_MS = 2 * 86_400_000;
+
+/**
+ * A campaign draft about a running sale: "it's on" with what's in it and until when, or, in its
+ * last two days, "last chance" with when it ends (tonight, tomorrow, on Monday) in the store's time
+ * zone. The button goes to the collection or product on sale, or the home page. Null when the sale
+ * isn't running.
+ */
+export async function saleEmail(db: Db, shop: { id: string; country: string; shipCutoff: { timeZone: string } | null }, saleId: string, now = new Date()) {
+  const sale = await db.query.sales.findFirst({ where: and(eq(schema.sales.id, saleId), eq(schema.sales.shopId, shop.id)) });
+  if (!sale || saleStatus(sale, now) !== "running") return null;
+  const zone = shop.shipCutoff?.timeZone ?? defaultCutoffZone(shop.country);
+  const collection = sale.collectionId ? await db.query.collections.findFirst({ where: eq(schema.collections.id, sale.collectionId), columns: { title: true, handle: true } }) : null;
+  const product =
+    sale.scope === "products" && sale.productIds.length === 1
+      ? await db.query.products.findFirst({ where: and(eq(schema.products.id, sale.productIds[0]!), eq(schema.products.shopId, shop.id)), columns: { title: true, handle: true } })
+      : null;
+  const what = sale.scope === "all" ? "everything" : collection ? `our ${collection.title} collection` : product ? `the ${product.title}` : "everything in the sale";
+  const buttonPath = collection ? `/collections/${collection.handle}` : product ? `/products/${product.handle}` : "/";
+  const base = { buttonPath, audience: "subscribers" as const, audienceTag: null, audienceProductId: null };
+  if (sale.endsAt && sale.endsAt.getTime() - now.getTime() <= LAST_CHANCE_MS) {
+    const date = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: zone });
+    const hour = Number(sale.endsAt.toLocaleString("en-US", { hour: "numeric", hourCycle: "h23", timeZone: zone }));
+    const ends =
+      date(sale.endsAt) === date(now)
+        ? hour >= 17 ? "tonight" : "today"
+        : date(sale.endsAt) === date(new Date(now.getTime() + 86_400_000))
+          ? "tomorrow"
+          : `on ${sale.endsAt.toLocaleDateString("en-US", { weekday: "long", timeZone: zone })}`;
+    return {
+      ...base,
+      subject: `Last chance: ${sale.title} ends ${ends}`,
+      body: `Hi {first_name},\n\nOur ${sale.title} ends ${ends}: ${sale.percentOff}% off ${what} until then. After that, prices go back up.`,
+      buttonLabel: "Shop before it ends",
+    };
+  }
+  const until = sale.endsAt ? `, until ${sale.endsAt.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: zone })}` : "";
+  return {
+    ...base,
+    subject: `${sale.title}: ${sale.percentOff}% off ${what}`,
+    body: `Hi {first_name},\n\nOur ${sale.title} is on: ${sale.percentOff}% off ${what}${until}.\n\nThe prices are already lower on the store, so there's no code to type.`,
+    buttonLabel: "Shop the sale",
+  };
+}
+
 /** Stops a sale's early access code now. */
 export async function endEarlyAccess(db: Db, shopId: string, saleId: string) {
   const sale = await db.query.sales.findFirst({ where: and(eq(schema.sales.id, saleId), eq(schema.sales.shopId, shopId)), columns: { earlyDiscountId: true } });
