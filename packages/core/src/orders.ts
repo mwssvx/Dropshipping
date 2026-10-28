@@ -781,6 +781,20 @@ export function paymentParam(value: string | null | undefined) {
   return (schema.orders.paymentStatus.enumValues as readonly string[]).includes(value ?? "") ? (value as Order["paymentStatus"]) : undefined;
 }
 
+/** Order total ranges for the order list, in minor units (from inclusive, to exclusive; null is open). */
+export const ORDER_TOTALS = {
+  "under-25": [null, 2500],
+  "25-100": [2500, 10000],
+  "100-250": [10000, 25000],
+  "over-250": [25000, null],
+} as const satisfies Record<string, readonly [number | null, number | null]>;
+export type OrderTotalRange = keyof typeof ORDER_TOTALS;
+
+/** An order total range from a link, or undefined when it isn't one. */
+export function totalParam(value: string | null | undefined) {
+  return Object.hasOwn(ORDER_TOTALS, value ?? "") ? (value as OrderTotalRange) : undefined;
+}
+
 export type OrderFilter = {
   fulfillmentStatus?: Order["fulfillmentStatus"];
   paymentStatus?: Order["paymentStatus"];
@@ -794,9 +808,16 @@ export type OrderFilter = {
   country?: string;
   /** Orders that used this discount code. */
   discountId?: string;
+  /** Orders whose total falls in this range. */
+  total?: OrderTotalRange;
   from?: Date;
   to?: Date;
 };
+
+function totalWhere(range: OrderTotalRange | undefined) {
+  const [min, max] = range && totalParam(range) ? ORDER_TOTALS[range] : [null, null];
+  return [min !== null ? gte(schema.orders.totalMinor, min) : undefined, max !== null ? lt(schema.orders.totalMinor, max) : undefined];
+}
 
 function orderWhere(shopId: string, filter: OrderFilter) {
   const tag = filter.tag?.trim().toLowerCase();
@@ -822,6 +843,7 @@ function orderWhere(shopId: string, filter: OrderFilter) {
       : undefined,
     filter.country && /^[A-Z]{2}$/i.test(filter.country) ? sql`${schema.orders.shippingAddress}->>'country' = ${filter.country.toUpperCase()}` : undefined,
     filter.discountId && /^[0-9a-f-]{36}$/i.test(filter.discountId) ? eq(schema.orders.discountId, filter.discountId) : undefined,
+    ...totalWhere(filter.total),
     // Placed in this range (from inclusive, to exclusive).
     filter.from ? gte(schema.orders.createdAt, filter.from) : undefined,
     filter.to ? lt(schema.orders.createdAt, filter.to) : undefined,
