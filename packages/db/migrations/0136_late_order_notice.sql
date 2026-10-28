@@ -1,0 +1,1 @@
+ALTER TABLE "shops" ADD COLUMN "late_order_notice" jsonb;
