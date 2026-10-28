@@ -3,6 +3,7 @@ import { useActionState, useMemo, useState } from "react";
 import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import type { CollectionRules } from "@sf/core/collection-rules";
+import type { CollectionSort } from "@sf/db";
 import type { FormState } from "../../actions";
 import { RulesEditor, type RuleProductView } from "./RulesEditor";
 
@@ -16,7 +17,7 @@ export function CollectionForm({
   currency,
 }: {
   action: (s: FormState, f: FormData) => Promise<FormState>;
-  initial: { title: string; description: string; imageUrl: string; productIds: string[]; rules: CollectionRules | null };
+  initial: { title: string; description: string; imageUrl: string; productIds: string[]; rules: CollectionRules | null; sortOrder: CollectionSort };
   products: RuleProductView[];
   currency: string;
   submitLabel: string;
@@ -29,6 +30,7 @@ export function CollectionForm({
   const [picked, setPicked] = useState(initial.productIds);
   const [mode, setMode] = useState<"manual" | "auto">(initial.rules ? "auto" : "manual");
   const [query, setQuery] = useState("");
+  const [sortOrder, setSortOrder] = useState(initial.sortOrder);
   const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const matches = products.filter((p) => !picked.includes(p.id) && p.title.toLowerCase().includes(query.trim().toLowerCase()));
   const move = (i: number, d: -1 | 1) => {
@@ -95,6 +97,22 @@ export function CollectionForm({
               );
             })}
           </ol>
+        </section>
+        )}
+        {/* An automatic collection is sorted by its rules ("Show them"). */}
+        {mode === "auto" ? <input type="hidden" name="sortOrder" value="featured" /> : (
+        <section className="card p-5 flex flex-col gap-2">
+          <div className="field max-w-sm">
+            <label className="label" htmlFor="sortOrder">Sort products by</label>
+            <select className="input" id="sortOrder" name="sortOrder" value={sortOrder} onChange={(e) => setSortOrder(e.target.value as CollectionSort)}>
+              <option value="featured">Your order, as listed above</option>
+              <option value="best_selling">Best selling</option>
+              <option value="newest">Newest first</option>
+              <option value="price_asc">Price, low to high</option>
+              <option value="price_desc">Price, high to low</option>
+            </select>
+          </div>
+          <p className="hint">How the collection&apos;s page lists products until a shopper picks another order. Sold-out products still follow your sold-out setting.</p>
         </section>
         )}
       </div>

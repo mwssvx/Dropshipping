@@ -805,6 +805,10 @@ export const themes = pgTable("themes", {
   updatedAt: updatedAt(),
 });
 
+/** How a collection's page lists its products before the buyer picks another order. */
+export const COLLECTION_SORTS = ["featured", "best_selling", "newest", "price_asc", "price_desc"] as const;
+export type CollectionSort = (typeof COLLECTION_SORTS)[number];
+
 export const collections = pgTable(
   "collections",
   {
@@ -816,6 +820,8 @@ export const collections = pgTable(
     imageUrl: text("image_url"),
     // Set for an automatic collection: products join and leave by these rules instead of by hand.
     rules: jsonb("rules").$type<CollectionRules>(),
+    // "featured" is the merchant's own order (or the rules' order for an automatic collection).
+    sortOrder: text("sort_order", { enum: COLLECTION_SORTS }).notNull().default("featured"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

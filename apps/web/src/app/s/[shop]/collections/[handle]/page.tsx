@@ -32,7 +32,9 @@ export default async function CollectionPage({ params, searchParams }: { params:
   const query = await searchParams;
   const { shop, collection, products: all } = await load(param, handle);
   const [base, fx] = await Promise.all([storeBase(param), buyerFx(shop)]);
-  const { products, sort, facets } = await browseProducts(await db(), shop.id, all, { ...browseOptions(query), q: undefined }, fx);
+  // The merchant's pick for this collection, until the buyer chooses another order.
+  const natural = "sortOrder" in collection ? collection.sortOrder : "featured";
+  const { products, sort, facets } = await browseProducts(await db(), shop.id, all, { ...browseOptions(query), sort: query.sort || natural, q: undefined }, fx);
   // The grid takes the catalog's compact product shape.
   const compact = await localProducts(param, compactProducts(products));
   const t = await storeT(param);
@@ -44,7 +46,7 @@ export default async function CollectionPage({ params, searchParams }: { params:
         <h1 className="text-3xl font-bold tracking-tight">{collection.title}</h1>
         {collection.description && <p className="text-muted max-w-2xl whitespace-pre-line">{collection.description}</p>}
       </header>
-      {all.length > 1 && <BrowseBar action={`${base}/collections/${collection.handle}`} params={{ ...query, q: undefined }} sort={sort} currency={fx.currency} count={compact.length} facets={facets} t={t} />}
+      {all.length > 1 && <BrowseBar action={`${base}/collections/${collection.handle}`} params={{ ...query, q: undefined }} sort={sort} natural={natural} currency={fx.currency} count={compact.length} facets={facets} t={t} />}
       {compact.length ? <ProductGrid products={compact} data={data} /> : <p className="hint">{filtered ? t.nothingMatchesFilters : t.nothingYet}</p>}
     </main>
   );

@@ -855,6 +855,13 @@
       "when": 1793158178050,
       "tag": "0122_card_quick_add",
       "breakpoints": true
+    },
+    {
+      "idx": 122,
+      "version": "7",
+      "when": 1793160291098,
+      "tag": "0123_collection_sort",
+      "breakpoints": true
     }
   ]
 }
