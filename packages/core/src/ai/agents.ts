@@ -6,7 +6,8 @@ import type { AgentContext, Shop } from "./context";
 import { untrusted } from "./context";
 import { addMessage, assistantConversation, BUYER_TOPICS, startBuyerMessage } from "./conversations";
 import { aiBudget, runAgent, type AgentSpec, type RunResult } from "./runtime";
-import { REVIEW_MAX_ITEMS, REVIEW_SUMMARY_MIN, thinMargins, TRENDS_MAX_ITEMS, TRENDS_MAX_SEARCHES } from "./tools";
+import { REVIEW_MAX_ITEMS, REVIEW_SUMMARY_MIN, thinMargins, TRENDS_MAX_ITEMS, TRENDS_MAX_SEARCHES, watchSignals } from "./tools";
+import { storeSignals, watchDays } from "../watch";
 import { skillMenu } from "./skills";
 import { brandInstructions, type BrandRules } from "./brand";
 import { LANGUAGES, shopLanguages, untranslated, type Language } from "../languages";
@@ -135,6 +136,20 @@ ${RULES}`,
     system: (shop) => `You summarize what buyers say about a product in their reviews for ${shop.name}, an online store. The summary shows above the reviews as "What buyers say".
 Call read_reviews, then save_review_summary once, then tell the merchant in one sentence what you wrote.
 Write two or three short sentences in plain text: what most buyers like, and any complaint several of them share. Be fair: if reviews are mixed, say so. Only say what the reviews say, in your own words; don't quote names, don't invent details, and don't add advice or marketing. No links.
+${RULES}`,
+  },
+  watch: {
+    agent: "watch",
+    effort: "low",
+    maxTokens: 4096,
+    system: (shop) => `You watch ${shop.name}, an online store, for days that are out of line. The store's code has already compared yesterday with the four weeks before and gives you the signals it found, with the figures.
+For each signal, look for the likely cause with one or two reads at most: read_sales (compare 7 days with 30, best sellers, where visitors came from), read_product_funnel, read_stock, read_returns. Then call save_alerts once, with one alert per signal:
+- title: short and plain.
+- likely_cause: what the data points to ("Visitors from TikTok fell from about 40 a day to 3", "The Galaxy lamp, the best seller, ran out of stock"). If the data doesn't show a cause, say so and name the usual causes to check (an ad that stopped, a payment or shipping setting, a supplier price rise).
+- what_to_do: one thing to do today, in the admin where possible.
+- area: where in the admin to do it, or null.
+For good news (sales_jump), say what drove it and how to make the most of it (stock, reorder, more of the same ad).
+Don't repeat the figures the signal already gives, and never invent others. Your final message is one sentence.
 ${RULES}`,
   },
   analyst: {
@@ -460,8 +475,37 @@ export async function findTrendsWithAi(ctx: AgentContext, shop: Shop, input: { f
   return { ...run, report: report ?? null };
 }
 
+/**
+ * The daily store watch. Code finds what moved yesterday; the model only runs when something did,
+ * to explain the likely cause and what to do. Once a day per store: null when it already ran today
+ * or when the day was normal.
+ */
+export async function runStoreWatch(ctx: AgentContext, shop: Shop, now = new Date()) {
+  const { day } = watchDays(now);
+  // Once a day, even when a run saved nothing, so a failing model isn't retried all day.
+  const [saved, ran] = await Promise.all([
+    ctx.db.query.aiReports.findFirst({ where: and(eq(schema.aiReports.shopId, shop.id), eq(schema.aiReports.kind, "watch"), gte(schema.aiReports.createdAt, day.to)) }),
+    ctx.db.query.agentRuns.findFirst({ where: and(eq(schema.agentRuns.shopId, shop.id), eq(schema.agentRuns.agent, "watch"), gte(schema.agentRuns.createdAt, day.to)) }),
+  ]);
+  if (saved || ran) return null;
+  const signals = await storeSignals(ctx.db, shop, now);
+  if (!signals.length || !(await aiBudget(ctx.db, shop, now)).left) return null;
+  watchSignals.set(shop.id, signals);
+  try {
+    const run = await runAgent(ctx, AGENT_SPECS.watch, shop, {
+      trigger: "schedule",
+      messages: [{ role: "user", content: `Yesterday was ${day.from.toISOString().slice(0, 10)}. Signals:\n${signals.map((s) => `- ${s.kind} (${s.tone}): ${s.headline}`).join("\n")}` }],
+    });
+    // The alert belongs to the day the job ran for, which matters when the job catches up late.
+    await ctx.db.update(schema.aiReports).set({ createdAt: now }).where(eq(schema.aiReports.runId, run.runId));
+    return run;
+  } finally {
+    watchSignals.delete(shop.id);
+  }
+}
+
 /** The store's latest AI reports, newest first. */
-export async function listAiReports(db: Db, shopId: string, kind: "review" | "trends", limit = 6) {
+export async function listAiReports(db: Db, shopId: string, kind: "review" | "trends" | "watch", limit = 6) {
   return db.query.aiReports.findMany({ where: and(eq(schema.aiReports.shopId, shopId), eq(schema.aiReports.kind, kind)), orderBy: desc(schema.aiReports.createdAt), limit });
 }
 
@@ -560,7 +604,13 @@ export async function runScheduledAgents(ctx: AgentContext, now = new Date()) {
       reviews++;
     }
   }
-  return { problemOrders: fixed, marginChecks: margins, storeReviews: reviews };
+  // The store watch, once a day; it only reaches the model when something moved.
+  let watches = 0;
+  for (const shop of shops) {
+    if (!shop.aiDailyWatch) continue;
+    if (await runStoreWatch(ctx, shop, now)) watches++;
+  }
+  return { problemOrders: fixed, marginChecks: margins, storeReviews: reviews, storeWatches: watches };
 }
 
 /** How each agent did this month, for the AI settings page. */

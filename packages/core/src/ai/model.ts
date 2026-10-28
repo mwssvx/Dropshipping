@@ -69,6 +69,7 @@ export const AGENT_MODELS: Record<AgentName, string> = {
   writer: "claude-sonnet-5-5",
   analyst: "claude-sonnet-5-5",
   scout: "claude-sonnet-5-5",
+  watch: "claude-haiku-5-5",
   buyer_support: "claude-sonnet-5-5",
   fulfilment: "claude-sonnet-5-5",
   assistant: "claude-opus-5-5",

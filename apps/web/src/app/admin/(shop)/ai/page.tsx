@@ -25,6 +25,7 @@ const WHAT = {
   answerer: "Drafts answers to shoppers' product questions when you press “Draft with AI” on the Questions page. Nothing is sent until you send it.",
   summarizer: "Writes “What buyers say” above a product's reviews when you press “Summarize with AI” on the product page. You can edit or remove it.",
   analyst: "Reviews your sales, profit, customers, returns and searches when you press “Review my store” on the Insights page (or every Monday if you turn it on below), and suggests what to do next.",
+  watch: "Each morning, compares yesterday’s sales, visitors, checkouts and refunds with the four weeks before. Only when something moved out of line does it explain the likely cause and what to do, on Today and the Insights page.",
   scout: "Searches the web for products that are taking off and suit your store when you press “Find trending products” on the Insights page. Saves ideas with their sources; it never adds products by itself.",
   shopper: "Answers shoppers' questions about your products, delivery and returns, on your store's pages, when you turn it on below. It only reads what your store already shows.",
   sizer: "Drafts a size chart from a product's description when you press “Draft with AI” on the Size charts page. It stays hidden until you check it and show it.",
@@ -59,6 +60,7 @@ export default async function AiSettingsPage() {
               autoPause={shop.aiAutoPause}
               shopper={shop.aiShopper}
               weeklyReview={shop.aiWeeklyReview}
+              dailyWatch={shop.aiDailyWatch}
               brand={brandFields(shop.aiBrand as BrandRules | null)}
               languages={Object.entries(LANGUAGES).map(([code, l]) => ({ code, name: l.english }))}
               skills={SKILL_NAMES.map((key) => ({ key, title: SKILLS[key].title, when: SKILLS[key].when, on: !shop.aiSkillsOff.includes(key) }))}

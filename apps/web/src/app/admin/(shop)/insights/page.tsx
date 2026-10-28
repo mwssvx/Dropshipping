@@ -76,11 +76,31 @@ function Ideas({ items }: { items: AiReportItem[] }) {
 
 export default async function InsightsPage() {
   const { shop, db } = await requireShop("analytics");
-  const [[latest, ...earlier], [trends]] = await Promise.all([listAiReports(db, shop.id, "review"), listAiReports(db, shop.id, "trends", 1)]);
+  const [[latest, ...earlier], [trends], watches] = await Promise.all([listAiReports(db, shop.id, "review"), listAiReports(db, shop.id, "trends", 1), listAiReports(db, shop.id, "watch", 5)]);
   return (
     <main className="pb-12">
       <PageHeader title="Insights" />
       <div className="px-4 sm:px-8 flex flex-col gap-6 max-w-3xl">
+        <section className="card p-5 flex flex-col gap-4" aria-labelledby="watch-title">
+          <div className="flex flex-col gap-1">
+            <h2 id="watch-title" className="font-semibold">Store watch</h2>
+            <p className="hint text-sm">
+              {shop.aiDailyWatch
+                ? "Each morning, yesterday is compared with your last four weeks. When sales, visitors, checkout or refunds are out of line, the AI looks for the likely cause and says what to do. Normal days cost nothing."
+                : <>The daily store watch is off. Turn it on in <Link className="underline" href="/admin/ai">AI settings</Link>.</>}
+            </p>
+          </div>
+          {watches.length ? (
+            watches.map((w, i) => (
+              <details key={w.id} open={i === 0} className="flex flex-col gap-2">
+                <summary className="cursor-pointer text-sm hint">{when.format(w.createdAt)}: {w.items.map((it) => it.title).join(", ")}</summary>
+                <Suggestions items={w.items} />
+              </details>
+            ))
+          ) : (
+            <p className="text-sm">Nothing out of line so far.</p>
+          )}
+        </section>
         <section className="card p-5 flex flex-col gap-4" aria-labelledby="review-title">
           <div className="flex flex-col gap-1">
             <h2 id="review-title" className="font-semibold">Store review</h2>

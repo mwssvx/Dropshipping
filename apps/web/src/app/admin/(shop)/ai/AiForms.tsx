@@ -4,7 +4,7 @@ import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import { marginCheckAction, saveAiSettingsAction } from "../../ai-actions";
 
-export function AiSettingsForm(props: { budget: string; planMax: string; topics: { key: string; label: string; on: boolean }[]; autoPause: boolean; shopper: boolean; weeklyReview: boolean; skills: { key: string; title: string; when: string; on: boolean }[]; brand: { voice: string; banned: string; language: string; titleMax: string }; languages: { code: string; name: string }[] }) {
+export function AiSettingsForm(props: { budget: string; planMax: string; topics: { key: string; label: string; on: boolean }[]; autoPause: boolean; shopper: boolean; weeklyReview: boolean; dailyWatch: boolean; skills: { key: string; title: string; when: string; on: boolean }[]; brand: { voice: string; banned: string; language: string; titleMax: string }; languages: { code: string; name: string }[] }) {
   const [state, action] = useActionState(saveAiSettingsAction, {});
   return (
     <form action={action} className="flex flex-col gap-5">
@@ -45,6 +45,13 @@ export function AiSettingsForm(props: { budget: string; planMax: string; topics:
         <span>
           <span className="font-medium">Review my store every Monday</span>
           <span className="hint block">The business analyst reads last month&apos;s numbers and leaves a few suggestions on the Insights page. Each review uses a few cents of your AI budget.</span>
+        </span>
+      </label>
+      <label className="flex items-start gap-3 text-sm">
+        <input type="checkbox" name="dailyWatch" defaultChecked={props.dailyWatch} className="mt-1 size-4" />
+        <span>
+          <span className="font-medium">Watch my store every day</span>
+          <span className="hint block">Each morning, yesterday&apos;s sales, visitors, checkout and refunds are compared with your last four weeks. When something is out of line, the AI looks for the likely cause and tells you on Today and on the Insights page. Normal days cost nothing.</span>
         </span>
       </label>
       <fieldset className="flex flex-col gap-3">
