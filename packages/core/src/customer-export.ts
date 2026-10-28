@@ -9,8 +9,8 @@ import { csvCell } from "./payouts";
 const MAX_ROWS = 20_000;
 const PAID = ["paid", "partially_refunded", "refunded"] as const;
 
-export async function customersCsv(db: Db, shopId: string, opts: { query?: string; tag?: string; filter?: CustomerFilter; country?: string; discountId?: string; productId?: string; money: boolean }) {
-  const customers = await listCustomers(db, shopId, { query: opts.query, tag: opts.tag, filter: opts.filter, country: opts.country, discountId: opts.discountId, productId: opts.productId, limit: MAX_ROWS });
+export async function customersCsv(db: Db, shopId: string, opts: { query?: string; tag?: string; filter?: CustomerFilter; country?: string; discountId?: string; productId?: string; minSpentMinor?: number; money: boolean }) {
+  const customers = await listCustomers(db, shopId, { query: opts.query, tag: opts.tag, filter: opts.filter, country: opts.country, discountId: opts.discountId, productId: opts.productId, minSpentMinor: opts.money ? opts.minSpentMinor : undefined, limit: MAX_ROWS });
   // Where each customer's orders went: the country and city of their latest paid order, and when they first ordered.
   const orders = customers.length
     ? await db

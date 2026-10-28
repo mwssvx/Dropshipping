@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { CUSTOMER_FILTERS, eraseCustomer, parseMoney, sendPersonalCode, setTaxExemption, tagCustomers, updateCustomerNotes, UserError } from "@sf/core";
+import { can, CUSTOMER_FILTERS, eraseCustomer, parseMoney, sendPersonalCode, setTaxExemption, spentParam, tagCustomers, updateCustomerNotes, UserError } from "@sf/core";
 import { campaigns, logged, requireShop } from "@/lib/server";
 
 export type NotesState = { error?: string; saved?: boolean; note?: string; tags?: string };
@@ -86,7 +86,7 @@ export type TagAllState = { error?: string; done?: string };
 
 /** Adds or removes a tag on everyone the customer list shows for its search, tag and filter. */
 export async function tagCustomersAction(_: TagAllState, form: FormData): Promise<TagAllState> {
-  const { shop, db, user } = await requireShop("customers");
+  const { shop, db, user, role } = await requireShop("customers");
   const remove = form.get("intent") === "remove";
   const list = {
     query: String(form.get("q") ?? "") || undefined,
@@ -95,6 +95,7 @@ export async function tagCustomersAction(_: TagAllState, form: FormData): Promis
     country: /^[A-Z]{2}$/.test(String(form.get("country") ?? "")) ? String(form.get("country")) : undefined,
     discountId: /^[0-9a-f-]{36}$/i.test(String(form.get("code") ?? "")) ? String(form.get("code")) : undefined,
     productId: /^[0-9a-f-]{36}$/i.test(String(form.get("product") ?? "")) ? String(form.get("product")) : undefined,
+    minSpentMinor: can(role, "money") ? spentParam(String(form.get("spent") ?? "")) : undefined,
   };
   try {
     const { tag, changed, full } = await tagCustomers(db, shop.id, list, { tag: String(form.get("tag") ?? ""), remove });
