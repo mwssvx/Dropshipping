@@ -1198,3 +1198,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Before they wonder** (`sendLateOrderEmails` in `packages/core/src/late-orders.ts`, Shipping → Delivery dates → Orders running late): when an order still hasn't shipped 3, 5, 7, 10 or 14 days after paying (the store picks), the buyer gets one email, "Your order #1001 from Your Store is taking a little longer", saying it hasn't been forgotten and tracking follows when it ships, with a few words of the store's own if it adds them. Buyers who hear first rarely open a dispute.
 2. **Only where it fits**: orders on hold, pre-orders (they have their own date), local pickup and delivery, free replacements and orders already on their way are left out, and orders far past their day when it's turned on don't get one. Each buyer hears once; it shows on the order's timeline as "Running late". The daily job sends them, and store files carry the setting (migration 0136).
+
+### Holiday checklist (after launch, part 208)
+
+1. **Ready in an afternoon** (`holidayChecklist` in `packages/core/src/holiday-checklist.ts`, `/admin/holidays`): ten things worth setting up before Black Friday and Christmas, each ticked from the store's own settings and linking to where it's done: delivery dates, a last day to order, longer returns for gifts, gift cards, gift wrapping, a sale, checkout reminders, a sign-up offer, running late emails, and a backup supplier for each of the five best sellers of the last 60 days (named when they have none).
+2. **On the home page in season**: from October 1 to December 24 the owner's home page shows "Get ready for the holidays" with how many are done and the next one, until all are.
