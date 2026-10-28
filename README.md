@@ -1088,3 +1088,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Orders by total (after launch, part 182)
 
 1. **Order total filter**: the order list has an "Order total" menu (Under $25.00, $25.00 to $100.00, $100.00 to $250.00, $250.00 or more, in the store's currency). It works with the other order filters, and the spreadsheet download, working on many orders at once and saved views keep it. It helps find the big orders worth a thank-you note or a closer look, or the small ones that cost more to ship than they earn (`ORDER_TOTALS` and `OrderFilter.total` in `packages/core/src/orders.ts`, `total` on the order list; no migration).
+
+### Customers by country (after launch, part 183)
+
+1. **Country filter on the customer list**: a "Bought for delivery to" menu shows only the customers with a paid order shipped to one country, with how many buyers each country has. It works with the search, tags, filters, sort and pages, and the spreadsheet download, "Tag these customers" and saved views keep it. Tag everyone in the UK before a British holiday, then give them a code for tagged customers or send them a campaign (`customerCountries` and `country` on the customer query in `packages/core/src/buyers.ts`; no migration).
