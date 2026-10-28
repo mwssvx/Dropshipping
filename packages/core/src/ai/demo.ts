@@ -400,6 +400,7 @@ function assistant(s: State, req: ModelRequest): BetaContentBlock[] {
         toolCall("create_discount", { code, kind: pct ? "percent" : "free_shipping", value: pct ? Number(pct) : 0, min_order: over ? Number(over) : null, days: days ? Number(days) : null, usage_limit: null, once_per_customer: /once (per|a) (customer|buyer)/.test(ask) }),
       ];
     }
+    if (/\b(what (has|did|does) (the |my )?ai|ai (do|did|done)|time (it )?saved|worth (it|the cost))\b/.test(ask)) return [toolCall("read_ai_impact", { month: /\blast month\b/.test(ask) ? "last" : "this" })];
     if (/\b(win[- ](them[- ])?back|stopped buying|slipping away|at risk|regulars?|lapsed|haven't (ordered|bought))\b/.test(ask)) return [toolCall("read_regulars_at_risk", {})];
     const coll = ask.match(/\b(?:collection|page) (?:of|for|with) (?:all )?(?:my |the |our )?([a-z0-9 '&-]{3,40}?)s?(?: products)?(?: called ["“]?([^"”]{2,60})["”]?)?[.!]?$/);
     if (coll && /\b(make|create|add|start|build)\b/.test(ask)) return [toolCall("find_products", { search: coll[1]!.trim() })];
@@ -431,6 +432,11 @@ function assistant(s: State, req: ModelRequest): BetaContentBlock[] {
   if (c.isError) return [text(`I couldn't do that: ${strip(c.result)}`)];
   const r = c.result;
   switch (c.name) {
+    case "read_ai_impact": {
+      const work = r.work as string[];
+      if (!work.length) return [text(`Nothing yet ${r.so_far ? "this month" : `in ${r.month}`}. Once buyers ask questions or you use the helpers, I'll tally it up here.`)];
+      return [text(`In ${r.month}${r.so_far ? " so far" : ""}, the AI:\n${work.map((w) => `• ${w}`).join("\n")}\n\nTime saved: ${String(r.time_saved_estimate).toLowerCase()} (a rough estimate). AI cost: ${r.ai_cost}.`)];
+    }
     case "read_regulars_at_risk": {
       if (!r.at_risk) return [text("None of your regulars are past their usual time to order. I'll be able to help here once buyers have ordered twice or more.")];
       if (/\b(draft|write|email|win)\b/.test(ask)) {

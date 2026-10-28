@@ -4,7 +4,7 @@ import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import { askAssistantAction } from "../../ai-actions";
 
-const SUGGESTIONS = ["How am I doing this month?", "What are shoppers searching for?", "What's trending that I could sell?", "Are any orders stuck?", "Which products make the least?", "Which regulars stopped buying?"];
+const SUGGESTIONS = ["How am I doing this month?", "What are shoppers searching for?", "What's trending that I could sell?", "Are any orders stuck?", "Which products make the least?", "Which regulars stopped buying?", "What did the AI do for me this month?"];
 
 export function AskForm() {
   const [state, action] = useActionState(askAssistantAction, {});

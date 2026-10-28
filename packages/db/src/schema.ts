@@ -149,6 +149,9 @@ export const shops = pgTable(
     aiMemory: jsonb("ai_memory").$type<string[]>().notNull().default([]),
     /** Buyer replies the owner rewrote before sending, newest first, so the buyer helper writes more like them. */
     aiReplyExamples: jsonb("ai_reply_examples").$type<{ topic: string; reply: string; at: string }[]>().notNull().default([]),
+    /** Email a monthly "what the AI did for you" report; aiMonthlyReportFor is the last month sent (YYYY-MM). */
+    aiMonthlyEmail: boolean("ai_monthly_email").notNull().default(true),
+    aiMonthlyReportFor: text("ai_monthly_report_for"),
     // Writing rules for the AI helpers (voice, banned words, language, title length); see core's ai/brand.ts.
     aiBrand: jsonb("ai_brand").$type<{ voice?: string; banned?: string[]; language?: string | null; titleMax?: number | null }>(),
     // Remind buyers who started checkout but didn't pay (one email, an hour later).

@@ -4,7 +4,7 @@ import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import { marginCheckAction, saveAiSettingsAction } from "../../ai-actions";
 
-export function AiSettingsForm(props: { budget: string; planMax: string; topics: { key: string; label: string; on: boolean }[]; autoPause: boolean; shopper: boolean; weeklyReview: boolean; dailyWatch: boolean; watchEmail: boolean; skills: { key: string; title: string; when: string; on: boolean }[]; brand: { voice: string; banned: string; language: string; titleMax: string }; languages: { code: string; name: string }[]; memory: string; memoryMax: number; examples: string[] }) {
+export function AiSettingsForm(props: { budget: string; planMax: string; topics: { key: string; label: string; on: boolean }[]; autoPause: boolean; shopper: boolean; weeklyReview: boolean; dailyWatch: boolean; watchEmail: boolean; monthlyEmail: boolean; skills: { key: string; title: string; when: string; on: boolean }[]; brand: { voice: string; banned: string; language: string; titleMax: string }; languages: { code: string; name: string }[]; memory: string; memoryMax: number; examples: string[] }) {
   const [state, action] = useActionState(saveAiSettingsAction, {});
   return (
     <form action={action} className="flex flex-col gap-5">
@@ -59,6 +59,13 @@ export function AiSettingsForm(props: { budget: string; planMax: string; topics:
         <span>
           <span className="font-medium">Email me the store watch&apos;s alerts</span>
           <span className="hint block">Sent to everyone on the team who can see money, at most once a day.</span>
+        </span>
+      </label>
+      <label className="flex items-start gap-3 text-sm">
+        <input type="checkbox" name="monthlyEmail" defaultChecked={props.monthlyEmail} className="mt-1 size-4" />
+        <span>
+          <span className="font-medium">Email me a monthly report of what the AI did</span>
+          <span className="hint block">On the 1st: buyer questions answered, replies drafted, changes made, the time that roughly saved, and what it cost. Free, and skipped in months it did nothing.</span>
         </span>
       </label>
       <fieldset className="flex flex-col gap-3">
