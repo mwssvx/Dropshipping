@@ -63,6 +63,8 @@ test("a merchant finds every order with a product, and orders to one country", a
   expect(csv).not.toContain(`ada-${id}@example.com`);
 
   // Both orders are from today, so a recent range keeps them; the download follows it.
+  // Each pick reloads the list; the menu only submits once the new page is running.
+  await page.waitForLoadState("load");
   await page.getByLabel("Placed in").selectOption("7");
   await expect(page).toHaveURL(/placed=7/);
   await expect(page).toHaveURL(/country=GB/);
@@ -73,9 +75,11 @@ test("a merchant finds every order with a product, and orders to one country", a
   expect(recent).toContain(`ada-${id}@example.com`);
 
   // Nothing is refunded yet; both orders are paid.
+  await page.waitForLoadState("load");
   await page.getByLabel("Payment status").selectOption({ label: "Refunded" });
   await expect(page).toHaveURL(/payment=refunded/);
   await expect(rows).toHaveCount(0);
+  await page.waitForLoadState("load");
   await page.getByLabel("Payment status").selectOption({ label: "Paid" });
   await expect(page).toHaveURL(/payment=paid/);
   await expect(rows).toHaveCount(1);

@@ -113,6 +113,35 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
           </section>
         </div>
 
+        <section className="card p-5 flex flex-col gap-3" aria-labelledby="source-sales-heading">
+          <h2 id="source-sales-heading" className="font-semibold">Sales by source</h2>
+          {r.salesBySource.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left hint">
+                    <th className="font-normal py-2">Source</th>
+                    <th className="font-normal py-2 text-right">Orders</th>
+                    <th className="font-normal py-2 text-right">Sales</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {r.salesBySource.map((s) => (
+                    <tr key={s.source}>
+                      <td className="py-2">{s.source}</td>
+                      <td className="py-2 text-right num">{s.orders}</td>
+                      <td className="py-2 text-right num">{money(s.salesMinor)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="hint">No sales in this period yet.</p>
+          )}
+          <p className="hint text-xs">The site or utm_source of the visit each order was placed in. Add ?utm_source=instagram to the links you share to see which posts and ads sell.</p>
+        </section>
+
         <section className="card p-5 flex flex-col gap-3" aria-labelledby="top-heading">
           <h2 id="top-heading" className="font-semibold">Best sellers</h2>
           {r.topProducts.length ? (

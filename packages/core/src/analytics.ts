@@ -1,5 +1,5 @@
 // Store analytics: what visitors did (storefront_events) and what they bought (orders).
-import { and, count, countDistinct, desc, eq, gte, inArray, isNotNull, lt, ne, sql } from "drizzle-orm";
+import { and, asc, count, countDistinct, desc, eq, gte, inArray, isNotNull, lt, ne, sql } from "drizzle-orm";
 import { schema, STOREFRONT_EVENTS, type Db, type StorefrontEventKind } from "@sf/db";
 import { pruneSearchTerms } from "./search-terms";
 
@@ -10,7 +10,7 @@ const DAY = 86_400_000;
 export async function recordEvent(
   db: Db,
   shopId: string,
-  input: { sessionId: string; kind: string; productId?: string | null; referrer?: string | null; host?: string | null },
+  input: { sessionId: string; kind: string; productId?: string | null; referrer?: string | null; host?: string | null; utmSource?: string | null },
 ) {
   if (!/^[A-Za-z0-9_-]{8,64}$/.test(input.sessionId)) return false;
   if (!(STOREFRONT_EVENTS as readonly string[]).includes(input.kind)) return false;
@@ -19,8 +19,27 @@ export async function recordEvent(
     const p = await db.query.products.findFirst({ where: and(eq(schema.products.id, productId), eq(schema.products.shopId, shopId)), columns: { id: true } });
     if (!p) return false;
   }
-  await db.insert(schema.storefrontEvents).values({ shopId, sessionId: input.sessionId, kind: input.kind as StorefrontEventKind, productId, source: sourceOf(input.referrer, input.host) });
+  await db.insert(schema.storefrontEvents).values({ shopId, sessionId: input.sessionId, kind: input.kind as StorefrontEventKind, productId, source: utmSourceOf(input.utmSource) ?? sourceOf(input.referrer, input.host) });
   return true;
+}
+
+/** A link's utm_source ("instagram", "spring-newsletter"), cleaned up, or null when there's none worth keeping. */
+export function utmSourceOf(value: string | null | undefined) {
+  const clean = value?.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9._-]/g, "").slice(0, 50);
+  return clean || null;
+}
+
+/** Where a visit came from: the first source it recorded, or null when it came direct. */
+export async function visitSource(db: Db, shopId: string, sessionId: string | null | undefined) {
+  if (!sessionId || !/^[A-Za-z0-9_-]{8,64}$/.test(sessionId)) return null;
+  const e = schema.storefrontEvents;
+  const [row] = await db
+    .select({ source: e.source })
+    .from(e)
+    .where(and(eq(e.shopId, shopId), eq(e.sessionId, sessionId), isNotNull(e.source)))
+    .orderBy(asc(e.createdAt))
+    .limit(1);
+  return row?.source ?? null;
 }
 
 /** The referring site's host, or null for direct visits and links inside the store. */
@@ -45,7 +64,8 @@ export async function analyticsReport(db: Db, shopId: string, range: AnalyticsRa
   const events = and(eq(schema.storefrontEvents.shopId, shopId), inRange(schema.storefrontEvents.createdAt));
   const day = (col: unknown) => sql<string>`to_char(${col} at time zone 'UTC', 'YYYY-MM-DD')`;
 
-  const [salesByDay, visitorsByDay, funnelRows, [visitorRow], top, views, sources, [referred]] = await Promise.all([
+  const sourceOrDirect = sql<string>`coalesce(${schema.orders.visitSource}, 'Direct')`;
+  const [salesByDay, visitorsByDay, funnelRows, [visitorRow], top, views, sources, [referred], salesBySource] = await Promise.all([
     db
       .select({ day: day(schema.orders.paidAt), sales: sql<number>`sum(${schema.orders.totalMinor} - ${schema.orders.refundedMinor})::bigint`, orders: count() })
       .from(schema.orders)
@@ -82,6 +102,13 @@ export async function analyticsReport(db: Db, shopId: string, range: AnalyticsRa
       .orderBy(desc(sql`2`))
       .limit(5),
     db.select({ n: countDistinct(schema.storefrontEvents.sessionId) }).from(schema.storefrontEvents).where(and(events, isNotNull(schema.storefrontEvents.source))),
+    db
+      .select({ source: sourceOrDirect, orders: count(), sales: sql<number>`sum(${schema.orders.totalMinor} - ${schema.orders.refundedMinor})::bigint` })
+      .from(schema.orders)
+      .where(paid)
+      .groupBy(sourceOrDirect)
+      .orderBy(desc(sql`3`))
+      .limit(8),
   ]);
 
   const days: { date: string; salesMinor: number; orders: number; visitors: number }[] = [];
@@ -118,6 +145,8 @@ export async function analyticsReport(db: Db, shopId: string, range: AnalyticsRa
     })),
     // A visitor counts once per site that sent them; the rest came direct.
     sources: withDirect(sources.map((s) => ({ source: s.source!, visitors: Number(s.visitors) })), visitors - Number(referred?.n ?? 0)),
+    // What each source's buyers paid, after refunds: the visit an order came from, or Direct.
+    salesBySource: salesBySource.map((s) => ({ source: s.source, orders: Number(s.orders), salesMinor: Number(s.sales) })),
   };
 }
 
