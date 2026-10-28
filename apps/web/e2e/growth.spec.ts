@@ -128,6 +128,16 @@ test("discount codes, reminders, reviews and suggestions", async ({ page, browse
   const ld = await buyer.locator('script[type="application/ld+json"]').first().textContent();
   expect(JSON.parse(ld!).aggregateRating).toMatchObject({ ratingValue: 4, reviewCount: 1 });
   await shot(buyer, "70-product-reviews");
+  // A summary of the reviews waits until there are a few to summarize.
+  await page.goto(lamp.admin);
+  const summary = page.getByRole("region", { name: "What buyers say" });
+  await expect(summary).toContainText("Needs at least 3 published reviews; this product has 1.");
+  await expect(summary.getByRole("button", { name: "Summarize with AI" })).toBeDisabled();
+  await summary.getByLabel("Summary").fill("Buyers love the warm light.");
+  await summary.getByRole("button", { name: "Save summary" }).click();
+  await expect(summary.getByText("Saved. It shows above the reviews on the product page.")).toBeVisible();
+  await buyer.reload();
+  await expect(buyer.getByRole("note", { name: "What buyers say" })).toContainText("Buyers love the warm light.");
 
   // Someone else leaves at payment. A reminder goes out, and when they pay it counts as won back.
   const grace = await (await browser.newContext({ ...info.project.use })).newPage();

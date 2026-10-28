@@ -23,6 +23,7 @@ const WHAT = {
   writer: "Drafts blog posts when you press “Write a draft” on the Blog page. Posts stay drafts until you publish them.",
   translator: "Translates your store when you press “Translate with AI” on the Languages page. You can edit any translation afterwards.",
   answerer: "Drafts answers to shoppers' product questions when you press “Draft with AI” on the Questions page. Nothing is sent until you send it.",
+  summarizer: "Writes “What buyers say” above a product's reviews when you press “Summarize with AI” on the product page. You can edit or remove it.",
   shopper: "Answers shoppers' questions about your products, delivery and returns, on your store's pages, when you turn it on below. It only reads what your store already shows.",
   sizer: "Drafts a size chart from a product's description when you press “Draft with AI” on the Size charts page. It stays hidden until you check it and show it.",
 };

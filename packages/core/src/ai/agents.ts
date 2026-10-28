@@ -6,7 +6,7 @@ import type { AgentContext, Shop } from "./context";
 import { untrusted } from "./context";
 import { addMessage, assistantConversation, BUYER_TOPICS, startBuyerMessage } from "./conversations";
 import { aiBudget, runAgent, type AgentSpec, type RunResult } from "./runtime";
-import { thinMargins } from "./tools";
+import { REVIEW_SUMMARY_MIN, thinMargins } from "./tools";
 import { LANGUAGES, shopLanguages, untranslated, type Language } from "../languages";
 import { shopperLinks } from "../shopper-links";
 
@@ -116,6 +116,15 @@ ${RULES}`,
 Call read_product_sizes, then save_size_chart_draft once, then tell the merchant in one sentence what you drafted and what to check.
 Make one row per size the product comes in, in order from smallest to largest, with the size name in the first column. Take measurements only from the description: never invent or estimate them. Supplier descriptions often give sizes in a list or a run-on line ("S: Bust 86cm Length 62cm"); turn them into columns like Chest, Waist, Length. If the description has no measurements for a size, leave its cells empty and start the note with "[Check: ", what to ask the supplier, then "]".
 Use the unit the description uses (cm when it doesn't say). Add a short "How to measure" line to the note when it helps.
+${RULES}`,
+  },
+  summarizer: {
+    agent: "summarizer",
+    effort: "low",
+    maxTokens: 2048,
+    system: (shop) => `You summarize what buyers say about a product in their reviews for ${shop.name}, an online store. The summary shows above the reviews as "What buyers say".
+Call read_reviews, then save_review_summary once, then tell the merchant in one sentence what you wrote.
+Write two or three short sentences in plain text: what most buyers like, and any complaint several of them share. Be fair: if reviews are mixed, say so. Only say what the reviews say, in your own words; don't quote names, don't invent details, and don't add advice or marketing. No links.
 ${RULES}`,
   },
   shopper: {
@@ -344,6 +353,20 @@ export async function askShopAssistant(
   const result = await runAgent(ctx, AGENT_SPECS.shopper, shop, { trigger: "buyer", conversationId: c.id, messages });
   if (result.status !== "done" || !result.text) return answer(SHOPPER_BUSY, false);
   return answer(result.text, true);
+}
+
+/** Writes "What buyers say" for a product from its published reviews. */
+export async function summarizeReviewsWithAi(ctx: AgentContext, shop: Shop, productId: string): Promise<RunResult> {
+  const [{ n }] = (await ctx.db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(schema.reviews)
+    .where(and(eq(schema.reviews.shopId, shop.id), eq(schema.reviews.productId, productId), eq(schema.reviews.status, "published")))) as [{ n: number }];
+  if (Number(n) < REVIEW_SUMMARY_MIN) throw new UserError(`A summary needs at least ${REVIEW_SUMMARY_MIN} published reviews.`);
+  return runAgent(ctx, AGENT_SPECS.summarizer, shop, {
+    trigger: "merchant",
+    productId,
+    messages: [{ role: "user", content: "Summarize what buyers say in this product's reviews." }],
+  });
 }
 
 /** A buyer asked a question on their order page. The agent answers, drafts, or hands it over. */

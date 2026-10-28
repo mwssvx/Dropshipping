@@ -715,6 +715,13 @@
       "when": 1793104573481,
       "tag": "0101_ai_shopper",
       "breakpoints": true
+    },
+    {
+      "idx": 102,
+      "version": "7",
+      "when": 1793105455521,
+      "tag": "0102_review_summary",
+      "breakpoints": true
     }
   ]
 }

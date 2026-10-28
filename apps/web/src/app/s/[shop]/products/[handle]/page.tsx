@@ -418,6 +418,13 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
             </ul>
           </div>
         )}
+        {product.reviewSummary && reviews.count > 0 && (
+          <div className="card p-4 flex flex-col gap-1 bg-sunken" role="note" aria-labelledby="review-summary-heading">
+            <h3 id="review-summary-heading" className="text-sm font-semibold">{t.reviewSummary}</h3>
+            <p className="text-sm whitespace-pre-line">{product.reviewSummary}</p>
+            {product.reviewSummaryCount !== null && <p className="hint text-xs">{t.reviewSummaryFrom(product.reviewSummaryCount)}</p>}
+          </div>
+        )}
         {reviews.count === 0 ? (
           <p className="hint">{t.noReviews}</p>
         ) : (
