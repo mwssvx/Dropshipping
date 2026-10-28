@@ -132,6 +132,11 @@ const sectionSchemas = {
     limit: z.number().int().min(3).max(12).default(6),
     minRating: z.number().int().min(1).max(5).default(4),
   }),
+  // Filled from what each shopper looked at, kept in their own browser.
+  recently_viewed: z.object({
+    heading: text(120),
+    limit: z.number().int().min(2).max(12).default(4),
+  }),
 } as const;
 
 export type SectionType = keyof typeof sectionSchemas;
@@ -149,6 +154,7 @@ export const SECTION_LABELS: Record<SectionType, { name: string; about: string }
   trust_badges: { name: "Trust badges", about: "Small icons with promises like free returns or secure checkout." },
   newsletter: { name: "Email signup", about: "Buyers leave their email to hear about news and offers. They confirm it by email first." },
   reviews: { name: "Buyer reviews", about: "The latest real reviews from your buyers, with their stars and your store's average. It fills itself as reviews come in." },
+  recently_viewed: { name: "Recently viewed", about: "The products each shopper looked at last, so they can find them again. Shoppers who haven't looked at any yet don't see it." },
 };
 
 const sectionId = z.string().regex(/^[a-z0-9]{4,24}$/, "Section ids are short lowercase codes.");

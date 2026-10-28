@@ -88,6 +88,10 @@ export const SECTION_FIELDS: Record<SectionType, Field[]> = {
     { key: "text", label: "Text", kind: "textarea", max: 400 },
     { key: "buttonLabel", label: "Button label", kind: "text", max: 40, hint: "Buyers confirm by email before they're added to your list in Email campaigns." },
   ],
+  recently_viewed: [
+    { key: "heading", label: "Heading", kind: "text", max: 120, hint: "Leave empty for “Recently viewed” in the shopper's language." },
+    { key: "limit", label: "How many to show", kind: "number", min: 2, max: 12 },
+  ],
   reviews: [
     { key: "heading", label: "Heading", kind: "text", max: 120 },
     { key: "limit", label: "How many to show", kind: "number", min: 3, max: 12 },

@@ -1068,3 +1068,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Products that still lack something (after launch, part 177)
 
 1. **Missing filter on the product list**: a "Missing" row lists products not archived with no photo, no description (markup and spaces alone count as none), an option with no weight (shipping rates by weight can't price it) or no customs details (HS code and country of origin). Weight and customs only count for products that ship, so downloads and gift cards never show there. Each chip shows its count and only appears while some product lacks it. The spreadsheet download, changing every product in the list and saved views follow it (`productGaps` and `ProductQuery.missing` in `packages/core/src/products.ts`; no migration).
+
+### Recently viewed on the home page (after launch, part 178)
+
+1. **Recently viewed section**: a home page section the merchant adds in the theme editor that shows the products each shopper looked at last, newest first, from the same cookie as Recently viewed on product pages. Shoppers who haven't looked at anything yet don't see it, and products taken off sale drop out. The merchant picks a heading (empty means "Recently viewed" in the shopper's language) and how many to show (2 to 12). The editor preview, which has no shopper, shows the store's first products as a stand-in. The cookie is only read when the section is on the page (section `recently_viewed` in `packages/core/src/theme-doc.ts`, `SectionData.recentIds` in `apps/web/src/theme/Sections.tsx`; no migration).

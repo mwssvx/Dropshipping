@@ -16,6 +16,8 @@ export function PreviewClient({ initial, shopName, currency, catalog, badges, ba
   base: string;
 }) {
   const [doc, setDoc] = useState(initial);
+  // The preview has no shopper, so Recently viewed shows the first products as a stand-in.
+  const sample = catalog.products.slice(0, 12).map((p) => p.id);
   const [highlight, setHighlight] = useState<string | null>(null);
 
   useEffect(() => {
@@ -44,7 +46,7 @@ export function PreviewClient({ initial, shopName, currency, catalog, badges, ba
   return (
     <StoreShell doc={doc} shopName={shopName} currency={currency} base={base} cartCount={0}>
       <main>
-        <HomeSections sections={doc.home} data={{ base, currency, catalog, badges }} highlight={highlight} />
+        <HomeSections sections={doc.home} data={{ base, currency, catalog, badges, recentIds: sample }} highlight={highlight} />
       </main>
     </StoreShell>
   );
