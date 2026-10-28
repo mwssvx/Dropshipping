@@ -346,11 +346,31 @@ export async function productGaps(db: Db, shopId: string) {
   return Object.fromEntries(PRODUCT_GAPS.map((g) => [g, Number(row?.[g] ?? 0)])) as Record<ProductGap, number>;
 }
 
+/** Products with an option that earns little: under 20% of its price, or less than it costs. */
+export const PRODUCT_MARGINS = ["low", "loss"] as const;
+export type ProductMargin = (typeof PRODUCT_MARGINS)[number];
+
+/** Options with no cost entered can't be judged, so they never count. */
+function marginWhere(margin: ProductMargin) {
+  const p = schema.products;
+  const thin = margin === "loss" ? sql`v.cost_minor > v.price_minor` : sql`v.cost_minor * 5 > v.price_minor * 4`;
+  return sql`exists (select 1 from ${schema.variants} v where v.product_id = ${p.id} and v.cost_minor is not null and ${thin})`;
+}
+
+/** How many products not archived earn little, for the list's filter. */
+export async function productMargins(db: Db, shopId: string) {
+  const [row] = await db
+    .select(Object.fromEntries(PRODUCT_MARGINS.map((m) => [m, sql<number>`count(*) filter (where ${marginWhere(m)})::int`])) as Record<ProductMargin, SQL<number>>)
+    .from(schema.products)
+    .where(and(eq(schema.products.shopId, shopId), ne(schema.products.status, "archived")));
+  return Object.fromEntries(PRODUCT_MARGINS.map((m) => [m, Number(row?.[m] ?? 0)])) as Record<ProductMargin, number>;
+}
+
 /** The product list's search and filters, shared by the page and its spreadsheet download. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** collection: a hand-picked collection's id; products in it. missing: products that lack this. */
-export type ProductQuery = { query?: string; status?: "active" | "draft" | "archived"; tag?: string; stock?: ProductStockFilter; source?: ProductSource; collection?: string; missing?: ProductGap };
+/** collection: a hand-picked collection's id; products in it. missing: products that lack this. margin: products that earn little. */
+export type ProductQuery = { query?: string; status?: "active" | "draft" | "archived"; tag?: string; stock?: ProductStockFilter; source?: ProductSource; collection?: string; missing?: ProductGap; margin?: ProductMargin };
 
 export function productWhere(db: Db, shopId: string, opts: ProductQuery) {
   const q = opts.query?.trim().toLowerCase();
@@ -365,6 +385,7 @@ export function productWhere(db: Db, shopId: string, opts: ProductQuery) {
       : undefined,
     // Archived products aren't worth finishing, so they're left out unless asked for, as in the counts.
     opts.missing && PRODUCT_GAPS.includes(opts.missing) ? and(gapWhere(opts.missing), opts.status ? undefined : ne(schema.products.status, "archived")) : undefined,
+    opts.margin && PRODUCT_MARGINS.includes(opts.margin) ? and(marginWhere(opts.margin), opts.status ? undefined : ne(schema.products.status, "archived")) : undefined,
     q
       ? or(
           sql`lower(${schema.products.title}) like ${`%${q}%`}`,
@@ -386,6 +407,7 @@ export function parseProductQuery(get: (key: string) => string | null | undefine
     source: PRODUCT_SOURCES.find((s) => s === get("source")),
     collection: UUID.test(get("collection") ?? "") ? get("collection")! : undefined,
     missing: PRODUCT_GAPS.find((g) => g === get("missing")),
+    margin: PRODUCT_MARGINS.find((m) => m === get("margin")),
   };
 }
 
