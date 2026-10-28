@@ -16,10 +16,11 @@ export const metadata = { title: "Orders" };
 
 const dateFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
-export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ show?: string; q?: string; tag?: string; product?: string; country?: string; placed?: string; status?: string; payment?: string; bulk?: string; before?: string }> }) {
-  const { show, q, tag, product: productParam, country: countryParam, placed: placedParam, status: statusParam, payment: paymentParamValue, bulk, before: beforeParam } = await searchParams;
+export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ show?: string; q?: string; tag?: string; product?: string; country?: string; code?: string; placed?: string; status?: string; payment?: string; bulk?: string; before?: string }> }) {
+  const { show, q, tag, product: productParam, country: countryParam, code: codeParam, placed: placedParam, status: statusParam, payment: paymentParamValue, bulk, before: beforeParam } = await searchParams;
   const productId = /^[0-9a-f-]{36}$/i.test(productParam ?? "") ? productParam : undefined;
   const country = /^[A-Z]{2}$/.test(countryParam ?? "") ? countryParam : undefined;
+  const discountId = /^[0-9a-f-]{36}$/i.test(codeParam ?? "") ? codeParam : undefined;
   const before = /^\d{1,9}$/.test(beforeParam ?? "") ? Number(beforeParam) : undefined;
   const from = placedSince(placedParam);
   const placed = from ? placedParam : undefined;
@@ -30,8 +31,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const heldOnly = show === "held";
   const transfersOnly = show === "transfers";
   const { shop, db, role } = await requireShop("orders");
-  const [{ orders, older }, problems, held, transfers, tags, countries, product, views] = await Promise.all([
-    orderPage(db, shop.id, { ...(problemsOnly ? { fulfillmentStatus: "problem" as const } : heldOnly ? { held: true } : transfersOnly ? { transfer: true } : {}), ...(status && !problemsOnly ? { fulfillmentStatus: status } : {}), paymentStatus: payment, query: q, tag, productId, country, from }, { before }),
+  const [{ orders, older }, problems, held, transfers, tags, countries, product, views, discount] = await Promise.all([
+    orderPage(db, shop.id, { ...(problemsOnly ? { fulfillmentStatus: "problem" as const } : heldOnly ? { held: true } : transfersOnly ? { transfer: true } : {}), ...(status && !problemsOnly ? { fulfillmentStatus: status } : {}), paymentStatus: payment, query: q, tag, productId, country, discountId, from }, { before }),
     countOrders(db, shop.id, { fulfillmentStatus: "problem" }),
     countOrders(db, shop.id, { held: true }),
     countOrders(db, shop.id, { transfer: true }),
@@ -39,13 +40,14 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     orderCountries(db, shop.id),
     productId ? db.query.products.findFirst({ where: (p, { and, eq }) => and(eq(p.id, productId), eq(p.shopId, shop.id)), columns: { id: true, title: true } }) : null,
     listSavedViews(db, shop.id, "orders"),
+    discountId ? db.query.discounts.findFirst({ where: (d, { and, eq }) => and(eq(d.id, discountId), eq(d.shopId, shop.id)), columns: { id: true, code: true } }) : null,
   ]);
   // On hold the same way the On hold tab counts it: held for the risk check and not refunded.
   const onHold = (o: (typeof orders)[number]) => !!o.heldAt && (o.paymentStatus === "paid" || o.paymentStatus === "partially_refunded");
-  const filtered = !!(q || tag || productId || country || placed || status || payment);
+  const filtered = !!(q || tag || productId || country || discountId || placed || status || payment);
   // Keeps the other filters when one changes.
-  const href = (next: { show?: string; q?: string; tag?: string; product?: string; country?: string; placed?: string; status?: string; payment?: string; before?: string }) => {
-    const params = new URLSearchParams(Object.entries({ show, q, tag, product: productId, country, placed, status, payment, ...next }).filter((e): e is [string, string] => !!e[1]));
+  const href = (next: { show?: string; q?: string; tag?: string; product?: string; country?: string; code?: string; placed?: string; status?: string; payment?: string; before?: string }) => {
+    const params = new URLSearchParams(Object.entries({ show, q, tag, product: productId, country, code: discountId, placed, status, payment, ...next }).filter((e): e is [string, string] => !!e[1]));
     return params.size ? `/admin/orders?${params}` : "/admin/orders";
   };
   return (
@@ -64,13 +66,14 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             Bank transfers {transfers > 0 && <span className="pill pill-info">{transfers}</span>}
           </Link>
         </nav>
-        <SavedViews list="orders" views={views} params={{ show: problemsOnly || heldOnly || transfersOnly ? show : undefined, q, tag, product: productId, country, placed, status, payment }} />
+        <SavedViews list="orders" views={views} params={{ show: problemsOnly || heldOnly || transfersOnly ? show : undefined, q, tag, product: productId, country, code: discountId, placed, status, payment }} />
         <form className="flex flex-wrap gap-2 max-w-4xl" role="search">
           <label className="sr-only" htmlFor="q">Search orders</label>
           <input className="input flex-1 min-w-40" id="q" name="q" type="search" defaultValue={q} placeholder="Order number, name or email" />
           {show && <input type="hidden" name="show" value={show} />}
           {tag && <input type="hidden" name="tag" value={tag} />}
           {productId && <input type="hidden" name="product" value={productId} />}
+          {discountId && <input type="hidden" name="code" value={discountId} />}
           {countries.length > 1 && <AutoSubmitSelect id="order-country" name="country" label="Ship-to country" value={country ?? ""} options={[["", "Every country"], ...countries.map((c) => [c.country, `${countryName(c.country)} (${c.count.toLocaleString("en-US")})`] as const)]} />}
           {!problemsOnly && <AutoSubmitSelect id="order-status" name="status" label="Delivery status" value={status ?? ""} options={[["", "Any delivery status"], ...Object.entries(FULFILMENT).filter(([k]) => k !== "problem").map(([k, [label]]) => [k, label] as const)]} />}
           <AutoSubmitSelect id="order-payment" name="payment" label="Payment status" value={payment ?? ""} options={[["", "Any payment status"], ...Object.entries(PAYMENT).map(([k, [label]]) => [k, label] as const)]} />
@@ -81,6 +84,12 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           <p className="text-sm flex flex-wrap items-center gap-2">
             <span>Orders with <strong>{product?.title ?? "a deleted product"}</strong></span>
             <Link href={href({ product: undefined })} className="underline">Show all orders</Link>
+          </p>
+        )}
+        {discountId && (
+          <p className="text-sm flex flex-wrap items-center gap-2">
+            <span>Orders that used <strong className="font-mono">{discount?.code ?? "a deleted code"}</strong></span>
+            <Link href={href({ code: undefined })} className="underline">Show all orders</Link>
           </p>
         )}
         {tags.length > 0 && (
@@ -109,6 +118,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             {tag && <input type="hidden" name="tag" value={tag} />}
             {productId && <input type="hidden" name="product" value={productId} />}
             {country && <input type="hidden" name="country" value={country} />}
+            {discountId && <input type="hidden" name="code" value={discountId} />}
             {placed && <input type="hidden" name="placed" value={placed} />}
             {status && <input type="hidden" name="status" value={status} />}
             {payment && <input type="hidden" name="payment" value={payment} />}
@@ -169,6 +179,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             {tag && <input type="hidden" name="keep-tag" value={tag} />}
             {productId && <input type="hidden" name="keep-product" value={productId} />}
             {country && <input type="hidden" name="keep-country" value={country} />}
+            {discountId && <input type="hidden" name="keep-code" value={discountId} />}
             {before && <input type="hidden" name="keep-before" value={before} />}
             <div className="field">
               <label className="label" htmlFor="bulk-tag">Tag for the picked orders</label>

@@ -22,6 +22,7 @@ export async function GET(request: Request) {
     tag: p.get("tag") ?? undefined,
     productId: p.get("product") ?? undefined,
     country: p.get("country") ?? undefined,
+    discountId: p.get("code") ?? undefined,
     from,
     to,
   });
