@@ -1028,3 +1028,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Product source filter (after launch, part 167)
 
 1. **Source**: when a store has products from more than one place, the Products page filters to those a supplier ships, the store's own stock, downloads, or gift cards, with a count on each. It works with the other filters, the sort, pages and the spreadsheet download (`PRODUCT_SOURCES` and `productSources` in `packages/core/src/products.ts`; no migration).
+
+### Change every product in a list (after launch, part 168)
+
+1. **Select all in this list**: when every product on a page of the product list is ticked and the list goes on to more pages, "Select all 230 in this list" picks every product its search and filters show, so one bulk change (status, prices, "was" price, collection, tag) covers all of them, up to 500 at a time. Unticking any product goes back to just the ticked ones (`productIds` and `parseProductQuery` in `packages/core/src/products.ts`; no migration).

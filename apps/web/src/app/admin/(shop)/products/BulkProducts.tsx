@@ -22,7 +22,16 @@ const KINDS = [
 ] as const;
 type Kind = (typeof KINDS)[number][0];
 
-export function BulkProducts({ rows, collections, tags = [], recent }: { rows: BulkRow[]; collections: { id: string; title: string }[]; tags?: string[]; recent: RecentEdit[] }) {
+export function BulkProducts({ rows, collections, tags = [], recent, total = rows.length, list = {}, maxAll = 500 }: {
+  rows: BulkRow[];
+  collections: { id: string; title: string }[];
+  tags?: string[];
+  recent: RecentEdit[];
+  /** How many products the list holds across all its pages, and its search and filters. */
+  total?: number;
+  list?: Record<string, string>;
+  maxAll?: number;
+}) {
   const [state, action] = useActionState(bulkEditAction, {} as BulkState);
   // Controlled, because React clears a form's own fields after each submit.
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -32,17 +41,30 @@ export function BulkProducts({ rows, collections, tags = [], recent }: { rows: B
   const [collectionId, setCollectionId] = useState(collections[0]?.id ?? "");
   const [tag, setTag] = useState("");
   const [belowCost, setBelowCost] = useState(false);
-  const toggle = (id: string) => setPicked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  // Every product in the list, on every page, rather than the ones ticked here.
+  const [everything, setEverything] = useState(false);
+  const toggle = (id: string) => {
+    setEverything(false);
+    setPicked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  };
   const all = picked.size === rows.length && rows.length > 0;
+  const count = everything ? total : picked.size;
   // A preview is for the products and change it was made from; touching either asks again.
-  const key = JSON.stringify([[...picked].sort(), kind, percent, ending, collectionId, tag]);
+  const key = JSON.stringify([everything ? "all" : [...picked].sort(), kind, percent, ending, collectionId, tag]);
   const preview = state.preview && state.key === key ? state.preview : null;
   const needsCollection = kind === "add" || kind === "remove";
 
   return (
     <div className="flex flex-col gap-4">
       <form action={action} className="flex flex-col gap-4">
-        {[...picked].map((id) => <input key={id} type="hidden" name="ids" value={id} />)}
+        {everything ? (
+          <>
+            <input type="hidden" name="all" value="1" />
+            {Object.entries(list).map(([k, v]) => <input key={k} type="hidden" name={`list.${k}`} value={v} />)}
+          </>
+        ) : (
+          [...picked].map((id) => <input key={id} type="hidden" name="ids" value={id} />)
+        )}
         <input type="hidden" name="kind" value={kind} />
         <input type="hidden" name="percent" value={percent} />
         <input type="hidden" name="ending" value={ending} />
@@ -56,7 +78,7 @@ export function BulkProducts({ rows, collections, tags = [], recent }: { rows: B
         {picked.size > 0 && (
           <section className="card p-4 flex flex-col gap-3" aria-label="Change selected products">
             <div className="flex flex-wrap items-end gap-3">
-              <p className="font-medium self-center">{picked.size === 1 ? "1 product selected" : `${picked.size} products selected`}</p>
+              <p className="font-medium self-center">{count === 1 ? "1 product selected" : `${count.toLocaleString("en-US")} products selected`}</p>
               <div className="field">
                 <label className="label" htmlFor="bulk-kind">Change</label>
                 <select className="input" id="bulk-kind" value={kind} onChange={(e) => setKind(e.target.value as Kind)}>
@@ -101,6 +123,19 @@ export function BulkProducts({ rows, collections, tags = [], recent }: { rows: B
               )}
               <button type="submit" className="btn btn-secondary" name="intent" value="preview">Preview</button>
             </div>
+            {all && total > rows.length && (
+              <p className="text-sm" role="note">
+                {everything ? (
+                  <>All {total.toLocaleString("en-US")} products in this list are selected, on every page.{" "}
+                    <button type="button" className="underline" onClick={() => setEverything(false)}>Just the {rows.length} on this page</button></>
+                ) : total <= maxAll ? (
+                  <>All {rows.length} on this page are selected.{" "}
+                    <button type="button" className="underline" onClick={() => setEverything(true)}>Select all {total.toLocaleString("en-US")} in this list</button></>
+                ) : (
+                  <span className="hint">All {rows.length} on this page are selected. A change can cover up to {maxAll} products, so narrow the list with a search or filter to change all {total.toLocaleString("en-US")}.</span>
+                )}
+              </p>
+            )}
             <FormError message={state.key === key ? state.error : undefined} />
             {preview && (
               <div className="flex flex-col gap-3">
@@ -147,7 +182,7 @@ export function BulkProducts({ rows, collections, tags = [], recent }: { rows: B
           <thead>
             <tr>
               <th className="w-10">
-                <input type="checkbox" aria-label="Select all products" checked={all} onChange={() => setPicked(all ? new Set() : new Set(rows.map((r) => r.id)))} />
+                <input type="checkbox" aria-label="Select all products" checked={all} onChange={() => { setEverything(false); setPicked(all ? new Set() : new Set(rows.map((r) => r.id))); }} />
               </th>
               <th>Product</th><th>Status</th><th className="text-right">Price</th><th className="text-right">Margin</th>
             </tr>
