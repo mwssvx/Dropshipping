@@ -1104,3 +1104,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### First orders and returning buyers (after launch, part 186)
 
 1. **New or returning buyers**: the order list gets a menu that shows only first orders (the buyer's first paid order with the store) or only orders from buyers who had paid for one before, matched by email whatever its capitals. Unpaid tries don't count as an earlier order. It works with the other order filters, and the spreadsheet download, working on many orders at once and saved views keep it. It shows whether a campaign brought new people or the same ones (`ORDER_BUYERS` and `OrderFilter.buyer` in `packages/core/src/orders.ts`; no migration).
+
+### Customers who used a code (after launch, part 187)
+
+1. **See customers on a discount code**: next to "See orders" on each used code in Marketing, "See customers" opens the customer list showing only people who paid for an order with that code. An order that tried the code but was never paid doesn't count, and a customer who used it once still shows with all their orders. The list keeps the code when you search, tag everyone, save a view or download the spreadsheet, and "Show all customers" clears it.
