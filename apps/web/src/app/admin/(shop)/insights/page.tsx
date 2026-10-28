@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { AI_REPORT_AREAS, listAiReports, TRENDS_MAX_SEARCHES, type AiReportArea } from "@sf/core";
+import { AI_REPORT_AREAS, atRiskCustomers, formatMoney, listAiReports, TRENDS_MAX_SEARCHES, type AiReportArea } from "@sf/core";
 import type { AiReportItem } from "@sf/db";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
-import { FindTrendsForm, ReviewStoreButton } from "./InsightsForms";
+import { DraftWinbackButton, FindTrendsForm, ReviewStoreButton } from "./InsightsForms";
 
 export const metadata = { title: "Insights" };
 
@@ -77,6 +77,7 @@ function Ideas({ items }: { items: AiReportItem[] }) {
 export default async function InsightsPage() {
   const { shop, db } = await requireShop("analytics");
   const [[latest, ...earlier], [trends], watches] = await Promise.all([listAiReports(db, shop.id, "review"), listAiReports(db, shop.id, "trends", 1), listAiReports(db, shop.id, "watch", 5)]);
+  const atRisk = await atRiskCustomers(db, shop.id);
   return (
     <main className="pb-12">
       <PageHeader title="Insights" />
@@ -99,6 +100,30 @@ export default async function InsightsPage() {
             ))
           ) : (
             <p className="text-sm">Nothing out of line so far.</p>
+          )}
+        </section>
+        <section className="card p-5 flex flex-col gap-4" aria-labelledby="regulars-title">
+          <div className="flex flex-col gap-1">
+            <h2 id="regulars-title" className="font-semibold">Regulars who may be slipping away</h2>
+            <p className="hint text-sm">Buyers who ordered twice or more and are now well past their own usual time between orders. Each one is measured against their own rhythm.</p>
+          </div>
+          {atRisk.length ? (
+            <>
+              <p className="text-sm">
+                {atRisk.length} {atRisk.length === 1 ? "regular has" : "regulars have"} spent {formatMoney(atRisk.reduce((s, c) => s + c.spentMinor, 0), shop.currency)} with you; {atRisk.filter((c) => c.subscribed).length} said yes to emails.
+              </p>
+              <ul className="text-sm flex flex-col divide-y divide-border">
+                {atRisk.slice(0, 5).map((c) => (
+                  <li key={c.customerId} className="py-2 flex flex-wrap justify-between gap-x-4">
+                    <Link className="font-medium hover:underline" href={`/admin/customers/${c.customerId}`}>{c.name ?? c.email}</Link>
+                    <span className="hint">Usually every {c.usualGapDays} days · last ordered {c.daysSince} days ago · {formatMoney(c.spentMinor, shop.currency)}</span>
+                  </li>
+                ))}
+              </ul>
+              <DraftWinbackButton />
+            </>
+          ) : (
+            <p className="text-sm">None right now. Regulars show up here when they&apos;re late for their next order.</p>
           )}
         </section>
         <section className="card p-5 flex flex-col gap-4" aria-labelledby="review-title">

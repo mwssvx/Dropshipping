@@ -1,4 +1,5 @@
 "use server";
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
   askAssistant,
@@ -35,6 +36,18 @@ export async function askAssistantAction(_: AgentState, form: FormData): Promise
   }
   revalidatePath("/admin", "layout");
   return { saved: true };
+}
+
+/** From Insights: the Assistant drafts a win-back email to regulars who may be slipping away. */
+export async function draftWinbackAction(_: AgentState): Promise<AgentState> {
+  const { shop } = await requireShop("assistant");
+  try {
+    await askAssistant(await agents(), shop, "Draft a win-back email to my regulars who stopped buying.");
+  } catch (e) {
+    return fail(e);
+  }
+  revalidatePath("/admin", "layout");
+  redirect("/admin/assistant");
 }
 
 /** Approve or turn down something an agent proposed. A message edit applies to drafted replies. */
