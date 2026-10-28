@@ -160,7 +160,7 @@ export type CustomerFilter = (typeof CUSTOMER_FILTERS)[number];
 /** Days without an order before a buyer counts as lapsed. */
 export const LAPSED_DAYS = 90;
 
-type CustomerQuery = { query?: string; tag?: string; filter?: CustomerFilter; country?: string; discountId?: string; now?: Date };
+type CustomerQuery = { query?: string; tag?: string; filter?: CustomerFilter; country?: string; discountId?: string; productId?: string; now?: Date };
 
 /** One row per customer the merchant should see, with what they've bought. */
 function customerRows(db: Db, shopId: string, opts: CustomerQuery) {
@@ -172,6 +172,8 @@ function customerRows(db: Db, shopId: string, opts: CustomerQuery) {
   const country = opts.country && /^[A-Z]{2}$/i.test(opts.country) ? opts.country.toUpperCase() : undefined;
   // Paid for an order with this discount code.
   const discountId = opts.discountId && /^[0-9a-f-]{36}$/i.test(opts.discountId) ? opts.discountId : undefined;
+  // Paid for an order with this product in it.
+  const productId = opts.productId && /^[0-9a-f-]{36}$/i.test(opts.productId) ? opts.productId : undefined;
   const filter =
     opts.filter === "repeat"
       ? sql`${paidCount} > 1`
@@ -211,6 +213,9 @@ function customerRows(db: Db, shopId: string, opts: CustomerQuery) {
         filter,
         country ? sql`bool_or(${schema.orders.shippingAddress}->>'country' = ${country} and ${schema.orders.paymentStatus} in ${PAID_SQL})` : undefined,
         discountId ? sql`bool_or(${schema.orders.discountId} = ${discountId} and ${schema.orders.paymentStatus} in ${PAID_SQL})` : undefined,
+        productId
+          ? sql`bool_or(${schema.orders.paymentStatus} in ${PAID_SQL} and exists (select 1 from order_lines ol join variants v on v.id = ol.variant_id where ol.order_id = ${schema.orders.id} and v.product_id = ${productId}))`
+          : undefined,
       ),
     );
 }

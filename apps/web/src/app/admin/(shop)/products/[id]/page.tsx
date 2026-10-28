@@ -83,6 +83,7 @@ export default async function EditProductPage({ params, searchParams }: { params
             </form>
             {!product.giftCard && <Link className="btn btn-secondary" href={`/admin/products/${product.id}/labels`}>Print labels</Link>}
             {can(role, "orders") && <Link className="btn btn-secondary" href={`/admin/orders?product=${product.id}`}>See orders</Link>}
+            {can(role, "customers") && <Link className="btn btn-secondary" href={`/admin/customers?product=${product.id}`}>See buyers</Link>}
             {product.status === "active" && <a className="btn btn-secondary" href={`/s/${shop.handle}/products/${product.handle}`} target="_blank">View on store ↗</a>}
           </>
         } />

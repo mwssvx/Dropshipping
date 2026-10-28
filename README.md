@@ -1108,3 +1108,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Customers who used a code (after launch, part 187)
 
 1. **See customers on a discount code**: next to "See orders" on each used code in Marketing, "See customers" opens the customer list showing only people who paid for an order with that code. An order that tried the code but was never paid doesn't count, and a customer who used it once still shows with all their orders. The list keeps the code when you search, tag everyone, save a view or download the spreadsheet, and "Show all customers" clears it.
+
+### Customers who bought a product (after launch, part 188)
+
+1. **See buyers on a product**: a product's page gets "See buyers" next to "See orders". It opens the customer list showing only people who paid for an order with that product in it, so you can tag them or send them a code for something that goes with it. Unpaid orders don't count, and a buyer still shows with all their orders. The list keeps the product when you search, tag everyone, save a view or download the spreadsheet, and "Show everyone" clears it.

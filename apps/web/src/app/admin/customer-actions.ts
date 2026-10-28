@@ -94,6 +94,7 @@ export async function tagCustomersAction(_: TagAllState, form: FormData): Promis
     filter: CUSTOMER_FILTERS.find((f) => f === form.get("filter")),
     country: /^[A-Z]{2}$/.test(String(form.get("country") ?? "")) ? String(form.get("country")) : undefined,
     discountId: /^[0-9a-f-]{36}$/i.test(String(form.get("code") ?? "")) ? String(form.get("code")) : undefined,
+    productId: /^[0-9a-f-]{36}$/i.test(String(form.get("product") ?? "")) ? String(form.get("product")) : undefined,
   };
   try {
     const { tag, changed, full } = await tagCustomers(db, shop.id, list, { tag: String(form.get("tag") ?? ""), remove });
