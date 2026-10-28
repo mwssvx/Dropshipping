@@ -1,4 +1,4 @@
-import { applyAllTagRules, lapseBankTransfers, notifyLowStock, notifySoldOut, publishDueProducts, sendReviewRequests, sendReorderReminders, pruneActivity, sendWeeklySummaries, pruneAuthRecords, pruneBuyerRecords, pruneStockAlerts, sendPriceDrops, sendStockAlerts, syncSupplierStock, pruneInvites, pruneEvents, refreshAllVerified, runWebhooks, routeStuckOrders, sendCampaignBatches, runFakePayouts, notifyNewDisputes, runDueSubscriptions, sendWinbackEmails, sendBirthdayCodes, notifyCostChanges, notifyLatePreorders, runHealthChecks, runScheduledAgents, sendAbandonedCartEmails, sendAllNotifications, sendReferralRewards, syncTracking } from "@sf/core";
+import { applyAllTagRules, lapseBankTransfers, notifyLowStock, notifySoldOut, publishDueProducts, sendReviewRequests, sendReorderReminders, pruneActivity, sendWeeklySummaries, pruneAuthRecords, pruneBuyerRecords, pruneStockAlerts, sendPriceDrops, sendStockAlerts, syncSupplierStock, pruneInvites, pruneEvents, refreshAllVerified, runWebhooks, routeStuckOrders, sendCampaignBatches, runFakePayouts, notifyNewDisputes, runDueSubscriptions, sendWinbackEmails, sendBirthdayCodes, sendScheduledGiftCards, notifyCostChanges, notifyLatePreorders, runHealthChecks, runScheduledAgents, sendAbandonedCartEmails, sendAllNotifications, sendReferralRewards, syncTracking } from "@sf/core";
 import { agents, campaigns, adminNotices, fulfillment, pushSender, stock, subscriptions, testPayments, webhooks } from "@/lib/server";
 
 /**
@@ -7,7 +7,7 @@ import { agents, campaigns, adminNotices, fulfillment, pushSender, stock, subscr
  * buyers whose saved items got cheaper hear about it). Pre-orders back in stock are placed. Buyers whose referred friend's order
  * arrived get their store credit, and subscription deliveries that are due are placed and charged.
  * Also checks store health and the verified badge, and in test mode stands in for the payment
- * processor's daily payouts. Customer tags from rules are brought up to date. Buyers who left a checkout get one reminder, buyers whose order arrived a few days ago are asked for a review, email campaigns go out in batches, and on Mondays store owners get last week's summary. Then the AI agents look at problem orders and thin margins, and last
+ * processor's daily payouts. Customer tags from rules are brought up to date. Buyers who left a checkout get one reminder, gift cards bought for someone else go out on their day, buyers whose order arrived a few days ago are asked for a review, email campaigns go out in batches, and on Mondays store owners get last week's summary. Then the AI agents look at problem orders and thin margins, and last
  * phones get push notifications and webhooks go out for anything new. Old visitor events are pruned.
  * Called by the scheduler with "Authorization: Bearer $CRON_SECRET". Open in development.
  */
@@ -55,6 +55,8 @@ export async function GET(request: Request) {
   const winback = await sendWinbackEmails(await campaigns());
   // Birthday codes for subscribers whose birthday is today.
   const birthdays = await sendBirthdayCodes(await campaigns());
+  // Gift cards bought for someone else, on the day the buyer picked.
+  const giftCards = await sendScheduledGiftCards(await campaigns());
   // The Monday summary of last week, once per store.
   const summaries = await sendWeeklySummaries(await adminNotices());
   const ai = await runScheduledAgents(await agents());
@@ -66,5 +68,5 @@ export async function GET(request: Request) {
   await pruneBuyerRecords(ctx.db);
   await pruneStockAlerts(ctx.db);
   await pruneActivity(ctx.db);
-  return Response.json({ published, routed, tracking, referrals, stock: stockSync, priceRises, soldOut, runningLow, preorders, subscriptions: repeats, restocked, priceDrops, payouts, disputes, health, verified, tagRules, reminders, transfers, reviewRequests, reorderReminders, campaigns: campaignEmails, winback, birthdays, summaries, ai, push, webhooks: hooks, pruned });
+  return Response.json({ published, routed, tracking, referrals, stock: stockSync, priceRises, soldOut, runningLow, preorders, subscriptions: repeats, restocked, priceDrops, payouts, disputes, health, verified, tagRules, reminders, transfers, reviewRequests, reorderReminders, campaigns: campaignEmails, winback, birthdays, giftCards, summaries, ai, push, webhooks: hooks, pruned });
 }

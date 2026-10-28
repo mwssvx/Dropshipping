@@ -890,6 +890,13 @@
       "when": 1793177188766,
       "tag": "0127_signup_popup",
       "breakpoints": true
+    },
+    {
+      "idx": 127,
+      "version": "7",
+      "when": 1793178462149,
+      "tag": "0128_gift_card_recipient",
+      "breakpoints": true
     }
   ]
 }

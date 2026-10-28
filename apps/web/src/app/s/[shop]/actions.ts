@@ -198,6 +198,10 @@ export async function checkoutAction(handle: string, _: CheckoutState, form: For
       giftCardCode: await readGiftCardCode(shop.id),
       shippingRateId: values.shippingRateId || null,
       gift: values.gift === "on" ? { from: values.giftFrom ?? "", message: values.giftMessage, recipientEmail: values.giftRecipientEmail } : null,
+      giftCardTo:
+        values.giftCardTo === "on"
+          ? { email: values.giftCardEmail ?? "", name: values.giftCardName, from: values.giftCardFrom ?? "", message: values.giftCardMessage, sendOn: values.giftCardSendOn }
+          : null,
       note: values.note || null,
     }, tax());
     orderId = order.id;

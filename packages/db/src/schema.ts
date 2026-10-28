@@ -508,6 +508,9 @@ export type PersonalizationValue = { fieldId: string; label: string; value: stri
 /** A gift order: who it's from, their message, and who to tell when it ships. */
 export type OrderGift = { from: string; message: string | null; recipientEmail: string | null };
 
+/** Gift cards bought for someone else: emailed to them, with a message, now or on a day the buyer picked ("2026-12-24"). */
+export type GiftCardDelivery = { email: string; name: string | null; from: string; message: string | null; sendOn: string | null };
+
 /** One change to a paid order before it shipped: a new address or another size. */
 export type OrderEdit = { at: string; by: "buyer" | "merchant"; changes: string[] };
 
@@ -653,6 +656,8 @@ export const orders = pgTable(
     // Set when the buyer marked the order as a gift. The recipient (when the buyer gave their
     // email) hears when it ships, with the message and tracking but no prices.
     gift: jsonb("gift").$type<OrderGift>(),
+    // Set when the buyer sent the gift cards on the order to someone else.
+    giftCardDelivery: jsonb("gift_card_delivery").$type<GiftCardDelivery>(),
     // Set when the order is paid. A held order isn't sent to the supplier until the merchant
     // sends it (heldAt cleared, riskReviewedAt set) or refunds it.
     risk: jsonb("risk").$type<OrderRisk>(),
@@ -1625,6 +1630,8 @@ export const giftCards = pgTable(
     sourceIndex: integer("source_index"),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     sentAt: timestamp("sent_at", { withTimezone: true }),
+    // A card the buyer asked to arrive later: the daily job emails it (with a fresh code) from then.
+    scheduledFor: timestamp("scheduled_for", { withTimezone: true }),
     disabledAt: timestamp("disabled_at", { withTimezone: true }),
     createdAt: createdAt(),
   },

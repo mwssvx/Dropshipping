@@ -3,7 +3,7 @@
 // of a refund. Buyers enter the code in the cart's code box. Only a hash of each code is stored:
 // the code is emailed once, and a lost code is replaced by sending a new one.
 import { createHash, randomInt } from "node:crypto";
-import { and, asc, desc, eq, gt, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
 import type { Mailer } from "./email";
@@ -61,15 +61,15 @@ async function insertCard(db: Db, values: Omit<typeof schema.giftCards.$inferIns
   return card ? { card, code } : null;
 }
 
-async function sendCode(ctx: GiftCardContext, shop: Shop, card: GiftCard, code: string, intro: string) {
+async function sendCode(ctx: GiftCardContext, shop: Shop, card: GiftCard, code: string, intro: string, gift?: { name: string | null; from: string }) {
   const store = await ctx.storeAddress(shop);
   try {
     await ctx.mailer.send({
       to: card.email,
-      subject: `Your ${formatMoney(card.balanceMinor, card.currency)} gift card for ${shop.name}`,
+      subject: gift ? `${gift.from} sent you a ${formatMoney(card.balanceMinor, card.currency)} gift card for ${shop.name}` : `Your ${formatMoney(card.balanceMinor, card.currency)} gift card for ${shop.name}`,
       text:
-        `Hi,\n\n${intro}\n\nGift card code: ${code}\nBalance: ${formatMoney(card.balanceMinor, card.currency)}\n` +
-        (card.note ? `\nNote: ${card.note}\n` : "") +
+        `Hi${gift?.name ? ` ${gift.name}` : ""},\n\n${intro}\n\nGift card code: ${code}\nBalance: ${formatMoney(card.balanceMinor, card.currency)}\n` +
+        (card.note ? (gift ? `\nMessage from ${gift.from}: ${card.note}\n` : `\nNote: ${card.note}\n`) : "") +
         `\nShop at ${store} and enter the code in your cart. It never expires, and whatever you don't spend stays on the card.\n` +
         `\nCheck what's left on it: ${store}/gift-cards\n`,
     });
@@ -99,9 +99,13 @@ export async function issueGiftCard(ctx: GiftCardContext, shop: Shop, input: { e
   return { card: made.card, sent, code: made.code };
 }
 
+/** The day a scheduled gift card goes out, in words: "December 24, 2026". */
+const sendDay = (day: string) => new Date(`${day}T00:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+
 /**
  * Issues one card per gift card bought on an order, worth what the buyer paid for it, and emails
- * the codes to the buyer. Safe to run again: cards already made for the order are skipped.
+ * the codes to the buyer, or to the person they bought them for (now, or on the day they picked,
+ * when the daily job sends them). Safe to run again: cards already made for the order are skipped.
  */
 export async function issueGiftCardsForOrder(ctx: GiftCardContext, orderId: string) {
   const order = await ctx.db.query.orders.findFirst({ where: eq(schema.orders.id, orderId) });
@@ -115,6 +119,8 @@ export async function issueGiftCardsForOrder(ctx: GiftCardContext, orderId: stri
     .leftJoin(schema.products, eq(schema.products.id, schema.variants.productId))
     .where(eq(schema.orderLines.orderId, order.id))
     .orderBy(asc(schema.orderLines.id));
+  const to = order.giftCardDelivery;
+  const scheduledFor = to?.sendOn ? new Date(`${to.sendOn}T00:00:00Z`) : null;
   let index = 0;
   let issued = 0;
   for (const { line, giftCard } of lines) {
@@ -125,16 +131,72 @@ export async function issueGiftCardsForOrder(ctx: GiftCardContext, orderId: stri
         currency: order.currency,
         initialMinor: line.unitPriceMinor,
         balanceMinor: line.unitPriceMinor,
-        email: order.email,
+        email: to?.email ?? order.email,
+        note: to?.message ?? null,
         sourceOrderId: order.id,
         sourceIndex: index,
+        scheduledFor,
       });
       if (!made) continue; // already issued
       issued++;
-      await sendCode(ctx, shop, made.card, made.code, `Thanks for your order #${order.number}. Here's the gift card you bought. Forward this email to give it to someone.`);
+      // A card for later keeps no code: a new one is made the day it goes out.
+      if (scheduledFor) continue;
+      if (to) await sendCode(ctx, shop, made.card, made.code, giftIntro(shop, to.from), to);
+      else await sendCode(ctx, shop, made.card, made.code, `Thanks for your order #${order.number}. Here's the gift card you bought. Forward this email to give it to someone.`);
     }
   }
+  // The buyer hears where their gift cards went, and when.
+  if (to && issued) {
+    const when = scheduledFor ? `will be emailed to ${to.email} on ${sendDay(to.sendOn!)}` : `went to ${to.email}`;
+    await ctx.mailer
+      .send({
+        to: order.email,
+        subject: `Your gift card for ${to.name ?? to.email} from ${shop.name}`,
+        text:
+          `Hi,\n\nThanks for your order #${order.number}. The ${issued === 1 ? "gift card" : `${issued} gift cards`} you bought ${when}` +
+          `${to.message ? `, with your message` : ""}. Ask the store if anything needs changing.\n`,
+      })
+      .catch(() => undefined);
+  }
   return { issued, onlyGiftCards: lines.length > 0 && lines.every((l) => l.giftCard) };
+}
+
+const giftIntro = (shop: Shop, from: string) => `${from} sent you a gift card for ${shop.name}.`;
+
+/**
+ * Gift cards bought for someone else whose day has come: each gets a fresh code, emailed to them.
+ * A card is claimed before its email, so two runs never send one twice; a failed email is tried
+ * again on the next run.
+ */
+export async function sendScheduledGiftCards(ctx: GiftCardContext, opts: { now?: Date; limit?: number } = {}) {
+  const g = schema.giftCards;
+  const t = opts.now ?? new Date();
+  const due = await ctx.db
+    .select({ card: g, delivery: schema.orders.giftCardDelivery })
+    .from(g)
+    .leftJoin(schema.orders, eq(schema.orders.id, g.sourceOrderId))
+    .where(and(isNull(g.sentAt), isNotNull(g.scheduledFor), lte(g.scheduledFor, t), isNull(g.disabledAt)))
+    .orderBy(asc(g.scheduledFor))
+    .limit(opts.limit ?? 200);
+  const shops = new Map<string, Shop | undefined>();
+  let sent = 0;
+  for (const { card, delivery } of due) {
+    if (!shops.has(card.shopId)) shops.set(card.shopId, await ctx.db.query.shops.findFirst({ where: eq(schema.shops.id, card.shopId) }));
+    const shop = shops.get(card.shopId);
+    if (!shop) continue;
+    const code = newGiftCardCode();
+    const normalized = normalizeGiftCardCode(code)!;
+    const [claimed] = await ctx.db
+      .update(g)
+      .set({ codeHash: hash(normalized), last4: normalized.slice(-4), sentAt: t })
+      .where(and(eq(g.id, card.id), isNull(g.sentAt)))
+      .returning();
+    if (!claimed) continue;
+    const ok = await sendCode(ctx, shop, claimed, code, giftIntro(shop, delivery?.from ?? shop.name), delivery ? { name: delivery.name, from: delivery.from } : undefined);
+    if (ok) sent++;
+    else await ctx.db.update(g).set({ sentAt: null }).where(eq(g.id, card.id));
+  }
+  return { sent };
 }
 
 /** Replaces a card's code (lost email, or a code someone shouldn't have). The old code stops working. */
@@ -146,7 +208,7 @@ export async function resendGiftCard(ctx: GiftCardContext, shop: Shop, cardId: s
   const normalized = normalizeGiftCardCode(code)!;
   const [updated] = await ctx.db
     .update(schema.giftCards)
-    .set({ codeHash: hash(normalized), last4: normalized.slice(-4), sentAt: null })
+    .set({ codeHash: hash(normalized), last4: normalized.slice(-4), sentAt: null, scheduledFor: null })
     .where(eq(schema.giftCards.id, card.id))
     .returning();
   const sent = await sendCode(ctx, shop, updated!, code, `${shop.name} sent you a new code for your gift card. The old code no longer works.`);
