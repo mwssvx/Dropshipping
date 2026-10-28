@@ -72,6 +72,11 @@ test("a merchant runs a sale and ends it", async ({ page, browser }, info) => {
   await spring.getByLabel("Keep it on for another").selectOption("7");
   await spring.getByRole("button", { name: "Keep it on" }).click();
   await expect(spring).toContainText(/to Jun 8,/);
+  // The announcement comes written, with a button to the lamp.
+  await spring.getByRole("link", { name: "Email your subscribers" }).click();
+  await expect(page.getByLabel("Subject")).toHaveValue(/^Spring sale: 25% off the Sunset Projection Lamp/);
+  await expect(page.getByLabel("Email", { exact: true })).toHaveValue(/is on: 25% off the Sunset Projection Lamp[^,]*, until Saturday, June 8\./);
+  await page.goto("/admin/sales");
 
   // Ended: the price goes back.
   await spring.getByRole("button", { name: "End now" }).click();

@@ -1229,3 +1229,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Cyber Monday too** (`extendSale` in `packages/core/src/sales.ts`, Sales → a sale that hasn't ended → Keep it on): moves the sale's end by a day, two, three or a week. The store's prices, the sale note and any countdown follow the new end at once.
 2. **Honest countdowns**: when the sale counts down on the store, the form says buyers notice a sale that keeps "ending", so it's worth doing once at most.
+
+### Sale emails (after launch, part 214)
+
+1. **Written for you** (`saleEmail` in `packages/core/src/sales.ts`, Sales → a running sale → Email your subscribers): opens a campaign that says the sale is on, what's in it and until when, with a "Shop the sale" button to the collection or product on sale (or the home page). No code needed, since the prices are already lower.
+2. **Last chance**: in a sale's last two days the button reads "Email: last chance" and the email says when it ends, in the store's time zone: tonight, today, tomorrow or on Thursday.

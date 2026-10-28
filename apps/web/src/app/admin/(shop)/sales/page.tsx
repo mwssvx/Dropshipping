@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { bundleProductChoices, EARLY_ACCESS_HOURS, formatMoney, listCollections, listSales, MAX_SALES, SALE_EXTEND_DAYS, saleResults, type SaleOutcome } from "@sf/core";
+import { bundleProductChoices, EARLY_ACCESS_HOURS, formatMoney, listCollections, listSales, LAST_CHANCE_MS, MAX_SALES, SALE_EXTEND_DAYS, saleResults, type SaleOutcome } from "@sf/core";
 import { requireShop, storeAddress } from "@/lib/server";
 import { deleteSaleAction, endEarlyAccessAction, endSaleAction, extendSaleAction, giveEarlyAccessAction } from "../../sale-actions";
 import { PageHeader } from "../PageHeader";
@@ -45,6 +45,11 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
                   {results.has(s.id) && <SaleResult title={s.title} running={s.status === "running"} result={results.get(s.id)!} currency={shop.currency} />}
                 </div>
                 <span className={`pill ${STATUS[s.status].pill}`}>{STATUS[s.status].label}</span>
+                {s.status === "running" && (
+                  <Link href={`/admin/campaigns/new?sale=${s.id}`} className="btn btn-secondary btn-sm">
+                    {s.endsAt && s.endsAt.getTime() - Date.now() <= LAST_CHANCE_MS ? "Email: last chance" : "Email your subscribers"}
+                  </Link>
+                )}
                 {s.status === "running" ? (
                   <form action={endSaleAction.bind(null, s.id)}>
                     <button className="btn btn-secondary btn-sm">End now</button>
