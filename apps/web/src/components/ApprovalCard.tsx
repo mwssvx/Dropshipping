@@ -12,6 +12,8 @@ export function ApprovalCard({ action, compact }: { action: PendingAction; compa
   const [yes, approve] = useActionState(decideAgentAction.bind(null, action.id, true), {});
   const [no, reject] = useActionState(decideAgentAction.bind(null, action.id, false), {});
   const message = typeof action.input.message === "string" ? action.input.message : null;
+  // What it will do, worked out before asking (the terms of a code, the products in a collection).
+  const preview = Array.isArray(action.input.preview) ? action.input.preview.filter((l): l is string => typeof l === "string") : [];
   if (yes.saved || no.saved) {
     return (
       <div className="card p-4 text-sm" role="status">
@@ -27,6 +29,13 @@ export function ApprovalCard({ action, compact }: { action: PendingAction; compa
         <p className="text-sm font-medium">{action.summary}</p>
         {action.reason && <p className="hint">Needs your OK: {action.reason.charAt(0).toLowerCase() + action.reason.slice(1)}</p>}
       </div>
+      {preview.length > 0 && (
+        <ul className="text-sm flex flex-col gap-1 list-disc pl-5" aria-label="What it will do">
+          {preview.map((line, k) => (
+            <li key={k} className={/at a loss/.test(line) ? "text-critical" : undefined}>{line}</li>
+          ))}
+        </ul>
+      )}
       <form action={approve} className="flex flex-col gap-3">
         {message !== null && (
           <div className="field">
