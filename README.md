@@ -1188,3 +1188,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **The busiest time of the week** (`whenBuyersBuy` in `packages/core/src/analytics.ts`, Analytics → When buyers buy): orders in the period by day of the week and by three-hour stretch of the day, and once there are 10 orders, the busiest one ("Most orders come in on Sundays, 6–9 pm"), so the merchant knows when to send a campaign or start an ad.
 2. **In the store's own time**: counted in the time zone of the same-day cutoff, or the store's country, and any other zone can be picked (handy for a store that sells mostly abroad). The period and comparison links keep it.
+
+### Buyers who come back (after launch, part 206)
+
+1. **How many order again** (`repeatBuyers` in `packages/core/src/analytics.ts`, Analytics → Buyers who come back): for each of the last six months, how many people bought for the first time and how many of them ordered again within 90 days, with the share over the months that have had their full 90 days and the average days to the second order. Months still inside their 90 days say "so far".
+2. **Counted fairly**: buyers are told apart by email in any case, a buyer whose first order was before the months shown isn't counted as new, and free replacements aren't a second order.
