@@ -21,6 +21,7 @@ export * from "./two-step";
 export * from "./devices";
 export * from "./activity";
 export * from "./saved-replies";
+export * from "./saved-views";
 export * from "./blog";
 export * from "./payment-links";
 export * from "./pricing";

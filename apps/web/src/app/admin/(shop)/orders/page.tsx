@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { BANK_DETAILS_MAX, BUYER_EDIT_HOURS, can, countOrders, countryName, formatMoney, orderCountries, orderPage, orderTags, RISK_HOLD_LABELS, TRANSFER_DAYS } from "@sf/core";
+import { BANK_DETAILS_MAX, BUYER_EDIT_HOURS, can, countOrders, countryName, formatMoney, listSavedViews, orderCountries, orderPage, orderTags, RISK_HOLD_LABELS, TRANSFER_DAYS } from "@sf/core";
 import { AutoSubmitSelect } from "@/components/AutoSubmitSelect";
+import { SavedViews } from "@/components/SavedViews";
 import { requireShop } from "@/lib/server";
 import { FulfilmentStatus, PaymentStatus } from "@/components/Status";
 import { PageHeader } from "../PageHeader";
@@ -24,7 +25,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const heldOnly = show === "held";
   const transfersOnly = show === "transfers";
   const { shop, db, role } = await requireShop("orders");
-  const [{ orders, older }, problems, held, transfers, tags, countries, product] = await Promise.all([
+  const [{ orders, older }, problems, held, transfers, tags, countries, product, views] = await Promise.all([
     orderPage(db, shop.id, { ...(problemsOnly ? { fulfillmentStatus: "problem" as const } : heldOnly ? { held: true } : transfersOnly ? { transfer: true } : {}), query: q, tag, productId, country }, { before }),
     countOrders(db, shop.id, { fulfillmentStatus: "problem" }),
     countOrders(db, shop.id, { held: true }),
@@ -32,6 +33,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     orderTags(db, shop.id),
     orderCountries(db, shop.id),
     productId ? db.query.products.findFirst({ where: (p, { and, eq }) => and(eq(p.id, productId), eq(p.shopId, shop.id)), columns: { id: true, title: true } }) : null,
+    listSavedViews(db, shop.id, "orders"),
   ]);
   // On hold the same way the On hold tab counts it: held for the risk check and not refunded.
   const onHold = (o: (typeof orders)[number]) => !!o.heldAt && (o.paymentStatus === "paid" || o.paymentStatus === "partially_refunded");
@@ -57,6 +59,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             Bank transfers {transfers > 0 && <span className="pill pill-info">{transfers}</span>}
           </Link>
         </nav>
+        <SavedViews list="orders" views={views} params={{ show: problemsOnly || heldOnly || transfersOnly ? show : undefined, q, tag, product: productId, country }} />
         <form className="flex flex-wrap gap-2 max-w-2xl" role="search">
           <label className="sr-only" htmlFor="q">Search orders</label>
           <input className="input flex-1 min-w-40" id="q" name="q" type="search" defaultValue={q} placeholder="Order number, name or email" />

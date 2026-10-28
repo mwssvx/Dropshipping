@@ -1449,6 +1449,23 @@ export const savedReplies = pgTable(
   (t) => [index("saved_replies_shop_idx").on(t.shopId, t.title)],
 );
 
+export const SAVED_VIEW_LISTS = ["products", "orders", "customers"] as const;
+
+/** A named search and set of filters on an admin list, shared by the store's team. */
+export const savedViews = pgTable(
+  "saved_views",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    list: text("list", { enum: SAVED_VIEW_LISTS }).notNull(),
+    name: text("name").notNull(),
+    // The list's own link parameters, like "stock=sold_out&tag=summer".
+    query: text("query").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("saved_views_shop_list_name_uq").on(t.shopId, t.list, t.name)],
+);
+
 /** An email or delivery address the store won't take orders from (chargebacks, stolen cards). */
 export const blockedBuyers = pgTable(
   "blocked_buyers",
