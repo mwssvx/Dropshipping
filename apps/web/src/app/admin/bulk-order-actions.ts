@@ -9,7 +9,7 @@ export async function bulkOrdersAction(form: FormData) {
   const { shop, db, user } = await requireShop("orders");
   const ids = form.getAll("ids").map(String);
   // Back to the same view of the list.
-  const back = new URLSearchParams(["show", "q", "tag", "product", "country", "code", "total", "before"].flatMap((k) => (form.get(`keep-${k}`) ? [[k, String(form.get(`keep-${k}`))]] : [])));
+  const back = new URLSearchParams(["show", "q", "tag", "product", "country", "code", "total", "buyer", "before"].flatMap((k) => (form.get(`keep-${k}`) ? [[k, String(form.get(`keep-${k}`))]] : [])));
   const op = String(form.get("op") ?? "");
   if (op === "slips") {
     if (!ids.length) back.set("bulk", "none");
