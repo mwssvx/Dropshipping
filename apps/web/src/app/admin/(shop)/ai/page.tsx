@@ -1,4 +1,4 @@
-import { aiBudget, BUYER_TOPICS, formatMoney, listAgentActivity, listShopperChats, LANGUAGES, MEMORY_MAX_NOTES, MODEL_LABEL, SKILL_NAMES, SKILLS, type BrandRules } from "@sf/core";
+import { aiBudget, aiImpact, aiMonth, BUYER_TOPICS, impactLines, timeSaved, type AiImpact, formatMoney, listAgentActivity, listShopperChats, LANGUAGES, MEMORY_MAX_NOTES, MODEL_LABEL, SKILL_NAMES, SKILLS, type BrandRules } from "@sf/core";
 import { aiModel, requireShop } from "@/lib/server";
 import { AGENT_LABEL } from "@/lib/agent-labels";
 import { PageHeader } from "../PageHeader";
@@ -34,7 +34,14 @@ const WHAT = {
 
 export default async function AiSettingsPage() {
   const { shop, db } = await requireShop("ai");
-  const [budget, activity, chats] = await Promise.all([aiBudget(db, shop), listAgentActivity(db, shop.id, 40), listShopperChats(db, shop.id)]);
+  const months = [aiMonth(new Date(), 0), aiMonth(new Date(), 1)] as const;
+  const [budget, activity, chats, thisMonth, lastMonth] = await Promise.all([
+    aiBudget(db, shop),
+    listAgentActivity(db, shop.id, 40),
+    listShopperChats(db, shop.id),
+    aiImpact(db, shop.id, months[0]),
+    aiImpact(db, shop.id, months[1]),
+  ]);
   const usd = (m: number) => formatMoney(m, "USD");
   const model = aiModel();
   return (
@@ -42,6 +49,16 @@ export default async function AiSettingsPage() {
       <PageHeader title="AI settings" />
       <div className="px-4 sm:px-8 grid gap-6 lg:grid-cols-[1fr_340px] items-start">
         <div className="flex flex-col gap-6 min-w-0">
+          <section className="card p-5 flex flex-col gap-4" aria-labelledby="impact-title">
+            <h2 id="impact-title" className="font-semibold">What the AI did for you</h2>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <ImpactColumn title={`${months[0].label.split(" ")[0]} so far`} impact={thisMonth} usd={usd} />
+              <ImpactColumn title={months[1].label.split(" ")[0]!} impact={lastMonth} usd={usd} />
+            </div>
+            <p className="hint text-xs">
+              Time saved is a rough, low guess at doing the same by hand: about 5 minutes for each buyer question it answered on its own, 3 for a drafted reply, 2 for a shopper&apos;s question, 4 for each change, 30 for a report and 10 for a store watch alert.
+            </p>
+          </section>
           <section className="card p-5 flex flex-col gap-4" aria-labelledby="budget-title">
             <div className="flex justify-between items-baseline gap-3 flex-wrap">
               <h2 id="budget-title" className="font-semibold">This month</h2>
@@ -63,6 +80,7 @@ export default async function AiSettingsPage() {
               weeklyReview={shop.aiWeeklyReview}
               dailyWatch={shop.aiDailyWatch}
               watchEmail={shop.aiWatchEmail}
+              monthlyEmail={shop.aiMonthlyEmail}
               brand={brandFields(shop.aiBrand as BrandRules | null)}
               memory={shop.aiMemory.join("\n")}
               memoryMax={MEMORY_MAX_NOTES}
@@ -129,4 +147,24 @@ export default async function AiSettingsPage() {
 
 function brandFields(b: BrandRules | null) {
   return { voice: b?.voice ?? "", banned: (b?.banned ?? []).join(", "), language: b?.language ?? "", titleMax: b?.titleMax ? String(b.titleMax) : "" };
+}
+
+function ImpactColumn({ title, impact, usd }: { title: string; impact: AiImpact; usd: (m: number) => string }) {
+  const lines = impactLines(impact);
+  return (
+    <div className="flex flex-col gap-2 text-sm" role="group" aria-label={title}>
+      <h3 className="label">{title}</h3>
+      {lines.length === 0 ? (
+        <p className="hint">Nothing yet.</p>
+      ) : (
+        <>
+          <ul className="flex flex-col gap-1 list-disc pl-5">{lines.map((l) => <li key={l}>{l}</li>)}</ul>
+          <p className="flex justify-between gap-3 flex-wrap border-t border-border pt-2">
+            <span><span className="font-semibold">{timeSaved(impact.minutesSaved)}</span> saved</span>
+            <span className="num">{usd(impact.costMinor)} of AI</span>
+          </p>
+        </>
+      )}
+    </div>
+  );
 }

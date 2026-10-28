@@ -32,6 +32,7 @@ import { createDiscount } from "../discounts";
 import { createCollection } from "../collections";
 import { createCampaign } from "../campaigns";
 import { AT_RISK_TAG, atRiskCustomers, tagAtRisk } from "../churn";
+import { aiImpact, aiMonth, impactLines, timeSaved } from "./impact";
 import { findNote, MEMORY_MAX_NOTES, MEMORY_NOTE_MAX, normalizeMemory } from "./memory";
 import { addMessage, BUYER_TOPICS, discardDrafts, sendBuyerMessage, setConversationStatus, type BuyerTopic } from "./conversations";
 
@@ -864,7 +865,7 @@ export async function thinMargins(run: Pick<RunScope, "ctx" | "shop">, minPct = 
 export async function setAiSettings(
   db: RunScope["ctx"]["db"],
   shop: Pick<RunScope["shop"], "id" | "plan">,
-  s: { budgetMinor?: number | null; autoReplyTopics?: string[]; autoPause?: boolean; shopper?: boolean; weeklyReview?: boolean; dailyWatch?: boolean; watchEmail?: boolean; replyExamples?: []; memory?: string[]; skillsOff?: string[]; brand?: BrandRules | null },
+  s: { budgetMinor?: number | null; autoReplyTopics?: string[]; autoPause?: boolean; shopper?: boolean; weeklyReview?: boolean; dailyWatch?: boolean; watchEmail?: boolean; monthlyEmail?: boolean; replyExamples?: []; memory?: string[]; skillsOff?: string[]; brand?: BrandRules | null },
 ) {
   const max = PLAN_AI_BUDGET_MINOR[shop.plan];
   if (s.budgetMinor !== undefined && s.budgetMinor !== null && (!Number.isFinite(s.budgetMinor) || s.budgetMinor < 0 || s.budgetMinor > max)) {
@@ -881,6 +882,7 @@ export async function setAiSettings(
       ...(s.weeklyReview !== undefined ? { aiWeeklyReview: s.weeklyReview } : {}),
       ...(s.dailyWatch !== undefined ? { aiDailyWatch: s.dailyWatch } : {}),
       ...(s.watchEmail !== undefined ? { aiWatchEmail: s.watchEmail } : {}),
+      ...(s.monthlyEmail !== undefined ? { aiMonthlyEmail: s.monthlyEmail } : {}),
       ...(s.replyExamples ? { aiReplyExamples: [] } : {}),
       ...(s.memory !== undefined ? { aiMemory: normalizeMemory(s.memory) } : {}),
       ...(s.brand !== undefined ? { aiBrand: s.brand } : {}),
@@ -1592,6 +1594,27 @@ async function discountPreview(run: RunScope, i: DiscountAsk, now = new Date()) 
 }
 
 const chatShopTools = [
+  tool({
+    name: "read_ai_impact",
+    kind: "read",
+    description:
+      "What the store's AI helpers did this month or last: buyer questions answered, replies drafted, shopper chats, changes made, reports, a rough estimate of the time that saved, and the AI cost. Use it when the owner asks what the AI did or whether it's worth it.",
+    input: z.object({ month: z.enum(["this", "last"]) }),
+    summary: (i) => `Looked at what the AI did ${i.month === "this" ? "this month" : "last month"}`,
+    async run(i, run) {
+      const month = aiMonth(run.ctx.now?.() ?? new Date(), i.month === "this" ? 0 : 1);
+      const r = await aiImpact(run.ctx.db, run.shop.id, month);
+      return {
+        month: month.label,
+        so_far: i.month === "this",
+        work: impactLines(r),
+        time_saved_estimate: timeSaved(r.minutesSaved),
+        ai_cost: formatMoney(r.costMinor, "USD"),
+        turned_down_by_owner: r.turnedDown,
+        waiting_for_owner: r.waiting,
+      };
+    },
+  }),
   tool({
     name: "read_regulars_at_risk",
     kind: "read",

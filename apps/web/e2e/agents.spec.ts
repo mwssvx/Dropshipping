@@ -96,6 +96,9 @@ test("a buyer's question gets a drafted reply the merchant checks, then automati
 
   // Let it answer "where is my order" questions itself from now on.
   await page.goto("/admin/ai");
+  // This month's tally of what the helpers did.
+  await expect(page.getByRole("group", { name: /so far/ }).getByText("Drafted 1 reply to buyers for you to check")).toBeVisible();
+  await expect(page.getByLabel("Email me a monthly report of what the AI did")).toBeChecked();
   // The owner's rewrite is kept so the helper writes more like them.
   await page.getByText("Your replies it learned from").click();
   await expect(page.getByText(/Thanks for shopping with us/)).toBeVisible();
