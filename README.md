@@ -1159,3 +1159,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Longer returns for gifts** (`packages/core/src/holiday-returns.ts`, Returns → Return policy → Holiday returns): pick the first and last order day of a holiday stretch (it starts at Nov 1 to Dec 24) and the day returns stay open until (Jan 31). Orders paid in the stretch can ask for a return until then; when the usual window from delivery ends later, that still applies. Once it's closed, the buyer's order page says "Returns for holiday orders closed on January 31."
 2. **Said where buyers look**: while the stretch is on, product pages say "Bought for the holidays? You can return it until January 31." in the store's language, and drafted returns policies add the dates until they've passed. It needs a return window above 0, since there's nothing to extend otherwise.
+
+### Compared with an earlier period (after launch, part 200)
+
+1. **How things moved** (`periodTotals` and `comparisonRange` in `packages/core/src/analytics.ts`): each headline number on Analytics (sales, orders, average order, visitors, conversion) now says how it moved, "Up 18% vs the 30 days before", in green or red. Conversion moves in percentage points. Numbers that had nothing before say "New".
+2. **Or the same days last year**: "Compare with" switches to the same days a year earlier, which is the fair comparison around Black Friday and the holidays. Visitor counts are kept about 13 months, so when last year's days start before that, visitors and conversion aren't compared rather than shown wrong.
