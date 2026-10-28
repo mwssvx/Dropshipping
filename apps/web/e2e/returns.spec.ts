@@ -104,6 +104,14 @@ test("a buyer asks for a return, the merchant approves it, then refunds it", asy
   await page.goto("/admin/orders");
   await page.goto((await page.getByRole("link", { name: "#1001" }).first().getAttribute("href"))!);
   await expect(page.getByText(`Refunded $${paid}: Return: It arrived damaged`)).toBeVisible();
+
+  // Returned most: which products come back, and why.
+  await page.goto("/admin/returns");
+  const most = page.getByRole("region", { name: "Returned most" });
+  await expect(most).toContainText("Of 1 item sold in the last 90 days, 1 came back (100%). Why: arrived damaged (1).");
+  await expect(most.getByRole("listitem", { name: "Returns of Sunset Projection Lamp" })).toContainText("1 of 1 back");
+  await most.getByRole("link", { name: "12 months" }).click();
+  await expect(page.getByRole("region", { name: "Returned most" })).toContainText("sold in the last 12 months");
 });
 
 test("store credit instead of a refund, declining needs a reason, and returns can be turned off", async ({ page, browser }, info) => {

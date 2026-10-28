@@ -1178,3 +1178,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **One update to many buyers** (`emailOrderUpdate` in `packages/core/src/fulfillment.ts`, Orders → tick orders → "Email the buyers"): when a supplier runs late, an item is missing, or the store takes a week off, write the update once in your own words. Each buyer gets it greeted by first name, with their order number and a link to their order, from "An update on your order #1001 from Your Store". It shows on each order's timeline as "Update from you", and failed sends show there too.
 2. **No double sends**: only paid orders get it (unpaid and refunded ones are left out, and the page says how many before you send). Pressing send twice, or a retried request, doesn't email anyone again. Up to 250 orders at a time, 1,000 characters.
+
+### Returned most (after launch, part 204)
+
+1. **Which products come back** (`returnsByProduct` in `packages/core/src/returns-report.ts`, Returns → Returned most): for the last 30 days, 90 days or 12 months, how many items sold and how many came back, with the main reasons ("didn't fit (4), arrived damaged (2)"), and each product's share returned. Counted from orders paid in the period, so the share is of what sold then; declined returns don't count.
+2. **What to do about it**: a product where one in ten or more comes back is marked, with a fix for its main reason: a size chart when it doesn't fit, better packing or another supplier when it arrives damaged, the photos and description when it's not as described. A share shows once 5 have sold, so one return doesn't look like 100%.

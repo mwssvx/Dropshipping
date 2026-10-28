@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { countReturns, DEFAULT_RETURN_INSTRUCTIONS, formatMoney, listReturns, RETURN_PAGE_SIZE, RETURN_REASON_LABELS } from "@sf/core";
+import { countReturns, DEFAULT_RETURN_INSTRUCTIONS, formatMoney, listReturns, RETURN_PAGE_SIZE, RETURN_REASON_LABELS, RETURNS_MIN_SOLD, RETURNS_REPORT_DAYS, returnsByProduct } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { DecideForm, HolidayReturnsForm, ReturnSettingsForm } from "./ReturnForms";
@@ -17,21 +17,35 @@ const STATUS = {
   declined: ["Declined", "pill-neutral"],
 } as const;
 
+/** The buyer-facing reasons read as the merchant's: "It arrived damaged" becomes "arrived damaged". */
+const REASON_SHORT = {
+  never_arrived: "never arrived",
+  damaged: "arrived damaged",
+  wrong_item: "wrong item",
+  not_as_described: "not as described",
+  too_small_or_big: "didn't fit",
+  changed_mind: "changed their mind",
+  other: "something else",
+} as const;
+const percent = (share: number) => `${Math.round(share * 100)}%`;
+
 /** Nov 1 to Dec 24 this year, returnable until Jan 31, or next year's once this year's has passed. */
 function holidayDefaults(now: Date) {
   const year = now.getUTCMonth() === 11 && now.getUTCDate() > 24 ? now.getUTCFullYear() + 1 : now.getUTCFullYear();
   return { from: `${year}-11-01`, to: `${year}-12-24`, until: `${year + 1}-01-31` };
 }
 
-export default async function ReturnsPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string }> }) {
+export default async function ReturnsPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string; days?: string }> }) {
   const { shop, db } = await requireShop("returns");
   const params = await searchParams;
   const q = params.q?.trim().slice(0, 100) || undefined;
   const page = /^\d{1,5}$/.test(params.page ?? "") ? Math.max(1, Number(params.page)) : 1;
-  const [open, closed, closedTotal] = await Promise.all([
+  const days = RETURNS_REPORT_DAYS.find((d) => String(d) === params.days) ?? 90;
+  const [open, closed, closedTotal, report] = await Promise.all([
     listReturns(db, shop.id, "open"),
     listReturns(db, shop.id, "answered", { query: q, page }),
     countReturns(db, shop.id, "answered", q),
+    returnsByProduct(db, shop.id, { days }),
   ]);
   const pages = Math.max(1, Math.ceil(closedTotal / RETURN_PAGE_SIZE));
   const href = (p: number) => `/admin/returns?${new URLSearchParams({ ...(q ? { q } : {}), ...(p > 1 ? { page: String(p) } : {}) })}#closed-returns`;
@@ -82,6 +96,42 @@ export default async function ReturnsPage({ searchParams }: { searchParams: Prom
             </ul>
           )}
         </section>
+        {report.sold > 0 && (
+          <section className="card p-5 flex flex-col gap-3" aria-labelledby="returned-most">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 id="returned-most" className="font-semibold">Returned most</h2>
+              <nav aria-label="Period" className="flex gap-1 text-sm">
+                {RETURNS_REPORT_DAYS.map((d) => (
+                  <Link key={d} href={`/admin/returns?days=${d}#returned-most`} aria-current={d === days ? "page" : undefined} className={`btn btn-sm ${d === days ? "btn-primary" : "btn-secondary"}`}>
+                    {d === 365 ? "12 months" : `${d} days`}
+                  </Link>
+                ))}
+              </nav>
+            </div>
+            <p className="text-sm">
+              Of {report.sold === 1 ? "1 item" : `${report.sold.toLocaleString("en-US")} items`} sold in the {days === 365 ? "last 12 months" : `last ${days} days`},{" "}
+              {report.returned === 0 ? "none came back." : `${report.returned.toLocaleString("en-US")} came back (${percent(report.share!)}).`}
+              {report.reasons.length > 0 && <> Why: {report.reasons.slice(0, 3).map((r) => `${REASON_SHORT[r.reason]} (${r.units})`).join(", ")}.</>}
+            </p>
+            {report.products.length > 0 && (
+              <ul className="divide-y divide-border text-sm">
+                {report.products.map((p) => (
+                  <li key={p.productId} className="py-3 flex flex-col gap-1" aria-label={`Returns of ${p.title}`}>
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <Link href={`/admin/products/${p.productId}`} className="font-medium underline">{p.title}</Link>
+                      <span className="num">
+                        {p.returned} of {p.sold} back{p.share !== null && <> · <span className={p.high ? "text-critical font-medium" : ""}>{percent(p.share)}</span></>}
+                      </span>
+                    </div>
+                    <p className="hint">{p.reasons.map((r) => `${REASON_SHORT[r.reason]} (${r.units})`).join(", ")}</p>
+                    {p.fix && p.high && <p>{p.fix}</p>}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="hint text-sm">Counts items from orders paid in the period, so the share is of what sold then. Declined returns don&apos;t count, and a share shows once {RETURNS_MIN_SOLD} have sold.</p>
+          </section>
+        )}
         <section className="card p-5 flex flex-col gap-3" aria-labelledby="return-settings">
           <h2 id="return-settings" className="font-semibold">Return policy</h2>
           <ReturnSettingsForm windowDays={shop.returnWindowDays} instructions={shop.returnInstructions ?? ""} placeholder={DEFAULT_RETURN_INSTRUCTIONS} />
