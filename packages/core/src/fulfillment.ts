@@ -696,6 +696,7 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
         ...(order.buyerNote ? [``, `Your note to ${shop.name}: ${order.buyerNote}`] : []),
         ...(order.parentOrderId ? [``, `You added this after checkout, so it's charged to the same card. It may arrive separately from order #${parentNumber}.`] : []),
         ...(order.source === "subscription" ? [``, `This is a delivery from your subscription, charged to your saved card. The link in your subscription emails lets you skip, change or cancel the next one.`] : []),
+        ...(shop.thankYouNote ? [``, shop.thankYouNote] : []),
         ``,
         onlyDownloads
           ? `There's nothing to ship. Your downloads are also on your order page: ${link}`

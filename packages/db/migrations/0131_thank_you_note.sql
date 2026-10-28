@@ -1,0 +1,1 @@
+ALTER TABLE "shops" ADD COLUMN "thank_you_note" text;
