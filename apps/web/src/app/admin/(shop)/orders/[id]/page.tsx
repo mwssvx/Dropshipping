@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { can, countryName, crossesBorder, disputeEvidence, disputeReason, disputesForOrder, formatMoney, getOrder, orderEditOptions, listRefunds, replaceableLines, replacementBlocked, replacementsOf, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode, formatShipsBy, preorderWaitingOn, isOrderBuyerBlocked, orderDownloads, DOWNLOADS_PER_ITEM, transferDueBy } from "@sf/core";
+import { can, countryName, crossesBorder, disputeEvidence, disputeReason, disputesForOrder, formatMoney, getOrder, ORDER_EMAIL_LABELS, orderEditOptions, listRefunds, replaceableLines, replacementBlocked, replacementsOf, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode, formatShipsBy, preorderWaitingOn, isOrderBuyerBlocked, orderDownloads, DOWNLOADS_PER_ITEM, transferDueBy } from "@sf/core";
 import { BlockBuyerForm } from "./BlockBuyerForm";
 import { fulfillment, requireShop, storeAddress, suppliers, testPayments } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
@@ -57,7 +57,6 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
     if (!supplierId) return "Sent by you";
     return labelFor(suppliers(), links.find((l) => l.id === supplierId));
   };
-  const EMAIL_LABEL = { order_confirmation: "Order confirmation", shipping_update: "Shipping update", delivered: "Delivery confirmation", refund: "Refund", support_reply: "Reply to a question", abandoned_cart: "Checkout reminder", abandoned_cart_offer: "Second checkout reminder (with a code)", payment_link: "Payment link", gift_shipped: "Gift heads-up", order_link: "Order link (Track your order)", order_updated: "Order change", pickup_ready: "Ready for pickup", bank_transfer: "How to pay by bank transfer", bank_transfer_lapsed: "Bank transfer didn't arrive", order_news: "Update from you", order_late: "Running late" };
   const timeline = [
     { at: order.createdAt, text: "Order placed" },
     ...(order.paidAt
@@ -77,7 +76,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
     ...order.fulfillments.flatMap((f) => (f.status === "cancelled" ? [{ at: f.updatedAt, text: `Supplier order cancelled (${supplierLabel(f.supplierId)})` }] : [])),
     ...order.emails.map((e) => ({
       at: e.sentAt ?? e.createdAt,
-      text: `${EMAIL_LABEL[e.kind]} email ${e.status === "sent" ? "sent" : e.status === "failed" ? "failed to send" : "queued"} to ${e.to}`,
+      text: `${ORDER_EMAIL_LABELS[e.kind]} email ${e.status === "sent" ? "sent" : e.status === "failed" ? "failed to send" : "queued"} to ${e.to}`,
     })),
   ].sort((x, y) => y.at.getTime() - x.at.getTime());
   const problems = order.fulfillments.filter((f) => f.problemCode);

@@ -6,6 +6,7 @@ import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, lt, ne, or, sql
 import { schema, type Db } from "@sf/db";
 import { NotFoundError, UserError } from "./errors";
 import type { Mailer } from "./email";
+import { ORDER_EMAIL_LABELS } from "./fulfillment";
 import { formatMoney } from "./money";
 import type { DisputeEvidence, PaymentProvider, ProviderDispute } from "./payments";
 import { can } from "./team";
@@ -67,7 +68,8 @@ export type EvidenceCheck = { label: string; ok: boolean; detail: string };
 
 /**
  * The evidence for a dispute, put together from the order: who bought what, where it went, its
- * tracking and delivery, the store's returns policy, earlier orders and messages with the buyer.
+ * tracking and delivery, the store's returns policy, earlier orders, the emails it sent the buyer and
+ * messages with them.
  * `checks` says what's there and what's missing, for the merchant.
  */
 export async function disputeEvidence(db: Db, shop: Shop, disputeId: string, opts: { note?: string | null } = {}) {
@@ -89,6 +91,11 @@ export async function disputeEvidence(db: Db, shop: Shop, disputeId: string, opt
         (m) => m.status === "sent" && m.author !== "staff",
       )
     : [];
+  // What the store told the buyer and when: the confirmation, tracking, a running late note.
+  const emails = await db.query.emails.findMany({
+    where: and(eq(schema.emails.orderId, order.id), eq(schema.emails.status, "sent"), eq(schema.emails.to, order.email)),
+    orderBy: asc(schema.emails.sentAt),
+  });
   const [earlier] = await db
     .select({ n: count() })
     .from(schema.orders)
@@ -109,6 +116,7 @@ export async function disputeEvidence(db: Db, shop: Shop, disputeId: string, opt
     ),
     ...(earlier && earlier.n > 0 ? [`The same buyer has ${earlier.n} earlier paid ${earlier.n === 1 ? "order" : "orders"} with this store.`] : []),
     ...(order.refundedMinor > 0 ? [`${money(order.refundedMinor)} of this order has already been refunded.`] : []),
+    ...(emails.length ? ["", "Emails the store sent the buyer about this order:", ...emails.slice(-12).map((e) => `${day.format(e.sentAt ?? e.createdAt)}: ${ORDER_EMAIL_LABELS[e.kind]}, "${clip(e.subject, 120)}"`)] : []),
     ...(messages.length
       ? ["", "Messages with the buyer:", ...messages.slice(-10).map((m) => `${day.format(m.createdAt)}, ${m.author === "buyer" ? "buyer" : shop.name}: ${clip(m.body.replace(/\s+/g, " "), 400)}`)]
       : []),
@@ -130,6 +138,7 @@ export async function disputeEvidence(db: Db, shop: Shop, disputeId: string, opt
     { label: "Tracking number", ok: tracked.length > 0, detail: tracked.length ? tracked.map((f) => f.trackingNumber).join(", ") : "No tracking yet. Add it on the order if the supplier sent one." },
     { label: "Delivered", ok: delivered.length > 0, detail: delivered.length ? "The carrier shows it delivered." : "The carrier hasn't shown it delivered." },
     { label: "Returns policy", ok: !!policy, detail: policy ? `Your "${policy.title}" page.` : "Add a returns or refund page so buyers, and banks, can see your policy." },
+    { label: "Emails to the buyer", ok: emails.length > 0, detail: emails.length ? emails.map((e) => ORDER_EMAIL_LABELS[e.kind]).filter((l, i, all) => all.indexOf(l) === i).join(", ") + "." : "None went out, so the bank only sees the order." },
     { label: "Messages with the buyer", ok: messages.length > 0, detail: messages.length ? `${messages.length} ${messages.length === 1 ? "message" : "messages"}.` : "None. That's fine if they never wrote." },
   ];
   return { dispute, order: { id: order.id, number: order.number }, evidence, checks };

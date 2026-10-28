@@ -51,8 +51,12 @@ describe("disputes", () => {
       ["Tracking number", true],
       ["Delivered", false],
       ["Returns policy", false],
+      ["Emails to the buyer", true],
       ["Messages with the buyer", false],
     ]);
+    // The order confirmation and the tracking email went to the buyer, and the bank sees when.
+    expect(gathered.checks.find((c) => c.label === "Emails to the buyer")?.detail).toBe("Order confirmation, Shipping update.");
+    expect(gathered.evidence.uncategorizedText).toMatch(/Emails the store sent the buyer about this order:\n.+: Order confirmation, ".+"\n.+: Shipping update, ".+"/);
     await f.returnsPage();
     gathered = await disputeEvidence(f.db, shop, dispute!.id);
     expect(gathered.checks.find((c) => c.label === "Returns policy")?.ok).toBe(true);
