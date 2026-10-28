@@ -1,6 +1,6 @@
 import { aiBudget, BUYER_TOPICS, formatMoney, listAgentActivity, listShopperChats, MODEL_LABEL } from "@sf/core";
 import { aiModel, requireShop } from "@/lib/server";
-import { AGENT_LABEL } from "@/components/ApprovalCard";
+import { AGENT_LABEL } from "@/lib/agent-labels";
 import { PageHeader } from "../PageHeader";
 import { AiSettingsForm, MarginCheckButton } from "./AiForms";
 
@@ -24,6 +24,7 @@ const WHAT = {
   translator: "Translates your store when you press “Translate with AI” on the Languages page. You can edit any translation afterwards.",
   answerer: "Drafts answers to shoppers' product questions when you press “Draft with AI” on the Questions page. Nothing is sent until you send it.",
   summarizer: "Writes “What buyers say” above a product's reviews when you press “Summarize with AI” on the product page. You can edit or remove it.",
+  analyst: "Reviews your sales, profit, customers, returns and searches when you press “Review my store” on the Insights page (or every Monday if you turn it on below), and suggests what to do next.",
   shopper: "Answers shoppers' questions about your products, delivery and returns, on your store's pages, when you turn it on below. It only reads what your store already shows.",
   sizer: "Drafts a size chart from a product's description when you press “Draft with AI” on the Size charts page. It stays hidden until you check it and show it.",
 };
@@ -56,6 +57,7 @@ export default async function AiSettingsPage() {
               topics={Object.entries(BUYER_TOPICS).map(([key, label]) => ({ key, label, on: shop.aiAutoReplyTopics.includes(key) }))}
               autoPause={shop.aiAutoPause}
               shopper={shop.aiShopper}
+              weeklyReview={shop.aiWeeklyReview}
             />
           </section>
           {chats.length > 0 && (

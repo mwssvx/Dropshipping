@@ -22,6 +22,8 @@ import { productQuestions } from "../questions";
 import { analyticsReport } from "../analytics";
 import { searchReport } from "../search-terms";
 import { inventoryReport } from "../inventory";
+import { profitReport } from "../profit";
+import { customerReport, productFunnel, returnsReport } from "../insights";
 import { AUTO, blocked, needsOk, untrusted, type Decision, type RunScope } from "./context";
 import { addMessage, BUYER_TOPICS, discardDrafts, sendBuyerMessage, setConversationStatus, type BuyerTopic } from "./conversations";
 
@@ -824,7 +826,7 @@ export async function thinMargins(run: Pick<RunScope, "ctx" | "shop">, minPct = 
 export async function setAiSettings(
   db: RunScope["ctx"]["db"],
   shop: Pick<RunScope["shop"], "id" | "plan">,
-  s: { budgetMinor?: number | null; autoReplyTopics?: string[]; autoPause?: boolean; shopper?: boolean },
+  s: { budgetMinor?: number | null; autoReplyTopics?: string[]; autoPause?: boolean; shopper?: boolean; weeklyReview?: boolean },
 ) {
   const max = PLAN_AI_BUDGET_MINOR[shop.plan];
   if (s.budgetMinor !== undefined && s.budgetMinor !== null && (!Number.isFinite(s.budgetMinor) || s.budgetMinor < 0 || s.budgetMinor > max)) {
@@ -838,6 +840,7 @@ export async function setAiSettings(
       ...(topics ? { aiAutoReplyTopics: topics } : {}),
       ...(s.autoPause !== undefined ? { aiAutoPause: s.autoPause } : {}),
       ...(s.shopper !== undefined ? { aiShopper: s.shopper } : {}),
+      ...(s.weeklyReview !== undefined ? { aiWeeklyReview: s.weeklyReview } : {}),
       updatedAt: new Date(),
     })
     .where(eq(schema.shops.id, shop.id));
@@ -1121,6 +1124,165 @@ const summarizerTools = [
   }),
 ];
 
+/** Where in the admin a suggestion is carried out. The model picks a key; the page makes the link. */
+export const AI_REPORT_AREAS = {
+  products: { label: "Products", path: "/admin/products" },
+  pricing: { label: "Pricing", path: "/admin/pricing" },
+  sales: { label: "Sales", path: "/admin/sales" },
+  marketing: { label: "Discounts and offers", path: "/admin/marketing" },
+  campaigns: { label: "Email campaigns", path: "/admin/campaigns" },
+  bundles: { label: "Bundles", path: "/admin/bundles" },
+  shipping: { label: "Shipping", path: "/admin/shipping" },
+  reviews: { label: "Reviews", path: "/admin/reviews" },
+  returns: { label: "Returns", path: "/admin/returns" },
+  search: { label: "Search fixes", path: "/admin/search-fixes" },
+  seo: { label: "Search engines", path: "/admin/seo" },
+  profit: { label: "Profit and ads", path: "/admin/profit" },
+  suppliers: { label: "Suppliers", path: "/admin/suppliers" },
+  inventory: { label: "Inventory", path: "/admin/inventory" },
+} as const;
+export type AiReportArea = keyof typeof AI_REPORT_AREAS;
+
+/** Most suggestions in one store review: a short list gets done, a long one gets ignored. */
+export const REVIEW_MAX_ITEMS = 5;
+
+const pct = (n: number | null) => (n === null ? null : `${n}%`);
+const assistantTool = (name: string) => assistantTools.find((t) => t.name === name)!;
+
+const analystTools = [
+  assistantTool("read_sales"),
+  assistantTool("read_shopper_interest"),
+  assistantTool("read_stock"),
+  tool({
+    name: "read_profit",
+    kind: "read",
+    description: "Profit over the last 30 or 90 days: sales after refunds, supplier costs, fees, ad spend and profit, in total and for the top products, with margin and return on ad spend.",
+    input: z.object({ days: z.union([z.literal(30), z.literal(90)]) }),
+    summary: (i) => `Read profit for the last ${i.days} days`,
+    async run(i, run) {
+      const r = await profitReport(run.ctx.db, run.shop, i.days);
+      const line = (p: (typeof r.products)[number]) => ({
+        product: p.title,
+        units: p.units,
+        sales: money(run, p.salesMinor - p.refundsMinor),
+        profit: money(run, p.profitMinor),
+        margin: pct(p.marginPercent),
+        ad_spend: p.adsMinor ? money(run, p.adsMinor) : null,
+        return_on_ad_spend: p.roas,
+        ads_lose_money_below: p.breakEvenRoas,
+        cost_missing: p.costMissing || undefined,
+      });
+      return {
+        days: r.days,
+        orders: r.orders,
+        total: line(r.totals),
+        products: r.products.slice(0, 12).map(line),
+        losing_money: r.products.filter((p) => p.profitMinor < 0).map((p) => p.title).slice(0, 10),
+        ad_spend_by_channel: r.adsByChannel.map((c) => `${c.label}: ${money(run, c.amountMinor)}`),
+      };
+    },
+  }),
+  tool({
+    name: "read_customers",
+    kind: "read",
+    description: "Who buys over the last 30 or 90 days: new and returning buyers, the share who ever bought twice, lapsed buyers (last order 90 days to a year ago), average spend per customer, orders using a discount, top countries and how many customers are on the email list.",
+    input: z.object({ days: z.union([z.literal(30), z.literal(90)]) }),
+    summary: (i) => `Read customers for the last ${i.days} days`,
+    async run(i, run) {
+      const r = await customerReport(run.ctx.db, run.shop.id, i.days);
+      return {
+        days: r.days,
+        buyers: r.buyers,
+        new_buyers: r.newBuyers,
+        returning_buyers: r.returningBuyers,
+        ever_bought: r.everBought,
+        bought_twice_or_more: pct(r.repeatPercent),
+        lapsed_buyers: r.lapsed,
+        average_spend_per_customer: money(run, r.averageLifetimeMinor),
+        orders: r.orders,
+        orders_with_a_discount: pct(r.discountedPercent),
+        top_countries: r.topCountries.map((c) => `${c.country}: ${c.orders} orders, ${money(run, c.salesMinor)}`),
+        email_list: `${r.emailList.subscribed} of ${r.emailList.customers} customers agreed to marketing email`,
+      };
+    },
+  }),
+  tool({
+    name: "read_product_funnel",
+    kind: "read",
+    description: "Per product over the last 30 or 90 days: products many visitors view but rarely add to the cart, products added to carts but rarely bought, products on sale that almost nobody sees, and the best converting ones.",
+    input: z.object({ days: z.union([z.literal(30), z.literal(90)]) }),
+    summary: (i) => `Read product views and sales for the last ${i.days} days`,
+    async run(i, run) {
+      const r = await productFunnel(run.ctx.db, run.shop.id, i.days);
+      const row = (p: (typeof r.viewedNotAdded)[number]) => ({ product: p.title, viewers: p.views, added_to_cart: p.carts, orders: p.orders, added_per_100_viewers: p.cartPercent, bought_per_100_viewers: p.buyPercent });
+      return {
+        days: r.days,
+        products_on_sale: r.products,
+        viewed_but_rarely_added: r.viewedNotAdded.map(row),
+        added_but_rarely_bought: r.addedNotBought.map(row),
+        almost_never_seen: r.notSeen,
+        almost_never_seen_count: r.notSeenCount,
+        best_converting: r.bestConverting.map(row),
+      };
+    },
+  }),
+  tool({
+    name: "read_returns",
+    kind: "read",
+    description: "Return requests and refunds over the last 30 or 90 days: how many, the reasons buyers gave, and the products returned most with their main reason.",
+    input: z.object({ days: z.union([z.literal(30), z.literal(90)]) }),
+    summary: (i) => `Read returns for the last ${i.days} days`,
+    async run(i, run) {
+      const r = await returnsReport(run.ctx.db, run.shop.id, i.days);
+      return {
+        days: r.days,
+        return_requests: r.requests,
+        refunds: r.refunds,
+        refunded: money(run, r.refundedMinor),
+        reasons: r.reasons.map((x) => `${x.reason}: ${x.requests}`),
+        most_returned: r.products.map((p) => `${p.title}: ${p.returned} returned, mostly ${p.mainReason}`),
+      };
+    },
+  }),
+  tool({
+    name: "save_review",
+    kind: "change",
+    description: `Save the store review for the merchant: a two or three sentence summary and up to ${REVIEW_MAX_ITEMS} suggestions, most important first. Call it once, at the end.`,
+    input: z.object({
+      summary: z.string().min(20).max(600),
+      suggestions: z
+        .array(
+          z.object({
+            title: z.string().min(3).max(90),
+            finding: z.string().min(10).max(400),
+            action: z.string().min(10).max(400),
+            impact: z.enum(["high", "medium", "low"]),
+            area: z.enum(Object.keys(AI_REPORT_AREAS) as [AiReportArea]).nullable(),
+          }),
+        )
+        .min(1)
+        .max(REVIEW_MAX_ITEMS),
+    }),
+    // It only writes a report for the merchant to read.
+    policy: () => AUTO,
+    summary: (i) => `Saved a store review with ${i.suggestions.length} suggestion${i.suggestions.length === 1 ? "" : "s"}`,
+    async run(i, run) {
+      const clean = (t: string) => t.replace(/<[^>]*>/g, "").trim();
+      const [row] = await run.ctx.db
+        .insert(schema.aiReports)
+        .values({
+          shopId: run.shop.id,
+          kind: "review",
+          runId: run.runId,
+          summary: clean(i.summary),
+          items: i.suggestions.map((x) => ({ title: clean(x.title), finding: clean(x.finding), action: clean(x.action), impact: x.impact, area: x.area })),
+        })
+        .returning();
+      return { saved: true, report_id: row!.id };
+    },
+  }),
+];
+
 export const AGENT_TOOLS: Record<AgentName, AgentTool[]> = {
   listing: listingTools,
   assistant: assistantTools,
@@ -1133,6 +1295,7 @@ export const AGENT_TOOLS: Record<AgentName, AgentTool[]> = {
   sizer: sizerTools,
   shopper: shopperTools,
   summarizer: summarizerTools,
+  analyst: analystTools,
 };
 
 export function findTool(agent: AgentName, name: string) {

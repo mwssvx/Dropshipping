@@ -479,6 +479,71 @@ function summarizer(s: State): BetaContentBlock[] {
   return [text("I wrote a short summary of the reviews. You can edit or remove it on the product page.")];
 }
 
+/* ───────────── Business analyst ───────────── */
+
+const ANALYST_READS: [string, Record<string, unknown>][] = [
+  ["read_sales", { days: 30 }],
+  ["read_profit", { days: 30 }],
+  ["read_product_funnel", { days: 30 }],
+  ["read_customers", { days: 30 }],
+  ["read_returns", { days: 30 }],
+  ["read_shopper_interest", {}],
+];
+
+type Suggestion = { title: string; finding: string; action: string; impact: "high" | "medium" | "low"; area: string | null };
+
+function analyst(s: State): BetaContentBlock[] {
+  const next = ANALYST_READS.find(([name]) => !s.has(name));
+  if (next) return [toolCall(next[0], next[1])];
+  if (!s.has("save_review")) {
+    const r = (name: string) => (s.has(name)?.isError ? {} : s.has(name)!.result) as Record<string, any>;
+    const sales = r("read_sales");
+    const profit = r("read_profit");
+    const funnel = r("read_product_funnel");
+    const customers = r("read_customers");
+    const returns = r("read_returns");
+    const interest = r("read_shopper_interest");
+    const out: Suggestion[] = [];
+    const losing = (profit.losing_money ?? []) as string[];
+    if (losing.length) {
+      out.push({ title: "Stop losing money on some products", finding: `${losing.slice(0, 3).join(", ")} made a loss over the last 30 days after supplier costs, fees and ads.`, action: "Raise their price or pause their ads; if the supplier cost went up, look for another supplier.", impact: "high", area: "pricing" });
+    }
+    const viewed = (funnel.viewed_but_rarely_added ?? [])[0];
+    if (viewed) {
+      out.push({ title: `Make “${viewed.product}” easier to say yes to`, finding: `${viewed.viewers} visitors looked at it but only ${viewed.added_to_cart} added it to the cart.`, action: "Check the price against similar shops, add more photos, and put the delivery time near the top of the description.", impact: "high", area: "products" });
+    }
+    const added = (funnel.added_but_rarely_bought ?? [])[0];
+    if (added) {
+      out.push({ title: "Find out why carts don't turn into orders", finding: `${added.added_to_cart} visitors added “${added.product}” to the cart but only ${added.orders} bought it.`, action: "Check what shipping costs at checkout; free shipping over a set amount often helps.", impact: "medium", area: "shipping" });
+    }
+    const nothing = (interest.searches_that_found_nothing ?? []) as string[];
+    if (nothing.length) {
+      out.push({ title: "Sell what shoppers search for", finding: `Searches that found nothing: ${nothing.slice(0, 3).join("; ")}.`, action: "Add products that match, or point those words at products you already sell with a search fix.", impact: "medium", area: "search" });
+    }
+    if ((customers.lapsed_buyers ?? 0) > 0) {
+      out.push({ title: "Win back buyers who haven't returned", finding: `${customers.lapsed_buyers} buyers last ordered 3 to 12 months ago; ${customers.bought_twice_or_more ?? "few"} of all buyers ever ordered twice.`, action: "Turn on a win-back offer so they get a code by email.", impact: "medium", area: "marketing" });
+    }
+    const reason = (returns.reasons ?? [])[0] as string | undefined;
+    if (reason && (returns.return_requests ?? 0) >= 2) {
+      out.push({ title: "Fix the main reason for returns", finding: `${returns.return_requests} return requests in 30 days; the most common reason: ${reason}.`, action: reason.startsWith("wrong size") ? "Add a size chart to the products that come back." : "Check the listings and photos of the most returned products against what arrives.", impact: "medium", area: "returns" });
+    }
+    if ((funnel.almost_never_seen_count ?? 0) > 0) {
+      out.push({ title: "Help shoppers find more of your products", finding: `${funnel.almost_never_seen_count} products on sale were seen by almost nobody in 30 days.`, action: "Put them in a collection on the home page, or write a better search description for them.", impact: "low", area: "seo" });
+    }
+    if (!(sales.orders > 0) && out.length < 2) {
+      out.push({ title: "Get your first visitors", finding: `The store had ${sales.visitors ?? 0} visitors and no orders in the last 30 days.`, action: "Share the store with friends and on social media, and email a launch offer to anyone on your list.", impact: "high", area: "campaigns" });
+    }
+    if (!out.length) {
+      out.push({ title: "Collect more reviews", finding: "Nothing stands out as a problem in the last 30 days.", action: "Turn on review request emails so happy buyers leave reviews that help the next shoppers decide.", impact: "low", area: "reviews" });
+    }
+    const summary = sales.orders > 0
+      ? `In the last 30 days the store took ${sales.orders} order${sales.orders === 1 ? "" : "s"} worth ${sales.sales} from ${sales.visitors} visitors, with a profit of ${profit.total?.profit ?? "unknown"}.`
+      : `The store has no orders in the last 30 days yet, from ${sales.visitors ?? 0} visitors, so most suggestions are about getting found.`;
+    return [toolCall("save_review", { summary, suggestions: out.slice(0, 5) })];
+  }
+  return [text("I reviewed your store and saved a few suggestions on the Insights page.")];
+}
+
 /* ───────────── Shopping assistant ───────────── */
 
 const STOP_WORDS = new Set("a an and any are as at be can could do does for from have i in is it me my of on or please show something that the there this to want what which with you your yours looking need find buy get got tell about sell store shop".split(" "));
@@ -533,4 +598,5 @@ const BRAINS: Record<ModelRequest["agent"], (s: State, req: ModelRequest) => Bet
   assistant,
   shopper,
   summarizer,
+  analyst,
 };

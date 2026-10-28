@@ -47,7 +47,7 @@ export const DEFAULT_MODEL = "claude-opus-5-5";
  * Each agent runs on the cheapest model that does its job well. Short, checked writing jobs
  * (listings, translations, size charts, answer drafts, margins, review summaries) and the storefront's shopping
  * assistant, which answers many shoppers from read-only tools, run on Haiku; the ones that write
- * to buyers or untangle orders on Sonnet; the open-ended Assistant on Opus.
+ * to buyers, untangle orders or weigh a store's numbers on Sonnet; the open-ended Assistant on Opus.
  */
 export const AGENT_MODELS: Record<AgentName, string> = {
   listing: "claude-haiku-5-5",
@@ -58,6 +58,7 @@ export const AGENT_MODELS: Record<AgentName, string> = {
   shopper: "claude-haiku-5-5",
   summarizer: "claude-haiku-5-5",
   writer: "claude-sonnet-5-5",
+  analyst: "claude-sonnet-5-5",
   buyer_support: "claude-sonnet-5-5",
   fulfilment: "claude-sonnet-5-5",
   assistant: "claude-opus-5-5",

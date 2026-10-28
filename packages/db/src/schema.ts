@@ -137,6 +137,8 @@ export const shops = pgTable(
     aiAutoPause: boolean("ai_auto_pause").notNull().default(false),
     // Show the AI shopping assistant on the storefront, for buyers to ask about products.
     aiShopper: boolean("ai_shopper").notNull().default(false),
+    // The AI store review runs by itself every Monday (from the store's AI budget).
+    aiWeeklyReview: boolean("ai_weekly_review").notNull().default(false),
     // Remind buyers who started checkout but didn't pay (one email, an hour later).
     abandonedCartEmails: boolean("abandoned_cart_emails").notNull().default(true),
     // A phone number at checkout, for the courier: not asked, optional, or required.
@@ -939,7 +941,7 @@ export const appeals = pgTable(
 
 // AI agents. Every run is recorded with its token use and cost, and every tool call it makes is an
 // agent action: reads run straight away, changes may wait for the merchant's approval.
-export const AGENTS = ["listing", "assistant", "buyer_support", "fulfilment", "margin", "writer", "translator", "answerer", "sizer", "shopper", "summarizer"] as const;
+export const AGENTS = ["listing", "assistant", "buyer_support", "fulfilment", "margin", "writer", "translator", "answerer", "sizer", "shopper", "summarizer", "analyst"] as const;
 export type AgentName = (typeof AGENTS)[number];
 
 export const agentRuns = pgTable(
@@ -988,6 +990,33 @@ export const agentActions = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("agent_actions_shop_status_idx").on(t.shopId, t.status, t.createdAt)],
+);
+
+export type AiReportItem = {
+  title: string;
+  /** What the numbers (or the sources) show. */
+  finding: string;
+  /** What to do about it. */
+  action: string;
+  impact: "high" | "medium" | "low";
+  /** Where in the admin to do it, from a fixed list (see AI_REPORT_AREAS in core). */
+  area: string | null;
+};
+
+// What an AI helper found for the merchant: the store review's suggestions. Kept so the merchant
+// can look back, and so a weekly review can say what changed.
+export const aiReports = pgTable(
+  "ai_reports",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["review"] }).notNull(),
+    runId: uuid("run_id").references(() => agentRuns.id, { onDelete: "set null" }),
+    summary: text("summary").notNull(),
+    items: jsonb("items").$type<AiReportItem[]>().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("ai_reports_shop_idx").on(t.shopId, t.kind, t.createdAt)],
 );
 
 // A conversation: a buyer asking about an order, the merchant talking to their assistant, or a
