@@ -462,6 +462,26 @@ export async function routeStuckOrders(ctx: FulfillmentContext, olderThanMs = 2 
 
 type EmailKind = (typeof schema.emails.$inferSelect)["kind"];
 
+/** What each order email is called on the order's timeline and in dispute evidence. */
+export const ORDER_EMAIL_LABELS: Record<EmailKind, string> = {
+  order_confirmation: "Order confirmation",
+  shipping_update: "Shipping update",
+  delivered: "Delivery confirmation",
+  refund: "Refund",
+  support_reply: "Reply to a question",
+  abandoned_cart: "Checkout reminder",
+  abandoned_cart_offer: "Second checkout reminder (with a code)",
+  payment_link: "Payment link",
+  gift_shipped: "Gift heads-up",
+  order_link: "Order link (Track your order)",
+  order_updated: "Order change",
+  pickup_ready: "Ready for pickup",
+  bank_transfer: "How to pay by bank transfer",
+  bank_transfer_lapsed: "Bank transfer didn't arrive",
+  order_news: "Update from you",
+  order_late: "Running late",
+};
+
 async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kind: EmailKind, ref: string) {
   const link = await ctx.orderStatusUrl(shop, order);
   // On a gift the address is the recipient's, so the buyer is greeted by the name they gave.

@@ -1213,3 +1213,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **In one click** (`createGiftGuides` in `packages/core/src/gift-guides.ts`, Collections → Gift guides): makes "Gifts under $25", "Gifts under $50" and "Gifts under $100" (in the store's currency), each filling itself by rules with what's in stock at that price or less, best sellers first, so they stay right as prices and stock change. Only the missing ones are made, and the card goes away once all three exist.
 2. **On the holiday checklist**: "Make gift guides" is now one of its eleven lines, ticked once all three exist.
+
+### Emails in dispute evidence (after launch, part 211)
+
+1. **What the store told the buyer** (`disputeEvidence` in `packages/core/src/disputes.ts`): the evidence sent to the bank now lists every email that went to the buyer about the order, with its date and subject (order confirmation, shipping update with tracking, running late, updates from the store), and the dispute's checklist on the order page shows "Emails to the buyer". A buyer who says they never heard anything has a hard time when the bank sees the shipping email.
+2. **One name for each email**: the order timeline and the evidence use the same names (`ORDER_EMAIL_LABELS` in `packages/core/src/fulfillment.ts`).

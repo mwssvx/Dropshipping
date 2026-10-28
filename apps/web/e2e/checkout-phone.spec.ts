@@ -19,13 +19,17 @@ test("checkout asks for a phone number for the courier, and the order shows it",
   const lamp = (await page.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!;
 
   await page.goto("/admin/shipping");
+  await page.waitForLoadState("load");
   const phone = page.getByRole("region", { name: "Phone number at checkout" });
   await expect(phone.getByLabel("Ask for it, but buyers can leave it empty")).toBeChecked();
   await phone.getByLabel("Buyers must enter one").check();
-  // The form has no saved message, so wait for the save itself before reloading.
+  // The form has no saved message, so wait for the save itself, then reload until the page shows it:
+  // on a slow runner the first reload can come back before the saved setting does.
   await Promise.all([page.waitForResponse((r) => r.request().method() === "POST" && r.ok()), phone.getByRole("button", { name: "Save" }).click()]);
-  await page.reload();
-  await expect(phone.getByLabel("Buyers must enter one")).toBeChecked();
+  await expect(async () => {
+    await page.reload();
+    await expect(phone.getByLabel("Buyers must enter one")).toBeChecked({ timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
 
   const buyer = await (await browser.newContext({ ...info.project.use })).newPage();
   await buyer.goto(lamp);

@@ -59,8 +59,10 @@ test("merchants answer a dispute with the evidence we gathered", async ({ page, 
   await expect(dispute.getByText("Needs your answer")).toBeVisible();
   await expect(dispute).toContainText("The money is held until the bank decides.");
   const evidence = dispute.getByRole("list", { name: "Evidence" });
-  await expect(evidence.getByRole("listitem")).toHaveCount(4);
+  await expect(evidence.getByRole("listitem")).toHaveCount(5);
   await expect(evidence.getByRole("listitem").filter({ hasText: "Returns policy" })).toContainText("(missing)");
+  await expect(evidence.getByRole("listitem").filter({ hasText: "Emails to the buyer" })).toContainText("(included)");
+  await expect(evidence.getByRole("listitem").filter({ hasText: "Emails to the buyer" })).toContainText("Order confirmation");
   await dispute.getByText("See everything we'll send").click();
   await expect(dispute.getByText(/Order #1001 from Lamps/)).toBeVisible();
   if (info.project.name === "desktop") await expect(page.getByRole("link", { name: /^Disputes\s*1$/ })).toBeVisible();
