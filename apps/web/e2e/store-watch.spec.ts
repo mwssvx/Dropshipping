@@ -22,6 +22,7 @@ test("the store watch shows on Insights and can be turned off", async ({ page },
   await expect(watch).toContainText("Each morning, yesterday is compared with your last four weeks.");
   await expect(watch).toContainText("Nothing out of line so far.");
   await shot(page, "149-store-watch");
+  await expect(page.getByRole("region", { name: "Regulars who may be slipping away" })).toContainText("None right now.");
 
   await page.goto("/admin/ai");
   const box = page.getByLabel(/Watch my store every day/);

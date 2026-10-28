@@ -2,7 +2,7 @@
 import { useActionState } from "react";
 import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
-import { findTrendsAction, reviewStoreAction } from "../../ai-actions";
+import { draftWinbackAction, findTrendsAction, reviewStoreAction } from "../../ai-actions";
 
 export function ReviewStoreButton({ again }: { again: boolean }) {
   const [state, action] = useActionState(reviewStoreAction, {});
@@ -24,6 +24,16 @@ export function FindTrendsForm({ again }: { again: boolean }) {
         <input className="input" id="focus" name="focus" maxLength={120} placeholder="Gifts for dog owners, cosy lighting, back to school…" />
       </div>
       <div><SubmitButton className={again ? "btn btn-secondary" : "btn btn-primary"} pendingText="Searching for trends…">Find trending products</SubmitButton></div>
+    </form>
+  );
+}
+
+export function DraftWinbackButton() {
+  const [state, action] = useActionState(draftWinbackAction, {});
+  return (
+    <form action={action} className="flex flex-col gap-2">
+      <FormError message={state.error} />
+      <div><SubmitButton className="btn btn-secondary" pendingText="Drafting…">Draft a win-back email with AI</SubmitButton></div>
     </form>
   );
 }

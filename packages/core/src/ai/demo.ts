@@ -400,6 +400,7 @@ function assistant(s: State, req: ModelRequest): BetaContentBlock[] {
         toolCall("create_discount", { code, kind: pct ? "percent" : "free_shipping", value: pct ? Number(pct) : 0, min_order: over ? Number(over) : null, days: days ? Number(days) : null, usage_limit: null, once_per_customer: /once (per|a) (customer|buyer)/.test(ask) }),
       ];
     }
+    if (/\b(win[- ](them[- ])?back|stopped buying|slipping away|at risk|regulars?|lapsed|haven't (ordered|bought))\b/.test(ask)) return [toolCall("read_regulars_at_risk", {})];
     const coll = ask.match(/\b(?:collection|page) (?:of|for|with) (?:all )?(?:my |the |our )?([a-z0-9 '&-]{3,40}?)s?(?: products)?(?: called ["“]?([^"”]{2,60})["”]?)?[.!]?$/);
     if (coll && /\b(make|create|add|start|build)\b/.test(ask)) return [toolCall("find_products", { search: coll[1]!.trim() })];
     if (/\b(human|person|support team|ticket|payout|hold|frozen|bug)\b/.test(ask)) {
@@ -430,6 +431,27 @@ function assistant(s: State, req: ModelRequest): BetaContentBlock[] {
   if (c.isError) return [text(`I couldn't do that: ${strip(c.result)}`)];
   const r = c.result;
   switch (c.name) {
+    case "read_regulars_at_risk": {
+      if (!r.at_risk) return [text("None of your regulars are past their usual time to order. I'll be able to help here once buyers have ordered twice or more.")];
+      if (/\b(draft|write|email|win)\b/.test(ask)) {
+        const store = req.system.match(/admin of (.+?), an online store/)?.[1] ?? "us";
+        return [
+          toolCall("draft_winback_email", {
+            subject: "We miss you, and we've got something new",
+            body: `Hi there,\n\nIt's been a little while since your last order, so we wanted to say thank you for being one of our regulars. We've added a few new things since you last visited, and we think you'll like them.\n\nCome and have a look whenever you're ready.\n\n${store}`,
+            button_label: "See what's new",
+            button_path: "/",
+          }),
+        ];
+      }
+      const top = (r.biggest as { first_name: string | null; spent: string; usually_every_days: number; last_order_days_ago: number }[]).slice(0, 3);
+      return [
+        text(
+          `${r.at_risk} regular${r.at_risk === 1 ? " is" : "s are"} past their usual time to order (they've spent ${r.spent_so_far} so far); ${r.said_yes_to_emails} said yes to emails.\n${top.map((t) => `• ${t.first_name ?? "A buyer"}: usually every ${t.usually_every_days} days, last ordered ${t.last_order_days_ago} days ago, spent ${t.spent}`).join("\n")}\n\nWant me to draft a win-back email to them?`,
+        ),
+      ];
+    }
+    case "draft_winback_email":
     case "create_discount":
     case "create_collection":
       return [text(waiting(c) ? `I've set that up; it's waiting for your OK next to this chat, with a preview of what it will do.` : `Done.`)];

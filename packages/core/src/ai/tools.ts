@@ -30,6 +30,8 @@ import { enabledSkills, SKILL_NAMES, SKILLS } from "./skills";
 import { brandProblems, type BrandRules } from "./brand";
 import { createDiscount } from "../discounts";
 import { createCollection } from "../collections";
+import { createCampaign } from "../campaigns";
+import { AT_RISK_TAG, atRiskCustomers, tagAtRisk } from "../churn";
 import { findNote, MEMORY_MAX_NOTES, MEMORY_NOTE_MAX, normalizeMemory } from "./memory";
 import { addMessage, BUYER_TOPICS, discardDrafts, sendBuyerMessage, setConversationStatus, type BuyerTopic } from "./conversations";
 
@@ -1589,6 +1591,67 @@ async function discountPreview(run: RunScope, i: DiscountAsk, now = new Date()) 
 }
 
 const chatShopTools = [
+  tool({
+    name: "read_regulars_at_risk",
+    kind: "read",
+    description:
+      "Regular buyers (2 or more orders) who are now well past their own usual gap between orders, so they may be about to stop buying. Biggest spenders first, with how many said yes to marketing emails.",
+    input: z.object({}),
+    summary: () => "Looked at regulars who may be slipping away",
+    async run(_, run) {
+      const all = await atRiskCustomers(run.ctx.db, run.shop.id);
+      return {
+        at_risk: all.length,
+        said_yes_to_emails: all.filter((c) => c.subscribed).length,
+        spent_so_far: money(run, all.reduce((s, c) => s + c.spentMinor, 0)),
+        // First names only: the model doesn't need buyers' emails.
+        biggest: all.slice(0, 10).map((c) => ({ first_name: c.name?.split(" ")[0] ?? null, orders: c.orders, spent: money(run, c.spentMinor), usually_every_days: c.usualGapDays, last_order_days_ago: c.daysSince })),
+      };
+    },
+  }),
+  tool({
+    name: "draft_winback_email",
+    kind: "change",
+    description:
+      `Draft a win-back email to regulars who may be slipping away (see read_regulars_at_risk). They're tagged "${AT_RISK_TAG}" and the email is saved as a draft campaign to them; nothing is sent until the owner sends it from Campaigns. Warm and short, no made-up offers: mention a discount code only if the owner gave one.`,
+    input: z.object({
+      subject: z.string().min(5).max(120),
+      body: z.string().min(40).max(3000).describe("Plain text, signed with the store's name"),
+      button_label: z.string().max(40).nullable(),
+      button_path: z.string().max(200).nullable().describe("A page on the store, e.g. / or /collections/new"),
+    }),
+    policy: () => needsOk("It tags customers and saves an email draft for you to send."),
+    summary: (i) => `Win-back email draft: “${i.subject}”`,
+    check: (i, run) => brandProblems(brand(run), [{ name: "subject", text: i.subject, isTitle: true }, { name: "email", text: i.body }]),
+    async propose(i, run) {
+      const all = await atRiskCustomers(run.ctx.db, run.shop.id);
+      if (!all.length) throw new UserError("No regulars are past their usual time to order right now, so there's no one to win back.");
+      const subscribed = all.filter((c) => c.subscribed).length;
+      return {
+        ...i,
+        customer_ids: all.map((c) => c.customerId),
+        preview: [
+          `${plural(all.length, "regular")} ${all.length === 1 ? "is" : "are"} past their usual time to order; ${subscribed ? `${subscribed} said yes to emails and would get it` : "none said yes to marketing emails, so nobody would get it yet"}.`,
+          `They'll be tagged “${AT_RISK_TAG}” so you can find them under Customers.`,
+          `Subject: “${i.subject}”`,
+          "It's saved as a draft in Campaigns. Nothing is sent until you send it there.",
+        ],
+      };
+    },
+    async run(i: { subject: string; body: string; button_label: string | null; button_path: string | null; customer_ids?: string[] }, run) {
+      const ids = i.customer_ids ?? (await atRiskCustomers(run.ctx.db, run.shop.id)).map((c) => c.customerId);
+      const tagged = await tagAtRisk(run.ctx.db, run.shop.id, ids);
+      const c = await createCampaign(run.ctx.db, run.shop.id, null, {
+        subject: i.subject,
+        body: i.body,
+        buttonLabel: i.button_label ?? undefined,
+        buttonPath: i.button_path ?? undefined,
+        audience: "tagged",
+        audienceTag: AT_RISK_TAG,
+      });
+      return { drafted: true, tagged, campaign: `/admin/campaigns/${c.id}` };
+    },
+  }),
   tool({
     name: "create_discount",
     kind: "change",
