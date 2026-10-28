@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { createDiscount, moderateReview, parseMoney, sendAbandonedCartEmails, setAbandonedCartOffer, setDiscountActive, setBirthdayOffer, setGrowthSettings, setSignupPopup, setPostPurchaseOffer, setReferralProgram, setReviewRequestDays, setSubscriptionOffer, setUpsell, setWelcomeOffer, setWinbackOffer, UserError } from "@sf/core";
+import { createDiscount, moderateReview, parseMoney, sendAbandonedCartEmails, setAbandonedCartOffer, setDiscountActive, setBirthdayOffer, setGrowthSettings, setSignupPopup, setThankYouNote, setPostPurchaseOffer, setReferralProgram, setReviewRequestDays, setSubscriptionOffer, setUpsell, setWelcomeOffer, setWinbackOffer, UserError } from "@sf/core";
 import { fulfillment, logged, requireShop, testPayments } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -249,6 +249,18 @@ export async function setBirthdayOfferAction(_: FormState, form: FormData): Prom
 }
 
 /** When the store's sign-up pop-up opens, or off. */
+export async function setThankYouNoteAction(_: FormState, form: FormData): Promise<FormState> {
+  const { shop, db } = await requireShop("marketing");
+  try {
+    await setThankYouNote(db, shop.id, String(form.get("note") ?? ""));
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath("/admin/marketing");
+  return { saved: true };
+}
+
 export async function setSignupPopupAction(_: FormState, form: FormData): Promise<FormState> {
   const { shop, db } = await requireShop("marketing");
   const value = String(form.get("seconds") ?? "");

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { abandonedCartStats, birthdaysKnown, birthdayStats, customerTags, describeDiscount, listCodeBatches, MAX_BATCH, formatMoney, listDiscounts, productChoices, POST_PURCHASE_MINUTES, postPurchaseStats, referralStats, SIGNUP_POPUP_SECONDS, SUBSCRIBE_WITHIN_DAYS, subscriptionStats, welcomeOfferStats, winbackDueCount, winbackStats } from "@sf/core";
+import { abandonedCartStats, birthdaysKnown, birthdayStats, customerTags, describeDiscount, listCodeBatches, MAX_BATCH, formatMoney, listDiscounts, productChoices, POST_PURCHASE_MINUTES, postPurchaseStats, referralStats, SIGNUP_POPUP_SECONDS, THANK_YOU_NOTE_MAX, SUBSCRIBE_WITHIN_DAYS, subscriptionStats, welcomeOfferStats, winbackDueCount, winbackStats } from "@sf/core";
 import { requireShop, testPayments } from "@/lib/server";
 import { sendOffersNowAction, sendRemindersNowAction, setDiscountActiveAction, setRemindersAction } from "../../growth-actions";
 import { ReminderOfferForm } from "./ReminderOfferForm";
@@ -11,6 +11,7 @@ import { WelcomeOfferForm } from "./WelcomeOfferForm";
 import { WinbackForm } from "./WinbackForm";
 import { BirthdayForm } from "./BirthdayForm";
 import { SignupPopupForm } from "./SignupPopupForm";
+import { ThankYouForm } from "./ThankYouForm";
 import { ReferralForm } from "./ReferralForm";
 import { PostPurchaseForm } from "./PostPurchaseForm";
 import { SubscriptionOfferForm } from "./SubscriptionOfferForm";
@@ -145,6 +146,15 @@ export default async function MarketingPage() {
             email, like the form on your home page.
           </p>
           <SignupPopupForm seconds={shop.signupPopupSeconds} choices={SIGNUP_POPUP_SECONDS} />
+        </section>
+
+        <section className="card p-5 flex flex-col gap-3" aria-labelledby="thank-you-heading">
+          <h2 id="thank-you-heading" className="font-semibold">Thank-you note</h2>
+          <p className="text-sm">
+            A few words for buyers who just paid, on their order page and in the order confirmation email. Point them to your
+            social pages, say how long handmade items take, or just thank them.
+          </p>
+          <ThankYouForm note={shop.thankYouNote} max={THANK_YOU_NOTE_MAX} />
         </section>
 
         <section className="card p-5 flex flex-col gap-3" aria-labelledby="welcome-heading">

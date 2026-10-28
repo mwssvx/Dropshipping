@@ -101,6 +101,9 @@ export default async function OrderStatusPage({ params, searchParams }: { params
           <Link href={`${base}/pay/${order.id}`} className="btn btn-primary self-start">Finish paying</Link>
         )}
       </div>
+      {paid && !replacing && shop.thankYouNote && (
+        <section className="card p-4 whitespace-pre-line" aria-label={`A note from ${shop.name}`}>{shop.thankYouNote}</section>
+      )}
       {offer && (
         <PostPurchaseOffer handle={handle} orderRef={ref} title={offer.product.title} imageUrl={offer.product.imageUrl} percentOff={offer.percentOff}
           until={`${utc.format(offer.expiresAt)} UTC`}

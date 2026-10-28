@@ -1136,3 +1136,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Sales by source (after launch, part 194)
 
 1. **Which sites and links sell** (`packages/core/src/analytics.ts`, Analytics → Sales by source): each order keeps where the visit it was placed in came from: the referring site (instagram.com) or the link's `utm_source` (add `?utm_source=spring-newsletter` to the links you share, and it wins over the referrer, since apps often hide that). Analytics adds up orders and sales after refunds by source, with Direct for typed-in visits, and the order page says "The buyer came from instagram.com."
+
+### Thank-you note (after launch, part 195)
+
+1. **A note for buyers who just paid** (`packages/core/src/thank-you.ts`, Marketing → Thank-you note): a few lines of your own (up to 500 characters) under "Thank you, Ada!" on the order page and at the end of the order confirmation email. Point buyers to your social pages, say how long handmade items take, or just thank them. Leave it empty for none. Store files carry it.
