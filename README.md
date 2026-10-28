@@ -998,3 +998,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Sorting the product list (after launch, part 160)
 
 1. **Sort**: the Products page sorts newest or oldest first, by title (A to Z or Z to A, ignoring case), by last change, or by price (each product's cheapest option). The sort stays with the search, status and tag filters and across pages (`sort` on `productPage` in `packages/core/src/products.ts`; no migration).
+
+### Sorting the customer list (after launch, part 161)
+
+1. **Sort**: the Customers page sorts by last order (as before), money spent, number of orders, newest customers, or name (ignoring case, with unnamed customers last). The sort stays with the search, tag filter and pages. Staff who can't see money don't get the money-spent sort (`sort` on `listCustomers` in `packages/core/src/buyers.ts`; the menu is `components/SortSelect.tsx`, shared with the product list; no migration).

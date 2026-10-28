@@ -184,10 +184,32 @@ function customerRows(db: Db, shopId: string, opts: { query?: string; tag?: stri
 /** Customers on one page of the customer list. */
 export const CUSTOMER_PAGE_SIZE = 100;
 
+/** Orders for the customer list: last order (the default), most spent, most orders, newest, or name. */
+export const CUSTOMER_SORTS = ["recent", "spent", "orders", "newest", "name"] as const;
+export type CustomerSort = (typeof CUSTOMER_SORTS)[number];
+
+function customerOrder(sort: CustomerSort) {
+  const c = schema.customers;
+  const paid = sql`${schema.orders.paymentStatus} in ${PAID_SQL}`;
+  switch (sort) {
+    case "spent":
+      return [sql`coalesce(sum(${schema.orders.totalMinor} - ${schema.orders.refundedMinor}) filter (where ${paid}), 0) desc`];
+    case "orders":
+      return [sql`count(${schema.orders.id}) filter (where ${paid}) desc`, sql`max(${schema.orders.paidAt}) desc nulls last`];
+    case "newest":
+      return [desc(c.createdAt)];
+    // Customers without a name go after the named ones, by email.
+    case "name":
+      return [sql`lower(${c.name}) asc nulls last`, c.email];
+    default:
+      return [sql`max(${schema.orders.paidAt}) desc nulls last`];
+  }
+}
+
 /** Customers for the merchant: who bought, how often, how much and when last. Latest buyers first. */
-export async function listCustomers(db: Db, shopId: string, opts: { query?: string; tag?: string; limit?: number; offset?: number } = {}) {
+export async function listCustomers(db: Db, shopId: string, opts: { query?: string; tag?: string; sort?: CustomerSort; limit?: number; offset?: number } = {}) {
   return customerRows(db, shopId, opts)
-    .orderBy(sql`max(${schema.orders.paidAt}) desc nulls last`, desc(schema.customers.createdAt), schema.customers.id)
+    .orderBy(...customerOrder(opts.sort ?? "recent"), desc(schema.customers.createdAt), schema.customers.id)
     .limit(opts.limit ?? 500)
     .offset(opts.offset ?? 0);
 }

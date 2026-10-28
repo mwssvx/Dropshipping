@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { can, CUSTOMER_PAGE_SIZE, customerTags, customerTotals, describeTagRule, formatMoney, listCustomers, listTagRules, productChoices, MAX_TAG_RULES } from "@sf/core";
+import { can, CUSTOMER_PAGE_SIZE, CUSTOMER_SORTS, customerTags, customerTotals, describeTagRule, formatMoney, listCustomers, listTagRules, productChoices, MAX_TAG_RULES } from "@sf/core";
+import { SortSelect } from "@/components/SortSelect";
 import { requireShop } from "@/lib/server";
 import { deleteTagRuleAction } from "../../tag-rule-actions";
 import { PageHeader } from "../PageHeader";
@@ -7,24 +8,35 @@ import { TagRuleForm } from "./TagRuleForm";
 
 export const metadata = { title: "Customers" };
 
+const SORTS = [
+  ["recent", "Last order"],
+  ["spent", "Most spent"],
+  ["orders", "Most orders"],
+  ["newest", "Newest customers"],
+  ["name", "Name A to Z"],
+] as const;
+
 const date = (d: Date | null) => (d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "No orders yet");
 
-export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string; tag?: string; erased?: string; page?: string }> }) {
+export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string; tag?: string; sort?: string; erased?: string; page?: string }> }) {
   const { shop, db, role } = await requireShop("customers");
-  const { q, tag, erased, page: pageParam } = await searchParams;
+  const { q, tag, sort: sortParam, erased, page: pageParam } = await searchParams;
+  const seesMoney = can(role, "money");
+  // Staff who can't see money can't rank customers by it either. The default is left out of links.
+  const sorts = SORTS.filter(([s]) => seesMoney || s !== "spent");
+  const sort = CUSTOMER_SORTS.find((s) => s === sortParam && s !== "recent" && sorts.some(([x]) => x === s));
   const page = Math.max(1, Math.min(10_000, Math.floor(Number(pageParam)) || 1));
   const [customers, totals, tags, rules, products] = await Promise.all([
-    listCustomers(db, shop.id, { query: q, tag, limit: CUSTOMER_PAGE_SIZE, offset: (page - 1) * CUSTOMER_PAGE_SIZE }),
+    listCustomers(db, shop.id, { query: q, tag, sort, limit: CUSTOMER_PAGE_SIZE, offset: (page - 1) * CUSTOMER_PAGE_SIZE }),
     customerTotals(db, shop.id, { query: q, tag }),
     customerTags(db, shop.id),
     listTagRules(db, shop.id),
     productChoices(db, shop.id),
   ]);
   const filtered = !!(q || tag);
-  const seesMoney = can(role, "money");
   const pages = Math.ceil(totals.customers / CUSTOMER_PAGE_SIZE);
   const pageHref = (n: number) => {
-    const params = new URLSearchParams({ ...(q ? { q } : {}), ...(tag ? { tag } : {}), ...(n > 1 ? { page: String(n) } : {}) });
+    const params = new URLSearchParams({ ...(q ? { q } : {}), ...(tag ? { tag } : {}), ...(sort ? { sort } : {}), ...(n > 1 ? { page: String(n) } : {}) });
     return params.size ? `/admin/customers?${params}` : "/admin/customers";
   };
   const first = (page - 1) * CUSTOMER_PAGE_SIZE + 1;
@@ -43,17 +55,18 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             {totals.customers.toLocaleString("en-US")} {totals.customers === 1 ? "customer" : "customers"} · {totals.repeat.toLocaleString("en-US")} bought more than once · {totals.accounts.toLocaleString("en-US")} signed in to their account
           </p>
         )}
-        <form className="flex gap-2 max-w-md" role="search">
+        <form className="flex flex-wrap gap-2 max-w-2xl" role="search">
           <label className="sr-only" htmlFor="q">Search customers</label>
-          <input className="input" id="q" name="q" type="search" defaultValue={q} placeholder="Name or email" />
+          <input className="input flex-1 min-w-40" id="q" name="q" type="search" defaultValue={q} placeholder="Name or email" />
           {tag && <input type="hidden" name="tag" value={tag} />}
           <button className="btn btn-secondary">Search</button>
+          <SortSelect id="customer-sort" label="Sort customers" value={sort ?? "recent"} options={sorts} />
         </form>
         {tags.length > 0 && (
           <nav aria-label="Filter by tag" className="flex flex-wrap gap-2 text-sm">
-            <Link href={q ? `/admin/customers?q=${encodeURIComponent(q)}` : "/admin/customers"} className={`pill ${tag ? "pill-neutral" : "pill-info"}`} aria-current={tag ? undefined : "page"}>All</Link>
+            <Link href={q || sort ? `/admin/customers?${new URLSearchParams({ ...(q ? { q } : {}), ...(sort ? { sort } : {}) })}` : "/admin/customers"} className={`pill ${tag ? "pill-neutral" : "pill-info"}`} aria-current={tag ? undefined : "page"}>All</Link>
             {tags.map((t) => (
-              <Link key={t.tag} href={`/admin/customers?${new URLSearchParams({ ...(q ? { q } : {}), tag: t.tag })}`}
+              <Link key={t.tag} href={`/admin/customers?${new URLSearchParams({ ...(q ? { q } : {}), tag: t.tag, ...(sort ? { sort } : {}) })}`}
                 className={`pill ${tag === t.tag ? "pill-info" : "pill-neutral"}`} aria-current={tag === t.tag ? "page" : undefined}>
                 {t.tag} <span className="hint num">{t.count}</span>
               </Link>
