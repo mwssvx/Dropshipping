@@ -18,3 +18,4 @@ export function modelFromEnv(env: Record<string, string | undefined>): ModelClie
   return env.ANTHROPIC_API_KEY ? new AnthropicModel(model, { apiKey: env.ANTHROPIC_API_KEY, models }) : new DemoModel(model, models);
 }
 export * from "./memory";
+export * from "./examples";

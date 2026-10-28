@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { learnFromEdit } from "./examples";
 import { schema, type Db } from "@sf/db";
 import { NotFoundError, UserError } from "../errors";
 import type { FulfillmentContext } from "../fulfillment";
@@ -134,6 +135,9 @@ export async function merchantReply(ctx: FulfillmentContext, shopId: string, con
   if (body.trim().length < 2) throw new UserError("Write a reply first.");
   const missing = unfilledFields(body);
   if (missing.length) throw new UserError(`Replace ${missing.join(" and ")} in the reply first: this conversation has nothing to fill it with yet.`, "unfilled_field");
+  // Writing their own reply over the helper's draft is a rewrite too: the helper learns from it.
+  const draft = await ctx.db.query.messages.findFirst({ where: and(eq(schema.messages.conversationId, c.id), eq(schema.messages.status, "draft"), eq(schema.messages.author, "agent")) });
+  if (draft) await learnFromEdit(ctx.db, shopId, { topic: draft.topic ?? "other", draft: draft.body, sent: body });
   const m = await addMessage(ctx.db, c.id, { author: "merchant", body: body.trim(), status: "draft" });
   // A reply from the merchant replaces any draft the assistant left.
   await discardDrafts(ctx.db, c.id, m.id);

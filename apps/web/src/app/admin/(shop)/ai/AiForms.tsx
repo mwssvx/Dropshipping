@@ -4,7 +4,7 @@ import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import { marginCheckAction, saveAiSettingsAction } from "../../ai-actions";
 
-export function AiSettingsForm(props: { budget: string; planMax: string; topics: { key: string; label: string; on: boolean }[]; autoPause: boolean; shopper: boolean; weeklyReview: boolean; dailyWatch: boolean; watchEmail: boolean; skills: { key: string; title: string; when: string; on: boolean }[]; brand: { voice: string; banned: string; language: string; titleMax: string }; languages: { code: string; name: string }[]; memory: string; memoryMax: number }) {
+export function AiSettingsForm(props: { budget: string; planMax: string; topics: { key: string; label: string; on: boolean }[]; autoPause: boolean; shopper: boolean; weeklyReview: boolean; dailyWatch: boolean; watchEmail: boolean; skills: { key: string; title: string; when: string; on: boolean }[]; brand: { voice: string; banned: string; language: string; titleMax: string }; languages: { code: string; name: string }[]; memory: string; memoryMax: number; examples: string[] }) {
   const [state, action] = useActionState(saveAiSettingsAction, {});
   return (
     <form action={action} className="flex flex-col gap-5">
@@ -93,6 +93,28 @@ export function AiSettingsForm(props: { budget: string; planMax: string; topics:
         <label className="label" htmlFor="memory">What the Assistant remembers</label>
         <span className="hint" id="memory-hint">Tell the Assistant &ldquo;remember that…&rdquo; in the chat, or write notes here, one per line (up to {props.memoryMax}). It reads them in every chat. Buyers&apos; helpers never see them.</span>
         <textarea className="input min-h-24" id="memory" name="memory" aria-describedby="memory-hint" defaultValue={props.memory} placeholder={"We only ship from the US warehouse\nWhen I ask how I'm doing, lead with profit"} />
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="label">How you write to buyers</span>
+        {props.examples.length ? (
+          <>
+            <span className="hint">When you rewrite a reply the buyer helper drafted, it keeps your version (the last {props.examples.length}) and writes more like you. It never takes facts from them.</span>
+            <details className="text-sm">
+              <summary className="cursor-pointer">Your replies it learned from</summary>
+              <ul className="flex flex-col gap-2 mt-2">
+                {props.examples.map((e, i) => (
+                  <li key={i} className="card p-3 whitespace-pre-line">{e}</li>
+                ))}
+              </ul>
+            </details>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="forgetExamples" className="size-4" />
+              Forget these and start again
+            </label>
+          </>
+        ) : (
+          <span className="hint">When you rewrite a reply the buyer helper drafted, it keeps your version and writes more like you next time.</span>
+        )}
       </div>
       <fieldset className="flex flex-col gap-2">
         <legend className="label mb-1">Skills the Assistant uses</legend>

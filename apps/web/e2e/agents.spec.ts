@@ -96,6 +96,9 @@ test("a buyer's question gets a drafted reply the merchant checks, then automati
 
   // Let it answer "where is my order" questions itself from now on.
   await page.goto("/admin/ai");
+  // The owner's rewrite is kept so the helper writes more like them.
+  await page.getByText("Your replies it learned from").click();
+  await expect(page.getByText(/Thanks for shopping with us/)).toBeVisible();
   await page.getByLabel("Where is my order").check();
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("Saved.")).toBeVisible();

@@ -66,6 +66,7 @@ export default async function AiSettingsPage() {
               brand={brandFields(shop.aiBrand as BrandRules | null)}
               memory={shop.aiMemory.join("\n")}
               memoryMax={MEMORY_MAX_NOTES}
+              examples={shop.aiReplyExamples.map((e) => e.reply)}
               languages={Object.entries(LANGUAGES).map(([code, l]) => ({ code, name: l.english }))}
               skills={SKILL_NAMES.map((key) => ({ key, title: SKILLS[key].title, when: SKILLS[key].when, on: !shop.aiSkillsOff.includes(key) }))}
             />
