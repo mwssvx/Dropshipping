@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eraseCustomer, parseMoney, sendPersonalCode, setTaxExemption, updateCustomerNotes, UserError } from "@sf/core";
+import { CUSTOMER_FILTERS, eraseCustomer, parseMoney, sendPersonalCode, setTaxExemption, tagCustomers, updateCustomerNotes, UserError } from "@sf/core";
 import { campaigns, logged, requireShop } from "@/lib/server";
 
 export type NotesState = { error?: string; saved?: boolean; note?: string; tags?: string };
@@ -78,6 +78,30 @@ export async function taxExemptionAction(id: string, _: ExemptionState, form: Fo
     return { saved: saved.taxExemptId ? "set" : "removed", number: saved.taxExemptId ?? "" };
   } catch (e) {
     if (e instanceof UserError) return { error: e.message, number };
+    throw e;
+  }
+}
+
+export type TagAllState = { error?: string; done?: string };
+
+/** Adds or removes a tag on everyone the customer list shows for its search, tag and filter. */
+export async function tagCustomersAction(_: TagAllState, form: FormData): Promise<TagAllState> {
+  const { shop, db, user } = await requireShop("customers");
+  const remove = form.get("intent") === "remove";
+  const list = {
+    query: String(form.get("q") ?? "") || undefined,
+    tag: String(form.get("listTag") ?? "") || undefined,
+    filter: CUSTOMER_FILTERS.find((f) => f === form.get("filter")),
+  };
+  try {
+    const { tag, changed, full } = await tagCustomers(db, shop.id, list, { tag: String(form.get("tag") ?? ""), remove });
+    const who = (n: number) => (n === 1 ? "1 customer" : `${n.toLocaleString("en-US")} customers`);
+    if (changed) await logged({ shop, user, db }, `${remove ? "Removed" : "Added"} the tag "${tag}" ${remove ? "from" : "to"} ${who(changed)}`, { href: "/admin/customers" });
+    revalidatePath("/admin/customers", "layout");
+    const done = changed ? `${remove ? "Removed" : "Added"} “${tag}” ${remove ? "from" : "to"} ${who(changed)}` : remove ? `Nobody here is tagged “${tag}”` : `Everyone here is already tagged “${tag}”`;
+    return { done: full ? `${done}. ${who(full)} already had 10 tags, so ${full === 1 ? "was" : "were"} left out` : done };
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
     throw e;
   }
 }

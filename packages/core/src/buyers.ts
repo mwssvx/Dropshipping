@@ -8,6 +8,7 @@ import type { Mailer } from "./email";
 import { UserError } from "./errors";
 import type { CartLine } from "./orders";
 import { buyerAmounts } from "./currency";
+import { MAX_TAGS, normalizeTags } from "./customers";
 
 const MINUTE = 60_000;
 const CODE_MINUTES = 10;
@@ -252,6 +253,44 @@ export async function customerTotals(db: Db, shopId: string, opts: CustomerQuery
     })
     .from(rows);
   return row!;
+}
+
+/** The most customers one "tag everyone in this list" can change. */
+export const MAX_TAG_ALL = 10_000;
+
+/**
+ * Adds or removes a tag on every customer the list shows for this search, tag and filter (all
+ * pages). Customers who already have the tag, or already have the most tags, are left as they are.
+ */
+export async function tagCustomers(db: Db, shopId: string, list: CustomerQuery, input: { tag: string; remove?: boolean }) {
+  if (input.tag.includes(",")) throw new UserError("Add one tag at a time.");
+  const [tag] = normalizeTags(input.tag, "A customer", 1);
+  if (!tag) throw new UserError("Enter the tag, like vip.");
+  const rows = await customerRows(db, shopId, list).limit(MAX_TAG_ALL + 1);
+  if (rows.length > MAX_TAG_ALL) throw new UserError(`That's more than ${MAX_TAG_ALL.toLocaleString("en-US")} customers. Narrow the list with a search or filter first.`);
+  const ids = rows.map((r) => r.id);
+  if (!ids.length) return { tag, changed: 0, full: 0 };
+  const has = sql`${schema.customers.tags} @> ${JSON.stringify([tag])}::jsonb`;
+  const t = schema.customers;
+  if (input.remove) {
+    // A rule tag taken off by hand is no longer tracked, as on the customer's page.
+    const changed = await db
+      .update(t)
+      .set({ tags: sql`${t.tags} - ${tag}::text`, autoTags: sql`${t.autoTags} - ${tag}::text` })
+      .where(and(eq(t.shopId, shopId), inArray(t.id, ids), has))
+      .returning({ id: t.id });
+    return { tag, changed: changed.length, full: 0 };
+  }
+  const changed = await db
+    .update(t)
+    .set({ tags: sql`${t.tags} || ${JSON.stringify([tag])}::jsonb` })
+    .where(and(eq(t.shopId, shopId), inArray(t.id, ids), sql`not ${has}`, sql`jsonb_array_length(${t.tags}) < ${MAX_TAGS}`))
+    .returning({ id: t.id });
+  const [full] = await db
+    .select({ n: count() })
+    .from(t)
+    .where(and(inArray(t.id, ids), sql`not ${has}`, sql`jsonb_array_length(${t.tags}) >= ${MAX_TAGS}`));
+  return { tag, changed: changed.length, full: Number(full?.n ?? 0) };
 }
 
 /** Old codes and expired buyer sessions are dropped by the scheduled job. */

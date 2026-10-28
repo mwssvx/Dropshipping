@@ -4,6 +4,7 @@ import { SortSelect } from "@/components/SortSelect";
 import { requireShop } from "@/lib/server";
 import { deleteTagRuleAction } from "../../tag-rule-actions";
 import { PageHeader } from "../PageHeader";
+import { TagEveryoneForm } from "./TagEveryoneForm";
 import { TagRuleForm } from "./TagRuleForm";
 
 export const metadata = { title: "Customers" };
@@ -91,6 +92,13 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
               </Link>
             ))}
           </nav>
+        )}
+        {/* Kept when a change empties a filtered list, so its result still shows. */}
+        {(filtered || totals.customers > 0) && (
+          <details className="text-sm">
+            <summary className="cursor-pointer underline w-fit">Tag {filtered ? "these customers" : "all customers"}</summary>
+            <TagEveryoneForm count={totals.customers} q={q} tag={tag} filter={filter} tags={tags.map((t) => t.tag)} />
+          </details>
         )}
         {totals.customers > 0 && (
           <p className="text-sm">
