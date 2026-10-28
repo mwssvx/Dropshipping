@@ -8,7 +8,7 @@ import { blockedItemMessage } from "./country-limits";
 import { applyDisputeEvent } from "./disputes";
 import { NotFoundError, UserError } from "./errors";
 import type { PaymentEvent, PaymentProvider } from "./payments";
-import { applyDiscount, automaticOffers, bxgyMissing, describeDiscount, findUsableDiscount, spreadDiscount, type Discount, type OfferUnit } from "./discounts";
+import { applyDiscount, automaticOffers, bxgyMissing, describeDiscount, findUsableDiscount, spreadDiscountOver, type Discount, type OfferUnit } from "./discounts";
 import { applyMoneyEvent } from "./payouts";
 import { estimateProcessingFee, platformFeeFor } from "./plans";
 import { BuiltInTaxCalculator, listTaxRegistrations, type TaxCalculator, type TaxResult } from "./tax";
@@ -235,7 +235,7 @@ export async function quoteCart(
   let bundle = savings.length
     ? { title: savings.map((b) => b.title).join(" + "), savings, discountMinor: savings.reduce((s, b) => s + b.savingMinor, 0) }
     : null;
-  type AppliedDiscount = { id: string; code: string; label: string; discountMinor: number; freeShipping: boolean; automatic: boolean };
+  type AppliedDiscount = { id: string; code: string; label: string; discountMinor: number; freeShipping: boolean; automatic: boolean; productIds: string[] };
   // Set inside use(), which TypeScript can't follow, hence the cast.
   let discount = null as AppliedDiscount | null;
   /** A valid code the cart didn't use because the bundle saves more. */
@@ -248,7 +248,7 @@ export async function quoteCart(
   const use = (d: Discount, applied: { discountMinor: number; shippingMinor: number }) => {
     bundle = null;
     shippingMinor = applied.shippingMinor;
-    discount = { id: d.id, code: d.code, label: describeDiscount(d, shop.currency), discountMinor: applied.discountMinor, freeShipping: d.kind === "free_shipping", automatic: d.automatic };
+    discount = { id: d.id, code: d.code, label: describeDiscount(d, shop.currency), discountMinor: applied.discountMinor, freeShipping: d.kind === "free_shipping", automatic: d.automatic, productIds: d.productIds };
   };
   if (opts.discountCode?.trim() && wholesale) throw new UserError("Discount codes don't apply to wholesale prices.", "discount_invalid");
   if (opts.discountCode?.trim()) {
@@ -256,6 +256,9 @@ export async function quoteCart(
     const applied = applyDiscount(d, goodsMinor, shippingMinor, units);
     if (d.kind === "bxgy" && !applied.discountMinor) {
       throw new UserError(`${d.code} is for "${describeDiscount(d, shop.currency)}". Add more to your cart to use it.`, "discount_invalid");
+    }
+    if ((d.kind === "percent" || d.kind === "amount") && d.productIds.length && !applied.discountMinor) {
+      throw new UserError(`${d.code} is for some products only, and none of them are in your cart.`, "discount_invalid");
     }
     if (bundle && bundle.discountMinor > applied.discountMinor + (shippingMinor - applied.shippingMinor)) {
       codeNotUsed = d.code;
@@ -501,7 +504,9 @@ export async function startCheckout(
   }
   // Tax is on what the buyer actually pays for each line, after the discount. Gift cards bought
   // here aren't taxed: tax is paid when they're spent.
-  const taxed = spreadDiscount(cart.items.map((i) => (i.giftCard ? 0 : i.lineMinor)), cart.discountMinor);
+  // A code for chosen products comes off those lines only.
+  const only = cart.discount?.productIds.length ? cart.discount.productIds : null;
+  const taxed = spreadDiscountOver(cart.items.map((i) => (i.giftCard ? 0 : i.lineMinor)), cart.items.map((i) => !i.giftCard && (!only || only.includes(i.productId))), cart.discountMinor);
   // A tax-exempt buyer pays none, when signed in. Repeat deliveries and after-checkout offers
   // follow the order they came from. Where prices include tax, they pay the price as shown.
   const taxExemptId = followUp
