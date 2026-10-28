@@ -1,11 +1,11 @@
-const PAYMENT: Record<string, [string, string]> = {
+export const PAYMENT: Record<string, [string, string]> = {
   pending: ["Awaiting payment", "pill-warning"],
   paid: ["Paid", "pill-success"],
   partially_refunded: ["Partly refunded", "pill-info"],
   refunded: ["Refunded", "pill-neutral"],
   failed: ["Payment failed", "pill-critical"],
 };
-const FULFILMENT: Record<string, [string, string]> = {
+export const FULFILMENT: Record<string, [string, string]> = {
   unfulfilled: ["To send", "pill-warning"],
   sent_to_supplier: ["Sent to supplier", "pill-info"],
   partially_shipped: ["Partly shipped", "pill-info"],

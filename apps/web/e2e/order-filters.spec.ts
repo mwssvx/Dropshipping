@@ -1,7 +1,7 @@
 import { expect, test, type Browser, type TestInfo } from "@playwright/test";
 
 // Order list filters: every order with one product (from the product's page), shipping to one
-// country, or placed recently.
+// country, placed recently, or by delivery and payment status.
 
 async function buy(browser: Browser, info: TestInfo, product: string, email: string, uk: boolean) {
   const buyer = await (await browser.newContext({ ...info.project.use })).newPage();
@@ -71,4 +71,15 @@ test("a merchant finds every order with a product, and orders to one country", a
   const recent = await (await page.request.get("/admin/orders/export.csv?placed=7")).text();
   expect(recent).toContain(`zoe-${id}@example.com`);
   expect(recent).toContain(`ada-${id}@example.com`);
+
+  // Nothing is refunded yet; both orders are paid.
+  await page.getByLabel("Payment status").selectOption({ label: "Refunded" });
+  await expect(page).toHaveURL(/payment=refunded/);
+  await expect(rows).toHaveCount(0);
+  await page.getByLabel("Payment status").selectOption({ label: "Paid" });
+  await expect(page).toHaveURL(/payment=paid/);
+  await expect(rows).toHaveCount(1);
+  await expect(page.getByLabel("Delivery status")).toBeVisible();
+  const paid = await (await page.request.get("/admin/orders/export.csv?payment=refunded")).text();
+  expect(paid).not.toContain(`@example.com`);
 });

@@ -1,4 +1,4 @@
-import { ordersCsv, placedSince } from "@sf/core";
+import { fulfillmentParam, ordersCsv, paymentParam, placedSince } from "@sf/core";
 import { requireShop } from "@/lib/server";
 
 const day = (s: string | null) => (s && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s)) ? new Date(`${s}T00:00:00Z`) : undefined);
@@ -16,6 +16,8 @@ export async function GET(request: Request) {
   const show = p.get("show");
   const csv = await ordersCsv(db, shop.id, {
     ...(show === "problems" ? { fulfillmentStatus: "problem" as const } : show === "held" ? { held: true } : show === "transfers" ? { transfer: true } : {}),
+    ...(show !== "problems" && fulfillmentParam(p.get("status")) ? { fulfillmentStatus: fulfillmentParam(p.get("status")) } : {}),
+    paymentStatus: paymentParam(p.get("payment")),
     query: p.get("q") ?? undefined,
     tag: p.get("tag") ?? undefined,
     productId: p.get("product") ?? undefined,

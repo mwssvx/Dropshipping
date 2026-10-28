@@ -1048,3 +1048,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### A collection's own order (after launch, part 172)
 
 1. **Sort products by**: a collection whose products the merchant picks can list them in their own order (as before), best selling first, newest first, or by price either way. The collection's page uses it until a shopper picks another order from Sort by, where the merchant's own order stays on offer as Featured. Automatic collections keep sorting by their rules ("Show them"). Home page sections still show a collection's products in the merchant's order (`sortOrder` on `collections`, `COLLECTION_SORTS` in `packages/db/src/schema.ts`; migration `0123_collection_sort`).
+
+### Order list by delivery and payment status (after launch, part 173)
+
+1. **Delivery status and Payment status**: the order list can show only orders still to send, with the supplier, partly shipped, shipped or delivered, and only those paid, awaiting payment, partly refunded, refunded or whose payment failed. Both work together and with the tabs, search, tags, product, country and date filters, the pages, saved views ("Shipped but refunded") and the spreadsheet download. Problem orders keep their own Needs attention tab (`fulfillmentParam` and `paymentParam` in `packages/core/src/orders.ts`; no migration).
