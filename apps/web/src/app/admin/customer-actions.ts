@@ -92,6 +92,7 @@ export async function tagCustomersAction(_: TagAllState, form: FormData): Promis
     query: String(form.get("q") ?? "") || undefined,
     tag: String(form.get("listTag") ?? "") || undefined,
     filter: CUSTOMER_FILTERS.find((f) => f === form.get("filter")),
+    country: /^[A-Z]{2}$/.test(String(form.get("country") ?? "")) ? String(form.get("country")) : undefined,
   };
   try {
     const { tag, changed, full } = await tagCustomers(db, shop.id, list, { tag: String(form.get("tag") ?? ""), remove });

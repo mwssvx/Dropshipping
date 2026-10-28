@@ -17,7 +17,7 @@ const NAME_MAX = 40;
 export const VIEW_PARAMS: Record<SavedViewList, readonly string[]> = {
   products: ["q", "status", "tag", "stock", "source", "collection", "missing", "margin", "sort"],
   orders: ["show", "q", "tag", "product", "country", "code", "total", "placed", "status", "payment"],
-  customers: ["q", "tag", "filter", "sort"],
+  customers: ["q", "tag", "filter", "country", "sort"],
 };
 
 /** Keeps only the list's own parameters, so "page" or anything made up is left out. */

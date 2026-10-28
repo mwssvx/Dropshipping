@@ -160,7 +160,7 @@ export type CustomerFilter = (typeof CUSTOMER_FILTERS)[number];
 /** Days without an order before a buyer counts as lapsed. */
 export const LAPSED_DAYS = 90;
 
-type CustomerQuery = { query?: string; tag?: string; filter?: CustomerFilter; now?: Date };
+type CustomerQuery = { query?: string; tag?: string; filter?: CustomerFilter; country?: string; now?: Date };
 
 /** One row per customer the merchant should see, with what they've bought. */
 function customerRows(db: Db, shopId: string, opts: CustomerQuery) {
@@ -168,6 +168,8 @@ function customerRows(db: Db, shopId: string, opts: CustomerQuery) {
   const tag = opts.tag?.trim().toLowerCase();
   const paidCount = sql`count(${schema.orders.id}) filter (where ${schema.orders.paymentStatus} in ${PAID_SQL})`;
   const since = new Date((opts.now ?? new Date()).getTime() - LAPSED_DAYS * 86_400_000);
+  // Bought at least once with delivery to this country (two letters).
+  const country = opts.country && /^[A-Z]{2}$/i.test(opts.country) ? opts.country.toUpperCase() : undefined;
   const filter =
     opts.filter === "repeat"
       ? sql`${paidCount} > 1`
@@ -205,8 +207,21 @@ function customerRows(db: Db, shopId: string, opts: CustomerQuery) {
         // Leaves out addresses that only asked for the newsletter and never confirmed or bought.
         sql`(count(${schema.orders.id}) > 0 or bool_or(${schema.customers.acceptsMarketing}) or max(${schema.customers.lastSignInAt}) is not null or max(${schema.customers.name}) is not null or bool_or(${schema.customers.wholesaleStatus} = 'approved') or max(jsonb_array_length(${schema.customers.tags})) > 0)`,
         filter,
+        country ? sql`bool_or(${schema.orders.shippingAddress}->>'country' = ${country} and ${schema.orders.paymentStatus} in ${PAID_SQL})` : undefined,
       ),
     );
+}
+
+/** Countries customers bought for, with how many buyers each, most first. For the customer list's country menu. */
+export async function customerCountries(db: Db, shopId: string) {
+  const country = sql<string>`${schema.orders.shippingAddress}->>'country'`;
+  const rows = await db
+    .select({ country, count: sql<number>`count(distinct ${schema.orders.email})::int` })
+    .from(schema.orders)
+    .where(and(eq(schema.orders.shopId, shopId), sql`${schema.orders.paymentStatus} in ${PAID_SQL}`))
+    .groupBy(country)
+    .orderBy(sql`count(distinct ${schema.orders.email}) desc`, country);
+  return rows.filter((r) => r.country && /^[A-Z]{2}$/.test(r.country));
 }
 
 /** Customers on one page of the customer list. */

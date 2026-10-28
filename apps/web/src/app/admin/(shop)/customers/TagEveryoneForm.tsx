@@ -4,13 +4,14 @@ import { FormError } from "@/components/FormError";
 import { tagCustomersAction, type TagAllState } from "../../customer-actions";
 
 /** Adds or removes one tag on every customer the list shows now, across all its pages. */
-export function TagEveryoneForm({ count, q, tag, filter, tags }: { count: number; q?: string; tag?: string; filter?: string; tags: string[] }) {
+export function TagEveryoneForm({ count, q, tag, filter, country, tags }: { count: number; q?: string; tag?: string; filter?: string; country?: string; tags: string[] }) {
   const [state, action, pending] = useActionState(tagCustomersAction, {} as TagAllState);
   return (
     <form action={action} className="flex flex-col gap-2 mt-2">
       {q && <input type="hidden" name="q" value={q} />}
       {tag && <input type="hidden" name="listTag" value={tag} />}
       {filter && <input type="hidden" name="filter" value={filter} />}
+      {country && <input type="hidden" name="country" value={country} />}
       <p className="hint">
         {count
           ? `Changes all ${count === 1 ? "1 customer" : `${count.toLocaleString("en-US")} customers`} in this list, on every page. Tag a group, then give them a code for tagged customers or an email campaign.`
