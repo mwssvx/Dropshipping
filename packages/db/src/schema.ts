@@ -139,6 +139,8 @@ export const shops = pgTable(
     aiShopper: boolean("ai_shopper").notNull().default(false),
     // The AI store review runs by itself every Monday (from the store's AI budget).
     aiWeeklyReview: boolean("ai_weekly_review").notNull().default(false),
+    // The daily store watch: an alert when sales, visitors, checkout or refunds move out of line.
+    aiDailyWatch: boolean("ai_daily_watch").notNull().default(true),
     // Assistant skills the merchant switched off (names from core's SKILLS).
     aiSkillsOff: jsonb("ai_skills_off").$type<string[]>().notNull().default([]),
     // Writing rules for the AI helpers (voice, banned words, language, title length); see core's ai/brand.ts.
@@ -945,7 +947,7 @@ export const appeals = pgTable(
 
 // AI agents. Every run is recorded with its token use and cost, and every tool call it makes is an
 // agent action: reads run straight away, changes may wait for the merchant's approval.
-export const AGENTS = ["listing", "assistant", "buyer_support", "fulfilment", "margin", "writer", "translator", "answerer", "sizer", "shopper", "summarizer", "analyst", "scout"] as const;
+export const AGENTS = ["listing", "assistant", "buyer_support", "fulfilment", "margin", "writer", "translator", "answerer", "sizer", "shopper", "summarizer", "analyst", "scout", "watch"] as const;
 export type AgentName = (typeof AGENTS)[number];
 
 export const agentRuns = pgTable(
@@ -1017,7 +1019,7 @@ export const aiReports = pgTable(
   {
     id: id(),
     shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["review", "trends"] }).notNull(),
+    kind: text("kind", { enum: ["review", "trends", "watch"] }).notNull(),
     runId: uuid("run_id").references(() => agentRuns.id, { onDelete: "set null" }),
     summary: text("summary").notNull(),
     items: jsonb("items").$type<AiReportItem[]>().notNull(),

@@ -119,3 +119,4 @@ export * from "./barcode";
 export * from "./pick-list";
 export * from "./shopper-links";
 export * from "./insights";
+export * from "./watch";

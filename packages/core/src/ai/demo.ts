@@ -584,6 +584,27 @@ function analyst(s: State): BetaContentBlock[] {
   return [text("I reviewed your store and saved a few suggestions on the Insights page.")];
 }
 
+/* ───────────── Store watch ───────────── */
+
+// Without a model, each signal gets the usual causes to check; the figures come from the signal itself.
+const WATCH_TEMPLATES: Record<string, { title: string; cause: string; todo: string; area: string | null }> = {
+  sales_drop: { title: "Sales fell yesterday", cause: "The data doesn't show one clear cause. The usual ones: an ad that stopped, a best seller that ran out, or a checkout setting that changed.", todo: "Check that your best sellers are in stock and your ads are running, then place a test order.", area: "sales" },
+  sales_jump: { title: "Sales jumped yesterday", cause: "More buyers than usual found the store, most likely from an ad or a post that took off.", todo: "Check stock on the best seller and reorder early if it's low; keep whatever ad brought them running.", area: "inventory" },
+  visitors_drop: { title: "Fewer visitors yesterday", cause: "Fewer people reached the store; an ad, a post or a link that usually sends visitors may have stopped.", todo: "Check where visitors came from on the Sales page and restart anything that stopped.", area: "campaigns" },
+  checkout_drop: { title: "Shoppers stopped paying at checkout", cause: "Shoppers reached checkout but didn't finish, which usually points to payment or the shipping price.", todo: "Place a test order to check payment works, and look at what shipping costs at checkout.", area: "shipping" },
+  refunds_up: { title: "More refunds than usual", cause: "More refunds than usual this week; a product that arrives different from its listing is the usual reason.", todo: "Open Returns to see which product comes back most and read the buyers' reasons.", area: "returns" },
+};
+
+function watch(s: State): BetaContentBlock[] {
+  if (!s.has("save_alerts")) {
+    const kinds = [...s.prompt.matchAll(/^- (\w+) \(/gm)].map((m) => m[1]!).filter((k) => WATCH_TEMPLATES[k]);
+    const alerts = kinds.slice(0, 5).map((k) => ({ signal: k, title: WATCH_TEMPLATES[k]!.title, likely_cause: WATCH_TEMPLATES[k]!.cause, what_to_do: WATCH_TEMPLATES[k]!.todo, area: WATCH_TEMPLATES[k]!.area }));
+    if (alerts.length) return [toolCall("save_alerts", { alerts })];
+    return [text("Nothing to flag.")];
+  }
+  return [text("I flagged what moved yesterday on the Insights page.")];
+}
+
 /* ───────────── Trend scout ───────────── */
 
 // The demo brain can't search the web, so beyond the store's own unmet searches it offers a few
@@ -697,4 +718,5 @@ const BRAINS: Record<ModelRequest["agent"], (s: State, req: ModelRequest) => Bet
   summarizer,
   analyst,
   scout,
+  watch,
 };

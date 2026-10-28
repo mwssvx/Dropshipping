@@ -1,0 +1,1 @@
+ALTER TABLE "shops" ADD COLUMN "ai_daily_watch" boolean DEFAULT true NOT NULL;

@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { countNeedsYou } from "../ai/conversations";
 import { listPendingActions } from "../ai/runtime";
@@ -8,7 +8,7 @@ import { openNotices } from "../trust";
 import type { Shop } from "../ai/context";
 import { can, type Role } from "../team";
 
-export type AttentionItem = { kind: "hold" | "notice" | "problems" | "risk" | "to_send" | "inbox" | "sold_out"; title: string; body: string; url: string; tone: "critical" | "warning" | "info" };
+export type AttentionItem = { kind: "hold" | "notice" | "problems" | "risk" | "to_send" | "inbox" | "sold_out" | "watch"; title: string; body: string; url: string; tone: "critical" | "warning" | "info" };
 
 const DAY = 86_400_000;
 
@@ -17,7 +17,7 @@ export async function todaySummary(db: Db, shop: Shop, now = new Date(), role: R
   const startOfDay = new Date(now);
   startOfDay.setHours(0, 0, 0, 0);
   const weekAgo = new Date(now.getTime() - 7 * DAY);
-  const [recent, open, requirements, notices, pending, inbox, soldOut] = await Promise.all([
+  const [recent, open, requirements, notices, pending, inbox, soldOut, watch] = await Promise.all([
     db.query.orders.findMany({
       where: and(eq(schema.orders.shopId, shop.id), inArray(schema.orders.paymentStatus, ["paid", "partially_refunded", "refunded"]), gte(schema.orders.paidAt, weekAgo)),
     }),
@@ -30,6 +30,11 @@ export async function todaySummary(db: Db, shop: Shop, now = new Date(), role: R
     listPendingActions(db, shop.id),
     countNeedsYou(db, shop.id),
     can(role, "products") ? soldOutAtSupplier(db, shop.id, now) : [],
+    // The store watch's alert from this morning (it covers yesterday), while it's still news.
+    db.query.aiReports.findFirst({
+      where: and(eq(schema.aiReports.shopId, shop.id), eq(schema.aiReports.kind, "watch"), gte(schema.aiReports.createdAt, new Date(now.getTime() - 1.5 * DAY)), lte(schema.aiReports.createdAt, now)),
+      orderBy: desc(schema.aiReports.createdAt),
+    }),
   ]);
   const net = (o: (typeof recent)[number]) => o.totalMinor - o.refundedMinor;
   const today = recent.filter((o) => o.paidAt! >= startOfDay);
@@ -58,10 +63,15 @@ export async function todaySummary(db: Db, shop: Shop, now = new Date(), role: R
       body: "Buyers can't order them until the supplier restocks. Add a backup supplier, or take them off sale.",
       url: "/products#supplier-sold-out",
     });
+  if (watch?.items.length) {
+    const tone = watch.items.some((i) => i.impact === "high") ? "critical" : watch.items.some((i) => i.impact === "medium") ? "warning" : "info";
+    const more = watch.items.length - 1;
+    attention.push({ kind: "watch", tone, title: watch.items[0]!.title, body: `${watch.items[0]!.action}${more ? ` (and ${more} more on Insights)` : ""}`, url: "/insights" });
+  }
 
   // Staff see order counts and order problems, not sales totals, payouts or AI proposals.
   const seesMoney = can(role, "money");
-  const ATTENTION_AREA = { hold: "money", notice: "trust", problems: "orders", risk: "orders", to_send: "orders", inbox: "inbox", sold_out: "products" } as const;
+  const ATTENTION_AREA = { hold: "money", notice: "trust", problems: "orders", risk: "orders", to_send: "orders", inbox: "inbox", sold_out: "products", watch: "analytics" } as const;
   return {
     currency: shop.currency,
     salesTodayMinor: seesMoney ? today.reduce((s, o) => s + net(o), 0) : null,

@@ -24,6 +24,7 @@ import { searchReport } from "../search-terms";
 import { inventoryReport } from "../inventory";
 import { profitReport } from "../profit";
 import { customerReport, productFunnel, returnsReport } from "../insights";
+import type { WatchSignal } from "../watch";
 import { AUTO, blocked, needsOk, untrusted, type Decision, type RunScope } from "./context";
 import { enabledSkills, SKILL_NAMES, SKILLS } from "./skills";
 import { brandProblems, type BrandRules } from "./brand";
@@ -855,7 +856,7 @@ export async function thinMargins(run: Pick<RunScope, "ctx" | "shop">, minPct = 
 export async function setAiSettings(
   db: RunScope["ctx"]["db"],
   shop: Pick<RunScope["shop"], "id" | "plan">,
-  s: { budgetMinor?: number | null; autoReplyTopics?: string[]; autoPause?: boolean; shopper?: boolean; weeklyReview?: boolean; skillsOff?: string[]; brand?: BrandRules | null },
+  s: { budgetMinor?: number | null; autoReplyTopics?: string[]; autoPause?: boolean; shopper?: boolean; weeklyReview?: boolean; dailyWatch?: boolean; skillsOff?: string[]; brand?: BrandRules | null },
 ) {
   const max = PLAN_AI_BUDGET_MINOR[shop.plan];
   if (s.budgetMinor !== undefined && s.budgetMinor !== null && (!Number.isFinite(s.budgetMinor) || s.budgetMinor < 0 || s.budgetMinor > max)) {
@@ -870,6 +871,7 @@ export async function setAiSettings(
       ...(s.autoPause !== undefined ? { aiAutoPause: s.autoPause } : {}),
       ...(s.shopper !== undefined ? { aiShopper: s.shopper } : {}),
       ...(s.weeklyReview !== undefined ? { aiWeeklyReview: s.weeklyReview } : {}),
+      ...(s.dailyWatch !== undefined ? { aiDailyWatch: s.dailyWatch } : {}),
       ...(s.brand !== undefined ? { aiBrand: s.brand } : {}),
       ...(s.skillsOff ? { aiSkillsOff: SKILL_NAMES.filter((n) => s.skillsOff!.includes(n)) } : {}),
       updatedAt: new Date(),
@@ -1417,9 +1419,60 @@ const scoutTools = [
   }),
 ];
 
-/* ───────────── Assistant skills, and the bigger helpers it can start ───────────── */
+/* ───────────── Store watch: explains what moved yesterday ───────────── */
+
+/** Signals waiting to be explained, by store, set for the length of one watch run (see runStoreWatch). */
+export const watchSignals = new Map<string, WatchSignal[]>();
+const WATCH_KINDS = ["sales_drop", "sales_jump", "visitors_drop", "checkout_drop", "refunds_up"] as const;
+const WATCH_IMPACT = { high: "high", medium: "medium", good: "low" } as const;
 
 const analystTool = (name: string) => analystTools.find((t) => t.name === name)!;
+
+const watchTools = [
+  analystTool("read_product_funnel"),
+  analystTool("read_returns"),
+  assistantTool("read_sales"),
+  assistantTool("read_stock"),
+  tool({
+    name: "save_alerts",
+    kind: "change",
+    description: "Save one alert per signal you were given: the likely cause in the store's data and one thing to do today. Call it once, at the end.",
+    input: z.object({
+      alerts: z
+        .array(
+          z.object({
+            signal: z.enum(WATCH_KINDS),
+            title: z.string().min(5).max(90).describe("Short, plain: \"Sales fell sharply yesterday\""),
+            likely_cause: z.string().min(10).max(400).describe("What the store's data suggests, or that the cause isn't clear from the data."),
+            what_to_do: z.string().min(10).max(300),
+            area: z.enum(Object.keys(AI_REPORT_AREAS) as [AiReportArea]).nullable(),
+          }),
+        )
+        .min(1)
+        .max(5),
+    }),
+    policy: () => AUTO,
+    summary: (i) => `Flagged ${i.alerts.length} ${i.alerts.length === 1 ? "thing" : "things"} that moved yesterday`,
+    async run(i, run) {
+      const signals = watchSignals.get(run.shop.id) ?? [];
+      const clean = (s: string) => s.replace(/<[^>]*>/g, "").trim();
+      // Only signals the code found are saved, each with the code's own figures, so a number in an alert is never made up.
+      const items = i.alerts.flatMap((a) => {
+        const s = signals.find((x) => x.kind === a.signal);
+        return s ? [{ title: clean(a.title), finding: `${s.headline} ${clean(a.likely_cause)}`, action: clean(a.what_to_do), impact: WATCH_IMPACT[s.tone], area: a.area }] : [];
+      });
+      if (!items.length) throw new UserError("None of those alerts match a signal you were given.");
+      const [row] = await run.ctx.db
+        .insert(schema.aiReports)
+        .values({ shopId: run.shop.id, kind: "watch", runId: run.runId, summary: signals.map((s) => s.headline).join(" "), items })
+        .returning();
+      return { saved: true, report_id: row!.id };
+    },
+  }),
+];
+
+/* ───────────── Assistant skills, and the bigger helpers it can start ───────────── */
+
 const reportForChat = (r: typeof schema.aiReports.$inferSelect) => ({
   made_on: r.createdAt.toISOString().slice(0, 10),
   summary: r.summary,
@@ -1503,6 +1556,7 @@ export const AGENT_TOOLS: Record<AgentName, AgentTool[]> = {
   summarizer: summarizerTools,
   analyst: analystTools,
   scout: scoutTools,
+  watch: watchTools,
 };
 
 export function findTool(agent: AgentName, name: string) {
