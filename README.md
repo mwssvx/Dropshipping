@@ -1140,3 +1140,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Thank-you note (after launch, part 195)
 
 1. **A note for buyers who just paid** (`packages/core/src/thank-you.ts`, Marketing → Thank-you note): a few lines of your own (up to 500 characters) under "Thank you, Ada!" on the order page and at the end of the order confirmation email. Point buyers to your social pages, say how long handmade items take, or just thank them. Leave it empty for none. Store files carry it.
+
+### Chat buttons (after launch, part 196)
+
+1. **WhatsApp and Telegram buttons** (`packages/core/src/chat-buttons.ts`, Inbox → Chat buttons): add your WhatsApp number (with its country code) and/or Telegram username, and a small button in the corner of every store page opens a chat with you. On WhatsApp the first message is filled in with the page the shopper was on ("Hi! I have a question about this: …/products/lamp"), in the store's language. The buttons stay off the checkout and payment pages, and store files carry them.
