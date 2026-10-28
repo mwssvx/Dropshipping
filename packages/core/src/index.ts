@@ -99,6 +99,7 @@ export * from "./holiday-returns";
 export * from "./returns-report";
 export * from "./late-orders";
 export * from "./holiday-checklist";
+export * from "./gift-guides";
 export * from "./price-watch";
 export * from "./preorders";
 export * from "./supplier-scores";
