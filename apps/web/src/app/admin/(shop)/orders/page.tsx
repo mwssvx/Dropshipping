@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { BANK_DETAILS_MAX, BUYER_EDIT_HOURS, can, countOrders, formatMoney, orderPage, orderTags, RISK_HOLD_LABELS, TRANSFER_DAYS } from "@sf/core";
+import { BANK_DETAILS_MAX, BUYER_EDIT_HOURS, can, countOrders, countryName, formatMoney, orderCountries, orderPage, orderTags, RISK_HOLD_LABELS, TRANSFER_DAYS } from "@sf/core";
+import { AutoSubmitSelect } from "@/components/AutoSubmitSelect";
 import { requireShop } from "@/lib/server";
 import { FulfilmentStatus, PaymentStatus } from "@/components/Status";
 import { PageHeader } from "../PageHeader";
@@ -14,26 +15,30 @@ export const metadata = { title: "Orders" };
 
 const dateFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
-export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ show?: string; q?: string; tag?: string; bulk?: string; before?: string }> }) {
-  const { show, q, tag, bulk, before: beforeParam } = await searchParams;
+export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ show?: string; q?: string; tag?: string; product?: string; country?: string; bulk?: string; before?: string }> }) {
+  const { show, q, tag, product: productParam, country: countryParam, bulk, before: beforeParam } = await searchParams;
+  const productId = /^[0-9a-f-]{36}$/i.test(productParam ?? "") ? productParam : undefined;
+  const country = /^[A-Z]{2}$/.test(countryParam ?? "") ? countryParam : undefined;
   const before = /^\d{1,9}$/.test(beforeParam ?? "") ? Number(beforeParam) : undefined;
   const problemsOnly = show === "problems";
   const heldOnly = show === "held";
   const transfersOnly = show === "transfers";
   const { shop, db, role } = await requireShop("orders");
-  const [{ orders, older }, problems, held, transfers, tags] = await Promise.all([
-    orderPage(db, shop.id, { ...(problemsOnly ? { fulfillmentStatus: "problem" as const } : heldOnly ? { held: true } : transfersOnly ? { transfer: true } : {}), query: q, tag }, { before }),
+  const [{ orders, older }, problems, held, transfers, tags, countries, product] = await Promise.all([
+    orderPage(db, shop.id, { ...(problemsOnly ? { fulfillmentStatus: "problem" as const } : heldOnly ? { held: true } : transfersOnly ? { transfer: true } : {}), query: q, tag, productId, country }, { before }),
     countOrders(db, shop.id, { fulfillmentStatus: "problem" }),
     countOrders(db, shop.id, { held: true }),
     countOrders(db, shop.id, { transfer: true }),
     orderTags(db, shop.id),
+    orderCountries(db, shop.id),
+    productId ? db.query.products.findFirst({ where: (p, { and, eq }) => and(eq(p.id, productId), eq(p.shopId, shop.id)), columns: { id: true, title: true } }) : null,
   ]);
   // On hold the same way the On hold tab counts it: held for the risk check and not refunded.
   const onHold = (o: (typeof orders)[number]) => !!o.heldAt && (o.paymentStatus === "paid" || o.paymentStatus === "partially_refunded");
-  const filtered = !!(q || tag);
+  const filtered = !!(q || tag || productId || country);
   // Keeps the other filters when one changes.
-  const href = (next: { show?: string; q?: string; tag?: string; before?: string }) => {
-    const params = new URLSearchParams(Object.entries({ show, q, tag, ...next }).filter((e): e is [string, string] => !!e[1]));
+  const href = (next: { show?: string; q?: string; tag?: string; product?: string; country?: string; before?: string }) => {
+    const params = new URLSearchParams(Object.entries({ show, q, tag, product: productId, country, ...next }).filter((e): e is [string, string] => !!e[1]));
     return params.size ? `/admin/orders?${params}` : "/admin/orders";
   };
   return (
@@ -52,13 +57,21 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             Bank transfers {transfers > 0 && <span className="pill pill-info">{transfers}</span>}
           </Link>
         </nav>
-        <form className="flex gap-2 max-w-md" role="search">
+        <form className="flex flex-wrap gap-2 max-w-2xl" role="search">
           <label className="sr-only" htmlFor="q">Search orders</label>
-          <input className="input" id="q" name="q" type="search" defaultValue={q} placeholder="Order number, name or email" />
+          <input className="input flex-1 min-w-40" id="q" name="q" type="search" defaultValue={q} placeholder="Order number, name or email" />
           {show && <input type="hidden" name="show" value={show} />}
           {tag && <input type="hidden" name="tag" value={tag} />}
+          {productId && <input type="hidden" name="product" value={productId} />}
+          {countries.length > 1 && <AutoSubmitSelect id="order-country" name="country" label="Ship-to country" value={country ?? ""} options={[["", "Every country"], ...countries.map((c) => [c.country, `${countryName(c.country)} (${c.count.toLocaleString("en-US")})`] as const)]} />}
           <button className="btn btn-secondary">Search</button>
         </form>
+        {productId && (
+          <p className="text-sm flex flex-wrap items-center gap-2">
+            <span>Orders with <strong>{product?.title ?? "a deleted product"}</strong></span>
+            <Link href={href({ product: undefined })} className="underline">Show all orders</Link>
+          </p>
+        )}
         {tags.length > 0 && (
           <nav aria-label="Filter by tag" className="flex flex-wrap gap-2 text-sm">
             <Link href={href({ tag: undefined })} className={`pill ${tag ? "pill-neutral" : "pill-info"}`} aria-current={tag ? undefined : "page"}>All tags</Link>
@@ -83,6 +96,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             {show && <input type="hidden" name="show" value={show} />}
             {q && <input type="hidden" name="q" value={q} />}
             {tag && <input type="hidden" name="tag" value={tag} />}
+            {productId && <input type="hidden" name="product" value={productId} />}
+            {country && <input type="hidden" name="country" value={country} />}
             <button className="btn btn-secondary">Download CSV</button>
             <p className="hint w-full">One row per item, for every order on the list (not just this page){filtered || show ? " with your filters" : ""}. Leave the dates empty for all of them.</p>
           </form>
@@ -119,7 +134,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         {before && orders.length === 0 ? (
           <div className="card p-10 text-center hint">No older orders. <Link href={href({ before: undefined })} className="underline">Back to the newest</Link></div>
         ) : filtered && orders.length === 0 ? (
-          <div className="card p-10 text-center hint">{q ? `No orders match "${q}".` : `No orders are tagged "${tag}".`}</div>
+          <div className="card p-10 text-center hint">{q ? `No orders match "${q}".` : tag ? `No orders are tagged "${tag}".` : "No orders match these filters."}</div>
         ) : transfersOnly && orders.length === 0 ? (
           <div className="card p-10 text-center hint">No orders are waiting for a bank transfer.</div>
         ) : heldOnly && orders.length === 0 ? (
@@ -138,6 +153,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             {show && <input type="hidden" name="keep-show" value={show} />}
             {q && <input type="hidden" name="keep-q" value={q} />}
             {tag && <input type="hidden" name="keep-tag" value={tag} />}
+            {productId && <input type="hidden" name="keep-product" value={productId} />}
+            {country && <input type="hidden" name="keep-country" value={country} />}
             {before && <input type="hidden" name="keep-before" value={before} />}
             <div className="field">
               <label className="label" htmlFor="bulk-tag">Tag for the picked orders</label>

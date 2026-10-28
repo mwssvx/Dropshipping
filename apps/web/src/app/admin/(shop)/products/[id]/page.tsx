@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts, detailsText, MAX_DETAILS, stockHistory, incomingStock, countryName, SHIPPING_COUNTRIES, productSwatches, digitalFileFor, formatFileSize, MAX_DIGITAL_FILE_BYTES, DOWNLOADS_PER_ITEM, CONTENT_UNITS, CONTENT_UNIT_LABELS, unitPrice, formatUnitPrice, type StockMovement } from "@sf/core";
+import { can, formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts, detailsText, MAX_DETAILS, stockHistory, incomingStock, countryName, SHIPPING_COUNTRIES, productSwatches, digitalFileFor, formatFileSize, MAX_DIGITAL_FILE_BYTES, DOWNLOADS_PER_ITEM, CONTENT_UNITS, CONTENT_UNIT_LABELS, unitPrice, formatUnitPrice, type StockMovement } from "@sf/core";
 import { requireShop, storeAddress, suppliers } from "@/lib/server";
 import { duplicateProductAction, updateProductAction } from "../../../actions";
 import { setUpsellAction } from "../../../growth-actions";
@@ -37,7 +37,7 @@ export default async function EditProductPage({ params, searchParams }: { params
   const { id } = await params;
   const { created, imported, saved, emailed, duplicated } = await searchParams;
   const sentCount = Number(emailed) || 0;
-  const { shop, db } = await requireShop("products");
+  const { shop, db, role } = await requireShop("products");
   await publishDueProducts(db, shop.id);
   const found = await getProduct(db, shop.id, id).catch((e) => {
     if (e instanceof NotFoundError) notFound();
@@ -82,6 +82,7 @@ export default async function EditProductPage({ params, searchParams }: { params
               <button className="btn btn-secondary">Duplicate</button>
             </form>
             {!product.giftCard && <Link className="btn btn-secondary" href={`/admin/products/${product.id}/labels`}>Print labels</Link>}
+            {can(role, "orders") && <Link className="btn btn-secondary" href={`/admin/orders?product=${product.id}`}>See orders</Link>}
             {product.status === "active" && <a className="btn btn-secondary" href={`/s/${shop.handle}/products/${product.handle}`} target="_blank">View on store ↗</a>}
           </>
         } />

@@ -15,6 +15,8 @@ export async function GET(request: Request) {
     ...(show === "problems" ? { fulfillmentStatus: "problem" as const } : show === "held" ? { held: true } : {}),
     query: p.get("q") ?? undefined,
     tag: p.get("tag") ?? undefined,
+    productId: p.get("product") ?? undefined,
+    country: p.get("country") ?? undefined,
     from,
     to,
   });
