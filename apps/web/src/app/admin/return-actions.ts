@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { decideReturn, formatMoney, parseMoney, sendReplacement, setReturnSettings, UserError, type ReturnDecision } from "@sf/core";
+import { decideReturn, formatMoney, parseMoney, sendReplacement, setHolidayReturns, setReturnSettings, UserError, type ReturnDecision } from "@sf/core";
 import { fulfillment, logged, notifyLater, refunds, requireShop, storeAddress } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -25,6 +25,25 @@ export async function returnSettingsAction(_: FormState, form: FormData): Promis
       instructions: String(form.get("instructions") ?? ""),
     }),
   );
+}
+
+export type HolidayReturnsState = { error?: string; saved?: { from: string; to: string; until: string } | null };
+
+/** Keeps returns open longer for orders paid in a holiday stretch, or stops doing so. */
+export async function holidayReturnsAction(_: HolidayReturnsState, form: FormData): Promise<HolidayReturnsState> {
+  const { shop, user, db } = await requireShop("returns");
+  const field = (name: string) => String(form.get(name) ?? "");
+  let saved: HolidayReturnsState["saved"] = null;
+  try {
+    saved = await setHolidayReturns(db, shop, form.get("enabled") === "on" ? { from: field("from"), to: field("to"), until: field("until") } : null);
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  await logged({ shop, user, db }, saved ? `Kept holiday orders returnable until ${saved.until}` : "Turned off holiday returns", { href: "/admin/returns#holiday-returns" });
+  revalidatePath("/admin/returns");
+  revalidatePath(`/s/${shop.handle}`, "layout");
+  return { saved };
 }
 
 /** One form, several buttons: the pressed button's value says what the merchant decided. */

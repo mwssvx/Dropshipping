@@ -1154,3 +1154,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Before checkout** (`cartDelivery` in `packages/core/src/delivery.ts`): under the cart's items, buyers see when everything would arrive if they paid now ("Arrives Nov 3 – Nov 12 to United States"), from the slowest item, with the cheapest rate to their country. Gift cards and downloads don't count, and a cart with a pre-order counts from the latest date one is promised to ship by.
 2. **The holiday line too**: when the store has a holiday order-by date (part 197), the cart repeats it under the dates, so a gift buyer knows before paying.
+
+### Holiday returns (after launch, part 199)
+
+1. **Longer returns for gifts** (`packages/core/src/holiday-returns.ts`, Returns → Return policy → Holiday returns): pick the first and last order day of a holiday stretch (it starts at Nov 1 to Dec 24) and the day returns stay open until (Jan 31). Orders paid in the stretch can ask for a return until then; when the usual window from delivery ends later, that still applies. Once it's closed, the buyer's order page says "Returns for holiday orders closed on January 31."
+2. **Said where buyers look**: while the stretch is on, product pages say "Bought for the holidays? You can return it until January 31." in the store's language, and drafted returns policies add the dates until they've passed. It needs a return window above 0, since there's nothing to extend otherwise.

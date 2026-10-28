@@ -1,10 +1,10 @@
 "use client";
-import { useActionState } from "react";
+import { startTransition, useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import type { FormState } from "../../actions";
-import { decideReturnAction, returnSettingsAction } from "../../return-actions";
+import { decideReturnAction, holidayReturnsAction, returnSettingsAction, type HolidayReturnsState } from "../../return-actions";
 
 export function ReturnSettingsForm({ windowDays, instructions, placeholder }: { windowDays: number; instructions: string; placeholder: string }) {
   const [state, action] = useActionState(returnSettingsAction, {} as FormState);
@@ -23,6 +23,57 @@ export function ReturnSettingsForm({ windowDays, instructions, placeholder }: { 
         <span className="hint">Sent with every approval, unless you write something else on that return. For cheap items, many stores say &ldquo;Keep it&rdquo; and refund straight away.</span>
       </div>
       <SubmitButton className="btn btn-secondary self-start">Save return settings</SubmitButton>
+    </form>
+  );
+}
+
+const dayLabel = (d: string) => new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${d}T00:00:00Z`));
+
+/** Longer returns for orders paid in a holiday stretch. Submitted by hand so React doesn't reset the fields after an error. */
+export function HolidayReturnsForm({ holiday, defaults }: { holiday: { from: string; to: string; until: string } | null; defaults: { from: string; to: string; until: string } }) {
+  const [state, action, pending] = useActionState(holidayReturnsAction, {} as HolidayReturnsState);
+  const [on, setOn] = useState(holiday !== null);
+  const value = holiday ?? defaults;
+  return (
+    <form
+      className="flex flex-col gap-3 text-sm"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const data = new FormData(e.currentTarget);
+        startTransition(() => action(data));
+      }}
+    >
+      <FormError message={state.error} />
+      {state.saved !== undefined && !pending && !state.error && (
+        <p role="status" className="banner banner-success">
+          {state.saved
+            ? `Saved. Orders paid from ${dayLabel(state.saved.from)} to ${dayLabel(state.saved.to)} can be returned until ${dayLabel(state.saved.until)}.`
+            : "Saved. Holiday orders have the usual return window."}
+        </p>
+      )}
+      <label className="flex items-center gap-2">
+        <input type="checkbox" name="enabled" checked={on} onChange={(e) => setOn(e.target.checked)} />
+        Longer returns for holiday orders
+      </label>
+      {on && (
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="field w-44">
+            <label className="label" htmlFor="holiday-from">First order day</label>
+            <input className="input" id="holiday-from" name="from" type="date" defaultValue={value.from} required />
+          </div>
+          <div className="field w-44">
+            <label className="label" htmlFor="holiday-to">Last order day</label>
+            <input className="input" id="holiday-to" name="to" type="date" defaultValue={value.to} required />
+          </div>
+          <div className="field w-44">
+            <label className="label" htmlFor="holiday-until">Returns open until</label>
+            <input className="input" id="holiday-until" name="until" type="date" defaultValue={value.until} required />
+          </div>
+        </div>
+      )}
+      <div>
+        <button type="submit" className="btn btn-secondary" disabled={pending} aria-busy={pending}>{pending ? "Saving…" : "Save holiday returns"}</button>
+      </div>
     </form>
   );
 }

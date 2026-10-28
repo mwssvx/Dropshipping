@@ -2,7 +2,7 @@ import Link from "next/link";
 import { countReturns, DEFAULT_RETURN_INSTRUCTIONS, formatMoney, listReturns, RETURN_PAGE_SIZE, RETURN_REASON_LABELS } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
-import { DecideForm, ReturnSettingsForm } from "./ReturnForms";
+import { DecideForm, HolidayReturnsForm, ReturnSettingsForm } from "./ReturnForms";
 
 export const metadata = { title: "Returns" };
 
@@ -16,6 +16,12 @@ const STATUS = {
   exchanged: ["Exchange sent", "pill-success"],
   declined: ["Declined", "pill-neutral"],
 } as const;
+
+/** Nov 1 to Dec 24 this year, returnable until Jan 31, or next year's once this year's has passed. */
+function holidayDefaults(now: Date) {
+  const year = now.getUTCMonth() === 11 && now.getUTCDate() > 24 ? now.getUTCFullYear() + 1 : now.getUTCFullYear();
+  return { from: `${year}-11-01`, to: `${year}-12-24`, until: `${year + 1}-01-31` };
+}
 
 export default async function ReturnsPage({ searchParams }: { searchParams: Promise<{ q?: string; page?: string }> }) {
   const { shop, db } = await requireShop("returns");
@@ -79,6 +85,15 @@ export default async function ReturnsPage({ searchParams }: { searchParams: Prom
         <section className="card p-5 flex flex-col gap-3" aria-labelledby="return-settings">
           <h2 id="return-settings" className="font-semibold">Return policy</h2>
           <ReturnSettingsForm windowDays={shop.returnWindowDays} instructions={shop.returnInstructions ?? ""} placeholder={DEFAULT_RETURN_INSTRUCTIONS} />
+          <div className="border-t border-border pt-3 flex flex-col gap-2">
+            <h3 id="holiday-returns" className="font-medium">Holiday returns</h3>
+            <p className="text-sm hint">
+              Gifts often get opened weeks after they&apos;re bought. Keep returns open longer for orders paid in a holiday stretch, and the
+              buyer&apos;s order page, your returns policy and product pages (while the stretch is on) say so. When the usual window ends later,
+              that still applies.
+            </p>
+            <HolidayReturnsForm holiday={shop.holidayReturns} defaults={holidayDefaults(new Date())} />
+          </div>
         </section>
         {(closedTotal > 0 || q) && (
           <section className="flex flex-col gap-3" aria-labelledby="closed-returns">

@@ -186,6 +186,8 @@ export const shops = pgTable(
     // Buyers can ask for a return this many days after delivery; 0 turns the form off.
     returnWindowDays: integer("return_window_days").notNull().default(30),
     returnInstructions: text("return_instructions"),
+    // Longer returns for orders paid in a holiday stretch ("Nov 1 to Dec 24, returnable until Jan 31"), or null.
+    holidayReturns: jsonb("holiday_returns").$type<HolidayReturns | null>(),
     // How supplier cost becomes a retail price, for imports and "reprice everything".
     pricingRule: jsonb("pricing_rule").$type<PricingRule>(),
     // Supplier price watch: warn when a cost rise leaves less than this margin, and optionally
@@ -1700,6 +1702,9 @@ export const shippingRates = pgTable(
 // A buyer asking to return items from an order. The merchant approves it (with instructions),
 // refunds it, gives store credit, or declines it.
 export const RETURN_REASONS = ["never_arrived", "damaged", "wrong_item", "not_as_described", "too_small_or_big", "changed_mind", "other"] as const;
+/** Holiday returns: orders paid from `from` to `to` (YYYY-MM-DD, inclusive) can be returned until `until`. */
+export type HolidayReturns = { from: string; to: string; until: string };
+
 export type ReturnItem = {
   lineId: string;
   title: string;
