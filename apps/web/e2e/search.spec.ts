@@ -55,12 +55,17 @@ test("buyers search the store, then sort and filter the results", async ({ page 
   await page.getByLabel("Sort by").selectOption({ label: "Price, low to high" });
   await page.getByRole("button", { name: "Apply" }).click();
   await expect(page).toHaveURL(/sort=price_asc/);
+  // The form is a plain GET: wait for the new page to finish loading before filling it again, or
+  // the typed price can land in the page that's being replaced.
+  await page.waitForLoadState("load");
   const up = await prices(page);
   expect(up).toEqual([...up].sort((a, b) => a - b));
   await page.getByLabel("Sort by").selectOption({ label: "Price, high to low" });
   await page.getByLabel("Highest price").fill(String(up[0]));
   await page.getByLabel("In stock only").check();
+  await expect(page.getByLabel("Highest price")).toHaveValue(String(up[0]));
   await page.getByRole("button", { name: "Apply" }).click();
+  await expect(page).toHaveURL(/max=/);
   await expect(page.getByText("1 product", { exact: true })).toBeVisible();
   expect(await prices(page)).toEqual([up[0]]);
   await shot(page, "112-collection-sorted");
