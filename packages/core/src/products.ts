@@ -295,8 +295,27 @@ function stockWhere(shopId: string, filter: ProductStockFilter) {
   }
 }
 
+export const PRODUCT_SOURCES = ["supplier", "own", "digital", "gift_card"] as const;
+export type ProductSource = (typeof PRODUCT_SOURCES)[number];
+
+/** Where a product comes from: a supplier ships it, the store ships its own stock, a download, or a gift card. */
+function sourceCase() {
+  const p = schema.products;
+  return sql<ProductSource>`case when ${p.giftCard} then 'gift_card' when ${p.digital} then 'digital' when ${p.sourceUrl} is not null or ${p.supplierId} is not null then 'supplier' else 'own' end`;
+}
+
+/** How many of the store's products come from each source, for the list's filter. */
+export async function productSources(db: Db, shopId: string) {
+  const rows = await db
+    .select({ source: sourceCase(), n: sql<number>`count(*)::int` })
+    .from(schema.products)
+    .where(eq(schema.products.shopId, shopId))
+    .groupBy(sourceCase());
+  return Object.fromEntries(PRODUCT_SOURCES.map((s) => [s, rows.find((r) => r.source === s)?.n ?? 0])) as Record<ProductSource, number>;
+}
+
 /** The product list's search and filters, shared by the page and its spreadsheet download. */
-export type ProductQuery = { query?: string; status?: "active" | "draft" | "archived"; tag?: string; stock?: ProductStockFilter };
+export type ProductQuery = { query?: string; status?: "active" | "draft" | "archived"; tag?: string; stock?: ProductStockFilter; source?: ProductSource };
 
 export function productWhere(db: Db, shopId: string, opts: ProductQuery) {
   const q = opts.query?.trim().toLowerCase();
@@ -305,6 +324,7 @@ export function productWhere(db: Db, shopId: string, opts: ProductQuery) {
     opts.status ? eq(schema.products.status, opts.status) : undefined,
     opts.tag ? sql`${schema.products.tags} @> ${JSON.stringify([opts.tag.trim().toLowerCase()])}::jsonb` : undefined,
     opts.stock ? stockWhere(shopId, opts.stock) : undefined,
+    opts.source ? sql`${sourceCase()} = ${opts.source}` : undefined,
     q
       ? or(
           sql`lower(${schema.products.title}) like ${`%${q}%`}`,
