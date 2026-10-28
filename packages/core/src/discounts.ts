@@ -25,6 +25,11 @@ const discountInput = z
     minSubtotalMinor: z.number().int().min(0).default(0),
     usageLimit: z.number().int().min(1, "The limit must be at least 1.").nullish(),
     oncePerCustomer: z.boolean().default(false),
+    customerTag: z
+      .string()
+      .nullish()
+      .transform((t) => t?.trim().toLowerCase().replace(/\s+/g, " ") || null)
+      .refine((t) => !t || t.length <= 30, "Customer tags are up to 30 characters."),
     startsAt: z.date().nullish(),
     endsAt: z.date().nullish(),
   })
@@ -40,6 +45,7 @@ const discountInput = z
     if (d.automatic && (d.kind === "percent" || d.kind === "amount") && d.productIds.length) {
       ctx.addIssue({ code: "custom", message: "Money off without a code is for the whole order. Give it a code to limit it to some products." });
     }
+    if (d.automatic && d.customerTag) ctx.addIssue({ code: "custom", message: "Money off without a code is for everyone. Give it a code to limit it to tagged customers." });
     if (d.automatic && d.kind === "free_shipping") ctx.addIssue({ code: "custom", message: "Free shipping over an amount is set under Shipping instead." });
     // Money off without a code needs a minimum order ("Spend more, save more"); money off everything is a sale.
     if (d.automatic && (d.kind === "percent" || d.kind === "amount") && d.minSubtotalMinor < 1) {
@@ -171,8 +177,8 @@ export async function productOffers(db: Db, shop: Shop, productId: string, now =
 
 /**
  * The discount a buyer typed, if it can be used on this cart right now. Throws a message for the
- * buyer otherwise. `email` is checked only at checkout, for once-per-customer codes and codes
- * made for one buyer.
+ * buyer otherwise. `email` is checked only at checkout, for once-per-customer codes, codes made
+ * for one buyer and codes for tagged customers.
  */
 export async function findUsableDiscount(db: Db, shop: Shop, code: string, cart: { subtotalMinor: number; email?: string }, now = new Date()) {
   const clean = code.trim().toUpperCase();
@@ -180,6 +186,11 @@ export async function findUsableDiscount(db: Db, shop: Shop, code: string, cart:
   if (!d || !d.active || (d.startsAt && d.startsAt > now)) throw new UserError(`"${clean}" isn't a valid code.`, "discount_invalid");
   if (d.email && cart.email && cart.email.trim().toLowerCase() !== d.email) {
     throw new UserError(`${clean} was sent to a different email address. Check out with that address to use it.`, "discount_invalid");
+  }
+  if (d.customerTag && cart.email) {
+    const customer = await db.query.customers.findFirst({ where: and(eq(schema.customers.shopId, shop.id), eq(schema.customers.email, cart.email.trim().toLowerCase())), columns: { tags: true } });
+    // The tag stays private: it's the merchant's label, so the buyer only hears the code isn't theirs.
+    if (!customer?.tags.includes(d.customerTag)) throw new UserError(`${clean} is for some customers only. Check out with the email on your account to use it.`, "discount_invalid");
   }
   if (d.endsAt && d.endsAt <= now) throw new UserError(`The code ${clean} has expired.`, "discount_invalid");
   if (cart.subtotalMinor < d.minSubtotalMinor) {

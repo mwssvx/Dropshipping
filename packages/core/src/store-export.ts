@@ -226,12 +226,13 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       min_subtotal: d.minSubtotalMinor,
       usage_limit: d.usageLimit,
       once_per_customer: d.oncePerCustomer,
+      customer_tag: d.customerTag,
       starts_at: iso(d.startsAt),
       ends_at: iso(d.endsAt),
       active: d.active,
-      ...(d.kind === "bxgy"
-        ? { buy_qty: d.buyQty, get_qty: d.getQty, products: d.productIds.map((id) => handleOf.get(id)).filter((h): h is string => !!h), automatic: d.automatic }
-        : {}),
+      ...(d.productIds.length ? { products: d.productIds.map((id) => handleOf.get(id)).filter((h): h is string => !!h) } : {}),
+      automatic: d.automatic,
+      ...(d.kind === "bxgy" ? { buy_qty: d.buyQty, get_qty: d.getQty } : {}),
     })),
     redirects: redirectRows.map((r) => ({ from: r.fromPath, to: r.toPath })),
     size_charts: chartRows.map((c) => ({
@@ -537,6 +538,7 @@ const importSchema = z.object({
         min_subtotal: money.default(0),
         usage_limit: z.number().int().min(1).nullable().optional(),
         once_per_customer: z.boolean().default(false),
+        customer_tag: z.string().trim().toLowerCase().min(1).max(30).nullable().optional(),
         starts_at: date,
         ends_at: date,
         active: z.boolean().default(true),
@@ -720,8 +722,9 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
       // A buy X get Y offer without its quantities can't work, so it's left out.
       const bxgy = d.kind === "bxgy";
       const scope = d.products.map((h) => productIds.get(h)).filter((id): id is string => !!id);
+      if (bxgy && (!d.buy_qty || !d.get_qty)) continue;
       // Nor one whose products aren't in the file: it would widen to every product.
-      if (bxgy && (!d.buy_qty || !d.get_qty || (d.products.length && !scope.length))) continue;
+      if (d.kind !== "free_shipping" && d.products.length && !scope.length) continue;
       await tx
         .insert(schema.discounts)
         .values({
@@ -732,13 +735,15 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
           minSubtotalMinor: d.min_subtotal,
           usageLimit: d.usage_limit ?? null,
           oncePerCustomer: d.once_per_customer,
+          customerTag: d.customer_tag ?? null,
           startsAt: d.starts_at ? new Date(d.starts_at) : null,
           endsAt: d.ends_at ? new Date(d.ends_at) : null,
           active: d.active,
           buyQty: bxgy ? d.buy_qty! : null,
           getQty: bxgy ? d.get_qty! : null,
-          productIds: bxgy ? scope : [],
-          automatic: d.automatic && (bxgy || ((d.kind === "percent" || d.kind === "amount") && d.min_subtotal > 0)),
+          productIds: d.kind === "free_shipping" ? [] : scope,
+          // Automatic money off is for the whole order and everyone, as createDiscount allows.
+          automatic: d.automatic && (bxgy || ((d.kind === "percent" || d.kind === "amount") && d.min_subtotal > 0 && !scope.length && !d.customer_tag)),
         })
         .onConflictDoNothing();
     }

@@ -1172,6 +1172,9 @@ export const discounts = pgTable(
     // How many paid orders may use it in total; null means no limit.
     usageLimit: integer("usage_limit"),
     oncePerCustomer: boolean("once_per_customer").notNull().default(false),
+    // Only buyers whose customer record has this tag (say "vip") can use the code. Checked at
+    // checkout, against the email they check out with.
+    customerTag: text("customer_tag"),
     startsAt: timestamp("starts_at", { withTimezone: true }),
     endsAt: timestamp("ends_at", { withTimezone: true }),
     active: boolean("active").notNull().default(true),
