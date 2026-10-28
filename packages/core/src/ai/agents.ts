@@ -2,11 +2,11 @@ import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import type { BetaMessageParam } from "@anthropic-ai/sdk/resources/beta/messages";
 import { schema, type Db } from "@sf/db";
 import { NotFoundError, UserError } from "../errors";
-import type { AgentContext, Shop } from "./context";
+import type { AgentContext, RunScope, Shop } from "./context";
 import { untrusted } from "./context";
 import { addMessage, assistantConversation, BUYER_TOPICS, startBuyerMessage } from "./conversations";
 import { aiBudget, runAgent, type AgentSpec, type RunResult } from "./runtime";
-import { REVIEW_MAX_ITEMS, REVIEW_SUMMARY_MIN, thinMargins, TRENDS_MAX_ITEMS, TRENDS_MAX_SEARCHES, watchSignals } from "./tools";
+import { REVIEW_MAX_ITEMS, REVIEW_SUMMARY_MIN, thinMargins, TRENDS_MAX_ITEMS, TRENDS_MAX_SEARCHES, replyVerdicts, watchSignals } from "./tools";
 import { storeSignals, watchDays } from "../watch";
 import { skillMenu } from "./skills";
 import { brandInstructions, type BrandRules } from "./brand";
@@ -150,6 +150,19 @@ For each signal, look for the likely cause with one or two reads at most: read_s
 - area: where in the admin to do it, or null.
 For good news (sales_jump), say what drove it and how to make the most of it (stock, reorder, more of the same ad).
 Don't repeat the figures the signal already gives, and never invent others. Your final message is one sentence.
+${RULES}`,
+  },
+  reply_checker: {
+    agent: "reply_checker",
+    effort: "low",
+    maxTokens: 2048,
+    system: (shop) => `You check a reply that ${shop.name}'s buyer helper is about to send to a buyer on its own, without the owner seeing it first. You get the buyer's message, everything the helper read (order data and store policies) and the reply.
+It's safe only if all of these hold:
+- Every fact in it (dates, delivery times, tracking, prices, stock, what the policy allows) is in what the helper read. Rounding and rewording are fine; anything else is made up.
+- It answers what the buyer actually asked.
+- It promises nothing the data and policies don't give: no refunds, discounts, replacements, free items or delivery dates of its own.
+- It's polite, and shares nothing a buyer shouldn't see (supplier names or costs, internal notes, other buyers' details).
+When in doubt, it isn't safe: an unsafe reply just waits for the owner, which costs little. Call give_verdict once, then stop.
 ${RULES}`,
   },
   analyst: {
@@ -502,6 +515,36 @@ export async function runStoreWatch(ctx: AgentContext, shop: Shop, now = new Dat
   } finally {
     watchSignals.delete(shop.id);
   }
+}
+
+/** Most of what the helper read that goes to the checker, so a long order can't make the check costly. */
+const CHECK_FACTS_MAX = 8000;
+
+/**
+ * The second look at a buyer reply that would go out on its own. Returns why it's held for the
+ * owner, or null when it can go. If the check can't run, the reply waits: sending unchecked is the
+ * risk this exists to avoid.
+ */
+export async function checkReply(run: RunScope, reply: string): Promise<string | null> {
+  const buyer = run.conversationId
+    ? await run.ctx.db.query.messages.findFirst({ where: and(eq(schema.messages.conversationId, run.conversationId), eq(schema.messages.author, "buyer")), orderBy: desc(schema.messages.createdAt) })
+    : null;
+  const facts = (run.facts ?? []).join("\n").slice(0, CHECK_FACTS_MAX);
+  const check = await runAgent(run.ctx, AGENT_SPECS.reply_checker, run.shop, {
+    trigger: "event",
+    conversationId: run.conversationId,
+    orderId: run.orderId,
+    messages: [
+      {
+        role: "user",
+        content: `The buyer's message:\n${untrusted("buyer", buyer?.body ?? "(none)")}\n\nWhat the helper read:\n${untrusted("store_data", facts || "(nothing)")}\n\nThe reply it wants to send:\n${untrusted("draft_reply", reply)}`,
+      },
+    ],
+  });
+  const verdict = replyVerdicts.get(check.runId);
+  replyVerdicts.delete(check.runId);
+  if (!verdict) return check.status === "over_budget" ? "The AI budget ran out before the second check, so it waits for you." : "The second check didn't finish, so it waits for you.";
+  return verdict.safe ? null : `A second check held it: ${verdict.problems.join("; ") || "it wasn't sure the reply was right"}.`;
 }
 
 /** The store's latest AI reports, newest first. */

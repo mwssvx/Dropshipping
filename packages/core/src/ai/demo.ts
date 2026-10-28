@@ -1,5 +1,6 @@
 import type { BetaContentBlock, BetaMessageParam } from "@anthropic-ai/sdk/resources/beta/messages";
 import type { AgentName } from "@sf/db";
+import { brandProblems } from "./brand";
 import { AGENT_MODELS, DEFAULT_MODEL, estimateTokens, text, toolCall, type ModelClient, type ModelRequest, type ModelResponse } from "./model";
 
 /**
@@ -584,6 +585,17 @@ function analyst(s: State): BetaContentBlock[] {
   return [text("I reviewed your store and saved a few suggestions on the Insights page.")];
 }
 
+/* ───────────── Reply checker ───────────── */
+
+// Without a model, the check is the one code can do: every number in the reply must be in what
+// the helper read (order numbers, dates, tracking, prices).
+function replyChecker(s: State): BetaContentBlock[] {
+  if (s.has("give_verdict")) return [text("Checked.")];
+  const part = (tag: string) => s.prompt.match(new RegExp(`<untrusted_data source="${tag}"[^>]*>([\\s\\S]*?)</untrusted_data>`))?.[1] ?? "";
+  const problems = brandProblems(null, [{ name: "reply", text: part("draft_reply") }], { facts: [part("store_data"), part("buyer")] });
+  return [toolCall("give_verdict", { safe: !problems.length, problems: problems.map((p) => p.replace("the product data", "the order or policies")) })];
+}
+
 /* ───────────── Store watch ───────────── */
 
 // Without a model, each signal gets the usual causes to check; the figures come from the signal itself.
@@ -719,4 +731,5 @@ const BRAINS: Record<ModelRequest["agent"], (s: State, req: ModelRequest) => Bet
   analyst,
   scout,
   watch,
+  reply_checker: replyChecker,
 };
