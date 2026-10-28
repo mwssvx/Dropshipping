@@ -1052,3 +1052,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Order list by delivery and payment status (after launch, part 173)
 
 1. **Delivery status and Payment status**: the order list can show only orders still to send, with the supplier, partly shipped, shipped or delivered, and only those paid, awaiting payment, partly refunded, refunded or whose payment failed. Both work together and with the tabs, search, tags, product, country and date filters, the pages, saved views ("Shipped but refunded") and the spreadsheet download. Problem orders keep their own Needs attention tab (`fulfillmentParam` and `paymentParam` in `packages/core/src/orders.ts`; no migration).
+
+### Product list by collection (after launch, part 174)
+
+1. **In collection**: the Products page can show only the products in one hand-picked collection, with how many each holds. It works with the search, the other filters, the sort, pages, saved views, the spreadsheet download and "Select all in this list", so a whole collection can be repriced or archived at once. Automatic collections aren't offered, since their own page already lists what their rules match (`ProductQuery.collection` in `packages/core/src/products.ts`; no migration).
