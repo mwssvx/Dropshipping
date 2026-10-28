@@ -762,6 +762,15 @@ export async function handlePaymentEvent(db: Db, provider: string, event: Paymen
   });
 }
 
+/** How far back the order list can look, in days: the last week, month, three months or year. */
+export const ORDER_PLACED_DAYS = [7, 30, 90, 365] as const;
+
+/** Where "placed in the last N days" starts, or undefined unless N is one of ORDER_PLACED_DAYS. */
+export function placedSince(days: string | number | null | undefined, now = new Date()) {
+  const n = Number(days);
+  return (ORDER_PLACED_DAYS as readonly number[]).includes(n) ? new Date(now.getTime() - n * 86_400_000) : undefined;
+}
+
 export type OrderFilter = {
   fulfillmentStatus?: Order["fulfillmentStatus"];
   held?: boolean;

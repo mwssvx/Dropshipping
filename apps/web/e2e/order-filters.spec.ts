@@ -1,6 +1,7 @@
 import { expect, test, type Browser, type TestInfo } from "@playwright/test";
 
-// Order list filters: every order with one product (from the product's page), or shipping to one country.
+// Order list filters: every order with one product (from the product's page), shipping to one
+// country, or placed recently.
 
 async function buy(browser: Browser, info: TestInfo, product: string, email: string, uk: boolean) {
   const buyer = await (await browser.newContext({ ...info.project.use })).newPage();
@@ -60,4 +61,14 @@ test("a merchant finds every order with a product, and orders to one country", a
   const csv = await (await page.request.get("/admin/orders/export.csv?country=GB")).text();
   expect(csv).toContain(`zoe-${id}@example.com`);
   expect(csv).not.toContain(`ada-${id}@example.com`);
+
+  // Both orders are from today, so a recent range keeps them; the download follows it.
+  await page.getByLabel("Placed in").selectOption("7");
+  await expect(page).toHaveURL(/placed=7/);
+  await expect(page).toHaveURL(/country=GB/);
+  await expect(rows).toHaveCount(1);
+  await expect(page.locator('form[aria-label="Download orders"] input[name="placed"]')).toHaveValue("7");
+  const recent = await (await page.request.get("/admin/orders/export.csv?placed=7")).text();
+  expect(recent).toContain(`zoe-${id}@example.com`);
+  expect(recent).toContain(`ada-${id}@example.com`);
 });

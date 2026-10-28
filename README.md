@@ -1040,3 +1040,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Add to cart from product cards (after launch, part 170)
 
 1. **Quick add**: product cards in collections, search and on the home page carry an "Add to cart" button when there's nothing to choose first: one option, no text to type, no minimum above one, and some left. The buyer lands in the cart, as from the product page; every other product still opens its page. It's on for every store and the Products page has a switch to turn it off. The theme editor's preview shows cards without it (`quickAddVariant` and `setCardQuickAdd` in `packages/core/src/badges.ts`; migration `0122_card_quick_add`).
+
+### Orders placed recently (after launch, part 171)
+
+1. **Placed in**: the order list can show only orders placed in the last 7, 30 or 90 days or the last 12 months. It works with the tabs, search, tags, product and country filters, the pages and saved views ("This month's UK orders" stays current). The spreadsheet download follows it too, and its own From date, when set, narrows it further. The download also follows the Bank transfers tab now (`ORDER_PLACED_DAYS` and `placedSince` in `packages/core/src/orders.ts`; no migration).

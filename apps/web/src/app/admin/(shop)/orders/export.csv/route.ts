@@ -1,4 +1,4 @@
-import { ordersCsv } from "@sf/core";
+import { ordersCsv, placedSince } from "@sf/core";
 import { requireShop } from "@/lib/server";
 
 const day = (s: string | null) => (s && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s)) ? new Date(`${s}T00:00:00Z`) : undefined);
@@ -7,12 +7,15 @@ const day = (s: string | null) => (s && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number
 export async function GET(request: Request) {
   const { shop, db } = await requireShop("orders");
   const p = new URL(request.url).searchParams;
-  const from = day(p.get("from"));
+  // Picked dates, else the list's "placed in the last N days" (the later start wins when both are set).
+  const picked = day(p.get("from"));
+  const recent = placedSince(p.get("placed"));
+  const from = picked && recent ? (picked > recent ? picked : recent) : (picked ?? recent);
   const until = day(p.get("to"));
   const to = until ? new Date(until.getTime() + 86_400_000) : undefined;
   const show = p.get("show");
   const csv = await ordersCsv(db, shop.id, {
-    ...(show === "problems" ? { fulfillmentStatus: "problem" as const } : show === "held" ? { held: true } : {}),
+    ...(show === "problems" ? { fulfillmentStatus: "problem" as const } : show === "held" ? { held: true } : show === "transfers" ? { transfer: true } : {}),
     query: p.get("q") ?? undefined,
     tag: p.get("tag") ?? undefined,
     productId: p.get("product") ?? undefined,
