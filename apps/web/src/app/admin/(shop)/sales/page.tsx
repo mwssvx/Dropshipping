@@ -92,7 +92,7 @@ function EarlyAccess({ sale: s, store }: { sale: Awaited<ReturnType<typeof listS
           <input className="input font-mono text-xs" id={`early-${s.id}`} readOnly value={`${store}/discount/${s.early.code}`} />
         </div>
         <div className="flex flex-wrap gap-3 items-center text-sm">
-          <Link href="/admin/campaigns/new" className="btn btn-secondary btn-sm">Email it to subscribers</Link>
+          <Link href={`/admin/campaigns/new?early=${s.id}`} className="btn btn-secondary btn-sm">{s.early.customerTag ? `Email the “${s.early.customerTag}” customers` : "Email your subscribers"}</Link>
           <form action={endEarlyAccessAction.bind(null, s.id)}>
             <button className="hint hover:text-critical">Stop early access</button>
           </form>

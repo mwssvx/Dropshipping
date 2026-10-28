@@ -8,6 +8,7 @@ import { z } from "zod";
 import { collectionMembership } from "./collections";
 import { createDiscount, setDiscountActive } from "./discounts";
 import { NotFoundError, UserError } from "./errors";
+import { defaultCutoffZone } from "./ship-cutoff";
 import { percentOff } from "./wholesale";
 
 export const MAX_SALES = 50;
@@ -138,6 +139,30 @@ export async function giveEarlyAccess(db: Db, shopId: string, saleId: string, op
   });
   await db.update(schema.sales).set({ earlyDiscountId: d.id, updatedAt: now }).where(eq(schema.sales.id, sale.id));
   return d;
+}
+
+/**
+ * A campaign draft announcing a sale's early access: when the sale starts, what's in it, and a
+ * button that puts the code in the cart. To the tagged customers when the code is for a tag.
+ * Null once the sale has started or has no early access.
+ */
+export async function earlyAccessEmail(db: Db, shop: { id: string; country: string; shipCutoff: { timeZone: string } | null }, saleId: string, now = new Date()) {
+  const sale = await db.query.sales.findFirst({ where: and(eq(schema.sales.id, saleId), eq(schema.sales.shopId, shop.id)) });
+  if (!sale?.earlyDiscountId || sale.startsAt <= now) return null;
+  const code = await db.query.discounts.findFirst({ where: eq(schema.discounts.id, sale.earlyDiscountId) });
+  if (!code?.active) return null;
+  const collection = sale.collectionId ? await db.query.collections.findFirst({ where: eq(schema.collections.id, sale.collectionId), columns: { title: true } }) : null;
+  const what = sale.scope === "all" ? "everything" : collection ? `our ${collection.title} collection` : "everything in the sale";
+  const day = sale.startsAt.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: shop.shipCutoff?.timeZone ?? defaultCutoffZone(shop.country) });
+  return {
+    subject: `Early access: ${sale.title}, ${sale.percentOff}% off`,
+    body: `Hi {first_name},\n\nOur ${sale.title} starts on ${day}, but you can shop it now: ${sale.percentOff}% off ${what}.\n\nThe button below puts your code, ${code.code}, in your cart. It works until the sale starts.`,
+    buttonLabel: "Shop early",
+    buttonPath: `/discount/${code.code}`,
+    audience: code.customerTag ? ("tagged" as const) : ("subscribers" as const),
+    audienceTag: code.customerTag,
+    audienceProductId: null,
+  };
 }
 
 /** Stops a sale's early access code now. */

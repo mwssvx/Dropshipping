@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { schema } from "@sf/db";
-import { DemoModel, deleteSale, endEarlyAccess, giveEarlyAccess, listSales, quoteCart } from "../src";
+import { DemoModel, deleteSale, earlyAccessEmail, endEarlyAccess, giveEarlyAccess, listSales, quoteCart } from "../src";
 import { DAY, makeFixture } from "../evals/fixture";
 
 describe("early access to a sale", () => {
@@ -21,6 +21,17 @@ describe("early access to a sale", () => {
     await expect(giveEarlyAccess(f.db, shopId, sale!.id, {}, now)).rejects.toThrow("already has early access");
     const [listed] = await listSales(f.db, shopId, now);
     expect(listed!.early).toMatchObject({ code: "EARLY-BLACKFRIDAY", customerTag: null });
+    // The announcement, written, with a button that applies the code.
+    const day = sale!.startsAt.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "America/New_York" });
+    expect(await earlyAccessEmail(f.db, await f.shop(), sale!.id, now)).toEqual({
+      subject: "Early access: Black Friday!, 30% off",
+      body: `Hi {first_name},\n\nOur Black Friday! starts on ${day}, but you can shop it now: 30% off everything in the sale.\n\nThe button below puts your code, EARLY-BLACKFRIDAY, in your cart. It works until the sale starts.`,
+      buttonLabel: "Shop early",
+      buttonPath: "/discount/EARLY-BLACKFRIDAY",
+      audience: "subscribers",
+      audienceTag: null,
+      audienceProductId: null,
+    });
 
     // 30% off the lamp only, the same as the sale will take.
     const lamp = await quoteCart(f.db, await f.shop(), [{ variantId: small!.id, quantity: 1 }], { discountCode: code.code });
@@ -58,5 +69,8 @@ describe("early access to a sale", () => {
     await expect(quoteCart(f.db, await f.shop(), lines, { discountCode: code, email: "bob@example.com" })).rejects.toThrow("for some customers only");
     expect((await quoteCart(f.db, await f.shop(), lines, { discountCode: code, email: "ada@example.com" })).discountMinor).toBeGreaterThan(0);
     await expect(giveEarlyAccess(f.db, shopId, sale!.id, { hours: 5 }, now)).rejects.toThrow();
+    // The email goes to the subscribers with that tag.
+    expect(await earlyAccessEmail(f.db, await f.shop(), sale!.id, now)).toMatchObject({ audience: "tagged", audienceTag: "vip", body: expect.stringContaining("20% off everything.") });
+    expect(await earlyAccessEmail(f.db, await f.shop(), sale!.id, new Date(now.getTime() + 2 * DAY))).toBeNull();
   });
 });

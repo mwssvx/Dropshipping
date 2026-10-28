@@ -1221,6 +1221,6 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 ### Early access to a sale (after launch, part 212)
 
-1. **Let subscribers in first** (`giveEarlyAccess` in `packages/core/src/sales.ts`, Sales → a scheduled sale → Give early access): makes a code like EARLY-BLACKFRIDAY with the sale's percentage off the same products, working from now (or one to three days before the sale) until the sale starts, when everyone gets the price anyway. The Sales page shows the link to send (it puts the code in the buyer's cart) and a button to write the email.
+1. **Let subscribers in first** (`giveEarlyAccess` in `packages/core/src/sales.ts`, Sales → a scheduled sale → Give early access): makes a code like EARLY-BLACKFRIDAY with the sale's percentage off the same products, working from now (or one to three days before the sale) until the sale starts, when everyone gets the price anyway. The Sales page shows the link to send (it puts the code in the buyer's cart), and "Email your subscribers" opens a campaign already written (`earlyAccessEmail`): when the sale starts, what's in it, and a "Shop early" button that applies the code.
 2. **Only for your best customers**: give it a customer tag (say "vip") and only customers with that tag can use it at checkout.
 3. **Stops cleanly**: "Stop early access" turns the code off, and deleting the sale turns its code off too (`sales.early_discount_id`, migration 0137).

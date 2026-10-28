@@ -100,4 +100,8 @@ test("a merchant runs a sale and ends it", async ({ page, browser }, info) => {
   await buyer.getByRole("button", { name: "Add to cart" }).click();
   await expect(buyer).toHaveURL(/\/cart$/);
   await expect(buyer.getByText("EARLY-SUMMERSALE2").first()).toBeVisible();
+  // The announcement comes written, with a button that applies the code.
+  await summer.getByRole("link", { name: "Email your subscribers" }).click();
+  await expect(page.getByLabel("Subject")).toHaveValue("Early access: Summer sale, 10% off");
+  await expect(page.getByLabel("Email", { exact: true })).toHaveValue(/you can shop it now: 10% off everything\.[\s\S]*EARLY-SUMMERSALE2/);
 });
