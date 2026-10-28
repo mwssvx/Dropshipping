@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { schema } from "@sf/db";
-import { DemoModel, listAiReports, runScheduledAgents, runStoreWatch, storeSignals, todaySummary } from "../src";
+import { createProduct, DemoModel, listAiReports, runScheduledAgents, runStoreWatch, sendWatchEmails, storeSignals, todaySummary } from "../src";
 import { DAY, makeFixture, type Fixture } from "../evals/fixture";
 
 const NOW = new Date("2026-11-04T07:00:00Z");
@@ -67,5 +67,44 @@ describe("the daily store watch", () => {
     expect((await runScheduledAgents(f.ctx, NOW)).storeWatches).toBe(0);
     await f.setShop({ aiDailyWatch: true });
     expect((await runScheduledAgents(f.ctx, NOW)).storeWatches).toBe(1);
+  });
+
+  it("flags a best seller about to run out, with nothing on order", async () => {
+    const f = await makeFixture(new DemoModel());
+    const shop = await f.shop();
+    const mug = await createProduct(f.db, shop.id, { title: "Mug", status: "active", variants: [{ title: "Default", priceMinor: 1000, costMinor: 300, stock: 12 }] });
+    for (let i = 0; i < 10; i++) await f.order(mug.id);
+    const signals = await storeSignals(f.db, shop, NOW);
+    expect(signals.map((s) => s.kind)).toEqual(["stock_running_out"]);
+    expect(signals[0]).toMatchObject({ tone: "medium", headline: "Mug has 2 left, about 6 days at its recent pace, and nothing is on order." });
+  });
+
+  it("flags the supplier turning down more orders than usual", async () => {
+    const f = await makeFixture(new DemoModel());
+    for (let i = 0; i < 2; i++) await f.outOfStockOrder();
+    await f.db.update(schema.fulfillments).set({ createdAt: YESTERDAY });
+    const [s] = await storeSignals(f.db, await f.shop(), NOW);
+    expect(s).toMatchObject({ kind: "supplier_failures", tone: "high", headline: "The supplier couldn't take 2 of yesterday's 2 orders (usually 5% fail)." });
+  });
+
+  it("emails the alert once to the people who see money, unless it's turned off", async () => {
+    const f = await makeFixture(new DemoModel());
+    await history(f, 2, 0);
+    await runStoreWatch(f.ctx, await f.shop(), NOW);
+    const ctx = { db: f.db, mailer: f.mailer, adminUrl: (p: string) => `https://admin.example${p}` };
+    const before = f.mailer.sent.length;
+    expect(await sendWatchEmails(ctx, NOW)).toEqual({ sent: 1 });
+    const mail = f.mailer.sent.at(-1)!;
+    expect(mail.subject).toBe("Glow Lamps: sales fell yesterday");
+    expect(mail.text).toContain("below the usual");
+    expect(mail.text).toContain("https://admin.example/admin/insights");
+    expect(f.mailer.sent.length).toBe(before + 1);
+    expect(await sendWatchEmails(ctx, NOW)).toEqual({ sent: 0 });
+
+    const g = await makeFixture(new DemoModel());
+    await history(g, 2, 0);
+    await g.setShop({ aiWatchEmail: false });
+    await runStoreWatch(g.ctx, await g.shop(), NOW);
+    expect(await sendWatchEmails({ ...ctx, db: g.db, mailer: g.mailer }, NOW)).toEqual({ sent: 0 });
   });
 });

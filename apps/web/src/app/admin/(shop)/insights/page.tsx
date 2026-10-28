@@ -86,7 +86,7 @@ export default async function InsightsPage() {
             <h2 id="watch-title" className="font-semibold">Store watch</h2>
             <p className="hint text-sm">
               {shop.aiDailyWatch
-                ? "Each morning, yesterday is compared with your last four weeks. When sales, visitors, checkout or refunds are out of line, the AI looks for the likely cause and says what to do. Normal days cost nothing."
+                ? "Each morning, yesterday is compared with your last four weeks. When sales, visitors, checkout, refunds, stock or supplier orders are out of line, the AI looks for the likely cause and says what to do. Normal days cost nothing."
                 : <>The daily store watch is off. Turn it on in <Link className="underline" href="/admin/ai">AI settings</Link>.</>}
             </p>
           </div>
