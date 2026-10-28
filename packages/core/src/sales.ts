@@ -2,7 +2,7 @@
 // While a sale runs, the store shows the sale price with the old price crossed out, and the cart
 // charges it; quantity, wholesale and bundle discounts come off the sale price. It ends by itself.
 // Overlapping sales don't add up: a product gets the biggest one. Gift cards are never on sale.
-import { and, asc, count, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, asc, count, countDistinct, eq, gt, gte, inArray, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
 import { collectionMembership } from "./collections";
@@ -187,4 +187,48 @@ export async function withSales<T extends Sellable>(db: Db, shopId: string, item
     if (item.variants) next.variants = item.variants.map((v) => ({ ...v, ...salePrice(v.priceMinor, v.compareAtMinor ?? null, sale) }));
     return next;
   });
+}
+
+export type SaleOutcome = { days: number; orders: number; units: number; salesMinor: number; beforeMinor: number; lift: number | null };
+
+/** Sales that have run, newest first, get results; older ones don't, to keep the page quick. */
+export const SALE_RESULTS_MAX = 10;
+
+/**
+ * How each sale that has started did: orders with something it covered, items on sale sold and
+ * what they brought in, over its days so far, against the same number of days just before it.
+ * A collection sale counts what's in the collection now.
+ */
+export async function saleResults(db: Db, shopId: string, sales: Pick<Sale, "id" | "scope" | "collectionId" | "productIds" | "startsAt" | "endsAt">[], now = new Date()) {
+  const started = sales
+    .filter((s) => s.startsAt <= now)
+    .sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime())
+    .slice(0, SALE_RESULTS_MAX);
+  const collectionIds = started.map((s) => s.collectionId).filter((c): c is string => !!c);
+  const members = await collectionMembership(db, shopId, collectionIds);
+  const o = schema.orders;
+  const l = schema.orderLines;
+  const totals = async (s: (typeof started)[number], from: Date, to: Date) => {
+    const ids = s.scope === "products" ? s.productIds : s.scope === "collection" ? [...(members.get(s.collectionId!) ?? [])] : null;
+    if (ids && !ids.length) return { orders: 0, units: 0, salesMinor: 0 };
+    const covered = ids ? inArray(schema.products.id, ids) : eq(schema.products.giftCard, false);
+    const [row] = await db
+      .select({ orders: countDistinct(o.id), units: sql<number>`coalesce(sum(${l.quantity}), 0)::int`, sales: sql<number>`coalesce(sum(${l.quantity} * ${l.unitPriceMinor}), 0)::bigint` })
+      .from(l)
+      .innerJoin(o, eq(o.id, l.orderId))
+      .innerJoin(schema.variants, eq(schema.variants.id, l.variantId))
+      .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
+      .where(and(eq(o.shopId, shopId), inArray(o.paymentStatus, ["paid", "partially_refunded", "refunded"]), ne(o.source, "replacement"), gte(o.paidAt, from), lt(o.paidAt, to), covered));
+    return { orders: Number(row?.orders ?? 0), units: Number(row?.units ?? 0), salesMinor: Number(row?.sales ?? 0) };
+  };
+  const results = new Map<string, SaleOutcome>();
+  await Promise.all(
+    started.map(async (s) => {
+      const to = s.endsAt && s.endsAt < now ? s.endsAt : now;
+      const length = Math.max(0, to.getTime() - s.startsAt.getTime());
+      const [during, before] = await Promise.all([totals(s, s.startsAt, to), totals(s, new Date(s.startsAt.getTime() - length), s.startsAt)]);
+      results.set(s.id, { days: Math.max(1, Math.round(length / 86_400_000)), ...during, beforeMinor: before.salesMinor, lift: before.salesMinor > 0 ? during.salesMinor / before.salesMinor : null });
+    }),
+  );
+  return results;
 }

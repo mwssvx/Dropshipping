@@ -1203,3 +1203,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Ready in an afternoon** (`holidayChecklist` in `packages/core/src/holiday-checklist.ts`, `/admin/holidays`): ten things worth setting up before Black Friday and Christmas, each ticked from the store's own settings and linking to where it's done: delivery dates, a last day to order, longer returns for gifts, gift cards, gift wrapping, a sale, checkout reminders, a sign-up offer, running late emails, and a backup supplier for each of the five best sellers of the last 60 days (named when they have none).
 2. **On the home page in season**: from October 1 to December 24 the owner's home page shows "Get ready for the holidays" with how many are done and the next one, until all are.
+
+### How each sale did (after launch, part 209)
+
+1. **Results on the Sales page** (`saleResults` in `packages/core/src/sales.ts`): every sale that has started shows its orders, items on sale sold and what they brought in ("Over 3 days: 42 orders, 61 items on sale, $1,830.00"), so far for one still running.
+2. **Against the days before**: the same number of days just before the sale, for the same products, gives "3.2× the 3 days before" in green or "Down 20% on the 3 days before" in red, which tells a merchant whether this Black Friday's discount was worth it. The newest 10 sales get results, and a collection sale counts what's in the collection now.
