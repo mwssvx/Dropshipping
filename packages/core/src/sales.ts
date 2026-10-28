@@ -85,6 +85,21 @@ export async function endSale(db: Db, shopId: string, saleId: string, now = new 
   await db.update(schema.sales).set({ endsAt: now, updatedAt: now }).where(eq(schema.sales.id, sale.id));
 }
 
+/** How much longer a sale can be kept on in one go, in days. */
+export const SALE_EXTEND_DAYS = [1, 2, 3, 7] as const;
+
+/** Keeps a sale on for longer ("Cyber Monday too"): its end moves by `days`. It must not have ended. */
+export async function extendSale(db: Db, shopId: string, saleId: string, days: number, now = new Date()) {
+  const sale = await db.query.sales.findFirst({ where: and(eq(schema.sales.id, saleId), eq(schema.sales.shopId, shopId)) });
+  if (!sale) throw new NotFoundError("Sale");
+  if (!sale.endsAt) throw new UserError("This sale runs until you end it.");
+  if (sale.endsAt <= now) throw new UserError("This sale has ended. Add a new one instead.");
+  if (!(SALE_EXTEND_DAYS as readonly number[]).includes(days)) throw new UserError("Pick how much longer the sale runs.");
+  const endsAt = new Date(sale.endsAt.getTime() + days * 86_400_000);
+  await db.update(schema.sales).set({ endsAt, updatedAt: now }).where(eq(schema.sales.id, sale.id));
+  return { ...sale, endsAt };
+}
+
 export async function deleteSale(db: Db, shopId: string, saleId: string) {
   const [row] = await db
     .delete(schema.sales)
