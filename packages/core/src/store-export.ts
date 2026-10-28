@@ -29,6 +29,7 @@ import { storePixels } from "./pixels";
 import { parseVideo } from "./video";
 import { detailsText, parseDetails } from "./product-details";
 import { groupBy } from "./group";
+import { productWhere, type ProductQuery } from "./products";
 
 export const EXPORT_FORMAT = "storefront-store";
 
@@ -1005,10 +1006,13 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
 }
 
 /** One row per variant, for spreadsheets and other platforms. Prices are in major units. */
-export async function productsCsv(db: Db, shopId: string) {
-  const products = await db.query.products.findMany({ where: eq(schema.products.shopId, shopId), orderBy: asc(schema.products.createdAt) });
+/** Every product, or only those the product list's search and filters show. */
+export async function productsCsv(db: Db, shopId: string, list: ProductQuery = {}) {
+  // Built as a plain select: raw SQL inside a relational query has its columns renamed.
+  const ids = db.select({ id: schema.products.id }).from(schema.products).where(productWhere(db, shopId, list));
+  const products = await db.query.products.findMany({ where: and(eq(schema.products.shopId, shopId), inArray(schema.products.id, ids)), orderBy: asc(schema.products.createdAt) });
   const variants = products.length
-    ? groupBy(await db.query.variants.findMany({ where: inArray(schema.variants.productId, db.select({ id: schema.products.id }).from(schema.products).where(eq(schema.products.shopId, shopId))), orderBy: asc(schema.variants.position) }), (v) => v.productId)
+    ? groupBy(await db.query.variants.findMany({ where: inArray(schema.variants.productId, ids), orderBy: asc(schema.variants.position) }), (v) => v.productId)
     : new Map<string, (typeof schema.variants.$inferSelect)[]>();
   const major = (m: number | null) => (m === null ? null : (m / 100).toFixed(2));
   const header = ["Handle", "Title", "Status", "Variant", "SKU", "Price", "Compare at price", "Cost", "Stock", "Image URL", "Supplier link", "Tags"];

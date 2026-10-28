@@ -1020,3 +1020,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Product stock filter (after launch, part 165)
 
 1. **Stock**: the Products page filters to products that are sold out (every option has a count and none are left), running low (still for sale, with an option at or under the running-low email's number), or in stock (at least one option can be bought). Options without a stock count always count as in stock. The filter works with the search, status, tags, sort and pages (`PRODUCT_STOCK_FILTERS` in `packages/core/src/products.ts`; no migration).
+
+### Download the products the list shows (after launch, part 166)
+
+1. **These products**: the Products page has "Download these products as a spreadsheet", which holds only the products its search, status, tags and stock filter show, with every option of each. Filter to Sold out, download, fill in the new stock, and upload it back under "Change prices and stock from a spreadsheet". With no filter it's every product, as before (`productWhere` in `packages/core/src/products.ts`, shared by the list and `productsCsv`; no migration).

@@ -143,6 +143,13 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                 ))}
               </nav>
             )}
+            {can(role, "export") && (
+              <p className="text-sm">
+                <a className="underline" href={`/admin/export/products.csv${filtered ? `?${new URLSearchParams(Object.entries({ q, status, tag, stock }).filter((e): e is [string, string] => !!e[1]))}` : ""}`} download>
+                  Download {filtered ? "these products" : "all products"} as a spreadsheet
+                </a>
+              </p>
+            )}
             <details className="text-sm">
               <summary className="cursor-pointer underline w-fit">Change prices and stock from a spreadsheet</summary>
               <PriceImportForm canDownload={can(role, "export")} />
