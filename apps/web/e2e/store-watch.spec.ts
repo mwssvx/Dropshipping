@@ -26,6 +26,7 @@ test("the store watch shows on Insights and can be turned off", async ({ page },
   await page.goto("/admin/ai");
   const box = page.getByLabel(/Watch my store every day/);
   await expect(box).toBeChecked();
+  await expect(page.getByLabel(/Email me the store watch/)).toBeChecked();
   await box.uncheck();
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("Saved.")).toBeVisible();

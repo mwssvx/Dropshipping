@@ -141,6 +141,8 @@ export const shops = pgTable(
     aiWeeklyReview: boolean("ai_weekly_review").notNull().default(false),
     // The daily store watch: an alert when sales, visitors, checkout or refunds move out of line.
     aiDailyWatch: boolean("ai_daily_watch").notNull().default(true),
+    /** Email the store watch's alerts as well as showing them in the admin and the app. */
+    aiWatchEmail: boolean("ai_watch_email").notNull().default(true),
     // Assistant skills the merchant switched off (names from core's SKILLS).
     aiSkillsOff: jsonb("ai_skills_off").$type<string[]>().notNull().default([]),
     /** Notes the owner asked the assistant to remember, used in every chat. */
@@ -1025,6 +1027,8 @@ export const aiReports = pgTable(
     runId: uuid("run_id").references(() => agentRuns.id, { onDelete: "set null" }),
     summary: text("summary").notNull(),
     items: jsonb("items").$type<AiReportItem[]>().notNull(),
+    /** When the store's people were emailed about it (store watch alerts only). */
+    notifiedAt: timestamp("notified_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [index("ai_reports_shop_idx").on(t.shopId, t.kind, t.createdAt)],

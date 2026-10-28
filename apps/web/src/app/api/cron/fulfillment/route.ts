@@ -1,4 +1,4 @@
-import { applyAllTagRules, notifyLowStock, notifySoldOut, publishDueProducts, sendReviewRequests, pruneActivity, sendWeeklySummaries, pruneAuthRecords, pruneBuyerRecords, pruneStockAlerts, sendPriceDrops, sendStockAlerts, syncSupplierStock, pruneInvites, pruneEvents, refreshAllVerified, runWebhooks, routeStuckOrders, sendCampaignBatches, runFakePayouts, notifyNewDisputes, runDueSubscriptions, sendWinbackEmails, notifyCostChanges, notifyLatePreorders, runHealthChecks, runScheduledAgents, sendAbandonedCartEmails, sendAllNotifications, sendReferralRewards, syncTracking } from "@sf/core";
+import { applyAllTagRules, notifyLowStock, notifySoldOut, publishDueProducts, sendReviewRequests, pruneActivity, sendWeeklySummaries, pruneAuthRecords, pruneBuyerRecords, pruneStockAlerts, sendPriceDrops, sendStockAlerts, syncSupplierStock, pruneInvites, pruneEvents, refreshAllVerified, runWebhooks, routeStuckOrders, sendCampaignBatches, runFakePayouts, notifyNewDisputes, runDueSubscriptions, sendWinbackEmails, notifyCostChanges, notifyLatePreorders, runHealthChecks, runScheduledAgents, sendAbandonedCartEmails, sendWatchEmails, sendAllNotifications, sendReferralRewards, syncTracking } from "@sf/core";
 import { agents, campaigns, adminNotices, fulfillment, pushSender, stock, subscriptions, testPayments, webhooks } from "@/lib/server";
 
 /**
@@ -53,6 +53,8 @@ export async function GET(request: Request) {
   // The Monday summary of last week, once per store.
   const summaries = await sendWeeklySummaries(await adminNotices());
   const ai = await runScheduledAgents(await agents());
+  // What the store watch just flagged, by email too.
+  const watchEmails = await sendWatchEmails(await adminNotices());
   const push = await sendAllNotifications({ db: ctx.db, push: pushSender() });
   const hooks = await runWebhooks(await webhooks());
   const pruned = await pruneEvents(ctx.db);
@@ -61,5 +63,5 @@ export async function GET(request: Request) {
   await pruneBuyerRecords(ctx.db);
   await pruneStockAlerts(ctx.db);
   await pruneActivity(ctx.db);
-  return Response.json({ published, routed, tracking, referrals, stock: stockSync, priceRises, soldOut, runningLow, preorders, subscriptions: repeats, restocked, priceDrops, payouts, disputes, health, verified, tagRules, reminders, reviewRequests, campaigns: campaignEmails, winback, summaries, ai, push, webhooks: hooks, pruned });
+  return Response.json({ published, routed, tracking, referrals, stock: stockSync, priceRises, soldOut, runningLow, preorders, subscriptions: repeats, restocked, priceDrops, payouts, disputes, health, verified, tagRules, reminders, reviewRequests, campaigns: campaignEmails, winback, summaries, ai, watchEmails, push, webhooks: hooks, pruned });
 }

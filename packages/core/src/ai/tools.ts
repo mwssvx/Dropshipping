@@ -24,7 +24,7 @@ import { searchReport } from "../search-terms";
 import { inventoryReport } from "../inventory";
 import { profitReport } from "../profit";
 import { customerReport, productFunnel, returnsReport } from "../insights";
-import type { WatchSignal } from "../watch";
+import { WATCH_KINDS, type WatchSignal } from "../watch";
 import { AUTO, blocked, needsOk, untrusted, type Decision, type RunScope } from "./context";
 import { enabledSkills, SKILL_NAMES, SKILLS } from "./skills";
 import { brandProblems, type BrandRules } from "./brand";
@@ -862,7 +862,7 @@ export async function thinMargins(run: Pick<RunScope, "ctx" | "shop">, minPct = 
 export async function setAiSettings(
   db: RunScope["ctx"]["db"],
   shop: Pick<RunScope["shop"], "id" | "plan">,
-  s: { budgetMinor?: number | null; autoReplyTopics?: string[]; autoPause?: boolean; shopper?: boolean; weeklyReview?: boolean; dailyWatch?: boolean; memory?: string[]; skillsOff?: string[]; brand?: BrandRules | null },
+  s: { budgetMinor?: number | null; autoReplyTopics?: string[]; autoPause?: boolean; shopper?: boolean; weeklyReview?: boolean; dailyWatch?: boolean; watchEmail?: boolean; memory?: string[]; skillsOff?: string[]; brand?: BrandRules | null },
 ) {
   const max = PLAN_AI_BUDGET_MINOR[shop.plan];
   if (s.budgetMinor !== undefined && s.budgetMinor !== null && (!Number.isFinite(s.budgetMinor) || s.budgetMinor < 0 || s.budgetMinor > max)) {
@@ -878,6 +878,7 @@ export async function setAiSettings(
       ...(s.shopper !== undefined ? { aiShopper: s.shopper } : {}),
       ...(s.weeklyReview !== undefined ? { aiWeeklyReview: s.weeklyReview } : {}),
       ...(s.dailyWatch !== undefined ? { aiDailyWatch: s.dailyWatch } : {}),
+      ...(s.watchEmail !== undefined ? { aiWatchEmail: s.watchEmail } : {}),
       ...(s.memory !== undefined ? { aiMemory: normalizeMemory(s.memory) } : {}),
       ...(s.brand !== undefined ? { aiBrand: s.brand } : {}),
       ...(s.skillsOff ? { aiSkillsOff: SKILL_NAMES.filter((n) => s.skillsOff!.includes(n)) } : {}),
@@ -1430,7 +1431,6 @@ const scoutTools = [
 
 /** Signals waiting to be explained, by store, set for the length of one watch run (see runStoreWatch). */
 export const watchSignals = new Map<string, WatchSignal[]>();
-const WATCH_KINDS = ["sales_drop", "sales_jump", "visitors_drop", "checkout_drop", "refunds_up"] as const;
 const WATCH_IMPACT = { high: "high", medium: "medium", good: "low" } as const;
 
 const analystTool = (name: string) => analystTools.find((t) => t.name === name)!;
