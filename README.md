@@ -1064,3 +1064,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Best sellers, newest or on sale on the home page (after launch, part 176)
 
 1. **Which products a featured grid shows**: the Featured products section gets a "Which products" choice: the collection's own order (as before), best sellers first, newest first, or only products on sale. Best sellers count units in paid orders; ties keep the collection's order, and any pick puts sold out products last. A sale grid with nothing on sale is left off the page instead of saying products are coming. "View all" opens the same list on the collection page, sorted the same way or filtered to what's on sale. Themes saved before keep the collection's order (`pickFeatured` and `featuredViewAll` in `packages/core/src/theme-doc.ts`, units sold in `storefrontCatalog`; no migration).
+
+### Products that still lack something (after launch, part 177)
+
+1. **Missing filter on the product list**: a "Missing" row lists products not archived with no photo, no description (markup and spaces alone count as none), an option with no weight (shipping rates by weight can't price it) or no customs details (HS code and country of origin). Weight and customs only count for products that ship, so downloads and gift cards never show there. Each chip shows its count and only appears while some product lacks it. The spreadsheet download, changing every product in the list and saved views follow it (`productGaps` and `ProductQuery.missing` in `packages/core/src/products.ts`; no migration).

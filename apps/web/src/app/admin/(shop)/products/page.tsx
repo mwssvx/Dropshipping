@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { can, formatMoney, listCollections, listSavedViews, MAX_BULK_PRODUCTS, PRODUCT_PAGE_SIZE, PRODUCT_SORTS, type ProductSource, productSources, type ProductStockFilter, productPage, productTags, recentBulkEdits, runningLow, soldOutAtSupplier } from "@sf/core";
+import { can, formatMoney, listCollections, listSavedViews, MAX_BULK_PRODUCTS, PRODUCT_PAGE_SIZE, PRODUCT_SORTS, type ProductGap, productGaps, type ProductSource, productSources, type ProductStockFilter, productPage, productTags, recentBulkEdits, runningLow, soldOutAtSupplier } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { BulkProducts, type BulkRow } from "./BulkProducts";
@@ -17,6 +17,7 @@ export const metadata = { title: "Products" };
 const STATUSES = [["active", "On sale"], ["draft", "Drafts"], ["archived", "Archived"]] as const;
 const STOCK: (readonly [ProductStockFilter, string])[] = [["in_stock", "In stock"], ["low", "Running low"], ["sold_out", "Sold out"]];
 const SOURCES: (readonly [ProductSource, string])[] = [["supplier", "From suppliers"], ["own", "Your own stock"], ["digital", "Downloads"], ["gift_card", "Gift cards"]];
+const GAPS: (readonly [ProductGap, string])[] = [["photo", "No photo"], ["description", "No description"], ["weight", "No weight"], ["customs", "No customs details"]];
 const SORTS = [
   ["newest", "Newest first"],
   ["oldest", "Oldest first"],
@@ -27,7 +28,7 @@ const SORTS = [
   ["price_desc", "Price, high to low"],
 ] as const;
 
-export default async function ProductsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; tag?: string; stock?: string; source?: string; collection?: string; sort?: string; page?: string }> }) {
+export default async function ProductsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; tag?: string; stock?: string; source?: string; collection?: string; missing?: string; sort?: string; page?: string }> }) {
   const { shop, db, role } = await requireShop("products");
   const params = await searchParams;
   const q = params.q?.trim() || undefined;
@@ -35,6 +36,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   const tag = params.tag?.trim().toLowerCase().slice(0, 30) || undefined;
   const stock = STOCK.find(([s]) => s === params.stock)?.[0];
   const source = SOURCES.find(([s]) => s === params.source)?.[0];
+  const missing = GAPS.find(([g]) => g === params.missing)?.[0];
   // Only hand-picked collections: an automatic one's page already shows what its rules match.
   const collections = await listCollections(db, shop.id);
   const picked = collections.filter((c) => !c.rules);
@@ -42,22 +44,25 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   // Newest first is the default, so it's left out of links.
   const sort = PRODUCT_SORTS.find((s) => s === params.sort && s !== "newest");
   const page = Math.max(1, Math.min(10_000, Math.floor(Number(params.page)) || 1));
-  const [{ products, total }, recent, soldOut, low, tags, sources, views] = await Promise.all([
-    productPage(db, shop.id, { query: q, status, tag, stock, source, collection, sort, page }),
+  const [{ products, total }, recent, soldOut, low, tags, sources, views, gaps] = await Promise.all([
+    productPage(db, shop.id, { query: q, status, tag, stock, source, collection, missing, sort, page }),
     recentBulkEdits(db, shop.id),
     soldOutAtSupplier(db, shop.id),
     runningLow(db, shop.id),
     productTags(db, shop.id),
     productSources(db, shop.id),
     listSavedViews(db, shop.id, "products"),
+    productGaps(db, shop.id),
   ]);
-  const filtered = !!(q || status || tag || stock || source || collection);
+  const filtered = !!(q || status || tag || stock || source || collection || missing);
+  // Only what some product still lacks, so a finished catalog shows no Missing row.
+  const shownGaps = GAPS.filter(([g]) => gaps[g] > 0 || missing === g);
   // The source filter only shows when the store has products from more than one place.
   const shownSources = SOURCES.filter(([s]) => sources[s] > 0 || source === s);
   const pages = Math.ceil(total / PRODUCT_PAGE_SIZE);
   // Keeps the other filters when one changes; a new filter starts at page 1.
-  const href = (next: { q?: string; status?: string; tag?: string; stock?: string; source?: string; collection?: string; page?: number }) => {
-    const merged = { q, status, tag, stock, source, collection, sort, ...next, page: next.page && next.page > 1 ? String(next.page) : undefined };
+  const href = (next: { q?: string; status?: string; tag?: string; stock?: string; source?: string; collection?: string; missing?: string; page?: number }) => {
+    const merged = { q, status, tag, stock, source, collection, missing, sort, ...next, page: next.page && next.page > 1 ? String(next.page) : undefined };
     const out = new URLSearchParams(Object.entries(merged).filter((e): e is [string, string] => !!e[1]));
     return out.size ? `/admin/products?${out}` : "/admin/products";
   };
@@ -128,6 +133,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
               {tag && <input type="hidden" name="tag" value={tag} />}
               {stock && <input type="hidden" name="stock" value={stock} />}
               {source && <input type="hidden" name="source" value={source} />}
+              {missing && <input type="hidden" name="missing" value={missing} />}
               <button className="btn btn-secondary">Search</button>
               {picked.length > 0 && (
                 <AutoSubmitSelect id="product-collection" name="collection" label="In collection" value={collection ?? ""}
@@ -135,7 +141,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
               )}
               <AutoSubmitSelect id="product-sort" label="Sort products" value={sort ?? "newest"} options={SORTS} />
             </form>
-            <SavedViews list="products" views={views} params={{ q, status, tag, stock, source, collection, sort }} />
+            <SavedViews list="products" views={views} params={{ q, status, tag, stock, source, collection, missing, sort }} />
             <nav className="flex flex-wrap gap-1" aria-label="Product filters">
               <Link href={href({ status: undefined })} className={`chip text-sm ${!status ? "font-semibold border-accent" : ""}`} aria-current={!status ? "page" : undefined}>All</Link>
               {STATUSES.map(([s, label]) => (
@@ -159,6 +165,18 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                 ))}
               </nav>
             )}
+            {shownGaps.length > 0 && (
+              <nav className="flex flex-wrap gap-1 items-center" aria-label="Filter by what's missing">
+                <span className="hint text-sm mr-1">Missing</span>
+                {shownGaps.map(([g, label]) => (
+                  <Link key={g} href={href({ missing: missing === g ? undefined : g })} className={`chip text-sm ${missing === g ? "font-semibold border-accent" : ""}`} aria-current={missing === g ? "page" : undefined}>
+                    {label} <span className="hint num">{gaps[g]}</span>
+                  </Link>
+                ))}
+              </nav>
+            )}
+            {missing === "weight" && <p className="hint text-sm">Products that ship with an option that has no weight. Shipping rates by weight can&apos;t price those options.</p>}
+            {missing === "customs" && <p className="hint text-sm">Products that ship with no HS code or no country it was made in. Customs can hold a parcel that crosses a border without them.</p>}
             {stock === "low" && <p className="hint text-sm">Still for sale, with an option at {shop.restockAlertAt} or fewer left. Change the number under Running-low email below.</p>}
             {tags.length > 0 && (
               <nav className="flex flex-wrap gap-1 items-center" aria-label="Filter by tag">
@@ -172,7 +190,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
             )}
             {can(role, "export") && (
               <p className="text-sm">
-                <a className="underline" href={`/admin/export/products.csv${filtered ? `?${new URLSearchParams(Object.entries({ q, status, tag, stock, source, collection }).filter((e): e is [string, string] => !!e[1]))}` : ""}`} download>
+                <a className="underline" href={`/admin/export/products.csv${filtered ? `?${new URLSearchParams(Object.entries({ q, status, tag, stock, source, collection, missing }).filter((e): e is [string, string] => !!e[1]))}` : ""}`} download>
                   Download {filtered ? "these products" : "all products"} as a spreadsheet
                 </a>
               </p>
@@ -205,7 +223,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
             tags={tags.map((t) => t.tag)}
             recent={recent.map((r) => ({ id: r.id, summary: r.summary, when: when(r.createdAt), undone: !!r.undoneAt, canUndo: r.canUndo }))}
             total={total}
-            list={Object.fromEntries(Object.entries({ q, status, tag, stock, source, collection }).filter((e): e is [string, string] => !!e[1]))}
+            list={Object.fromEntries(Object.entries({ q, status, tag, stock, source, collection, missing }).filter((e): e is [string, string] => !!e[1]))}
             maxAll={MAX_BULK_PRODUCTS}
           />
         )}
