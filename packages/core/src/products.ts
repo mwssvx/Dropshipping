@@ -315,7 +315,10 @@ export async function productSources(db: Db, shopId: string) {
 }
 
 /** The product list's search and filters, shared by the page and its spreadsheet download. */
-export type ProductQuery = { query?: string; status?: "active" | "draft" | "archived"; tag?: string; stock?: ProductStockFilter; source?: ProductSource };
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** collection: a hand-picked collection's id; products in it. */
+export type ProductQuery = { query?: string; status?: "active" | "draft" | "archived"; tag?: string; stock?: ProductStockFilter; source?: ProductSource; collection?: string };
 
 export function productWhere(db: Db, shopId: string, opts: ProductQuery) {
   const q = opts.query?.trim().toLowerCase();
@@ -325,6 +328,9 @@ export function productWhere(db: Db, shopId: string, opts: ProductQuery) {
     opts.tag ? sql`${schema.products.tags} @> ${JSON.stringify([opts.tag.trim().toLowerCase()])}::jsonb` : undefined,
     opts.stock ? stockWhere(shopId, opts.stock) : undefined,
     opts.source ? sql`${sourceCase()} = ${opts.source}` : undefined,
+    opts.collection && UUID.test(opts.collection)
+      ? inArray(schema.products.id, db.select({ id: schema.collectionProducts.productId }).from(schema.collectionProducts).where(eq(schema.collectionProducts.collectionId, opts.collection)))
+      : undefined,
     q
       ? or(
           sql`lower(${schema.products.title}) like ${`%${q}%`}`,
@@ -344,6 +350,7 @@ export function parseProductQuery(get: (key: string) => string | null | undefine
     tag: get("tag")?.trim().toLowerCase().slice(0, 30) || undefined,
     stock: PRODUCT_STOCK_FILTERS.find((s) => s === get("stock")),
     source: PRODUCT_SOURCES.find((s) => s === get("source")),
+    collection: UUID.test(get("collection") ?? "") ? get("collection")! : undefined,
   };
 }
 
