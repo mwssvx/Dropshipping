@@ -97,6 +97,55 @@ export async function periodTotals(db: Db, shopId: string, range: AnalyticsRange
 /** The change from `before` to `now` as a fraction (0.18 is 18% up), or null when there was nothing before to compare with. */
 export const periodChange = (now: number, before: number) => (before > 0 ? (now - before) / before : null);
 
+export const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
+/** The day in three-hour stretches, by their starting hour. */
+export const DAY_PARTS = ["12–3 am", "3–6 am", "6–9 am", "9 am–12 pm", "12–3 pm", "3–6 pm", "6–9 pm", "9 pm–12 am"] as const;
+/** Below this many orders the busiest time would be chance. */
+export const BUSIEST_MIN_ORDERS = 10;
+
+/**
+ * When orders come in, in the store's time zone: by day of the week, by three-hour stretch of the
+ * day, and the busiest stretch of the week once there are enough orders to say. Helps pick when to
+ * send a campaign or start an ad.
+ */
+export async function whenBuyersBuy(db: Db, shopId: string, range: AnalyticsRange, timeZone: string) {
+  let zone = "UTC";
+  try {
+    zone = new Intl.DateTimeFormat("en-US", { timeZone }).resolvedOptions().timeZone;
+  } catch {
+    // An unknown zone counts in UTC rather than failing the page.
+  }
+  const o = schema.orders;
+  const local = sql`(${o.paidAt} at time zone ${zone})`;
+  const dow = sql<number>`extract(isodow from ${local})::int`;
+  const part = sql<number>`(extract(hour from ${local})::int / 3)`;
+  const rows = await db
+    .select({ dow, part, orders: count() })
+    .from(o)
+    .where(and(eq(o.shopId, shopId), inArray(o.paymentStatus, [...PAID]), ne(o.source, "replacement"), gte(o.paidAt, range.from), lt(o.paidAt, range.to)))
+    // By position: the zone is a parameter each time, so Postgres can't match the expressions.
+    .groupBy(sql`1`, sql`2`);
+  const grid = WEEKDAYS.map(() => DAY_PARTS.map(() => 0));
+  for (const r of rows) grid[Number(r.dow) - 1]![Number(r.part)]! += Number(r.orders);
+  const orders = grid.flat().reduce((a, b) => a + b, 0);
+  let busiest: { day: (typeof WEEKDAYS)[number]; part: (typeof DAY_PARTS)[number]; orders: number } | null = null;
+  if (orders >= BUSIEST_MIN_ORDERS) {
+    for (let d = 0; d < WEEKDAYS.length; d++) {
+      for (let p = 0; p < DAY_PARTS.length; p++) {
+        const n = grid[d]![p]!;
+        if (n > (busiest?.orders ?? 0)) busiest = { day: WEEKDAYS[d]!, part: DAY_PARTS[p]!, orders: n };
+      }
+    }
+  }
+  return {
+    timeZone: zone,
+    orders,
+    byDay: WEEKDAYS.map((day, d) => ({ day, orders: grid[d]!.reduce((a, b) => a + b, 0) })),
+    byPart: DAY_PARTS.map((part, p) => ({ part, orders: grid.reduce((a, parts) => a + parts[p]!, 0) })),
+    busiest,
+  };
+}
+
 /** Sales by day, the visitor funnel, best sellers and where visitors came from. `to` is exclusive. */
 export async function analyticsReport(db: Db, shopId: string, range: AnalyticsRange) {
   const inRange = (col: typeof schema.orders.paidAt | typeof schema.storefrontEvents.createdAt) => and(gte(col, range.from), lt(col, range.to));

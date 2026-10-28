@@ -1183,3 +1183,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Which products come back** (`returnsByProduct` in `packages/core/src/returns-report.ts`, Returns → Returned most): for the last 30 days, 90 days or 12 months, how many items sold and how many came back, with the main reasons ("didn't fit (4), arrived damaged (2)"), and each product's share returned. Counted from orders paid in the period, so the share is of what sold then; declined returns don't count.
 2. **What to do about it**: a product where one in ten or more comes back is marked, with a fix for its main reason: a size chart when it doesn't fit, better packing or another supplier when it arrives damaged, the photos and description when it's not as described. A share shows once 5 have sold, so one return doesn't look like 100%.
+
+### When buyers buy (after launch, part 205)
+
+1. **The busiest time of the week** (`whenBuyersBuy` in `packages/core/src/analytics.ts`, Analytics → When buyers buy): orders in the period by day of the week and by three-hour stretch of the day, and once there are 10 orders, the busiest one ("Most orders come in on Sundays, 6–9 pm"), so the merchant knows when to send a campaign or start an ad.
+2. **In the store's own time**: counted in the time zone of the same-day cutoff, or the store's country, and any other zone can be picked (handy for a store that sells mostly abroad). The period and comparison links keep it.

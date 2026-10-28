@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { analyticsReport, comparisonRange, formatMoney, periodChange, periodTotals, searchReport, type Comparison } from "@sf/core";
+import { analyticsReport, BUSIEST_MIN_ORDERS, comparisonRange, CUTOFF_TIME_ZONES, defaultCutoffZone, formatMoney, periodChange, periodTotals, searchReport, whenBuyersBuy, type Comparison } from "@sf/core";
 import { requireShop, storeAddress } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 
@@ -23,20 +23,26 @@ function pointsLabel(now: number | null, before: number | null) {
   return pts === 0 ? "Same" : `${pts > 0 ? "Up" : "Down"} ${Math.abs(pts)} pts`;
 }
 
-export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<{ days?: string; compare?: string }> }) {
+export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<{ days?: string; compare?: string; tz?: string }> }) {
   const { shop, db } = await requireShop("analytics");
-  const { days: wanted, compare: wantedCompare } = await searchParams;
+  const { days: wanted, compare: wantedCompare, tz } = await searchParams;
   const days = RANGES.find((d) => String(d) === wanted) ?? 30;
   const compare: Comparison = wantedCompare === "year" ? "year" : "previous";
   const now = new Date();
   const to = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) + DAY;
   const range = { from: new Date(to - days * DAY), to: new Date(to) };
-  const [r, before, searches, store] = await Promise.all([
+  const zone = CUTOFF_TIME_ZONES.find(([z]) => z === tz)?.[0] ?? shop.shipCutoff?.timeZone ?? defaultCutoffZone(shop.country);
+  const [r, before, searches, store, when] = await Promise.all([
     analyticsReport(db, shop.id, range),
     periodTotals(db, shop.id, comparisonRange(range, compare), now),
     searchReport(db, shop.id, range),
     storeAddress(shop),
+    whenBuyersBuy(db, shop.id, range, zone),
   ]);
+  // The period and comparison links keep a picked time zone.
+  const tzParam = zone === tz ? `&tz=${encodeURIComponent(zone)}` : "";
+  const busiestDay = Math.max(1, ...when.byDay.map((d) => d.orders));
+  const busiestPart = Math.max(1, ...when.byPart.map((p) => p.orders));
   const versus = compare === "year" ? "vs the same days last year" : `vs the ${days} days before`;
   const searchLink = (term: string) => `${store}/search?q=${encodeURIComponent(term)}`;
   const money = (m: number) => formatMoney(m, shop.currency);
@@ -52,7 +58,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         actions={
           <nav className="flex gap-1" aria-label="Period">
             {RANGES.map((d) => (
-              <Link key={d} href={`/admin/analytics?days=${d}${compare === "year" ? "&compare=year" : ""}`} aria-current={d === days ? "page" : undefined} className={`btn ${d === days ? "btn-primary" : "btn-secondary"}`}>
+              <Link key={d} href={`/admin/analytics?days=${d}${compare === "year" ? "&compare=year" : ""}${tzParam}`} aria-current={d === days ? "page" : undefined} className={`btn ${d === days ? "btn-primary" : "btn-secondary"}`}>
                 {d} days
               </Link>
             ))}
@@ -63,7 +69,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         <nav className="flex flex-wrap items-center gap-2 text-sm" aria-label="Compare with">
           <span className="hint">Compare with</span>
           {(["previous", "year"] as const).map((c) => (
-            <Link key={c} href={`/admin/analytics?days=${days}&compare=${c}`} aria-current={c === compare ? "page" : undefined} className={`pill ${c === compare ? "pill-success" : ""}`}>
+            <Link key={c} href={`/admin/analytics?days=${days}&compare=${c}${tzParam}`} aria-current={c === compare ? "page" : undefined} className={`pill ${c === compare ? "pill-success" : ""}`}>
               {c === "year" ? "Same days last year" : `The ${days} days before`}
             </Link>
           ))}
@@ -106,6 +112,49 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
             </figure>
           )}
         </section>
+
+        {when.orders > 0 && (
+          <section className="card p-5 flex flex-col gap-3" aria-labelledby="when-heading">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 id="when-heading" className="font-semibold">When buyers buy</h2>
+              <form action="/admin/analytics#when-heading" className="flex items-center gap-2 text-sm">
+                <input type="hidden" name="days" value={days} />
+                {compare === "year" && <input type="hidden" name="compare" value="year" />}
+                <label htmlFor="when-tz" className="hint">Time zone</label>
+                <select id="when-tz" name="tz" defaultValue={when.timeZone} className="input">
+                  {CUTOFF_TIME_ZONES.map(([z, name]) => <option key={z} value={z}>{name}</option>)}
+                </select>
+                <button className="btn btn-secondary btn-sm">Show</button>
+              </form>
+            </div>
+            <p className="text-sm">
+              {when.busiest
+                ? <>Most orders come in on <strong>{when.busiest.day}s, {when.busiest.part}</strong>. Send campaigns and start ads a little before then.</>
+                : <span className="hint">The busiest time shows once there are {BUSIEST_MIN_ORDERS} orders in the period.</span>}
+            </p>
+            <div className="grid gap-6 sm:grid-cols-2">
+              {(
+                [
+                  ["By day of the week", when.byDay.map((d) => [d.day, d.orders] as const), busiestDay],
+                  ["By time of day", when.byPart.map((p) => [p.part, p.orders] as const), busiestPart],
+                ] as const
+              ).map(([title, bars, most]) => (
+                <div key={title} className="flex flex-col gap-2">
+                  <h3 className="text-sm font-medium">{title}</h3>
+                  <ul className="flex flex-col gap-1.5" aria-label={title}>
+                    {bars.map(([name, n]) => (
+                      <li key={name} className="grid grid-cols-[6.5rem_1fr_2rem] items-center gap-2 text-sm" aria-label={`${name}: ${n} ${n === 1 ? "order" : "orders"}`}>
+                        <span className="hint">{name}</span>
+                        <span className="h-2 rounded-full bg-sunken overflow-hidden"><span className="block h-full bg-accent" style={{ width: `${(n / most) * 100}%` }} /></span>
+                        <span className="num text-right">{n}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <div className="grid gap-6 lg:grid-cols-2">
           <section className="card p-5 flex flex-col gap-3" aria-labelledby="funnel-heading">
