@@ -2,7 +2,7 @@
 // automatic ones the store works out, so they're never wrong: how much is off when a product is on
 // sale, "Sold out" when nothing can be ordered, and "New" for a while after it was added. A card
 // shows two at most, the merchant's own first. Also where sold-out products sit in lists.
-import { and, eq } from "drizzle-orm";
+import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { schema, SOLD_OUT_DISPLAY, type BadgeSettings, type Db, type SoldOutDisplay } from "@sf/db";
 import { BADGE_MAX_LENGTH } from "./badge-rules";
 import { NotFoundError, UserError } from "./errors";
@@ -41,6 +41,40 @@ export async function setCardQuickAdd(db: Db, shopId: string, on: boolean) {
 export async function setShareButtons(db: Db, shopId: string, on: boolean) {
   await db.update(schema.shops).set({ shareButtons: on, updatedAt: new Date() }).where(eq(schema.shops.id, shopId));
   return on;
+}
+
+/** Whether product pages say how many sold lately. */
+export async function setRecentSales(db: Db, shopId: string, on: boolean) {
+  await db.update(schema.shops).set({ recentSales: on, updatedAt: new Date() }).where(eq(schema.shops.id, shopId));
+  return on;
+}
+
+/** Days "sold in the last N days" counts. */
+export const RECENT_SALES_DAYS = 7;
+/** Fewer sales than this aren't shown: "1 sold" helps nobody. */
+export const RECENT_SALES_MIN = 3;
+
+/**
+ * Units of a product sold in paid orders over the last week, or null when it's fewer than
+ * RECENT_SALES_MIN. Refunded orders don't count, so the number stays honest.
+ */
+export async function recentSalesCount(db: Db, shopId: string, productId: string, now = new Date()) {
+  const since = new Date(now.getTime() - RECENT_SALES_DAYS * 86_400_000);
+  const [row] = await db
+    .select({ units: sql<number>`coalesce(sum(${schema.orderLines.quantity}), 0)::int` })
+    .from(schema.orderLines)
+    .innerJoin(schema.orders, eq(schema.orders.id, schema.orderLines.orderId))
+    .innerJoin(schema.variants, eq(schema.variants.id, schema.orderLines.variantId))
+    .where(
+      and(
+        eq(schema.orders.shopId, shopId),
+        inArray(schema.orders.paymentStatus, ["paid", "partially_refunded"]),
+        eq(schema.variants.productId, productId),
+        gte(schema.orders.paidAt, since),
+      ),
+    );
+  const units = Number(row?.units ?? 0);
+  return units >= RECENT_SALES_MIN ? units : null;
 }
 
 /** Which automatic badges the store's product cards show. */

@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { setBadgeSettings, setCardQuickAdd, setProductBadge, setShareButtons, setSoldOutDisplay, UserError } from "@sf/core";
+import { setBadgeSettings, setCardQuickAdd, setProductBadge, setRecentSales, setShareButtons, setSoldOutDisplay, UserError } from "@sf/core";
 import { requireShop } from "@/lib/server";
 
 export type BadgeState = { error?: string; saved?: boolean };
@@ -52,6 +52,15 @@ export async function soldOutAction(_: BadgeState, form: FormData): Promise<Badg
 export async function shareButtonsAction(_: BadgeState, form: FormData): Promise<BadgeState> {
   const { shop, db } = await requireShop("products");
   await setShareButtons(db, shop.id, form.get("share") === "on");
+  revalidatePath("/admin/products");
+  revalidatePath(`/s/${shop.handle}`, "layout");
+  return { saved: true };
+}
+
+/** "12 sold in the last 7 days" on product pages. */
+export async function recentSalesAction(_: BadgeState, form: FormData): Promise<BadgeState> {
+  const { shop, db } = await requireShop("products");
+  await setRecentSales(db, shop.id, form.get("recentSales") === "on");
   revalidatePath("/admin/products");
   revalidatePath(`/s/${shop.handle}`, "layout");
   return { saved: true };

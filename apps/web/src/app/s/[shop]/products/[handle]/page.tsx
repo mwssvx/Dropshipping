@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, formatDeliveryWindow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, countdownTo, shipsToCountry } from "@sf/core";
+import { bundlesForProduct, formatDeliveryWindow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, countdownTo, shipsToCountry, recentSalesCount, RECENT_SALES_DAYS } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { ShareButtons } from "@/components/ShareButtons";
 import { SaleCountdown } from "@/components/SaleCountdown";
@@ -109,7 +109,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
     many && defs.length > 0 &&
     product.variants.every((x) => Object.keys(x.options ?? {}).sort().join("|") === names) &&
     new Set(product.variants.map((x) => JSON.stringify(defs.map((d) => x.options?.[d.name])))).size === product.variants.length;
-  const [reviews, questions, rawUpsells, base, fx, chart, rawRecent] = await Promise.all([
+  const [reviews, questions, rawUpsells, base, fx, chart, rawRecent, soldLately] = await Promise.all([
     productReviews(await db(), product.id),
     productQuestions(await db(), product.id),
     upsellsFor(await db(), shop.id, [product.id]),
@@ -117,6 +117,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
     buyerFx(shop),
     sizeChartForProduct(await db(), shop.id, product.id),
     readRecent(shop.id).then(async (ids) => recentlyViewed(await db(), shop.id, ids, { exclude: [product.id] })),
+    shop.recentSales ? recentSalesCount(await db(), shop.id, product.id) : null,
   ]);
   const recent = await localProducts(shopHandle, rawRecent);
   const askedKind = ASKED_MESSAGES[(query.asked ?? "") as keyof typeof ASKED_MESSAGES];
@@ -203,6 +204,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
         )}
         {/* Outside the status line above, so screen readers aren't read every tick. */}
         {saleEnds && <SaleCountdown endsAt={saleEnds.toISOString()} lang={lang} text={{ endsIn: t.saleEndsIn, ended: t.saleEnded }} className="text-sm font-medium num" />}
+        {soldLately !== null && <p className="text-sm hint num sf-recent-sales">{t.soldRecently(soldLately, RECENT_SALES_DAYS)}</p>}
         {v && wholesale && (
           <p className="banner banner-info" role="status">
             {t.wholesalePrice} <strong className="num"><Price minor={percentOff(v.priceMinor, wholesale.percentOff)} currency={shop.currency} fx={fx} /></strong> ({t.percentOff(wholesale.percentOff)})
