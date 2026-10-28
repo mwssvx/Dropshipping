@@ -1,4 +1,4 @@
-import { aiBudget, BUYER_TOPICS, formatMoney, listAgentActivity, listShopperChats, MODEL_LABEL } from "@sf/core";
+import { aiBudget, BUYER_TOPICS, formatMoney, listAgentActivity, listShopperChats, MODEL_LABEL, SKILL_NAMES, SKILLS } from "@sf/core";
 import { aiModel, requireShop } from "@/lib/server";
 import { AGENT_LABEL } from "@/lib/agent-labels";
 import { PageHeader } from "../PageHeader";
@@ -59,6 +59,7 @@ export default async function AiSettingsPage() {
               autoPause={shop.aiAutoPause}
               shopper={shop.aiShopper}
               weeklyReview={shop.aiWeeklyReview}
+              skills={SKILL_NAMES.map((key) => ({ key, title: SKILLS[key].title, when: SKILLS[key].when, on: !shop.aiSkillsOff.includes(key) }))}
             />
           </section>
           {chats.length > 0 && (

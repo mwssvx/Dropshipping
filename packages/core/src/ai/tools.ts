@@ -25,6 +25,7 @@ import { inventoryReport } from "../inventory";
 import { profitReport } from "../profit";
 import { customerReport, productFunnel, returnsReport } from "../insights";
 import { AUTO, blocked, needsOk, untrusted, type Decision, type RunScope } from "./context";
+import { enabledSkills, SKILL_NAMES, SKILLS } from "./skills";
 import { addMessage, BUYER_TOPICS, discardDrafts, sendBuyerMessage, setConversationStatus, type BuyerTopic } from "./conversations";
 
 export type AgentTool<I = any> = {
@@ -826,7 +827,7 @@ export async function thinMargins(run: Pick<RunScope, "ctx" | "shop">, minPct = 
 export async function setAiSettings(
   db: RunScope["ctx"]["db"],
   shop: Pick<RunScope["shop"], "id" | "plan">,
-  s: { budgetMinor?: number | null; autoReplyTopics?: string[]; autoPause?: boolean; shopper?: boolean; weeklyReview?: boolean },
+  s: { budgetMinor?: number | null; autoReplyTopics?: string[]; autoPause?: boolean; shopper?: boolean; weeklyReview?: boolean; skillsOff?: string[] },
 ) {
   const max = PLAN_AI_BUDGET_MINOR[shop.plan];
   if (s.budgetMinor !== undefined && s.budgetMinor !== null && (!Number.isFinite(s.budgetMinor) || s.budgetMinor < 0 || s.budgetMinor > max)) {
@@ -841,6 +842,7 @@ export async function setAiSettings(
       ...(s.autoPause !== undefined ? { aiAutoPause: s.autoPause } : {}),
       ...(s.shopper !== undefined ? { aiShopper: s.shopper } : {}),
       ...(s.weeklyReview !== undefined ? { aiWeeklyReview: s.weeklyReview } : {}),
+      ...(s.skillsOff ? { aiSkillsOff: SKILL_NAMES.filter((n) => s.skillsOff!.includes(n)) } : {}),
       updatedAt: new Date(),
     })
     .where(eq(schema.shops.id, shop.id));
@@ -1385,9 +1387,81 @@ const scoutTools = [
   }),
 ];
 
+/* ───────────── Assistant skills, and the bigger helpers it can start ───────────── */
+
+const analystTool = (name: string) => analystTools.find((t) => t.name === name)!;
+const reportForChat = (r: typeof schema.aiReports.$inferSelect) => ({
+  made_on: r.createdAt.toISOString().slice(0, 10),
+  summary: r.summary,
+  items: r.items.map((i) => ({ title: i.title, finding: i.finding, action: i.action, ...(i.sources?.length ? { sources: i.sources.map((x) => x.url) } : {}) })),
+  saved_on: "the Insights page",
+});
+
+/**
+ * Runs the store review or the trend scout from the chat. Each keeps its own cooldown; when it's
+ * too soon, the Assistant gets the latest saved one instead so it can still answer.
+ */
+async function startReport(run: RunScope, kind: "review" | "trends", go: () => Promise<{ status: string; report: typeof schema.aiReports.$inferSelect | null }>) {
+  try {
+    const r = await go();
+    if (!r.report) throw new UserError(r.status === "over_budget" ? "This month's AI budget ran out." : "It didn't finish. The owner can try again from the Insights page.");
+    return reportForChat(r.report);
+  } catch (e) {
+    if (!(e instanceof UserError)) throw e;
+    const { listAiReports } = await import("./agents");
+    const [latest] = await listAiReports(run.ctx.db, run.shop.id, kind, 1);
+    if (!latest) throw e;
+    return { note: e.message, latest: reportForChat(latest) };
+  }
+}
+
+const skillTools = [
+  tool({
+    name: "use_skill",
+    kind: "read",
+    description: "Read the playbook for one of your skills (they're listed in your instructions). Do this before answering a question in that skill's area, then follow the playbook.",
+    input: z.object({ skill: z.enum(SKILL_NAMES) }),
+    summary: (i) => `Read the ${SKILLS[i.skill].title.toLowerCase()} playbook`,
+    async run(i, run) {
+      if (!enabledSkills(run.shop.aiSkillsOff).includes(i.skill)) throw new UserError("The owner switched this skill off. Answer without it.");
+      return { skill: i.skill, playbook: SKILLS[i.skill].playbook };
+    },
+  }),
+  analystTool("read_profit"),
+  analystTool("read_customers"),
+  analystTool("read_product_funnel"),
+  analystTool("read_returns"),
+  tool({
+    name: "review_store",
+    kind: "change",
+    description:
+      "Ask the business analyst for a full written review of the store: it reads sales, profit, customers, the product funnel and returns, and saves up to five suggestions on the Insights page. Takes a minute and a few cents; runs at most every 12 hours. Use it when the owner wants a full review or a plan, not for a single number.",
+    input: z.object({}),
+    policy: () => AUTO,
+    summary: () => "Asked the business analyst for a store review",
+    async run(_, run) {
+      const { reviewStoreWithAi } = await import("./agents");
+      return startReport(run, "review", () => reviewStoreWithAi(run.ctx, run.shop));
+    },
+  }),
+  tool({
+    name: "find_trends",
+    kind: "change",
+    description:
+      "Ask the trend scout to search TikTok, Instagram, Google, Amazon and Reddit for products in demand that suit this store, and save the ideas with their sources on the Insights page. Takes a minute and a few cents; runs at most once a day. Give a short focus if the owner named one.",
+    input: z.object({ focus: z.string().max(120).optional() }),
+    policy: () => AUTO,
+    summary: (i) => (i.focus ? `Asked the trend scout for ideas: ${i.focus}` : "Asked the trend scout for trending products"),
+    async run(i, run) {
+      const { findTrendsWithAi } = await import("./agents");
+      return startReport(run, "trends", () => findTrendsWithAi(run.ctx, run.shop, { focus: i.focus }));
+    },
+  }),
+];
+
 export const AGENT_TOOLS: Record<AgentName, AgentTool[]> = {
   listing: listingTools,
-  assistant: assistantTools,
+  assistant: [...assistantTools, ...skillTools],
   buyer_support: buyerTools,
   fulfilment: fulfilmentTools,
   margin: marginTools,

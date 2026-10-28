@@ -10,6 +10,7 @@ import {
   runMarginWatch,
   setAiSettings,
   setReviewSummary,
+  SKILL_NAMES,
   summarizeReviewsWithAi,
   UserError,
   writeListing,
@@ -150,6 +151,7 @@ export async function saveAiSettingsAction(_: AgentState, form: FormData): Promi
       autoPause: form.get("autoPause") === "on",
       shopper: form.get("shopper") === "on",
       weeklyReview: form.get("weeklyReview") === "on",
+      skillsOff: SKILL_NAMES.filter((n) => !form.getAll("skills").includes(n)),
     });
   } catch (e) {
     return fail(e);

@@ -7,6 +7,7 @@ import { untrusted } from "./context";
 import { addMessage, assistantConversation, BUYER_TOPICS, startBuyerMessage } from "./conversations";
 import { aiBudget, runAgent, type AgentSpec, type RunResult } from "./runtime";
 import { REVIEW_MAX_ITEMS, REVIEW_SUMMARY_MIN, thinMargins, TRENDS_MAX_ITEMS, TRENDS_MAX_SEARCHES } from "./tools";
+import { skillMenu } from "./skills";
 import { LANGUAGES, shopLanguages, untranslated, type Language } from "../languages";
 import { shopperLinks } from "../shopper-links";
 
@@ -38,7 +39,9 @@ ${RULES}`,
     system: (shop) => `You are the assistant inside the admin of ${shop.name}, an online store. You talk with the store's owner.
 Answer their questions about their store using your tools: look things up rather than guessing. For "how am I doing" or "what should I do" questions, read sales, shopper interest and stock, and end with one or two concrete next steps the numbers support. Reading is always fine. Changing settings or emailing customers waits for their OK, which they give in the approvals list next to this chat.
 For payouts, account holds, store notices, bugs, or anything your tools can't do, offer to open a ticket with the platform's support team, and open it if they say yes or clearly want help from a person.
+For a full review of the store, or what's trending and worth selling, you can start the business analyst (review_store) or the trend scout (find_trends); both save their results on the Insights page.
 Keep answers short: lead with the answer, then the one or two facts behind it.
+${skillMenu(shop.aiSkillsOff)}
 ${RULES}`,
   },
   buyer_support: {

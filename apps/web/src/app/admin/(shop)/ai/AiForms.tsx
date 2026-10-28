@@ -4,7 +4,7 @@ import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import { marginCheckAction, saveAiSettingsAction } from "../../ai-actions";
 
-export function AiSettingsForm(props: { budget: string; planMax: string; topics: { key: string; label: string; on: boolean }[]; autoPause: boolean; shopper: boolean; weeklyReview: boolean }) {
+export function AiSettingsForm(props: { budget: string; planMax: string; topics: { key: string; label: string; on: boolean }[]; autoPause: boolean; shopper: boolean; weeklyReview: boolean; skills: { key: string; title: string; when: string; on: boolean }[] }) {
   const [state, action] = useActionState(saveAiSettingsAction, {});
   return (
     <form action={action} className="flex flex-col gap-5">
@@ -47,6 +47,21 @@ export function AiSettingsForm(props: { budget: string; planMax: string; topics:
           <span className="hint block">The business analyst reads last month&apos;s numbers and leaves a few suggestions on the Insights page. Each review uses a few cents of your AI budget.</span>
         </span>
       </label>
+      <fieldset className="flex flex-col gap-2">
+        <legend className="label mb-1">Skills the Assistant uses</legend>
+        <div className="flex flex-col gap-2">
+          {props.skills.map((s) => (
+            <label key={s.key} className="flex items-start gap-3 text-sm">
+              <input type="checkbox" name="skills" value={s.key} defaultChecked={s.on} className="mt-1 size-4" />
+              <span>
+                <span className="font-medium">{s.title}</span>
+                <span className="hint block">For {s.when}.</span>
+              </span>
+            </label>
+          ))}
+        </div>
+        <span className="hint">Each skill is a playbook the Assistant reads only when a question needs it, so having them on costs next to nothing.</span>
+      </fieldset>
       <div><SubmitButton>Save</SubmitButton></div>
     </form>
   );
