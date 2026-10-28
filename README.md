@@ -1010,3 +1010,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Tag a whole customer list (after launch, part 163)
 
 1. **Everyone here**: under the customer list, "Tag these customers" adds or removes one tag on everyone the list shows for its search, tag and filter, on every page (up to 10,000). Tag every repeat buyer "loyal", then give them a code for tagged customers or send them a campaign. Customers who already have 10 tags are left out and counted, removing a tag also stops a tag rule from tracking it, and each change goes in the activity log (`tagCustomers` in `packages/core/src/buyers.ts`; no migration).
+
+### Order filters by product and country (after launch, part 164)
+
+1. **By product**: a product's page has "See orders", which lists every order with that product in it. Handy when a supplier says something is wrong with one item (`productId` in `OrderFilter`, `packages/core/src/orders.ts`).
+2. **By country**: when orders go to more than one country, the order list has a ship-to country menu, showing how many orders each has (`orderCountries`).
+3. Both work with the search, tabs, tags, pages, bulk actions and the spreadsheet download. No migration.

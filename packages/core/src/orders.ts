@@ -762,7 +762,19 @@ export async function handlePaymentEvent(db: Db, provider: string, event: Paymen
   });
 }
 
-export type OrderFilter = { fulfillmentStatus?: Order["fulfillmentStatus"]; held?: boolean; transfer?: boolean; tag?: string; query?: string; from?: Date; to?: Date };
+export type OrderFilter = {
+  fulfillmentStatus?: Order["fulfillmentStatus"];
+  held?: boolean;
+  transfer?: boolean;
+  tag?: string;
+  query?: string;
+  /** Orders with at least one item of this product. */
+  productId?: string;
+  /** Orders shipping to this country (two letters). */
+  country?: string;
+  from?: Date;
+  to?: Date;
+};
 
 function orderWhere(shopId: string, filter: OrderFilter) {
   const tag = filter.tag?.trim().toLowerCase();
@@ -781,10 +793,27 @@ function orderWhere(shopId: string, filter: OrderFilter) {
         ? eq(schema.orders.number, Number(q))
         : sql`(lower(${schema.orders.email}) like ${`%${q}%`} or lower(${schema.orders.shippingAddress}->>'name') like ${`%${q}%`})`
       : undefined,
+    filter.productId && /^[0-9a-f-]{36}$/i.test(filter.productId)
+      ? // Plain names inside: the relational query renames every column to the orders table.
+        sql`exists (select 1 from order_lines ol join variants v on v.id = ol.variant_id where ol.order_id = ${schema.orders.id} and v.product_id = ${filter.productId})`
+      : undefined,
+    filter.country && /^[A-Z]{2}$/i.test(filter.country) ? sql`${schema.orders.shippingAddress}->>'country' = ${filter.country.toUpperCase()}` : undefined,
     // Placed in this range (from inclusive, to exclusive).
     filter.from ? gte(schema.orders.createdAt, filter.from) : undefined,
     filter.to ? lt(schema.orders.createdAt, filter.to) : undefined,
   );
+}
+
+/** The countries the store's orders ship to, most orders first, for the order list's filter. */
+export async function orderCountries(db: Db, shopId: string) {
+  const country = sql<string>`${schema.orders.shippingAddress}->>'country'`;
+  const rows = await db
+    .select({ country, count: sql<number>`count(*)::int` })
+    .from(schema.orders)
+    .where(eq(schema.orders.shopId, shopId))
+    .groupBy(country)
+    .orderBy(sql`count(*) desc`, country);
+  return rows.filter((r) => r.country && /^[A-Z]{2}$/.test(r.country));
 }
 
 /** Every order matching the filter, newest first. For exports and summaries; the order list pages through them. */

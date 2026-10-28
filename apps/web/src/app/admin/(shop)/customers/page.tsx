@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { can, CUSTOMER_FILTERS, CUSTOMER_PAGE_SIZE, CUSTOMER_SORTS, LAPSED_DAYS, customerTags, customerTotals, describeTagRule, formatMoney, listCustomers, listTagRules, productChoices, MAX_TAG_RULES } from "@sf/core";
-import { SortSelect } from "@/components/SortSelect";
+import { AutoSubmitSelect } from "@/components/AutoSubmitSelect";
 import { requireShop } from "@/lib/server";
 import { deleteTagRuleAction } from "../../tag-rule-actions";
 import { PageHeader } from "../PageHeader";
@@ -73,7 +73,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
           {tag && <input type="hidden" name="tag" value={tag} />}
           {filter && <input type="hidden" name="filter" value={filter} />}
           <button className="btn btn-secondary">Search</button>
-          <SortSelect id="customer-sort" label="Sort customers" value={sort ?? "recent"} options={sorts} />
+          <AutoSubmitSelect id="customer-sort" label="Sort customers" value={sort ?? "recent"} options={sorts} />
         </form>
         {(filtered || totals.customers > 0) && <nav aria-label="Show customers" className="flex flex-wrap gap-2 text-sm">
           <Link href={listHref({ filter: undefined })} className={`pill ${filter ? "pill-neutral" : "pill-info"}`} aria-current={filter ? undefined : "page"}>Everyone</Link>

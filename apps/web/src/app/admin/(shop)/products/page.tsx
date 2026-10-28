@@ -8,7 +8,7 @@ import { RestockAlertForm } from "./RestockAlertForm";
 import { BadgeSettingsForm } from "./BadgeSettingsForm";
 import { SoldOutForm } from "./SoldOutForm";
 import { PriceImportForm } from "./PriceImportForm";
-import { SortSelect } from "@/components/SortSelect";
+import { AutoSubmitSelect } from "@/components/AutoSubmitSelect";
 
 export const metadata = { title: "Products" };
 
@@ -114,7 +114,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
               {status && <input type="hidden" name="status" value={status} />}
               {tag && <input type="hidden" name="tag" value={tag} />}
               <button className="btn btn-secondary">Search</button>
-              <SortSelect id="product-sort" label="Sort products" value={sort ?? "newest"} options={SORTS} />
+              <AutoSubmitSelect id="product-sort" label="Sort products" value={sort ?? "newest"} options={SORTS} />
             </form>
             <nav className="flex flex-wrap gap-1" aria-label="Product filters">
               <Link href={href({ status: undefined })} className={`chip text-sm ${!status ? "font-semibold border-accent" : ""}`} aria-current={!status ? "page" : undefined}>All</Link>
