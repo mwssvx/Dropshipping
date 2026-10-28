@@ -1,0 +1,1 @@
+ALTER TABLE "shops" ADD COLUMN "chat_buttons" jsonb;

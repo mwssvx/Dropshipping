@@ -133,6 +133,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       birthday_offer: shop.birthdayOffer ? { percent_off: shop.birthdayOffer.percentOff, days: shop.birthdayOffer.days } : null,
       signup_popup_seconds: shop.signupPopupSeconds,
       thank_you_note: shop.thankYouNote,
+      chat_buttons: shop.chatButtons,
       after_checkout_offer: shop.postPurchaseOffer && handleOf.get(shop.postPurchaseOffer.productId)
         ? { product: handleOf.get(shop.postPurchaseOffer.productId)!, percent_off: shop.postPurchaseOffer.percentOff, active: shop.postPurchaseOffer.active }
         : null,
@@ -327,6 +328,7 @@ const importSchema = z.object({
       birthday_offer: z.object({ percent_off: z.number().int().min(5).max(50), days: z.number().int().min(7).max(60) }).nullable().optional(),
       signup_popup_seconds: z.union([z.literal(5), z.literal(15), z.literal(30), z.literal(60)]).nullable().optional(),
       thank_you_note: z.string().max(500).nullable().optional(),
+      chat_buttons: z.object({ whatsapp: z.string().regex(/^[1-9]\d{7,14}$/).nullable(), telegram: z.string().regex(/^[A-Za-z][A-Za-z0-9_]{4,31}$/).nullable() }).nullable().optional(),
       after_checkout_offer: z.object({ product: handle, percent_off: z.number().int().min(0).max(50), active: z.boolean() }).nullable().optional(),
       subscribe_and_save: z.object({ percent_off: z.number().int().min(0).max(30), active: z.boolean() }).nullable().optional(),
       delivery_estimates: z.object({ enabled: z.boolean(), processing_days: z.number().int().min(0).max(14) }).optional(),
@@ -824,6 +826,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
     }
     if (data.store.signup_popup_seconds !== undefined) settings.signupPopupSeconds = data.store.signup_popup_seconds;
     if (data.store.thank_you_note !== undefined) settings.thankYouNote = data.store.thank_you_note?.trim() || null;
+    if (data.store.chat_buttons !== undefined) settings.chatButtons = data.store.chat_buttons?.whatsapp || data.store.chat_buttons?.telegram ? data.store.chat_buttons : null;
     if (data.store.welcome_offer !== undefined) {
       const w = data.store.welcome_offer;
       settings.welcomeOffer = w ? { percentOff: w.percent_off, minSubtotalMinor: w.min_subtotal, days: w.days } : null;

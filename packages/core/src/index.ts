@@ -93,6 +93,7 @@ export * from "./winback";
 export * from "./birthday";
 export * from "./signup-popup";
 export * from "./thank-you";
+export * from "./chat-buttons";
 export * from "./price-watch";
 export * from "./preorders";
 export * from "./supplier-scores";

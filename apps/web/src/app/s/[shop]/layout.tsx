@@ -1,8 +1,9 @@
 import { readCart } from "@/lib/cart";
 import { Track } from "@/components/Track";
 import { StoreShell } from "@/theme/StoreShell";
-import { activeClosure, LANGUAGES, needsConsent, shopCurrencies, shopLanguages, SIGNUP_POPUP_QUIET, storePixels, storeWideCountdown } from "@sf/core";
+import { activeClosure, LANGUAGES, needsConsent, shopCurrencies, shopLanguages, SIGNUP_POPUP_QUIET, CHAT_BUTTON_QUIET, chatLinks, storePixels, storeWideCountdown } from "@sf/core";
 import { SignupPopup } from "@/components/SignupPopup";
+import { ChatButtons } from "@/components/ChatButtons";
 import { currentBuyer } from "@/lib/buyer";
 import { SaleCountdown } from "@/components/SaleCountdown";
 import { AdPixels } from "@/components/AdPixels";
@@ -80,6 +81,13 @@ export default async function StoreLayout({ children, params }: { children: Reac
           quiet={SIGNUP_POPUP_QUIET.source}
           action={popupSignupAction.bind(null, param)}
           text={{ title: t.popupTitle, text: t.popupText, offer: shop.welcomeOffer ? t.welcomeOfferNote(shop.welcomeOffer.percentOff) : null, email: t.signupEmail, signUp: t.signUp, noThanks: t.popupNoThanks, close: t.close, sent: t.signupSent, invalid: t.signupInvalid }}
+        />
+      )}
+      {shop.chatButtons && (
+        <ChatButtons
+          links={chatLinks(shop.chatButtons, t.chatHello)}
+          quiet={CHAT_BUTTON_QUIET.source}
+          text={{ whatsapp: t.chatWhatsApp, telegram: t.chatTelegram, hello: t.chatHello }}
         />
       )}
       {pixels && <AdPixels ids={pixels} ask={ask} text={{ message: t.cookieMessage, accept: t.cookieAccept, decline: t.cookieDecline, settings: t.cookieSettings }} />}

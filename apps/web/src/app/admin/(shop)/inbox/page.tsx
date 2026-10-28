@@ -3,6 +3,7 @@ import { listInbox } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { ConversationStatus } from "./ConversationStatus";
+import { ChatButtonsForm } from "./ChatButtonsForm";
 
 export const metadata = { title: "Inbox" };
 
@@ -45,6 +46,15 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
             ))}
           </ul>
         )}
+        <section className="card p-5 flex flex-col gap-3 max-w-2xl" aria-labelledby="chat-heading">
+          <h2 id="chat-heading" className="font-semibold">Chat buttons</h2>
+          <p className="text-sm">
+            A small button in the corner of your store lets shoppers message you on WhatsApp or Telegram. On WhatsApp the first
+            message names the page they were on, so you know which product they mean. Those chats happen in the app, not here.
+            Leave both empty for no button.
+          </p>
+          <ChatButtonsForm whatsapp={shop.chatButtons?.whatsapp ?? null} telegram={shop.chatButtons?.telegram ?? null} />
+        </section>
       </div>
     </main>
   );

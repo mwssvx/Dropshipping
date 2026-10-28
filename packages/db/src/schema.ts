@@ -215,6 +215,8 @@ export const shops = pgTable(
     signupPopupSeconds: integer("signup_popup_seconds"),
     // The store's own words for buyers who just paid, on the order page and in the confirmation email.
     thankYouNote: text("thank_you_note"),
+    // A floating chat button on the store: a WhatsApp number (digits) and/or a Telegram username.
+    chatButtons: jsonb("chat_buttons").$type<ChatButtons>(),
     holdRiskyOrders: text("hold_risky_orders", { enum: ["off", "medium", "high"] }).notNull().default("high"),
     postPurchaseOffer: jsonb("post_purchase_offer").$type<PostPurchaseOffer>(),
     subscriptionOffer: jsonb("subscription_offer").$type<SubscriptionOffer>(),
@@ -498,6 +500,7 @@ export type AdPixels = { meta: string | null; tiktok: string | null; google: str
 /** Which automatic badges product cards show: "-20%" on sale, "Sold out", and "New" for this many days (0 is off). */
 export type BadgeSettings = { sale: boolean; soldOut: boolean; newDays: number };
 
+export type ChatButtons = { whatsapp: string | null; telegram: string | null };
 export type StoreClosure = { mode: "password" | "holiday"; message: string | null; until: string | null; passwordHash: string | null; accessKey: string | null };
 
 /** How many a buyer can take: per order (`min`, `max`) and in all, across their paid orders (`perCustomer`). */
