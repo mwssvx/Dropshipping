@@ -1,11 +1,13 @@
 // Bulk edit: change many products at once from the Products list. Publish, hide or archive them,
 // move prices up or down by a percent, set or clear the crossed-out "was" price, or add them to a
-// collection. Every change is saved with what it replaced, so the merchant can undo it for a week.
+// collection, or add or remove a tag. Every change is saved with what it replaced, so the merchant can undo it for a week.
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { schema, type BulkEditAction, type BulkEditSnapshot, type Db } from "@sf/db";
 import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
+import { normalizeTags } from "./customers";
 import { formatMoney } from "./money";
+import { MAX_PRODUCT_TAGS } from "./products";
 
 type Shop = typeof schema.shops.$inferSelect;
 
@@ -23,6 +25,7 @@ const actionSchema = z.discriminatedUnion("kind", [
   }),
   z.object({ kind: z.literal("compare_at"), percent: z.number().int().min(5, "Show a \"was\" price 5% to 300% above the price.").max(300, "Show a \"was\" price 5% to 300% above the price.").nullable() }),
   z.object({ kind: z.literal("collection"), collectionId: z.string().uuid(), remove: z.boolean().default(false) }),
+  z.object({ kind: z.literal("tag"), tag: z.string(), remove: z.boolean().default(false) }),
 ]);
 
 export type BulkEditInput = z.input<typeof actionSchema>;
@@ -47,8 +50,10 @@ async function plan(db: Db, shop: Shop, productIds: string[], input: BulkEditInp
   const variants = await db.query.variants.findMany({ where: inArray(schema.variants.productId, ids) });
   const money = (n: number | null) => (n == null ? "none" : formatMoney(n, shop.currency));
   const changes: BulkChange[] = [];
-  const snapshot: BulkEditSnapshot = { products: [], variants: [], collection: [] };
+  const snapshot: BulkEditSnapshot = { products: [], variants: [], collection: [], tags: [] };
   let skipped = 0;
+  // Products that already have as many tags as they can.
+  let full = 0;
 
   if (action.kind === "status") {
     for (const p of products) {
@@ -67,6 +72,21 @@ async function plan(db: Db, shop: Shop, productIds: string[], input: BulkEditInp
       if (inIt.has(p.id) !== action.remove) continue;
       changes.push({ productId: p.id, product: p.title, variant: null, before: inIt.has(p.id) ? `in ${collection.title}` : "", after: action.remove ? "" : `in ${collection.title}`, belowCost: false });
       snapshot.collection.push({ collectionId: collection.id, productId: p.id, wasIn: inIt.has(p.id) });
+    }
+  } else if (action.kind === "tag") {
+    if (action.tag.includes(",")) throw new UserError("Add one tag at a time.");
+    const [tag] = normalizeTags(action.tag, "A product", 1);
+    if (!tag) throw new UserError("Enter the tag, like summer.");
+    action.tag = tag;
+    for (const p of products) {
+      const had = p.tags.includes(tag);
+      if (had !== action.remove) continue;
+      if (!had && p.tags.length >= MAX_PRODUCT_TAGS) {
+        full++;
+        continue;
+      }
+      changes.push({ productId: p.id, product: p.title, variant: null, before: p.tags.join(", "), after: (had ? p.tags.filter((t) => t !== tag) : [...p.tags, tag]).join(", "), belowCost: false });
+      snapshot.tags!.push({ productId: p.id, tag, had });
     }
   } else {
     for (const p of products) {
@@ -99,13 +119,13 @@ async function plan(db: Db, shop: Shop, productIds: string[], input: BulkEditInp
       }
     }
   }
-  return { action, changes, snapshot, skipped, products: new Set(changes.map((c) => c.productId)).size };
+  return { action, changes, snapshot, skipped, full, products: new Set(changes.map((c) => c.productId)).size };
 }
 
 /** What an edit would change, for the confirm step. */
 export async function previewBulkEdit(db: Db, shop: Shop, productIds: string[], input: BulkEditInput) {
-  const { changes, skipped, products } = await plan(db, shop, productIds, input);
-  return { changes, skipped, products, belowCost: changes.filter((c) => c.belowCost).length };
+  const { changes, skipped, full, products } = await plan(db, shop, productIds, input);
+  return { changes, skipped, full, products, belowCost: changes.filter((c) => c.belowCost).length };
 }
 
 export function describeBulkAction(action: BulkEditAction, collectionTitle?: string) {
@@ -118,6 +138,8 @@ export function describeBulkAction(action: BulkEditAction, collectionTitle?: str
       return action.percent == null ? "Cleared \"was\" prices" : `Set "was" prices ${action.percent}% above`;
     case "collection":
       return `${action.remove ? "Took out of" : "Added to"} ${collectionTitle ?? "a collection"}`;
+    case "tag":
+      return `${action.remove ? "Removed" : "Added"} the tag “${action.tag}”`;
   }
 }
 
@@ -146,6 +168,7 @@ export async function applyBulkEdit(db: Db, shop: Shop, productIds: string[], in
       if (c.wasIn) await tx.delete(schema.collectionProducts).where(and(eq(schema.collectionProducts.collectionId, c.collectionId), eq(schema.collectionProducts.productId, c.productId)));
       else await tx.insert(schema.collectionProducts).values({ collectionId: c.collectionId, productId: c.productId, position: 1_000_000 }).onConflictDoNothing();
     }
+    for (const t of snapshot.tags ?? []) await setTag(tx, t.productId, t.tag, !t.had, now);
     const touched = [...new Set(changes.map((c) => c.productId))];
     if (action.kind !== "status") await tx.update(schema.products).set({ updatedAt: now }).where(inArray(schema.products.id, touched));
     const [edit] = await tx.insert(schema.bulkEdits).values({ shopId: shop.id, summary, action, snapshot, products: touched.length, createdBy: opts.userId ?? null, createdAt: now }).returning();
@@ -201,10 +224,24 @@ export async function undoBulkEdit(db: Db, shopId: string, editId: string, now =
       else await tx.delete(schema.collectionProducts).where(and(eq(schema.collectionProducts.collectionId, c.collectionId), eq(schema.collectionProducts.productId, c.productId)));
       restored++;
     }
+    // A tag goes back to how it was, leaving any other tags changed since alone.
+    for (const t of snapshot.tags ?? []) {
+      if (await setTag(tx, t.productId, t.tag, t.had, now)) restored++;
+      else kept++;
+    }
   });
   return { restored, kept };
 }
 
+
+/** Adds or removes one tag on a product. False when the product is gone or already like that. */
+async function setTag(tx: Pick<Db, "query" | "update">, productId: string, tag: string, on: boolean, now: Date) {
+  const row = await tx.query.products.findFirst({ where: eq(schema.products.id, productId), columns: { tags: true } });
+  if (!row || row.tags.includes(tag) === on) return false;
+  const tags = on ? [...row.tags, tag].slice(0, MAX_PRODUCT_TAGS) : row.tags.filter((t) => t !== tag);
+  await tx.update(schema.products).set({ tags, updatedAt: now }).where(eq(schema.products.id, productId));
+  return true;
+}
 
 /** The last changes, newest first, for the Products page. */
 export async function recentBulkEdits(db: Db, shopId: string, now = new Date(), limit = 5) {

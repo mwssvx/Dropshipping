@@ -30,6 +30,12 @@ function actionFrom(form: FormData): BulkEditInput {
     case "remove":
       if (!collectionId) throw new UserError("Pick a collection.");
       return { kind: "collection", collectionId, remove: kind === "remove" };
+    case "add_tag":
+    case "remove_tag": {
+      const tag = String(form.get("tag") ?? "").trim();
+      if (!tag) throw new UserError("Enter the tag, like summer.");
+      return { kind: "tag", tag, remove: kind === "remove_tag" };
+    }
     default:
       throw new UserError("Pick what to change.");
   }

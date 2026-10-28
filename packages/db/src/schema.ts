@@ -89,12 +89,15 @@ export type BulkEditAction =
   | { kind: "status"; status: "draft" | "active" | "archived" }
   | { kind: "price"; percent: number; ending: "99" | "95" | "00" | "none" }
   | { kind: "compare_at"; percent: number | null }
-  | { kind: "collection"; collectionId: string; remove: boolean };
+  | { kind: "collection"; collectionId: string; remove: boolean }
+  | { kind: "tag"; tag: string; remove: boolean };
 /** What a bulk edit replaced, and what it set, so it can be undone without losing later edits. */
 export type BulkEditSnapshot = {
   products: { id: string; status: "draft" | "active" | "archived" }[];
   variants: { id: string; priceMinor: number; compareAtMinor: number | null; newPriceMinor: number; newCompareAtMinor: number | null }[];
   collection: { collectionId: string; productId: string; wasIn: boolean }[];
+  /** Edits from before tags could be changed in bulk don't have this. */
+  tags?: { productId: string; tag: string; had: boolean }[];
 };
 
 export type PricingRule = { kind: "multiplier" | "fixed"; value: number; ending: "99" | "95" | "00" | "none"; compareAtPercent: number | null; minPriceMinor: number };

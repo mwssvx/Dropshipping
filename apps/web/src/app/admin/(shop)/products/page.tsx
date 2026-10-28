@@ -144,6 +144,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           <BulkProducts
             rows={rows}
             collections={collections.filter((c) => !c.rules).map((c) => ({ id: c.id, title: c.title }))}
+            tags={tags.map((t) => t.tag)}
             recent={recent.map((r) => ({ id: r.id, summary: r.summary, when: when(r.createdAt), undone: !!r.undoneAt, canUndo: r.canUndo }))}
           />
         )}
