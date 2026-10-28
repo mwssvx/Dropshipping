@@ -1,0 +1,1 @@
+ALTER TABLE "shops" ADD COLUMN "recent_sales" boolean DEFAULT false NOT NULL;

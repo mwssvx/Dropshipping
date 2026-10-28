@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { can, formatMoney, listCollections, listSavedViews, MAX_BULK_PRODUCTS, PRODUCT_PAGE_SIZE, PRODUCT_SORTS, type ProductGap, productGaps, type ProductMargin, productMargins, type ProductSource, productSources, type ProductStockFilter, productPage, productTags, recentBulkEdits, runningLow, soldOutAtSupplier } from "@sf/core";
+import { can, formatMoney, RECENT_SALES_MIN, listCollections, listSavedViews, MAX_BULK_PRODUCTS, PRODUCT_PAGE_SIZE, PRODUCT_SORTS, type ProductGap, productGaps, type ProductMargin, productMargins, type ProductSource, productSources, type ProductStockFilter, productPage, productTags, recentBulkEdits, runningLow, soldOutAtSupplier } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { BulkProducts, type BulkRow } from "./BulkProducts";
@@ -9,6 +9,7 @@ import { BadgeSettingsForm } from "./BadgeSettingsForm";
 import { SoldOutForm } from "./SoldOutForm";
 import { QuickAddForm } from "./QuickAddForm";
 import { ShareButtonsForm } from "./ShareButtonsForm";
+import { RecentSalesForm } from "./RecentSalesForm";
 import { PriceImportForm } from "./PriceImportForm";
 import { AutoSubmitSelect } from "@/components/AutoSubmitSelect";
 import { SavedViews } from "@/components/SavedViews";
@@ -313,6 +314,16 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
             </p>
           </div>
           <ShareButtonsForm on={shop.shareButtons} />
+        </section>
+        <section className="card p-5 mt-6 flex flex-col gap-3 max-w-3xl" aria-labelledby="recent-sales-heading">
+          <div>
+            <h2 id="recent-sales-heading" className="font-semibold">Recent sales</h2>
+            <p className="hint">
+              Product pages say &quot;12 sold in the last 7 days&quot;, counted from paid orders and leaving out refunds, so it&apos;s always true.
+              It only shows once a product has sold {RECENT_SALES_MIN} or more that week.
+            </p>
+          </div>
+          <RecentSalesForm on={shop.recentSales} />
         </section>
       </div>
     </main>

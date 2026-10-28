@@ -232,6 +232,8 @@ export const shops = pgTable(
     cardQuickAdd: boolean("card_quick_add").notNull().default(true),
     // Share buttons on product pages: copy the link, WhatsApp, Facebook and Pinterest.
     shareButtons: boolean("share_buttons").notNull().default(true),
+    // "12 sold in the last 7 days" on product pages, from real paid orders. Off until the merchant turns it on.
+    recentSales: boolean("recent_sales").notNull().default(false),
     // Where sold-out products go in collections, search and the home page.
     soldOutProducts: text("sold_out_products", { enum: SOLD_OUT_DISPLAY }).notNull().default("last"),
     // Searches the merchant pointed elsewhere: "lampshade" shows the results for "lamp shade".

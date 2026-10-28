@@ -1092,3 +1092,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Customers by country (after launch, part 183)
 
 1. **Country filter on the customer list**: a "Bought for delivery to" menu shows only the customers with a paid order shipped to one country, with how many buyers each country has. It works with the search, tags, filters, sort and pages, and the spreadsheet download, "Tag these customers" and saved views keep it. Tag everyone in the UK before a British holiday, then give them a code for tagged customers or send them a campaign (`customerCountries` and `country` on the customer query in `packages/core/src/buyers.ts`; no migration).
+
+### Recent sales on product pages (after launch, part 184)
+
+1. **"12 sold in the last 7 days"**: a switch on the Products page (off by default) makes product pages say how many of a product sold in the last week. It counts units in paid orders and leaves out refunds, so it's always true, unlike the fake "23 people are looking at this" apps Shopify stores install. It only shows once a product has sold 3 or more that week, and it's in the store's language (`recentSalesCount` and `setRecentSales` in `packages/core/src/badges.ts`; migration `0125_recent_sales` adds `shops.recent_sales`).
