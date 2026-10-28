@@ -16,7 +16,7 @@ export default async function NewCollectionPage() {
       <PageHeader title="Create collection" back={<Link href="/admin/collections" className="hint hover:text-ink">← Collections</Link>} />
       <div className="px-4 sm:px-8">
         <CollectionForm action={createCollectionAction} submitLabel="Save collection" products={ruleProducts(products)} currency={shop.currency}
-          initial={{ title: "", description: "", imageUrl: "", productIds: [], rules: null }} />
+          initial={{ title: "", description: "", imageUrl: "", productIds: [], rules: null, sortOrder: "featured" }} />
       </div>
     </main>
   );

@@ -31,14 +31,17 @@ export function browseOptions(p: BrowseParams) {
  * Sort and filter controls for the search and collection pages. A plain GET form, so it works
  * before any script loads and every result page has its own shareable address.
  */
-export function BrowseBar({ action, params, sort, currency, search, count, facets = [], t = storeText(null) }: { action: string; params: BrowseParams; sort: Sort; currency: string; search?: boolean; count: number; facets?: Facet[]; t?: StoreText }) {
+export function BrowseBar({ action, params, sort, natural: naturalSort = "featured", currency, search, count, facets = [], t = storeText(null) }: { action: string; params: BrowseParams; sort: Sort; natural?: Sort; currency: string; search?: boolean; count: number; facets?: Facet[]; t?: StoreText }) {
   const chosen = optionParams(params.opt);
   const isChosen = (name: string, value: string) => Object.entries(chosen).some(([n, vs]) => n.toLowerCase() === name.toLowerCase() && vs.includes(value));
   // The first choice is the page's natural order, sent as no sort at all, so a new search goes
-  // back to best match instead of keeping the last page's order.
+  // back to best match instead of keeping the last page's order. A collection's natural order is
+  // the one its merchant picked; "Featured" is then a choice of its own.
   const q = params.q?.trim();
-  const natural = search ? (q ? t.sorts.relevance : t.sorts.newest) : t.sorts.featured;
-  const sorts = (["best_selling", "price_asc", "price_desc", "newest"] as const).filter((s) => !(search && !q && s === "newest"));
+  const natural = search ? (q ? t.sorts.relevance : t.sorts.newest) : t.sorts[naturalSort];
+  const sorts = search
+    ? (["best_selling", "price_asc", "price_desc", "newest"] as const).filter((s) => !(!q && s === "newest"))
+    : (["featured", "best_selling", "price_asc", "price_desc", "newest"] as const).filter((s) => s !== naturalSort);
   return (
     <form action={action} method="get" role="search" aria-label={search ? t.searchStore : t.sortAndFilter} className="flex flex-col gap-4">
       {search && (

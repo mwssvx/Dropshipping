@@ -18,6 +18,7 @@ import {
   updatePage,
   UserError,
   type ThemeDoc,
+  type CollectionInput,
 } from "@sf/core";
 import { domains, logged, requireShop } from "@/lib/server";
 import type { FormState } from "./actions";
@@ -71,6 +72,7 @@ function readCollection(form: FormData) {
     imageUrl: String(form.get("imageUrl") ?? ""),
     productIds: auto ? [] : form.getAll("productIds").map(String),
     rules: auto ? rulesFromForm(String(form.get("rules") ?? "")) : null,
+    sortOrder: (form.get("sortOrder") ?? undefined) as CollectionInput["sortOrder"],
   };
 }
 

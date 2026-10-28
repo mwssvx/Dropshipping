@@ -1044,3 +1044,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Orders placed recently (after launch, part 171)
 
 1. **Placed in**: the order list can show only orders placed in the last 7, 30 or 90 days or the last 12 months. It works with the tabs, search, tags, product and country filters, the pages and saved views ("This month's UK orders" stays current). The spreadsheet download follows it too, and its own From date, when set, narrows it further. The download also follows the Bank transfers tab now (`ORDER_PLACED_DAYS` and `placedSince` in `packages/core/src/orders.ts`; no migration).
+
+### A collection's own order (after launch, part 172)
+
+1. **Sort products by**: a collection whose products the merchant picks can list them in their own order (as before), best selling first, newest first, or by price either way. The collection's page uses it until a shopper picks another order from Sort by, where the merchant's own order stays on offer as Featured. Automatic collections keep sorting by their rules ("Show them"). Home page sections still show a collection's products in the merchant's order (`sortOrder` on `collections`, `COLLECTION_SORTS` in `packages/db/src/schema.ts`; migration `0123_collection_sort`).

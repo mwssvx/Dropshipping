@@ -1,0 +1,1 @@
+ALTER TABLE "collections" ADD COLUMN "sort_order" text DEFAULT 'featured' NOT NULL;

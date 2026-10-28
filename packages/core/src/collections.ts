@@ -1,5 +1,5 @@
 import { and, asc, count, eq, inArray } from "drizzle-orm";
-import { schema, type Db } from "@sf/db";
+import { COLLECTION_SORTS, schema, type Db } from "@sf/db";
 import { z } from "zod";
 import { applyRules, collectionRulesSchema, type CollectionRules } from "./collection-rules";
 import { NotFoundError, UserError } from "./errors";
@@ -23,6 +23,8 @@ const collectionInput = z.object({
   productIds: z.array(z.string().uuid()).max(500).default([]),
   /** Set for an automatic collection; its products then come from the rules, not productIds. */
   rules: collectionRulesSchema.nullable().default(null),
+  /** The order its page lists products in; left out, an update keeps the one it has. */
+  sortOrder: z.enum(COLLECTION_SORTS, { error: "Pick how the collection is sorted." }).optional(),
 });
 export type CollectionInput = z.input<typeof collectionInput>;
 

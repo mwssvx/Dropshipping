@@ -24,7 +24,7 @@ export default async function CollectionPage({ params, searchParams }: { params:
       <div className="px-4 sm:px-8 flex flex-col gap-6">
         <CollectionForm action={updateCollectionAction.bind(null, collection.id)} submitLabel="Save" products={ruleProducts(products)} currency={shop.currency}
           saved={(await searchParams).saved === "1"}
-          initial={{ title: collection.title, description: collection.description, imageUrl: collection.imageUrl ?? "", productIds: collection.productIds, rules: collection.rules }} />
+          initial={{ title: collection.title, description: collection.description, imageUrl: collection.imageUrl ?? "", productIds: collection.productIds, rules: collection.rules, sortOrder: collection.sortOrder }} />
         <form action={deleteCollectionAction.bind(null, collection.id)}>
           <button className="text-sm text-critical hover:underline">Delete this collection</button>
           <p className="hint">Products stay in your store. Only the grouping is removed.</p>
