@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { analyticsReport, BUSIEST_MIN_ORDERS, comparisonRange, CUTOFF_TIME_ZONES, defaultCutoffZone, formatMoney, periodChange, periodTotals, searchReport, whenBuyersBuy, type Comparison } from "@sf/core";
+import { analyticsReport, BUSIEST_MIN_ORDERS, COME_BACK_DAYS, comparisonRange, CUTOFF_TIME_ZONES, defaultCutoffZone, formatMoney, periodChange, periodTotals, repeatBuyers, searchReport, whenBuyersBuy, type Comparison } from "@sf/core";
 import { requireShop, storeAddress } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 
@@ -32,13 +32,15 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const to = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) + DAY;
   const range = { from: new Date(to - days * DAY), to: new Date(to) };
   const zone = CUTOFF_TIME_ZONES.find(([z]) => z === tz)?.[0] ?? shop.shipCutoff?.timeZone ?? defaultCutoffZone(shop.country);
-  const [r, before, searches, store, when] = await Promise.all([
+  const [r, before, searches, store, when, repeat] = await Promise.all([
     analyticsReport(db, shop.id, range),
     periodTotals(db, shop.id, comparisonRange(range, compare), now),
     searchReport(db, shop.id, range),
     storeAddress(shop),
     whenBuyersBuy(db, shop.id, range, zone),
+    repeatBuyers(db, shop.id, { now }),
   ]);
+  const monthName = (m: string) => new Date(`${m}-01T00:00:00Z`).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
   // The period and comparison links keep a picked time zone.
   const tzParam = zone === tz ? `&tz=${encodeURIComponent(zone)}` : "";
   const busiestDay = Math.max(1, ...when.byDay.map((d) => d.orders));
@@ -253,6 +255,47 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
             <p className="hint">Your best sellers show here after your first sales.</p>
           )}
         </section>
+
+        {repeat.months.some((m) => m.buyers > 0) && (
+          <section className="card p-5 flex flex-col gap-3" aria-labelledby="repeat-heading">
+            <h2 id="repeat-heading" className="font-semibold">Buyers who come back</h2>
+            <p className="text-sm">
+              {repeat.share === null ? (
+                <span className="hint">Once a month&apos;s first-time buyers have had {COME_BACK_DAYS} days, this says how many ordered again.</span>
+              ) : (
+                <>
+                  <strong className="num">{Math.round(repeat.share * 100)}%</strong> of first-time buyers ordered again within {COME_BACK_DAYS} days
+                  {repeat.averageDays !== null && <>, after {repeat.averageDays === 1 ? "1 day" : `${repeat.averageDays} days`} on average</>}.
+                </>
+              )}
+            </p>
+            <table className="text-sm w-full">
+              <thead>
+                <tr className="text-left hint">
+                  <th className="font-normal py-1">First bought in</th>
+                  <th className="font-normal py-1 text-right">New buyers</th>
+                  <th className="font-normal py-1 text-right">Came back</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {repeat.months.map((m) => (
+                  <tr key={m.month}>
+                    <td className="py-1.5">{monthName(m.month)}</td>
+                    <td className="py-1.5 text-right num">{m.buyers}</td>
+                    <td className="py-1.5 text-right num">
+                      {m.buyers ? `${m.cameBack} · ${Math.round(m.share! * 100)}%` : "–"}
+                      {m.buyers > 0 && !m.complete && <span className="hint"> so far</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="hint text-xs">
+              Buyers are told apart by email. Reorder reminders on a product, a thank-you note with a code, and birthday codes all help bring
+              people back.
+            </p>
+          </section>
+        )}
 
         <section className="card p-5 flex flex-col gap-3" aria-labelledby="searches-heading">
           <div className="flex flex-wrap items-baseline justify-between gap-2">

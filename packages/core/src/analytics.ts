@@ -146,6 +146,60 @@ export async function whenBuyersBuy(db: Db, shopId: string, range: AnalyticsRang
   };
 }
 
+/** How long a first-time buyer has to order again to count as coming back. */
+export const COME_BACK_DAYS = 90;
+
+/**
+ * Buyers who come back: for each month, how many people bought for the first time, and how many of
+ * them ordered again within 90 days. A month less than 90 days old is still filling in, so it says so.
+ * Buyers are told apart by email, in any case. Free replacements aren't orders.
+ */
+export async function repeatBuyers(db: Db, shopId: string, opts: { months?: number; now?: Date } = {}) {
+  const months = opts.months ?? 6;
+  const now = opts.now ?? new Date();
+  const since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1));
+  const o = schema.orders;
+  const buyers = db
+    .select({ first: sql<Date>`min(${o.paidAt})`.as("first"), second: sql<Date | null>`(array_agg(${o.paidAt} order by ${o.paidAt}))[2]`.as("second") })
+    .from(o)
+    .where(and(eq(o.shopId, shopId), inArray(o.paymentStatus, [...PAID]), ne(o.source, "replacement"), isNotNull(o.paidAt)))
+    .groupBy(sql`lower(${o.email})`)
+    .having(sql`min(${o.paidAt}) >= ${since}`)
+    .as("b");
+  const back = sql`${buyers.second} < ${buyers.first} + make_interval(days => ${COME_BACK_DAYS})`;
+  const rows = await db
+    .select({
+      month: sql<string>`to_char(${buyers.first} at time zone 'UTC', 'YYYY-MM')`,
+      buyers: count(),
+      cameBack: sql<number>`(count(*) filter (where ${back}))::int`,
+      days: sql<number | null>`avg(extract(epoch from ${buyers.second} - ${buyers.first}) / 86400) filter (where ${back})`,
+    })
+    .from(buyers)
+    .groupBy(sql`1`);
+
+  const list = Array.from({ length: months }, (_, i) => {
+    const start = Date.UTC(since.getUTCFullYear(), since.getUTCMonth() + i, 1);
+    const month = new Date(start).toISOString().slice(0, 7);
+    const end = Date.UTC(since.getUTCFullYear(), since.getUTCMonth() + i + 1, 1);
+    const r = rows.find((x) => x.month === month);
+    const n = Number(r?.buyers ?? 0);
+    const cameBack = Number(r?.cameBack ?? 0);
+    // Everyone who first bought that month has had their full 90 days.
+    return { month, buyers: n, cameBack, share: n ? cameBack / n : null, complete: end + COME_BACK_DAYS * DAY <= now.getTime() };
+  });
+  const done = list.filter((m) => m.complete);
+  const doneBuyers = done.reduce((a, m) => a + m.buyers, 0);
+  const doneBack = done.reduce((a, m) => a + m.cameBack, 0);
+  const backRows = rows.filter((r) => Number(r.cameBack) > 0);
+  const backTotal = backRows.reduce((a, r) => a + Number(r.cameBack), 0);
+  return {
+    months: list,
+    // Over the months that have had their full 90 days.
+    share: doneBuyers ? doneBack / doneBuyers : null,
+    averageDays: backTotal ? Math.round(backRows.reduce((a, r) => a + Number(r.days ?? 0) * Number(r.cameBack), 0) / backTotal) : null,
+  };
+}
+
 /** Sales by day, the visitor funnel, best sellers and where visitors came from. `to` is exclusive. */
 export async function analyticsReport(db: Db, shopId: string, range: AnalyticsRange) {
   const inRange = (col: typeof schema.orders.paidAt | typeof schema.storefrontEvents.createdAt) => and(gte(col, range.from), lt(col, range.to));

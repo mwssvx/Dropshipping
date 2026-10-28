@@ -56,6 +56,11 @@ test("a sale from a tagged Instagram link shows under Sales by source", async ({
   await when.getByRole("button", { name: "Show" }).click();
   await expect(page).toHaveURL(/days=7&compare=year&tz=Australia%2FSydney/);
   await expect(page.getByRole("region", { name: "When buyers buy" }).getByRole("listitem", { name: `${weekday("Australia/Sydney")}: 1 order` })).toBeVisible();
+  // Buyers who come back: this month's one new buyer, still inside their 90 days.
+  const back = page.getByRole("region", { name: "Buyers who come back" });
+  const month = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+  await expect(back).toContainText("Once a month's first-time buyers have had 90 days");
+  await expect(back.getByRole("row", { name: new RegExp(`^${month}`) })).toContainText("0 · 0% so far");
   await page.goto("/admin/orders");
   await page.getByRole("link", { name: "#1001" }).first().click();
   await expect(page.getByText("The buyer came from instagram.")).toBeVisible();
