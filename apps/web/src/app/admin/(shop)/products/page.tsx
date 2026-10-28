@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatMoney, listCollections, PRODUCT_PAGE_SIZE, productPage, recentBulkEdits, runningLow, soldOutAtSupplier } from "@sf/core";
+import { can, formatMoney, listCollections, PRODUCT_PAGE_SIZE, productPage, recentBulkEdits, runningLow, soldOutAtSupplier } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { BulkProducts, type BulkRow } from "./BulkProducts";
@@ -7,13 +7,14 @@ import { LowStockForm } from "./LowStockForm";
 import { RestockAlertForm } from "./RestockAlertForm";
 import { BadgeSettingsForm } from "./BadgeSettingsForm";
 import { SoldOutForm } from "./SoldOutForm";
+import { PriceImportForm } from "./PriceImportForm";
 
 export const metadata = { title: "Products" };
 
 const STATUSES = [["active", "On sale"], ["draft", "Drafts"], ["archived", "Archived"]] as const;
 
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; page?: string }> }) {
-  const { shop, db } = await requireShop("products");
+  const { shop, db, role } = await requireShop("products");
   const params = await searchParams;
   const q = params.q?.trim() || undefined;
   const status = STATUSES.find(([s]) => s === params.status)?.[0];
@@ -105,6 +106,10 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                 <Link key={s} href={href({ status: s })} className={`chip text-sm ${status === s ? "font-semibold border-accent" : ""}`} aria-current={status === s ? "page" : undefined}>{label}</Link>
               ))}
             </nav>
+            <details className="text-sm">
+              <summary className="cursor-pointer underline w-fit">Change prices and stock from a spreadsheet</summary>
+              <PriceImportForm canDownload={can(role, "export")} />
+            </details>
           </div>
         )}
         {products.length === 0 && (filtered || page > 1) ? (

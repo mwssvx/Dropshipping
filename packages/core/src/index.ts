@@ -112,6 +112,7 @@ export * from "./review-requests";
 export * from "./personal-codes";
 export * from "./supplier-sold-out";
 export * from "./tracking-import";
+export * from "./price-import";
 export * from "./packing-slips";
 export * from "./own-stock";
 export * from "./local-pickup";
