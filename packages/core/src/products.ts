@@ -295,16 +295,12 @@ function stockWhere(shopId: string, filter: ProductStockFilter) {
   }
 }
 
-export async function productPage(
-  db: Db,
-  shopId: string,
-  opts: { query?: string; status?: "active" | "draft" | "archived"; tag?: string; stock?: ProductStockFilter; sort?: ProductSort; page?: number; size?: number } = {},
-) {
-  await publishDueProducts(db, shopId);
-  const size = opts.size ?? PRODUCT_PAGE_SIZE;
-  const page = Math.max(1, Math.floor(opts.page ?? 1));
+/** The product list's search and filters, shared by the page and its spreadsheet download. */
+export type ProductQuery = { query?: string; status?: "active" | "draft" | "archived"; tag?: string; stock?: ProductStockFilter };
+
+export function productWhere(db: Db, shopId: string, opts: ProductQuery) {
   const q = opts.query?.trim().toLowerCase();
-  const where = and(
+  return and(
     eq(schema.products.shopId, shopId),
     opts.status ? eq(schema.products.status, opts.status) : undefined,
     opts.tag ? sql`${schema.products.tags} @> ${JSON.stringify([opts.tag.trim().toLowerCase()])}::jsonb` : undefined,
@@ -316,6 +312,13 @@ export async function productPage(
         )
       : undefined,
   );
+}
+
+export async function productPage(db: Db, shopId: string, opts: ProductQuery & { sort?: ProductSort; page?: number; size?: number } = {}) {
+  await publishDueProducts(db, shopId);
+  const size = opts.size ?? PRODUCT_PAGE_SIZE;
+  const page = Math.max(1, Math.floor(opts.page ?? 1));
+  const where = productWhere(db, shopId, opts);
   const [rows, [count]] = await Promise.all([
     db.select().from(schema.products).where(where).orderBy(...productOrder(opts.sort ?? "newest"), asc(schema.products.id)).limit(size).offset((page - 1) * size),
     db.select({ n: sql<number>`count(*)::int` }).from(schema.products).where(where),
