@@ -10,7 +10,7 @@ export default async function StoreHome({ params, searchParams }: { params: Prom
   const { signup } = await searchParams;
   const [shop, theme, base] = await Promise.all([loadShop(param), loadTheme(param), storeBase(param)]);
   const raw = await storefrontCatalog(await db(), shop.id);
-  const catalog = { products: await localProducts(param, raw.products), collections: await localCollections(param, raw.collections) };
+  const catalog = { products: await localProducts(param, raw.products), collections: await localCollections(param, raw.collections), reviews: raw.reviews };
   return (
     <main>
       <h1 className="sr-only">{theme.settings.seo.title || shop.name}</h1>

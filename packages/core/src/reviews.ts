@@ -204,6 +204,43 @@ export async function productReviews(db: Db, productId: string, limit = 20) {
   return { count: n, average: n ? Math.round(Number(stats?.avg) * 10) / 10 : null, reviews, photos };
 }
 
+/** How many recent reviews the home page's reviews section can choose from. */
+export const STORE_REVIEWS_SHOWN = 24;
+
+/**
+ * The store's published reviews of products still on sale, newest first, with the store-wide
+ * average. For the home page's reviews section, which picks from them by rating.
+ */
+export async function storeReviews(db: Db, shopId: string, limit = STORE_REVIEWS_SHOWN) {
+  const where = and(eq(schema.reviews.shopId, shopId), eq(schema.reviews.status, "published"), eq(schema.products.status, "active"));
+  const [[stats], rows] = await Promise.all([
+    db.select({ n: count(), avg: avg(schema.reviews.rating) }).from(schema.reviews).innerJoin(schema.products, eq(schema.products.id, schema.reviews.productId)).where(where),
+    db
+      .select({
+        id: schema.reviews.id,
+        name: schema.reviews.name,
+        rating: schema.reviews.rating,
+        body: schema.reviews.body,
+        orderId: schema.reviews.orderId,
+        photoIds: schema.reviews.photoIds,
+        productTitle: schema.products.title,
+        productHandle: schema.products.handle,
+      })
+      .from(schema.reviews)
+      .innerJoin(schema.products, eq(schema.products.id, schema.reviews.productId))
+      .where(where)
+      .orderBy(desc(schema.reviews.createdAt), desc(schema.reviews.id))
+      .limit(limit),
+  ]);
+  const n = Number(stats?.n ?? 0);
+  return {
+    count: n,
+    average: n ? Math.round(Number(stats?.avg) * 10) / 10 : null,
+    latest: rows.map(({ orderId, photoIds, ...r }) => ({ ...r, verified: !!orderId, photoUrl: photoIds[0] ? reviewPhotoUrl(photoIds[0]) : null })),
+  };
+}
+export type StoreReviews = Awaited<ReturnType<typeof storeReviews>>;
+
 export async function countPendingReviews(db: Db, shopId: string) {
   const [row] = await db.select({ n: count() }).from(schema.reviews).where(and(eq(schema.reviews.shopId, shopId), eq(schema.reviews.status, "pending")));
   return Number(row?.n ?? 0);

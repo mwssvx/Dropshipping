@@ -96,6 +96,12 @@ const sectionSchemas = {
     text: text(400),
     buttonLabel: text(40),
   }),
+  // Filled from the store's own published reviews, never typed in.
+  reviews: z.object({
+    heading: text(120),
+    limit: z.number().int().min(3).max(12).default(6),
+    minRating: z.number().int().min(1).max(5).default(4),
+  }),
 } as const;
 
 export type SectionType = keyof typeof sectionSchemas;
@@ -112,6 +118,7 @@ export const SECTION_LABELS: Record<SectionType, { name: string; about: string }
   testimonials: { name: "Customer quotes", about: "Short quotes from happy buyers. Use real ones only." },
   trust_badges: { name: "Trust badges", about: "Small icons with promises like free returns or secure checkout." },
   newsletter: { name: "Email signup", about: "Buyers leave their email to hear about news and offers. They confirm it by email first." },
+  reviews: { name: "Buyer reviews", about: "The latest real reviews from your buyers, with their stars and your store's average. It fills itself as reviews come in." },
 };
 
 const sectionId = z.string().regex(/^[a-z0-9]{4,24}$/, "Section ids are short lowercase codes.");

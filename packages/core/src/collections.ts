@@ -7,6 +7,7 @@ import { uniqueHandle } from "./handles";
 import { listActiveProducts } from "./products";
 import { placeSoldOut, productSoldOut, quickAddVariant, soldOutDisplay } from "./badges";
 import { cardSwatches } from "./swatches";
+import { storeReviews } from "./reviews";
 
 /** "all" is every active product. It isn't stored, so no collection can take that handle. */
 export const ALL_COLLECTION = "all";
@@ -163,7 +164,7 @@ export async function getCollectionByHandle(db: Db, shopId: string, handle: stri
  * product order. Plain data, so the editor preview can render the same sections in the browser.
  */
 export async function storefrontCatalog(db: Db, shopId: string) {
-  const [all, mode] = await Promise.all([listActiveProducts(db, shopId), soldOutDisplay(db, shopId)]);
+  const [all, mode, reviews] = await Promise.all([listActiveProducts(db, shopId), soldOutDisplay(db, shopId), storeReviews(db, shopId)]);
   const now = new Date();
   const soldOut = new Set(all.filter((p) => productSoldOut(p, now)).map((p) => p.id));
   const active = placeSoldOut(all, mode, (p) => soldOut.has(p.id));
@@ -199,7 +200,7 @@ export async function storefrontCatalog(db: Db, shopId: string) {
       (id) => soldOut.has(id),
     ),
   }));
-  return { products, collections };
+  return { products, collections, reviews };
 }
 export type StorefrontCatalog = Awaited<ReturnType<typeof storefrontCatalog>>;
 
