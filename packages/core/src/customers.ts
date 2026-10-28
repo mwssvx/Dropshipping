@@ -215,6 +215,7 @@ export async function exportCustomerData(db: Db, shop: { id: string; name: strin
     emails_sent: emails.map((e) => ({ subject: e.subject, kind: e.kind, status: e.status, at: (e.sentAt ?? e.createdAt).toISOString() })),
     back_in_stock_requests: alerts.map((a) => ({ product: a.product, option: a.option, asked_at: a.createdAt.toISOString(), emailed_at: a.notifiedAt?.toISOString() ?? null })),
     saved_items: saved.map((x) => ({ product: x.product, price_when_saved: x.priceMinor, saved_at: x.createdAt.toISOString() })),
+    saved_list_shared: Boolean(customer.savedShareToken),
     reward_points: points.map((x) => ({ points: x.points, kind: x.kind, note: x.note, at: x.createdAt.toISOString() })),
     // Friends' emails are theirs, so only the counts and credit.
     refer_a_friend: customer.referralCode ? { link_code: customer.referralCode, friends_sent_a_code: referred.length, credit_earned: referred.reduce((n, r) => n + (r.rewardMinor ?? 0), 0) } : null,

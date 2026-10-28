@@ -329,6 +329,14 @@ const en = {
   startDrops: "Email me when prices drop",
   keepList: "Keep your list and hear about price drops",
   keepListNote: "Sign in with your email and we'll keep these on your account and tell you when they get cheaper. No password needed.",
+  shareTitle: "Share your list",
+  shareNote: "Send friends a link to what you've saved, so they know what you'd like. They see the products and prices, not your email.",
+  shareStart: "Get a link to share",
+  shareStop: "Stop sharing",
+  shareStopNote: "Stopping turns this link off. Sharing again makes a new one.",
+  sharedTitle: (name: string | null) => (name ? `${name}'s saved items` : "Saved items"),
+  sharedNote: "Buying a gift? Open any item to pick an option and add it to your cart.",
+  sharedEmpty: "Nothing on this list right now.",
 };
 
 export type StoreText = typeof en;
@@ -648,6 +656,14 @@ const de: StoreText = {
   startDrops: "Bei Preissenkungen benachrichtigen",
   keepList: "Behalte deine Liste und erfahre von Preissenkungen",
   keepListNote: "Melde dich mit deiner E-Mail an, dann speichern wir die Liste in deinem Konto und sagen dir, wenn etwas günstiger wird. Kein Passwort nötig.",
+  shareTitle: "Liste teilen",
+  shareNote: "Schick Freunden einen Link zu deiner Merkliste, damit sie wissen, was dir gefällt. Sie sehen die Produkte und Preise, nicht deine E-Mail.",
+  shareStart: "Link zum Teilen erstellen",
+  shareStop: "Nicht mehr teilen",
+  shareStopNote: "Danach funktioniert dieser Link nicht mehr. Teilst du erneut, gibt es einen neuen.",
+  sharedTitle: (name) => (name ? `Merkliste von ${name}` : "Merkliste"),
+  sharedNote: "Du suchst ein Geschenk? Öffne einen Artikel, wähle eine Variante und leg ihn in den Warenkorb.",
+  sharedEmpty: "Auf dieser Liste ist gerade nichts.",
 };
 
 const fr: StoreText = {
@@ -965,6 +981,14 @@ const fr: StoreText = {
   startDrops: "Me prévenir des baisses de prix",
   keepList: "Gardez votre liste et soyez prévenu des baisses de prix",
   keepListNote: "Connectez-vous avec votre e-mail : nous garderons ces articles sur votre compte et vous préviendrons quand ils baissent. Aucun mot de passe nécessaire.",
+  shareTitle: "Partager votre liste",
+  shareNote: "Envoyez à vos proches un lien vers vos favoris pour qu'ils sachent ce qui vous ferait plaisir. Ils voient les produits et les prix, pas votre e-mail.",
+  shareStart: "Obtenir un lien à partager",
+  shareStop: "Arrêter le partage",
+  shareStopNote: "Arrêter désactive ce lien. Si vous partagez à nouveau, un nouveau lien sera créé.",
+  sharedTitle: (name) => (name ? `Les favoris de ${name}` : "Favoris"),
+  sharedNote: "Vous cherchez un cadeau ? Ouvrez un article pour choisir une option et l'ajouter au panier.",
+  sharedEmpty: "Cette liste est vide pour le moment.",
 };
 
 const es: StoreText = {
@@ -1282,6 +1306,14 @@ const es: StoreText = {
   startDrops: "Avisarme cuando bajen los precios",
   keepList: "Conserva tu lista y entérate de las bajadas de precio",
   keepListNote: "Inicia sesión con tu correo y guardaremos esto en tu cuenta y te avisaremos cuando baje de precio. No necesitas contraseña.",
+  shareTitle: "Comparte tu lista",
+  shareNote: "Envía a tus amigos un enlace a lo que has guardado para que sepan qué te gustaría. Verán los productos y precios, no tu correo.",
+  shareStart: "Obtener un enlace para compartir",
+  shareStop: "Dejar de compartir",
+  shareStopNote: "Al dejar de compartir, este enlace deja de funcionar. Si vuelves a compartir, se crea uno nuevo.",
+  sharedTitle: (name) => (name ? `Guardados de ${name}` : "Guardados"),
+  sharedNote: "¿Buscas un regalo? Abre cualquier artículo para elegir una opción y añadirlo al carrito.",
+  sharedEmpty: "Ahora mismo no hay nada en esta lista.",
 };
 
 const it: StoreText = {
@@ -1599,6 +1631,14 @@ const it: StoreText = {
   startDrops: "Avvisami quando i prezzi scendono",
   keepList: "Conserva la tua lista e scopri i ribassi",
   keepListNote: "Accedi con la tua email: salveremo questi articoli nel tuo account e ti avviseremo quando costano meno. Nessuna password necessaria.",
+  shareTitle: "Condividi la tua lista",
+  shareNote: "Invia agli amici un link ai tuoi salvati, così sanno cosa ti piacerebbe. Vedono i prodotti e i prezzi, non la tua email.",
+  shareStart: "Crea un link da condividere",
+  shareStop: "Smetti di condividere",
+  shareStopNote: "Smettendo, questo link non funziona più. Se condividi di nuovo, ne creiamo uno nuovo.",
+  sharedTitle: (name) => (name ? `I salvati di ${name}` : "Salvati"),
+  sharedNote: "Cerchi un regalo? Apri un articolo per scegliere un'opzione e aggiungerlo al carrello.",
+  sharedEmpty: "Al momento questa lista è vuota.",
 };
 
 const nl: StoreText = {
@@ -1916,6 +1956,14 @@ const nl: StoreText = {
   startDrops: "Mail me als prijzen dalen",
   keepList: "Bewaar je lijst en hoor over prijsdalingen",
   keepListNote: "Log in met je e-mail, dan bewaren we deze in je account en laten we je weten als ze goedkoper worden. Geen wachtwoord nodig.",
+  shareTitle: "Deel je lijst",
+  shareNote: "Stuur vrienden een link naar wat je hebt bewaard, zodat ze weten wat je leuk vindt. Ze zien de producten en prijzen, niet je e-mail.",
+  shareStart: "Maak een link om te delen",
+  shareStop: "Stoppen met delen",
+  shareStopNote: "Als je stopt, werkt deze link niet meer. Deel je opnieuw, dan krijg je een nieuwe.",
+  sharedTitle: (name) => (name ? `Bewaard door ${name}` : "Bewaard"),
+  sharedNote: "Op zoek naar een cadeau? Open een artikel om een optie te kiezen en het in je winkelwagen te doen.",
+  sharedEmpty: "Er staat nu niets op deze lijst.",
 };
 
 const TEXTS: Record<string, StoreText> = { de, fr, es, it, nl };

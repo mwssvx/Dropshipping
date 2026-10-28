@@ -399,6 +399,8 @@ export const customers = pgTable(
     acceptsMarketing: boolean("accepts_marketing").notNull().default(false),
     /** Emails when an item they saved gets cheaper. Asked for by the buyer, so separate from marketing. */
     priceAlerts: boolean("price_alerts").notNull().default(true),
+    /** Their saved list is public at <store>/saved/<token> while this is set. Made when they press Share. */
+    savedShareToken: text("saved_share_token"),
     marketingConsentAt: timestamp("marketing_consent_at", { withTimezone: true }),
     unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
     // When we last emailed a "confirm your signup" link, so a signup form can't be used to flood an inbox.
@@ -428,7 +430,7 @@ export const customers = pgTable(
     emailToken: text("email_token").notNull().unique().default(sql`replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '')`),
     createdAt: createdAt(),
   },
-  (t) => [uniqueIndex("customers_shop_email_uq").on(t.shopId, t.email), uniqueIndex("customers_shop_referral_code_uq").on(t.shopId, t.referralCode)],
+  (t) => [uniqueIndex("customers_shop_email_uq").on(t.shopId, t.email), uniqueIndex("customers_shop_referral_code_uq").on(t.shopId, t.referralCode), uniqueIndex("customers_saved_share_uq").on(t.savedShareToken)],
 );
 
 /**

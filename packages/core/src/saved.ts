@@ -1,5 +1,6 @@
 // Saved items: buyers keep products for later. Guests keep a list in a cookie; signed-in buyers
 // keep theirs on their account, and get one email when something they saved gets cheaper.
+import { randomBytes } from "node:crypto";
 import { and, asc, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import type { Mailer } from "./email";
@@ -93,6 +94,40 @@ export async function listSaved(db: Db, shopId: string, who: { customerId: strin
       soldOut: f.soldOut,
     }];
   });
+}
+
+/**
+ * Sharing: a signed-in buyer gets a link to their saved list, so a friend can see it (to buy a
+ * gift, say). The link is a long random token; turning sharing off forgets it, so an old link
+ * stops working, and sharing again makes a new one.
+ */
+export async function shareSaved(db: Db, shopId: string, customerId: string) {
+  const where = and(eq(schema.customers.id, customerId), eq(schema.customers.shopId, shopId));
+  const customer = await db.query.customers.findFirst({ where, columns: { savedShareToken: true } });
+  if (!customer) throw new NotFoundError("Customer");
+  if (customer.savedShareToken) return customer.savedShareToken;
+  await db.update(schema.customers).set({ savedShareToken: randomBytes(18).toString("base64url") }).where(and(where, isNull(schema.customers.savedShareToken)));
+  // Pressed twice at once: the first token stays.
+  return (await db.query.customers.findFirst({ where, columns: { savedShareToken: true } }))!.savedShareToken!;
+}
+
+export async function stopSharingSaved(db: Db, shopId: string, customerId: string) {
+  await db.update(schema.customers).set({ savedShareToken: null }).where(and(eq(schema.customers.id, customerId), eq(schema.customers.shopId, shopId)));
+}
+
+/**
+ * The list behind a share link, or null when the link is wrong or sharing is off. Friends see the
+ * products and today's prices, but not the buyer's email or what the prices were when they saved.
+ */
+export async function sharedSaved(db: Db, shopId: string, token: string) {
+  if (!/^[\w-]{20,40}$/.test(token)) return null;
+  const customer = await db.query.customers.findFirst({
+    where: and(eq(schema.customers.shopId, shopId), eq(schema.customers.savedShareToken, token)),
+    columns: { id: true, name: true },
+  });
+  if (!customer) return null;
+  const items = (await listSaved(db, shopId, { customerId: customer.id })).map(({ savedPriceMinor: _, ...item }) => item);
+  return { firstName: customer.name?.trim().split(/\s+/)[0] || null, items };
 }
 
 /** How many buyers saved each product, most saved first, for the merchant. */
