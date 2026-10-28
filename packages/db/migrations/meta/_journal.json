@@ -708,6 +708,13 @@
       "when": 1793103124461,
       "tag": "0100_barcodes",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1793104573481,
+      "tag": "0101_ai_shopper",
+      "breakpoints": true
     }
   ]
 }

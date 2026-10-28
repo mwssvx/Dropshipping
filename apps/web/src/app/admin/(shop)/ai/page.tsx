@@ -1,4 +1,4 @@
-import { aiBudget, BUYER_TOPICS, formatMoney, listAgentActivity, MODEL_LABEL } from "@sf/core";
+import { aiBudget, BUYER_TOPICS, formatMoney, listAgentActivity, listShopperChats, MODEL_LABEL } from "@sf/core";
 import { aiModel, requireShop } from "@/lib/server";
 import { AGENT_LABEL } from "@/components/ApprovalCard";
 import { PageHeader } from "../PageHeader";
@@ -23,12 +23,13 @@ const WHAT = {
   writer: "Drafts blog posts when you press “Write a draft” on the Blog page. Posts stay drafts until you publish them.",
   translator: "Translates your store when you press “Translate with AI” on the Languages page. You can edit any translation afterwards.",
   answerer: "Drafts answers to shoppers' product questions when you press “Draft with AI” on the Questions page. Nothing is sent until you send it.",
+  shopper: "Answers shoppers' questions about your products, delivery and returns, on your store's pages, when you turn it on below. It only reads what your store already shows.",
   sizer: "Drafts a size chart from a product's description when you press “Draft with AI” on the Size charts page. It stays hidden until you check it and show it.",
 };
 
 export default async function AiSettingsPage() {
   const { shop, db } = await requireShop("ai");
-  const [budget, activity] = await Promise.all([aiBudget(db, shop), listAgentActivity(db, shop.id, 40)]);
+  const [budget, activity, chats] = await Promise.all([aiBudget(db, shop), listAgentActivity(db, shop.id, 40), listShopperChats(db, shop.id)]);
   const usd = (m: number) => formatMoney(m, "USD");
   const model = aiModel();
   return (
@@ -53,8 +54,23 @@ export default async function AiSettingsPage() {
               planMax={(budget.planMaxMinor / 100).toFixed(2)}
               topics={Object.entries(BUYER_TOPICS).map(([key, label]) => ({ key, label, on: shop.aiAutoReplyTopics.includes(key) }))}
               autoPause={shop.aiAutoPause}
+              shopper={shop.aiShopper}
             />
           </section>
+          {chats.length > 0 && (
+            <section className="card p-5 flex flex-col gap-3" aria-labelledby="shopper-chats-title">
+              <h2 id="shopper-chats-title" className="font-semibold">What shoppers asked</h2>
+              <p className="hint text-sm">The latest chats with your store&apos;s shopping assistant. Questions it couldn&apos;t answer are good ideas for your listings and pages.</p>
+              <ul className="flex flex-col divide-y divide-border text-sm">
+                {chats.map((c) => (
+                  <li key={c.id} className="py-2 flex gap-3 justify-between">
+                    <span className="min-w-0">{c.questions.map((q, i) => <span key={i} className="block truncate">{q}</span>)}</span>
+                    <span className="hint num whitespace-nowrap">{when.format(c.updatedAt)}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           <section className="card" aria-labelledby="activity-title">
             <h2 id="activity-title" className="font-semibold px-5 pt-4 pb-2">What the assistants did</h2>
             {activity.length === 0 ? (

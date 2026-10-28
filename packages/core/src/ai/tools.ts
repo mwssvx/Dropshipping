@@ -15,6 +15,10 @@ import { saveQuestionDraft } from "../questions";
 import { createSizeChart } from "../size-charts";
 import { isLanguage, LANGUAGES, saveTranslation } from "../languages";
 import type { ProblemCode } from "../suppliers";
+import { getActiveProductByHandle } from "../products";
+import { searchProducts } from "../search";
+import { sizeChartForProduct } from "../size-charts";
+import { productQuestions } from "../questions";
 import { AUTO, blocked, needsOk, untrusted, type Decision, type RunScope } from "./context";
 import { addMessage, BUYER_TOPICS, discardDrafts, sendBuyerMessage, setConversationStatus, type BuyerTopic } from "./conversations";
 
@@ -749,7 +753,7 @@ export async function thinMargins(run: Pick<RunScope, "ctx" | "shop">, minPct = 
 export async function setAiSettings(
   db: RunScope["ctx"]["db"],
   shop: Pick<RunScope["shop"], "id" | "plan">,
-  s: { budgetMinor?: number | null; autoReplyTopics?: string[]; autoPause?: boolean },
+  s: { budgetMinor?: number | null; autoReplyTopics?: string[]; autoPause?: boolean; shopper?: boolean },
 ) {
   const max = PLAN_AI_BUDGET_MINOR[shop.plan];
   if (s.budgetMinor !== undefined && s.budgetMinor !== null && (!Number.isFinite(s.budgetMinor) || s.budgetMinor < 0 || s.budgetMinor > max)) {
@@ -762,6 +766,7 @@ export async function setAiSettings(
       ...(s.budgetMinor !== undefined ? { aiBudgetMinor: s.budgetMinor === max ? null : s.budgetMinor } : {}),
       ...(topics ? { aiAutoReplyTopics: topics } : {}),
       ...(s.autoPause !== undefined ? { aiAutoPause: s.autoPause } : {}),
+      ...(s.shopper !== undefined ? { aiShopper: s.shopper } : {}),
       updatedAt: new Date(),
     })
     .where(eq(schema.shops.id, shop.id));
@@ -911,6 +916,77 @@ const sizerTools = [
   }),
 ];
 
+/* ───────────── Shopping assistant: answers shoppers on the storefront, reads only ───────────── */
+
+/** HTML from a product description as plain lines, for the model to read. */
+const plainText = (html: string) =>
+  html.replace(/<br\s*\/?>|<\/p>|<\/li>/gi, "\n").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\n{3,}/g, "\n\n").trim();
+
+const shopperTools = [
+  tool({
+    name: "search_products",
+    kind: "read",
+    description: "Search the store's products on sale. Returns up to 6 with title, handle (for links), price, whether in stock, and the start of the description. Search with the words a shopper would use, like \"lamp\" or \"phone stand\".",
+    input: z.object({
+      query: z.string().max(100).describe("Words to search for. Empty lists the store's featured products."),
+      max_price: z.number().positive().optional().describe("Highest price, in the store's currency (19.99, not cents)."),
+      in_stock_only: z.boolean().optional(),
+    }),
+    summary: (i) => (i.query ? `Searched products for “${i.query.slice(0, 60)}”` : "Looked at the store's products"),
+    async run(i, run) {
+      const { products, showingFor } = await searchProducts(run.ctx.db, run.shop.id, {
+        q: i.query || undefined,
+        sort: i.query ? "relevance" : "featured",
+        maxMinor: i.max_price ? Math.round(i.max_price * 100) : null,
+        inStock: i.in_stock_only,
+      });
+      return {
+        showing_results_for: showingFor ?? null,
+        products: products.slice(0, 6).map((p) => {
+          const cheapest = p.variants.reduce((a, b) => (b.priceMinor < a.priceMinor ? b : a), p.variants[0]!);
+          return {
+            title: p.title,
+            handle: p.handle,
+            price: cheapest ? `${p.variants.some((v) => v.priceMinor !== cheapest.priceMinor) ? "from " : ""}${money(run, cheapest.priceMinor)}` : null,
+            in_stock: p.variants.some((v) => v.stock === null || v.stock > 0),
+            about: untrusted("product", plainText(p.descriptionHtml).slice(0, 300)),
+          };
+        }),
+        note: products.length ? null : "Nothing in the store matches. Say so plainly; don't suggest products from elsewhere.",
+      };
+    },
+  }),
+  tool({
+    name: "read_product",
+    kind: "read",
+    description: "Everything the store says about one product: description, details, options with price and stock, delivery time, size chart and questions already answered.",
+    input: z.object({ handle: z.string().max(200).describe("The product's handle, from search_products or the page the shopper is on.") }),
+    summary: (i) => `Read the product “${i.handle.slice(0, 60)}”`,
+    async run(i, run) {
+      const { db } = run.ctx;
+      const p = await getActiveProductByHandle(db, run.shop.id, i.handle).catch(() => null);
+      if (!p) throw new UserError("There's no product on sale with that handle. Use search_products to find it.");
+      const [chart, answered] = await Promise.all([sizeChartForProduct(db, run.shop.id, p.id), productQuestions(db, p.id, 8)]);
+      return {
+        title: p.title,
+        handle: p.handle,
+        description: untrusted("product", plainText(p.descriptionHtml).slice(0, 3000)),
+        details: p.details.map((d) => `${d.label}: ${d.value}`),
+        options: p.variants.map((v) => ({
+          name: v.title,
+          price: money(run, v.priceMinor),
+          was: v.compareAtMinor && v.compareAtMinor > v.priceMinor ? money(run, v.compareAtMinor) : null,
+          in_stock: v.stock === null || v.stock > 0,
+          delivery_days: v.shipDaysMin != null && v.shipDaysMax != null ? `${v.shipDaysMin}-${v.shipDaysMax}` : null,
+        })),
+        size_chart: chart ? { unit: chart.unit, columns: chart.columns, rows: chart.rows, note: chart.note } : null,
+        answered_questions: answered.map((q) => ({ question: untrusted("shopper", q.body), answer: q.answer })),
+      };
+    },
+  }),
+  storePolicies,
+];
+
 export const AGENT_TOOLS: Record<AgentName, AgentTool[]> = {
   listing: listingTools,
   assistant: assistantTools,
@@ -921,6 +997,7 @@ export const AGENT_TOOLS: Record<AgentName, AgentTool[]> = {
   translator: translatorTools,
   answerer: answererTools,
   sizer: sizerTools,
+  shopper: shopperTools,
 };
 
 export function findTool(agent: AgentName, name: string) {

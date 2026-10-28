@@ -92,6 +92,7 @@ export async function saveAiSettingsAction(_: AgentState, form: FormData): Promi
       budgetMinor: budget === "" ? null : Math.round(Number(budget) * 100),
       autoReplyTopics: form.getAll("topics").map(String),
       autoPause: form.get("autoPause") === "on",
+      shopper: form.get("shopper") === "on",
     });
   } catch (e) {
     return fail(e);

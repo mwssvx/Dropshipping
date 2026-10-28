@@ -29,6 +29,7 @@
     "./theme": "./src/theme-doc.ts",
     "./money": "./src/money.ts",
     "./collection-rules": "./src/collection-rules.ts",
-    "./badges": "./src/badge-rules.ts"
+    "./badges": "./src/badge-rules.ts",
+    "./shopper-links": "./src/shopper-links.ts"
   }
 }
