@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
 
 // Holiday order-by date: the merchant names a holiday and the day orders must arrive by, and product
-// pages say the last day to order.
+// pages and the cart say the last day to order.
 
 const inDays = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
 
-test("product pages say the last day to order for a holiday", async ({ page, browser }, info) => {
+test("product pages and the cart say the last day to order for a holiday", async ({ page, browser }, info) => {
   const id = `${info.project.name}-${Date.now()}`;
   await page.goto("/signup");
   await page.getByLabel("Email").fill(`holiday-${id}@example.com`);
@@ -33,6 +33,14 @@ test("product pages say the last day to order for a holiday", async ({ page, bro
   const buyer = await (await browser.newContext({ ...info.project.use })).newPage();
   await buyer.goto(store);
   await expect(buyer.locator("#holiday-deadline")).toHaveText(/^Order by [A-Z][a-z]{2} \d{1,2} to get it in time for Christmas\.$/);
+  const orderBy = (await buyer.locator("#holiday-deadline").textContent())!;
+  // The cart says the same, under the dates for everything in it.
+  await buyer.getByRole("button", { name: "Add to cart" }).click();
+  await expect(buyer.getByRole("link", { name: /^Cart, 1 item/ })).toBeVisible();
+  await buyer.goto(store.replace(/\/products\/.*$/, "/cart"));
+  await expect(buyer.locator("#cart-delivery")).toContainText(/^Arrives [A-Z][a-z]{2} \d{1,2} – [A-Z][a-z]{2} \d{1,2} to United States/);
+  await expect(buyer.locator("#cart-holiday")).toHaveText(orderBy);
+  await buyer.goto(store);
 
   // Arriving tomorrow is out of reach for a supplier order.
   await settings.getByLabel("Must arrive by").fill(inDays(1));

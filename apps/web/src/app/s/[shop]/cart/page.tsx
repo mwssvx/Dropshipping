@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { convertAmount, convertPrice, formatMoney, pointsFor, presentQuote, quoteCart, recentlyViewed, upsellsFor, boughtTogether, onHoliday, UserError } from "@sf/core";
+import { cartDelivery, convertAmount, convertPrice, formatDeliveryWindow, formatMoney, pointsFor, presentQuote, quoteCart, recentlyViewed, upsellsFor, boughtTogether, onHoliday, UserError } from "@sf/core";
 import { buyerCountry, buyerFx } from "@/lib/currency";
 import { readCart, readDiscountCode, readGiftCardCode } from "@/lib/cart";
 import { db } from "@/lib/server";
@@ -9,6 +9,7 @@ import { RecentlyViewed } from "@/components/RecentlyViewed";
 import { addToCartAction, removeCodeAction, removeGiftCardAction, saveForLaterAction, updateCartAction } from "../actions";
 import { CodeForm } from "./CodeForm";
 import { lineTitles, loadShop, localProducts, storeBase, storeLang, storeT } from "../data";
+import { HolidayDeadline } from "@/components/HolidayDeadline";
 
 export const metadata = { title: "Cart" };
 
@@ -51,6 +52,8 @@ export default async function CartPage({ params, searchParams }: { params: Promi
   // Item titles in the buyer's language, by the product each option belongs to.
   const t = await storeT(handle);
   const lang = (await storeLang(handle)) ?? "en-US";
+  const dayFormat = new Intl.DateTimeFormat(lang, { month: "short", day: "numeric", timeZone: "UTC" });
+  const delivery = quote ? await cartDelivery(await db(), shop, quote.items, { country: opts.countryHint }) : null;
   const shipsBy = (d: string) => new Intl.DateTimeFormat(lang, { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
   const titles = await lineTitles(handle, quote?.items ?? [], variants);
   // Shown in the buyer's currency when they picked one; the total is exactly what they'll pay.
@@ -147,6 +150,12 @@ export default async function CartPage({ params, searchParams }: { params: Promi
                 <div className="h-full rounded-full bg-success" style={{ width: `${Math.min(100, (100 * quote.goodsMinor) / quote.freeShipping.overMinor)}%` }} />
               </div>
             </div>
+          )}
+          {delivery && (
+            <p id="cart-delivery" className="self-end w-full max-w-xs text-sm flex flex-col gap-0.5">
+              <span className="font-medium">{t.arrives(formatDeliveryWindow(delivery, (d) => dayFormat.format(d)), new Intl.DisplayNames([lang], { type: "region" }).of(delivery.country) ?? delivery.country)}</span>
+              {delivery.holiday && <HolidayDeadline id="cart-holiday" holiday={delivery.holiday} t={t} day={(d) => dayFormat.format(d)} />}
+            </p>
           )}
           <dl className="grid grid-cols-[1fr_auto] gap-y-1 num text-sm self-end w-full max-w-xs">
             <dt className="hint">{t.subtotal}</dt><dd className="text-right">{money(shown!.subtotalMinor)}</dd>
