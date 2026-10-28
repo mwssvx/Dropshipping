@@ -1080,3 +1080,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Products that earn little (after launch, part 180)
 
 1. **Margin filter on the product list**: a "Margin" row lists products not archived with an option that keeps under 20% of its price after its cost, or that sells below cost, each with its count, shown only while some product does. Options with no cost entered aren't counted, and fees and shipping aren't taken off (the Profit report does that). The spreadsheet download, changing every product in the list (raise their prices by 10%) and saved views follow it (`productMargins` and `ProductQuery.margin` in `packages/core/src/products.ts`; no migration). The checkout phone browser test now waits for its save before reloading, which made it flaky.
+
+### Orders that used a code (after launch, part 181)
+
+1. **See orders for a discount code**: each code on the Marketing page that has been used gets a "See orders" link, which opens the order list showing only the orders that used it ("Orders that used ADA10 · Show all orders"). It works with the other order filters, and the spreadsheet download, working on many orders at once and saved views keep it. It helps check what a code given to a creator or posted on social media really sold (`OrderFilter.discountId` in `packages/core/src/orders.ts`, `code` on the order list; no migration).

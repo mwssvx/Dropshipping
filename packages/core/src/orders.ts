@@ -792,6 +792,8 @@ export type OrderFilter = {
   productId?: string;
   /** Orders shipping to this country (two letters). */
   country?: string;
+  /** Orders that used this discount code. */
+  discountId?: string;
   from?: Date;
   to?: Date;
 };
@@ -819,6 +821,7 @@ function orderWhere(shopId: string, filter: OrderFilter) {
         sql`exists (select 1 from order_lines ol join variants v on v.id = ol.variant_id where ol.order_id = ${schema.orders.id} and v.product_id = ${filter.productId})`
       : undefined,
     filter.country && /^[A-Z]{2}$/i.test(filter.country) ? sql`${schema.orders.shippingAddress}->>'country' = ${filter.country.toUpperCase()}` : undefined,
+    filter.discountId && /^[0-9a-f-]{36}$/i.test(filter.discountId) ? eq(schema.orders.discountId, filter.discountId) : undefined,
     // Placed in this range (from inclusive, to exclusive).
     filter.from ? gte(schema.orders.createdAt, filter.from) : undefined,
     filter.to ? lt(schema.orders.createdAt, filter.to) : undefined,
