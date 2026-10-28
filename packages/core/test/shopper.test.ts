@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { schema } from "@sf/db";
 import {
   askShopAssistant,
@@ -9,6 +9,7 @@ import {
   ScriptedModel,
   SHOPPER_BUDGET_SHARE,
   SHOPPER_MAX_PER_CHAT,
+  shopperCards,
   shopperLinks,
   shopperThread,
   text,
@@ -89,6 +90,21 @@ describe("shopping assistant", () => {
     expect(r.answered).toBe(false);
     const runs = await f.db.query.agentRuns.findMany({ where: and(eq(schema.agentRuns.shopId, shop.id), eq(schema.agentRuns.agent, "shopper")) });
     expect(runs).toHaveLength(1);
+  });
+
+  it("shows the products an answer links to as cards, with quick add for single-option products", async () => {
+    const f = await open();
+    const shop = await f.shop();
+    const lamp = (await f.db.query.products.findFirst({ where: eq(schema.products.id, f.products.lamp.id) }))!;
+    const stand = (await f.db.query.products.findFirst({ where: eq(schema.products.id, f.products.stand.id) }))!;
+    const reply = `Try [the lamp](/products/${lamp.handle}), [it again](/products/${lamp.handle}) or [the stand](/products/${stand.handle}).`;
+    const cards = await shopperCards(f.db, shop.id, reply);
+    // The stand is a draft, and the lamp is listed once.
+    expect(cards).toMatchObject([{ handle: lamp.handle, title: lamp.title, inStock: true }]);
+    const vs = await f.variants(lamp.id);
+    expect(cards[0]!.variantId).toBe(vs.length === 1 ? vs[0]!.id : null);
+    await f.db.delete(schema.variants).where(and(eq(schema.variants.productId, lamp.id), ne(schema.variants.id, vs[0]!.id)));
+    expect((await shopperCards(f.db, shop.id, reply))[0]).toMatchObject({ variantId: vs[0]!.id, from: false });
   });
 
   it("turns only product links into links", () => {
