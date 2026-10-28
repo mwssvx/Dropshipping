@@ -6,6 +6,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { UserError } from "./errors";
+import { holidayReturnsDates } from "./holiday-returns";
 import { formatMoney } from "./money";
 import { createPage } from "./pages";
 import { countryName, listShippingZones } from "./shipping";
@@ -30,11 +31,19 @@ function days(min: number | null, max: number | null) {
   return d ? `${d} business ${d === 1 ? "day" : "days"}` : null;
 }
 
+const longDay = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+
+function holidayLine(shop: Shop) {
+  const h = holidayReturnsDates(shop);
+  return h ? [`Holiday orders get longer returns: orders placed from ${longDay.format(h.from)} to ${longDay.format(h.to)} can be returned until ${longDay.format(h.until)}.`] : [];
+}
+
 function returnsPolicy(shop: Shop) {
   const parts = [`We want you to be happy with your order from ${shop.name}.`];
   if (shop.returnWindowDays > 0) {
     parts.push(
       `You can ask for a return within ${shop.returnWindowDays} days of delivery. Open your order page (the link is in your order email) and choose "Return something", or write to us through our contact page. Tell us what you're sending back and why.`,
+      ...holidayLine(shop),
       shop.returnInstructions?.trim() || "Items should be unused and in their original packaging. We'll tell you where to send them once we've approved the return.",
       "Once the items reach us and we've checked them, we refund the price to the card you paid with. Banks usually take 5 to 10 business days to show it. Shipping costs aren't refunded unless the item arrived damaged or wasn't what you ordered.",
     );

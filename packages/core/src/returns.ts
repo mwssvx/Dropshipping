@@ -8,6 +8,7 @@ import { RETURN_REASONS, schema, type Db, type ReturnItem } from "@sf/db";
 import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
 import { issueGiftCard, type GiftCardContext } from "./gift-cards";
+import { holidayReturnsUntil } from "./holiday-returns";
 import { formatMoney } from "./money";
 import { refundOrder, type RefundContext } from "./refunds";
 import { sendReplacement } from "./replacements";
@@ -84,12 +85,17 @@ export async function returnOptions(db: Db, shop: Shop, order: Order, now = new 
   ]);
   const exchanges = await exchangeChoices(db, lines);
   const open = requests.find((r) => r.status === "requested" || r.status === "approved") ?? null;
-  const closesAt = start ? new Date(start.getTime() + shop.returnWindowDays * DAY) : null;
+  const normal = start ? new Date(start.getTime() + shop.returnWindowDays * DAY) : null;
+  // Orders paid in the holiday stretch stay returnable until its date, when that's later.
+  const holiday = holidayReturnsUntil(shop, order.paidAt);
+  const longer = holiday && (!normal || holiday > normal) ? holiday : null;
+  const closesAt = longer ?? normal;
   let blocked: string | null = null;
   if (!shop.returnWindowDays) blocked = `${shop.name} handles returns by email. Reply to your order confirmation to ask.`;
   else if (!["paid", "partially_refunded"].includes(order.paymentStatus)) blocked = order.paymentStatus === "refunded" ? "This order has been refunded." : "This order isn't paid.";
   else if (!lines.length) blocked = "Nothing in this order can be returned.";
-  else if (closesAt && closesAt < now) blocked = `Returns closed ${shop.returnWindowDays} days after delivery.`;
+  else if (closesAt && closesAt < now)
+    blocked = longer ? `Returns for holiday orders closed on ${new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", timeZone: "UTC" }).format(longer)}.` : `Returns closed ${shop.returnWindowDays} days after delivery.`;
   return { canRequest: !blocked && !open, blocked, open, latest: requests[0] ?? null, closesAt, lines, exchanges };
 }
 
