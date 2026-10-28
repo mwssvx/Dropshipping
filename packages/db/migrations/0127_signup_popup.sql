@@ -1,0 +1,1 @@
+ALTER TABLE "shops" ADD COLUMN "signup_popup_seconds" integer;

@@ -1,12 +1,14 @@
 import { readCart } from "@/lib/cart";
 import { Track } from "@/components/Track";
 import { StoreShell } from "@/theme/StoreShell";
-import { activeClosure, LANGUAGES, needsConsent, shopCurrencies, shopLanguages, storePixels, storeWideCountdown } from "@sf/core";
+import { activeClosure, LANGUAGES, needsConsent, shopCurrencies, shopLanguages, SIGNUP_POPUP_QUIET, storePixels, storeWideCountdown } from "@sf/core";
+import { SignupPopup } from "@/components/SignupPopup";
+import { currentBuyer } from "@/lib/buyer";
 import { SaleCountdown } from "@/components/SaleCountdown";
 import { AdPixels } from "@/components/AdPixels";
 import { db, storeAddress } from "@/lib/server";
 import { buyerCountry, buyerFx } from "@/lib/currency";
-import { setCurrencyAction } from "./actions";
+import { popupSignupAction, setCurrencyAction } from "./actions";
 import { themeLayoutAttrs, themeStyle } from "@/theme/style";
 import { closureDate, loadShop, loadTheme, storeBase, storeLang, storePath, storeRoot, storeT } from "./data";
 
@@ -64,11 +66,22 @@ export default async function StoreLayout({ children, params }: { children: Reac
   // Ad tags, once the buyer agrees where the law asks for it.
   const pixels = storePixels(shop);
   const ask = pixels ? needsConsent(shop, await buyerCountry()) : false;
+  // The sign-up pop-up, for visitors who aren't signed in as a subscriber already.
+  const popup = shop.signupPopupSeconds && shop.status === "active" && !closure && !(await currentBuyer(shop.id))?.acceptsMarketing;
   const picker = currencies.length > 1 ? { currencies, current: (await buyerFx(shop)).currency, action: setCurrencyAction.bind(null, param) } : undefined;
   return (
     <StoreShell doc={theme} shopName={shop.name} currency={shop.currency} base={base} cartCount={count} closed={shop.status !== "active"} notice={notice} verified={!!shop.verifiedAt && shop.status === "active"} picker={picker} t={t} languages={langs.length ? { root, current: lang ?? "en", options: [{ code: "en", name: "English" }, ...langs.map((l) => ({ code: l, name: LANGUAGES[l].name }))] } : undefined}>
       <Track shopId={shop.id} kind="page_view" />
       {children}
+      {popup && (
+        <SignupPopup
+          shopId={shop.id}
+          seconds={shop.signupPopupSeconds!}
+          quiet={SIGNUP_POPUP_QUIET.source}
+          action={popupSignupAction.bind(null, param)}
+          text={{ title: t.popupTitle, text: t.popupText, offer: shop.welcomeOffer ? t.welcomeOfferNote(shop.welcomeOffer.percentOff) : null, email: t.signupEmail, signUp: t.signUp, noThanks: t.popupNoThanks, close: t.close, sent: t.signupSent, invalid: t.signupInvalid }}
+        />
+      )}
       {pixels && <AdPixels ids={pixels} ask={ask} text={{ message: t.cookieMessage, accept: t.cookieAccept, decline: t.cookieDecline, settings: t.cookieSettings }} />}
     </StoreShell>
   );

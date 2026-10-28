@@ -883,6 +883,13 @@
       "when": 1793175894416,
       "tag": "0126_birthday_codes",
       "breakpoints": true
+    },
+    {
+      "idx": 126,
+      "version": "7",
+      "when": 1793177188766,
+      "tag": "0127_signup_popup",
+      "breakpoints": true
     }
   ]
 }

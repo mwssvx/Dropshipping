@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { abandonedCartStats, birthdaysKnown, birthdayStats, customerTags, describeDiscount, listCodeBatches, MAX_BATCH, formatMoney, listDiscounts, productChoices, POST_PURCHASE_MINUTES, postPurchaseStats, referralStats, SUBSCRIBE_WITHIN_DAYS, subscriptionStats, welcomeOfferStats, winbackDueCount, winbackStats } from "@sf/core";
+import { abandonedCartStats, birthdaysKnown, birthdayStats, customerTags, describeDiscount, listCodeBatches, MAX_BATCH, formatMoney, listDiscounts, productChoices, POST_PURCHASE_MINUTES, postPurchaseStats, referralStats, SIGNUP_POPUP_SECONDS, SUBSCRIBE_WITHIN_DAYS, subscriptionStats, welcomeOfferStats, winbackDueCount, winbackStats } from "@sf/core";
 import { requireShop, testPayments } from "@/lib/server";
 import { sendOffersNowAction, sendRemindersNowAction, setDiscountActiveAction, setRemindersAction } from "../../growth-actions";
 import { ReminderOfferForm } from "./ReminderOfferForm";
@@ -10,6 +10,7 @@ import { setCodeBatchActiveAction } from "../../code-batch-actions";
 import { WelcomeOfferForm } from "./WelcomeOfferForm";
 import { WinbackForm } from "./WinbackForm";
 import { BirthdayForm } from "./BirthdayForm";
+import { SignupPopupForm } from "./SignupPopupForm";
 import { ReferralForm } from "./ReferralForm";
 import { PostPurchaseForm } from "./PostPurchaseForm";
 import { SubscriptionOfferForm } from "./SubscriptionOfferForm";
@@ -133,6 +134,16 @@ export default async function MarketingPage() {
             <h3 className="font-medium text-sm">New batch</h3>
             <CodeBatchForm currency={shop.currency} max={MAX_BATCH} />
           </div>
+        </section>
+
+        <section className="card p-5 flex flex-col gap-3" aria-labelledby="popup-heading">
+          <h2 id="popup-heading" className="font-semibold">Sign-up pop-up</h2>
+          <p className="text-sm">
+            A small window asks new visitors for their email{shop.welcomeOffer ? `, with your welcome offer of ${shop.welcomeOffer.percentOff}% off` : ""}.
+            It opens once, never on the cart, checkout or account pages, and not again after they close it or sign up. Signups confirm by
+            email, like the form on your home page.
+          </p>
+          <SignupPopupForm seconds={shop.signupPopupSeconds} choices={SIGNUP_POPUP_SECONDS} />
         </section>
 
         <section className="card p-5 flex flex-col gap-3" aria-labelledby="welcome-heading">
