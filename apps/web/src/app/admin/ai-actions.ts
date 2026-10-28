@@ -6,6 +6,7 @@ import {
   fixProblemOrder,
   merchantReply,
   reviewStoreWithAi,
+  findTrendsWithAi,
   runMarginWatch,
   setAiSettings,
   setReviewSummary,
@@ -94,6 +95,19 @@ export async function reviewStoreAction(_: AgentState): Promise<AgentState> {
     revalidatePath("/admin/insights");
     if (run.status === "over_budget") return { error: "This month's AI budget is used up. You can raise it in AI settings." };
     if (!run.report) return { error: run.error ?? "The review couldn't be finished. Try again later." };
+    return { saved: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function findTrendsAction(_: AgentState, form: FormData): Promise<AgentState> {
+  const { shop } = await requireShop("analytics");
+  try {
+    const run = await findTrendsWithAi(await agents(), shop, { focus: String(form.get("focus") ?? "") });
+    revalidatePath("/admin/insights");
+    if (run.status === "over_budget") return { error: "This month's AI budget is used up. You can raise it in AI settings." };
+    if (!run.report) return { error: run.error ?? "The trend search couldn't be finished. Try again later." };
     return { saved: true };
   } catch (e) {
     return fail(e);

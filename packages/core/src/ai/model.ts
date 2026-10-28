@@ -19,9 +19,18 @@ export type ModelRequest = {
   /** How hard the model thinks. Bulk work runs low; talking to people runs medium. */
   effort: "low" | "medium" | "high";
   maxTokens: number;
+  /** Web searches the model may run on Anthropic's side in one call (the trend scout). None when unset. */
+  webSearches?: number;
 };
 
-export type ModelUsage = { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number };
+export type ModelUsage = {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  /** Web searches run in the call; each is billed on top of tokens. */
+  webSearches?: number;
+};
 
 export type ModelResponse = {
   content: BetaContentBlock[];
@@ -59,6 +68,7 @@ export const AGENT_MODELS: Record<AgentName, string> = {
   summarizer: "claude-haiku-5-5",
   writer: "claude-sonnet-5-5",
   analyst: "claude-sonnet-5-5",
+  scout: "claude-sonnet-5-5",
   buyer_support: "claude-sonnet-5-5",
   fulfilment: "claude-sonnet-5-5",
   assistant: "claude-opus-5-5",
@@ -91,10 +101,13 @@ const PRICES: Record<string, { input: number; output: number; cacheRead: number;
   "claude-opus-4-8": { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
 };
 
+/** A web search costs $10 per 1,000, on any model. */
+export const WEB_SEARCH_MICROS = 10_000;
+
 /** Cost of one model call in millionths of a dollar (a token at $4 per million costs 4 micros). */
 export function costMicros(model: string, u: ModelUsage): number {
   const p = PRICES[model] ?? PRICES[DEFAULT_MODEL]!;
-  return Math.ceil(u.inputTokens * p.input + u.outputTokens * p.output + u.cacheReadTokens * p.cacheRead + u.cacheWriteTokens * p.cacheWrite);
+  return Math.ceil(u.inputTokens * p.input + u.outputTokens * p.output + u.cacheReadTokens * p.cacheRead + u.cacheWriteTokens * p.cacheWrite) + (u.webSearches ?? 0) * WEB_SEARCH_MICROS;
 }
 
 /** Haiku has no server-side fallback; the API rejects the parameter there. */
@@ -131,7 +144,8 @@ export class AnthropicModel implements ModelClient {
       cache_control: { type: "ephemeral" },
       output_config: { effort: req.effort },
       system: req.system,
-      tools: req.tools,
+      // Web search runs on Anthropic's side; its results come back in the reply and go back unchanged.
+      tools: req.webSearches ? [...req.tools, { type: "web_search_20260209" as const, name: "web_search" as const, max_uses: req.webSearches }] : req.tools,
       tool_choice: { type: "auto" },
       messages: req.messages,
     });
@@ -144,6 +158,7 @@ export class AnthropicModel implements ModelClient {
         outputTokens: res.usage.output_tokens,
         cacheReadTokens: res.usage.cache_read_input_tokens ?? 0,
         cacheWriteTokens: res.usage.cache_creation_input_tokens ?? 0,
+        webSearches: res.usage.server_tool_use?.web_search_requests ?? 0,
       },
     };
   }

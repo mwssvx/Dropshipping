@@ -19,6 +19,8 @@ export type AgentSpec = {
   system: (shop: Shop) => string;
   effort: "low" | "medium" | "high";
   maxTokens: number;
+  /** Most web searches per model call, for agents that look things up online. */
+  webSearches?: number;
 };
 
 export type RunInput = {
@@ -104,7 +106,7 @@ export async function runAgent(ctx: AgentContext, spec: AgentSpec, shop: Shop, i
         error = "The assistant took too many steps and was stopped.";
         break;
       }
-      const res = await ctx.model.create({ agent: spec.agent, model: base.model, system, tools, messages, effort: spec.effort, maxTokens: spec.maxTokens });
+      const res = await ctx.model.create({ agent: spec.agent, model: base.model, system, tools, messages, effort: spec.effort, maxTokens: spec.maxTokens, webSearches: spec.webSearches });
       const cost = costMicros(res.model, res.usage);
       spent += cost;
       await db
@@ -133,6 +135,13 @@ export async function runAgent(ctx: AgentContext, spec: AgentSpec, shop: Shop, i
         // A cut-off tool call may have half its input; don't run anything from this turn.
         status = "failed";
         error = "The answer was too long and got cut off.";
+        break;
+      }
+      // A long web search turn pauses; sending it back as is lets the server carry on.
+      if (res.stopReason === "pause_turn" && spent < budget.limitMinor * 10_000) continue;
+      if (res.stopReason === "pause_turn") {
+        status = "over_budget";
+        error = "This month's AI budget ran out part way through.";
         break;
       }
       if (!calls.length) break;

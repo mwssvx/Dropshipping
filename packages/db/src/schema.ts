@@ -941,7 +941,7 @@ export const appeals = pgTable(
 
 // AI agents. Every run is recorded with its token use and cost, and every tool call it makes is an
 // agent action: reads run straight away, changes may wait for the merchant's approval.
-export const AGENTS = ["listing", "assistant", "buyer_support", "fulfilment", "margin", "writer", "translator", "answerer", "sizer", "shopper", "summarizer", "analyst"] as const;
+export const AGENTS = ["listing", "assistant", "buyer_support", "fulfilment", "margin", "writer", "translator", "answerer", "sizer", "shopper", "summarizer", "analyst", "scout"] as const;
 export type AgentName = (typeof AGENTS)[number];
 
 export const agentRuns = pgTable(
@@ -1001,16 +1001,19 @@ export type AiReportItem = {
   impact: "high" | "medium" | "low";
   /** Where in the admin to do it, from a fixed list (see AI_REPORT_AREAS in core). */
   area: string | null;
+  /** Trend ideas: the pages that show the trend, and words to search a supplier's catalog with. */
+  sources?: { title: string; url: string }[];
+  search?: string;
 };
 
-// What an AI helper found for the merchant: the store review's suggestions. Kept so the merchant
-// can look back, and so a weekly review can say what changed.
+// What an AI helper found for the merchant: the store review's suggestions, or the trend scout's
+// product ideas. Kept so the merchant can look back.
 export const aiReports = pgTable(
   "ai_reports",
   {
     id: id(),
     shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: ["review"] }).notNull(),
+    kind: text("kind", { enum: ["review", "trends"] }).notNull(),
     runId: uuid("run_id").references(() => agentRuns.id, { onDelete: "set null" }),
     summary: text("summary").notNull(),
     items: jsonb("items").$type<AiReportItem[]>().notNull(),

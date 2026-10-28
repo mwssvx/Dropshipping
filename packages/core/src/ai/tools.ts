@@ -1283,6 +1283,108 @@ const analystTools = [
   }),
 ];
 
+/** Most product ideas in one trend report. */
+export const TRENDS_MAX_ITEMS = 6;
+/** Web searches one trend report may run: $10 per 1,000, so at most about 6 cents. */
+export const TRENDS_MAX_SEARCHES = 6;
+
+/** A link the merchant may open from a trend idea: plain https, no credentials, no odd ports. */
+export function safeSourceUrl(raw: string): string | null {
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== "https:" || u.username || u.password || u.port) return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
+const scoutTools = [
+  tool({
+    name: "read_store_profile",
+    kind: "read",
+    description: "What the store sells and who to: its country and currency, collections, products on sale with prices, best sellers of the last 90 days, and what its own shoppers searched for (including searches that found nothing).",
+    input: z.object({}),
+    summary: () => "Read what the store sells and what its shoppers look for",
+    async run(_, run) {
+      const { db } = run.ctx;
+      const to = new Date();
+      const [products, collections, sales, searches] = await Promise.all([
+        db
+          .select({ title: schema.products.title, price: sql<number>`min(${schema.variants.priceMinor})::int` })
+          .from(schema.products)
+          .innerJoin(schema.variants, eq(schema.variants.productId, schema.products.id))
+          .where(and(eq(schema.products.shopId, run.shop.id), eq(schema.products.status, "active")))
+          .groupBy(schema.products.id, schema.products.title)
+          .orderBy(desc(schema.products.createdAt))
+          .limit(40),
+        db.query.collections.findMany({ where: eq(schema.collections.shopId, run.shop.id), columns: { title: true }, limit: 20 }),
+        analyticsReport(db, run.shop.id, { from: new Date(to.getTime() - 90 * DAY), to }),
+        searchReport(db, run.shop.id, { from: new Date(to.getTime() - 90 * DAY), to: new Date(to.getTime() + DAY) }, 15),
+      ]);
+      return {
+        store: run.shop.name,
+        sells_to: run.shop.country,
+        currency: run.shop.currency,
+        collections: collections.map((c) => c.title),
+        products_on_sale: products.map((p) => `${p.title} (${money(run, p.price)})`),
+        best_sellers_90_days: sales.topProducts.map((p) => `${p.title}: ${p.units} sold`),
+        shopper_searches: searches.top.map((t) => `${t.term}: ${t.searches}`),
+        searches_that_found_nothing: searches.nothing.map((t) => `${t.term}: ${t.searches}`),
+      };
+    },
+  }),
+  tool({
+    name: "save_trend_ideas",
+    kind: "change",
+    description: `Save the product ideas for the merchant: a short summary and up to ${TRENDS_MAX_ITEMS} ideas, most promising first. Call it once, at the end.`,
+    input: z.object({
+      summary: z.string().min(20).max(600),
+      ideas: z
+        .array(
+          z.object({
+            product: z.string().min(3).max(90),
+            why_now: z.string().min(10).max(400),
+            how_to_sell_it: z.string().min(10).max(400),
+            confidence: z.enum(["high", "medium", "low"]),
+            supplier_search: z.string().min(2).max(60),
+            sources: z.array(z.object({ title: z.string().min(1).max(120), url: z.string().max(500) })).max(3),
+          }),
+        )
+        .min(1)
+        .max(TRENDS_MAX_ITEMS),
+    }),
+    // It only writes a report for the merchant to read.
+    policy: () => AUTO,
+    summary: (i) => `Saved ${i.ideas.length} trending product idea${i.ideas.length === 1 ? "" : "s"}`,
+    async run(i, run) {
+      const clean = (t: string) => t.replace(/<[^>]*>/g, "").trim();
+      const [row] = await run.ctx.db
+        .insert(schema.aiReports)
+        .values({
+          shopId: run.shop.id,
+          kind: "trends",
+          runId: run.runId,
+          summary: clean(i.summary),
+          items: i.ideas.map((x) => ({
+            title: clean(x.product),
+            finding: clean(x.why_now),
+            action: clean(x.how_to_sell_it),
+            impact: x.confidence,
+            area: "suppliers",
+            search: clean(x.supplier_search),
+            sources: x.sources.flatMap((src) => {
+              const url = safeSourceUrl(src.url);
+              return url ? [{ title: clean(src.title), url }] : [];
+            }),
+          })),
+        })
+        .returning();
+      return { saved: true, report_id: row!.id };
+    },
+  }),
+];
+
 export const AGENT_TOOLS: Record<AgentName, AgentTool[]> = {
   listing: listingTools,
   assistant: assistantTools,
@@ -1296,6 +1398,7 @@ export const AGENT_TOOLS: Record<AgentName, AgentTool[]> = {
   shopper: shopperTools,
   summarizer: summarizerTools,
   analyst: analystTools,
+  scout: scoutTools,
 };
 
 export function findTool(agent: AgentName, name: string) {
