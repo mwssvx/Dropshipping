@@ -244,10 +244,36 @@ export const PRODUCT_PAGE_SIZE = 100;
  * One page of the admin product list, newest first, each with its variants, plus how many match
  * in all. `query` matches the title or an exact SKU.
  */
+/** Orders for the admin product list. Price is each product's lowest option price. */
+export const PRODUCT_SORTS = ["newest", "oldest", "title", "title_desc", "updated", "price", "price_desc"] as const;
+export type ProductSort = (typeof PRODUCT_SORTS)[number];
+
+function productOrder(sort: ProductSort) {
+  const p = schema.products;
+  const price = sql`(select min(${schema.variants.priceMinor}) from ${schema.variants} where ${schema.variants.productId} = ${p.id})`;
+  switch (sort) {
+    case "oldest":
+      return [asc(p.createdAt)];
+    case "title":
+      return [sql`lower(${p.title}) asc`];
+    case "title_desc":
+      return [sql`lower(${p.title}) desc`];
+    case "updated":
+      return [desc(p.updatedAt)];
+    // Products with no options yet go last either way.
+    case "price":
+      return [sql`${price} asc nulls last`];
+    case "price_desc":
+      return [sql`${price} desc nulls last`];
+    default:
+      return [desc(p.createdAt)];
+  }
+}
+
 export async function productPage(
   db: Db,
   shopId: string,
-  opts: { query?: string; status?: "active" | "draft" | "archived"; tag?: string; page?: number; size?: number } = {},
+  opts: { query?: string; status?: "active" | "draft" | "archived"; tag?: string; sort?: ProductSort; page?: number; size?: number } = {},
 ) {
   await publishDueProducts(db, shopId);
   const size = opts.size ?? PRODUCT_PAGE_SIZE;
@@ -265,7 +291,7 @@ export async function productPage(
       : undefined,
   );
   const [rows, [count]] = await Promise.all([
-    db.select().from(schema.products).where(where).orderBy(desc(schema.products.createdAt), asc(schema.products.id)).limit(size).offset((page - 1) * size),
+    db.select().from(schema.products).where(where).orderBy(...productOrder(opts.sort ?? "newest"), asc(schema.products.id)).limit(size).offset((page - 1) * size),
     db.select({ n: sql<number>`count(*)::int` }).from(schema.products).where(where),
   ]);
   const vs = rows.length

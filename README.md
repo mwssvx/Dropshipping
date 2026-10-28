@@ -994,3 +994,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **A code for a range**: percent, amount and buy X get Y codes can be for one collection, like SUMMER20 for the Summer collection. Only what's in the collection comes down in price, and the code follows the collection as it is at checkout, so products added later are included. That works for collections that fill themselves too, so "20% off everything tagged summer" needs no upkeep (`collectionId` in `packages/core/src/discounts.ts`; migration `0120_collection_codes`).
 2. **Never wider than meant**: a code whose collection is empty or deleted stops working, rather than coming off the whole order. The codes list says when a code's collection was deleted, and store files bring codes over with their collection.
+
+### Sorting the product list (after launch, part 160)
+
+1. **Sort**: the Products page sorts newest or oldest first, by title (A to Z or Z to A, ignoring case), by last change, or by price (each product's cheapest option). The sort stays with the search, status and tag filters and across pages (`sort` on `productPage` in `packages/core/src/products.ts`; no migration).
