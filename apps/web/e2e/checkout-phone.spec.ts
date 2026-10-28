@@ -22,7 +22,8 @@ test("checkout asks for a phone number for the courier, and the order shows it",
   const phone = page.getByRole("region", { name: "Phone number at checkout" });
   await expect(phone.getByLabel("Ask for it, but buyers can leave it empty")).toBeChecked();
   await phone.getByLabel("Buyers must enter one").check();
-  await phone.getByRole("button", { name: "Save" }).click();
+  // The form has no saved message, so wait for the save itself before reloading.
+  await Promise.all([page.waitForResponse((r) => r.request().method() === "POST" && r.ok()), phone.getByRole("button", { name: "Save" }).click()]);
   await page.reload();
   await expect(phone.getByLabel("Buyers must enter one")).toBeChecked();
 

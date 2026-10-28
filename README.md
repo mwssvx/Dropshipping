@@ -1076,3 +1076,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Share buttons (after launch, part 179)
 
 1. **Share buttons on product pages**: below Save for later, shoppers can copy the product's link or share it on WhatsApp, Facebook or Pinterest (with the product's first photo). Phones that can share get a Share button that opens their own list of apps. The link is the page's own address without its query, read in the browser so it's right on a store's own domain too. The words come in the shopper's language. A switch on the Products page turns them off (`shops.share_buttons`, migration `0124_share_buttons`; `ShareButtons` in `apps/web/src/components/ShareButtons.tsx`).
+
+### Products that earn little (after launch, part 180)
+
+1. **Margin filter on the product list**: a "Margin" row lists products not archived with an option that keeps under 20% of its price after its cost, or that sells below cost, each with its count, shown only while some product does. Options with no cost entered aren't counted, and fees and shipping aren't taken off (the Profit report does that). The spreadsheet download, changing every product in the list (raise their prices by 10%) and saved views follow it (`productMargins` and `ProductQuery.margin` in `packages/core/src/products.ts`; no migration). The checkout phone browser test now waits for its save before reloading, which made it flaky.
