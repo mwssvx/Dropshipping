@@ -8,6 +8,7 @@ import { RestockAlertForm } from "./RestockAlertForm";
 import { BadgeSettingsForm } from "./BadgeSettingsForm";
 import { SoldOutForm } from "./SoldOutForm";
 import { QuickAddForm } from "./QuickAddForm";
+import { ShareButtonsForm } from "./ShareButtonsForm";
 import { PriceImportForm } from "./PriceImportForm";
 import { AutoSubmitSelect } from "@/components/AutoSubmitSelect";
 import { SavedViews } from "@/components/SavedViews";
@@ -286,6 +287,16 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
             </p>
           </div>
           <QuickAddForm on={shop.cardQuickAdd} />
+        </section>
+        <section className="card p-5 mt-6 flex flex-col gap-3 max-w-3xl" aria-labelledby="share-heading">
+          <div>
+            <h2 id="share-heading" className="font-semibold">Share buttons</h2>
+            <p className="hint">
+              Product pages get buttons to copy the link or share it on WhatsApp, Facebook and Pinterest. On phones, Share opens the phone&apos;s own list of apps.
+              Shared links show the product&apos;s photo and title.
+            </p>
+          </div>
+          <ShareButtonsForm on={shop.shareButtons} />
         </section>
       </div>
     </main>

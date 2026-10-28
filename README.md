@@ -1072,3 +1072,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Recently viewed on the home page (after launch, part 178)
 
 1. **Recently viewed section**: a home page section the merchant adds in the theme editor that shows the products each shopper looked at last, newest first, from the same cookie as Recently viewed on product pages. Shoppers who haven't looked at anything yet don't see it, and products taken off sale drop out. The merchant picks a heading (empty means "Recently viewed" in the shopper's language) and how many to show (2 to 12). The editor preview, which has no shopper, shows the store's first products as a stand-in. The cookie is only read when the section is on the page (section `recently_viewed` in `packages/core/src/theme-doc.ts`, `SectionData.recentIds` in `apps/web/src/theme/Sections.tsx`; no migration).
+
+### Share buttons (after launch, part 179)
+
+1. **Share buttons on product pages**: below Save for later, shoppers can copy the product's link or share it on WhatsApp, Facebook or Pinterest (with the product's first photo). Phones that can share get a Share button that opens their own list of apps. The link is the page's own address without its query, read in the browser so it's right on a store's own domain too. The words come in the shopper's language. A switch on the Products page turns them off (`shops.share_buttons`, migration `0124_share_buttons`; `ShareButtons` in `apps/web/src/components/ShareButtons.tsx`).

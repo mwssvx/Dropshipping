@@ -3,6 +3,7 @@ import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
 import { bundlesForProduct, formatDeliveryWindow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, countdownTo, shipsToCountry } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
+import { ShareButtons } from "@/components/ShareButtons";
 import { SaleCountdown } from "@/components/SaleCountdown";
 import { RecentlyViewed } from "@/components/RecentlyViewed";
 import { RememberView } from "@/components/RememberView";
@@ -335,6 +336,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           )}
           {query.saved === "full" && <span role="status" className="text-sm text-critical">{t.savedFull}</span>}
         </form>
+        {shop.shareButtons && <ShareButtons title={product.title} imageUrl={productPhotos(product)[0] ?? product.variants.find((x) => x.imageUrl)?.imageUrl} t={{ share: t.share, copyLink: t.copyLink, linkCopied: t.linkCopied, shareOn: t.shareOn("%s") }} />}
         {(soldOut.length > 0 || alert) && (
           <form id="stock-alert" action={stockAlertAction.bind(null, shopHandle, product.handle)} className="card p-4 flex flex-col gap-3" aria-labelledby="stock-alert-h">
             <h2 id="stock-alert-h" className="font-semibold">{buyable.length === 0 ? t.alertTitle : t.alertTitleOption}</h2>

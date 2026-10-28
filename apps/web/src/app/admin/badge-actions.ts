@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { setBadgeSettings, setCardQuickAdd, setProductBadge, setSoldOutDisplay, UserError } from "@sf/core";
+import { setBadgeSettings, setCardQuickAdd, setProductBadge, setShareButtons, setSoldOutDisplay, UserError } from "@sf/core";
 import { requireShop } from "@/lib/server";
 
 export type BadgeState = { error?: string; saved?: boolean };
@@ -49,6 +49,14 @@ export async function soldOutAction(_: BadgeState, form: FormData): Promise<Badg
 }
 
 /** The "Add to cart" button on product cards. */
+export async function shareButtonsAction(_: BadgeState, form: FormData): Promise<BadgeState> {
+  const { shop, db } = await requireShop("products");
+  await setShareButtons(db, shop.id, form.get("share") === "on");
+  revalidatePath("/admin/products");
+  revalidatePath(`/s/${shop.handle}`, "layout");
+  return { saved: true };
+}
+
 export async function quickAddAction(_: BadgeState, form: FormData): Promise<BadgeState> {
   const { shop, db } = await requireShop("products");
   await setCardQuickAdd(db, shop.id, form.get("quickAdd") === "on");
