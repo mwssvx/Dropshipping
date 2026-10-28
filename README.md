@@ -1006,3 +1006,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Customer filters (after launch, part 162)
 
 1. **Show**: the Customers page narrows to people subscribed to emails, who bought more than once, who bought before but not in the last 90 days, or who never bought (signed up, were tagged, or asked a question). Filters work with the search, tags, sort and pages, the count shows how many match, and the spreadsheet download takes the same filter (`CUSTOMER_FILTERS` in `packages/core/src/buyers.ts`; no migration).
+
+### Tag a whole customer list (after launch, part 163)
+
+1. **Everyone here**: under the customer list, "Tag these customers" adds or removes one tag on everyone the list shows for its search, tag and filter, on every page (up to 10,000). Tag every repeat buyer "loyal", then give them a code for tagged customers or send them a campaign. Customers who already have 10 tags are left out and counted, removing a tag also stops a tag rule from tracking it, and each change goes in the activity log (`tagCustomers` in `packages/core/src/buyers.ts`; no migration).
