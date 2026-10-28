@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { listSaved } from "@sf/core";
 import { Price } from "@/components/Price";
+import { ReferralCard } from "@/components/ReferralCard";
 import { currentBuyer } from "@/lib/buyer";
 import { buyerFx } from "@/lib/currency";
 import { readGuestSaved } from "@/lib/saved";
-import { db } from "@/lib/server";
+import { db, storeAddress } from "@/lib/server";
 import { SignInForm } from "../account/SignInForm";
-import { priceAlertsAction, toggleSavedAction } from "../actions";
+import { priceAlertsAction, shareSavedAction, toggleSavedAction } from "../actions";
 import { loadShop, localProducts, storeBase, storeT } from "../data";
 
 export const metadata = { title: "Saved items", robots: { index: false } };
@@ -53,6 +54,22 @@ export default async function SavedPage({ params }: { params: Promise<{ shop: st
           })}
         </ul>
       )}
+
+      {buyer && items.length > 0 &&
+        (buyer.savedShareToken ? (
+          <ReferralCard id="share" title={t.shareTitle} body={t.shareNote} link={`${await storeAddress(shop)}/saved/${buyer.savedShareToken}`} labels={{ link: t.referLink, copy: t.referCopy, copied: t.referCopied }}>
+            <form action={shareSavedAction.bind(null, handle, false)} className="flex flex-wrap items-center gap-3 text-sm">
+              <button className="btn btn-secondary">{t.shareStop}</button>
+              <span className="hint">{t.shareStopNote}</span>
+            </form>
+          </ReferralCard>
+        ) : (
+          <form action={shareSavedAction.bind(null, handle, true)} className="card p-5 flex flex-col gap-3">
+            <h2 className="font-semibold">{t.shareTitle}</h2>
+            <p className="text-sm text-muted">{t.shareNote}</p>
+            <button className="btn btn-secondary self-start">{t.shareStart}</button>
+          </form>
+        ))}
 
       {buyer ? (
         <form action={priceAlertsAction.bind(null, handle, !on)} className="card p-4 flex flex-wrap items-center justify-between gap-3 text-sm">
