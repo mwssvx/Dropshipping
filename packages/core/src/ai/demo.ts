@@ -373,6 +373,9 @@ function assistant(s: State, req: ModelRequest): BetaContentBlock[] {
       return [toolCall("change_setting", { setting: "prices_include_tax", value: /on top|added|add\b|exclud/.test(ask) ? "false" : "true" })];
     }
     if (num) return [toolCall("read_order", { order_number: Number(num) })];
+    if (/\b(sell|selling|sales|best ?sellers?|visitors?|conversion)\b/.test(ask)) return [toolCall("read_sales", { days: /\bweek\b|7 days/.test(ask) ? 7 : /90|quarter|3 months/.test(ask) ? 90 : 30 })];
+    if (/\b(search|searching|looking for|shoppers? (want|ask))/.test(ask)) return [toolCall("read_shopper_interest", {})];
+    if (/\b(stock|inventory|run(ning)? (out|low)|restock)\b/.test(ask)) return [toolCall("read_stock", {})];
     if (/\b(problem|stuck|fail|issue)\b/.test(ask)) return [toolCall("find_orders", { filter: "problem" })];
     if (/\b(product|margin|price|cost)\b/.test(ask)) return [toolCall("find_products", {})];
     if (/\b(orders?)\b/.test(ask)) return [toolCall("find_orders", { filter: /unfulfilled|not sent|waiting/.test(ask) ? "unfulfilled" : "all" })];
@@ -401,6 +404,38 @@ function assistant(s: State, req: ModelRequest): BetaContentBlock[] {
       const rows = r as { order_number: number; buyer: string; total: string; delivery: string }[];
       if (!rows.length) return [text(c.input.filter === "problem" ? "No orders have a delivery problem right now." : "No orders match that yet.")];
       return [text(`${rows.length === 10 ? "The 10 most recent" : rows.length} order${rows.length === 1 ? "" : "s"}:\n${rows.map((o) => `• #${o.order_number}, ${o.buyer}, ${o.total}, ${o.delivery.replace(/_/g, " ")}`).join("\n")}`)];
+    }
+    case "read_sales": {
+      const best = (r.best_sellers ?? []).slice(0, 3).map((p: { product: string; units: number; sales: string }) => `${p.product} (${p.units} sold, ${p.sales})`);
+      return [
+        text(
+          `In the last ${r.days} days: ${r.orders} order${r.orders === 1 ? "" : "s"}, ${r.sales} in sales from ${r.visitors} visitor${r.visitors === 1 ? "" : "s"}.` +
+            (best.length ? ` Best sellers: ${best.join(", ")}.` : " Nothing has sold yet."),
+        ),
+      ];
+    }
+    case "read_shopper_interest": {
+      const nothing: string[] = r.searches_that_found_nothing ?? [];
+      const top: string[] = r.top_searches ?? [];
+      if (!r.searches && !r.shopping_assistant_questions) return [text("Nobody has searched your store in the last 30 days yet.")];
+      return [
+        text(
+          (top.length ? `Top searches: ${top.slice(0, 5).join("; ")}.` : "") +
+            (nothing.length ? ` These found nothing, so they may be products to add or listings to reword: ${nothing.slice(0, 5).join("; ")}.` : ""),
+        ),
+      ];
+    }
+    case "read_stock": {
+      if (r.note) return [text(r.note)];
+      const low = (r.soonest_to_run_out ?? []).filter((x: { running_low: boolean }) => x.running_low);
+      const first = r.soonest_to_run_out?.[0];
+      return [
+        text(
+          `You keep ${r.options_counted} option${r.options_counted === 1 ? "" : "s"} in stock, worth ${r.value_at_cost} at cost.` +
+            (low.length ? ` Running low: ${low.map((x: { option: string; in_stock: number }) => `${x.option} (${x.in_stock} left)`).join(", ")}.` : "") +
+            (first?.lasts_about_days != null ? ` ${first.option} runs out first, in about ${first.lasts_about_days} days.` : ""),
+        ),
+      ];
     }
     case "find_products": {
       const rows = r as { product: string; option: string; price: string; margin_pct: number | null; on_sale: boolean }[];

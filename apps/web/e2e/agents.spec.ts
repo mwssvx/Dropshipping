@@ -123,6 +123,8 @@ test("the assistant answers from real data, and changes wait for an OK", async (
   await expect(page.getByRole("article", { name: /New title and description/ })).toBeVisible();
   await page.getByRole("button", { name: "How am I doing this month?" }).click();
   await expect(page.getByText(/In the last 30 days .* had 1 order/)).toBeVisible();
+  await page.getByRole("button", { name: "What are shoppers searching for?" }).click();
+  await expect(page.getByText("Nobody has searched your store in the last 30 days yet.")).toBeVisible();
   await page.getByLabel("Message the assistant").fill("Please show prices with VAT included");
   await page.getByRole("button", { name: "Send", exact: true }).click();
   const setting = page.getByRole("article", { name: "Show prices with tax included" });
