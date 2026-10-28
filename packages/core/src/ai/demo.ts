@@ -544,6 +544,63 @@ function analyst(s: State): BetaContentBlock[] {
   return [text("I reviewed your store and saved a few suggestions on the Insights page.")];
 }
 
+/* ───────────── Trend scout ───────────── */
+
+// The demo brain can't search the web, so beyond the store's own unmet searches it offers a few
+// seasonal examples, and says plainly that they're examples.
+const SEASONAL: Record<string, { product: string; search: string }[]> = {
+  winter: [
+    { product: "Wearable heated blanket", search: "wearable heated blanket" },
+    { product: "Warm-white LED fairy lights", search: "led fairy lights" },
+  ],
+  spring: [
+    { product: "Self-watering herb planter", search: "self watering planter" },
+    { product: "Portable mini fan", search: "portable neck fan" },
+  ],
+  summer: [
+    { product: "Portable neck fan", search: "portable neck fan" },
+    { product: "Collapsible water bottle", search: "collapsible water bottle" },
+  ],
+  autumn: [
+    { product: "Sunset projection lamp", search: "sunset projection lamp" },
+    { product: "Weighted throw blanket", search: "weighted blanket" },
+  ],
+};
+const season = (d: Date) => ["winter", "winter", "spring", "spring", "spring", "summer", "summer", "summer", "autumn", "autumn", "autumn", "winter"][d.getUTCMonth()]!;
+
+function scout(s: State): BetaContentBlock[] {
+  const profile = s.has("read_store_profile");
+  if (!profile) return [toolCall("read_store_profile", {})];
+  if (!s.has("save_trend_ideas")) {
+    const missing = ((profile.result?.searches_that_found_nothing ?? []) as string[]).slice(0, 3);
+    const today = new Date(s.prompt.match(/Today is (\d{4}-\d{2}-\d{2})/)?.[1] ?? Date.now());
+    const ideas = [
+      ...missing.map((line) => {
+        const [term, count] = line.split(": ");
+        return {
+          product: term!.charAt(0).toUpperCase() + term!.slice(1),
+          why_now: `Your own shoppers searched for “${term}” ${count === "1" ? "once" : `${count} times`} and found nothing in your store.`,
+          how_to_sell_it: "Find a well-reviewed version at your supplier and price it in line with your other products.",
+          confidence: "medium",
+          supplier_search: term!.slice(0, 60),
+          sources: [],
+        };
+      }),
+      ...SEASONAL[season(today)]!.map((x) => ({
+        product: x.product,
+        why_now: "An example of a seasonal best seller. Demo mode can't search the web, so this isn't checked against live trends.",
+        how_to_sell_it: "Show it in use in the photos and mention gifting in the description.",
+        confidence: "low",
+        supplier_search: x.search,
+        sources: [],
+      })),
+    ];
+    const summary = `Demo mode: these ideas come from what your shoppers searched for${missing.length ? "" : " (nothing unmet yet)"} and from seasonal examples. With an Anthropic API key, the trend scout searches TikTok, Google, Amazon and Reddit trends and links its sources.`;
+    return [toolCall("save_trend_ideas", { summary, ideas: ideas.slice(0, 6) })];
+  }
+  return [text("I saved a few product ideas on the Insights page.")];
+}
+
 /* ───────────── Shopping assistant ───────────── */
 
 const STOP_WORDS = new Set("a an and any are as at be can could do does for from have i in is it me my of on or please show something that the there this to want what which with you your yours looking need find buy get got tell about sell store shop".split(" "));
@@ -599,4 +656,5 @@ const BRAINS: Record<ModelRequest["agent"], (s: State, req: ModelRequest) => Bet
   shopper,
   summarizer,
   analyst,
+  scout,
 };

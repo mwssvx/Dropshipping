@@ -41,3 +41,37 @@ test("the business analyst reviews the store and suggests what to do next", asyn
   await page.goto("/admin/insights");
   await expect(page.getByText("It also runs every Monday.")).toBeVisible();
 });
+
+test("the trend scout suggests products to add, once a day", async ({ page, browser }, info) => {
+  const id = `${info.project.name}-${Date.now()}`;
+  await page.goto("/signup");
+  await page.getByLabel("Email").fill(`trends-${id}@example.com`);
+  await page.getByLabel("Password").fill("correct horse battery");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByLabel("Store name").fill(`Trends ${id}`);
+  await page.getByRole("button", { name: "Create store" }).click();
+  await expect(page.getByRole("heading", { name: /Welcome to Trends/ })).toBeVisible();
+
+  await page.goto("/admin/products/import");
+  await page.getByRole("link", { name: /sunset projection lamp/i }).click();
+  await page.getByRole("button", { name: "Import and publish" }).click();
+  await expect(page.getByText("Imported and live on your store.")).toBeVisible();
+  const home = (await page.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!.replace(/\/products\/.*$/, "");
+
+  // A shopper searched for something the store doesn't sell.
+  const buyer = await (await browser.newContext({ ...info.project.use })).newPage();
+  await buyer.goto(`${home}/search?q=cat+bed`);
+  await expect(buyer.getByRole("heading", { level: 1 })).toBeVisible();
+
+  await page.goto("/admin/insights");
+  await page.getByLabel("What kind of products? (optional)").fill("pet gifts");
+  await page.getByRole("button", { name: "Find trending products" }).click();
+  // Demo mode says so, and the shopper's unmet search comes first.
+  await expect(page.getByText(/^Demo mode/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Cat bed" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Find “cat bed” on AliExpress ↗" })).toHaveAttribute("href", /SearchText=cat%20bed/);
+  await shot(page, "146-trending-products");
+
+  await page.getByRole("button", { name: "Find trending products" }).click();
+  await expect(page.getByText(/try again tomorrow/)).toBeVisible();
+});

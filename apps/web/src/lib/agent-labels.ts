@@ -12,4 +12,5 @@ export const AGENT_LABEL: Record<string, string> = {
   shopper: "Shopping assistant",
   summarizer: "Review summarizer",
   analyst: "Business analyst",
+  scout: "Trend scout",
 };
