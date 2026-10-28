@@ -6,7 +6,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { convertPrice, noConversion, type DisplayFx } from "./money";
 import { listActiveProducts } from "./products";
-import { placeSoldOut, productSoldOut, soldOutDisplay } from "./badges";
+import { placeSoldOut, productSoldOut, quickAddVariant, soldOutDisplay } from "./badges";
 import { fixedSearch } from "./search-terms";
 import { cardSwatches } from "./swatches";
 
@@ -197,5 +197,6 @@ export const compactProducts = (products: ActiveProduct[]) =>
       createdAt: p.createdAt,
       soldOut: productSoldOut(p),
       swatches: cardSwatches(p),
+      quickAdd: quickAddVariant(p),
     };
   });

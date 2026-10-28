@@ -3,6 +3,7 @@ import { db } from "@/lib/server";
 import { buyerFx } from "@/lib/currency";
 import { BrowseBar, browseOptions, type BrowseParams } from "@/theme/Browse";
 import { ProductGrid } from "@/theme/Sections";
+import { addToCartAction } from "../../actions";
 import { loadShop, localCollections, localProducts, storeBase, storeT, missing } from "../../data";
 
 async function load(param: string, handle: string, count = true) {
@@ -35,7 +36,7 @@ export default async function CollectionPage({ params, searchParams }: { params:
   // The grid takes the catalog's compact product shape.
   const compact = await localProducts(param, compactProducts(products));
   const t = await storeT(param);
-  const data = { base, currency: shop.currency, fx, t, badges: shop.productBadges, catalog: { products: compact, collections: [] } };
+  const data = { base, currency: shop.currency, fx, t, badges: shop.productBadges, quickAdd: shop.cardQuickAdd ? addToCartAction.bind(null, param) : undefined, catalog: { products: compact, collections: [] } };
   const filtered = !!(query.min || query.max || query.stock || query.sale || query.opt);
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 flex flex-col gap-8">

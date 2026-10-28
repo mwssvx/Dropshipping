@@ -1,0 +1,1 @@
+ALTER TABLE "shops" ADD COLUMN "card_quick_add" boolean DEFAULT true NOT NULL;

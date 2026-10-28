@@ -1036,3 +1036,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Saved views (after launch, part 169)
 
 1. **Views**: on the Products, Orders and Customers lists, "Save this view" names the current search, filters and sort ("Restock these", "Rush orders to the UK", "Lapsed VIPs"). Saved views show as links above the list for everyone on the team, the one you're on is marked, and × removes one. Saving the same name again changes it, and a list can have up to 20. Only the list's own link parameters are kept, never the page number (`packages/core/src/saved-views.ts`; migration `0121_saved_views`).
+
+### Add to cart from product cards (after launch, part 170)
+
+1. **Quick add**: product cards in collections, search and on the home page carry an "Add to cart" button when there's nothing to choose first: one option, no text to type, no minimum above one, and some left. The buyer lands in the cart, as from the product page; every other product still opens its page. It's on for every store and the Products page has a switch to turn it off. The theme editor's preview shows cards without it (`quickAddVariant` and `setCardQuickAdd` in `packages/core/src/badges.ts`; migration `0122_card_quick_add`).

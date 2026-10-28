@@ -848,6 +848,13 @@
       "when": 1793157056803,
       "tag": "0121_saved_views",
       "breakpoints": true
+    },
+    {
+      "idx": 121,
+      "version": "7",
+      "when": 1793158178050,
+      "tag": "0122_card_quick_add",
+      "breakpoints": true
     }
   ]
 }

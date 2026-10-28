@@ -3,7 +3,7 @@ import { db } from "@/lib/server";
 import { buyerFx } from "@/lib/currency";
 import { HomeSections } from "@/theme/Sections";
 import { loadShop, loadTheme, localCollections, localProducts, storeBase, storeT } from "./data";
-import { newsletterAction } from "./actions";
+import { addToCartAction, newsletterAction } from "./actions";
 
 export default async function StoreHome({ params, searchParams }: { params: Promise<{ shop: string }>; searchParams: Promise<{ signup?: string }> }) {
   const { shop: param } = await params;
@@ -21,6 +21,7 @@ export default async function StoreHome({ params, searchParams }: { params: Prom
         catalog,
         t: await storeT(param),
         badges: shop.productBadges,
+        quickAdd: shop.cardQuickAdd ? addToCartAction.bind(null, param) : undefined,
         signup: { action: newsletterAction.bind(null, param), status: signup === "sent" || signup === "invalid" ? signup : null, offerPercent: shop.welcomeOffer?.percentOff ?? null },
       }} />
     </main>
