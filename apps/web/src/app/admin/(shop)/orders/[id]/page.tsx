@@ -436,6 +436,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
           {child && child.paymentStatus !== "pending" && (
             <p>The buyer added <Link href={`/admin/orders/${child.id}`} className="underline">order #{child.number}</Link> after checkout.</p>
           )}
+          {order.visitSource && <p>The buyer came from {order.visitSource}.</p>}
           {order.buyerNote && (
             <section aria-labelledby="buyer-note-heading">
               <h2 id="buyer-note-heading" className="font-semibold mb-1">Note from the customer</h2>

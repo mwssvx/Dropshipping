@@ -427,6 +427,8 @@ export async function startCheckout(
     acceptsMarketing?: boolean;
     /** From the campaign click cookie; checked to belong to this store. */
     campaignId?: string | null;
+    /** Where the buyer's visit came from (`visitSource`): a site or utm_source, null when direct. */
+    visitSource?: string | null;
     /** The signed-in buyer, from their session. Wholesale prices follow the account. */
     buyerEmail?: string | null;
     /** A gift card code the buyer entered in the cart. */
@@ -636,6 +638,7 @@ export async function startCheckout(
         processingFeeMinor: dueMinor ? estimateProcessingFee(dueMinor) : 0,
         presentment,
         campaignId,
+        visitSource: input.visitSource?.slice(0, 100) || null,
         wholesale: !!cart.wholesale,
         giftCardId: cart.giftCard?.id ?? null,
         giftCardMinor,

@@ -19,7 +19,9 @@ export function Track({ shopId, kind, productId }: { shopId: string; kind: "page
   useEffect(() => {
     // Counting visits must never break the page.
     try {
-      const body = JSON.stringify({ shopId, kind, productId, sessionId: visitId(), referrer: document.referrer || null });
+      // A link tagged ?utm_source=instagram names its source even when the app hides the referrer.
+      const utmSource = new URLSearchParams(location.search).get("utm_source");
+      const body = JSON.stringify({ shopId, kind, productId, sessionId: visitId(), referrer: document.referrer || null, utmSource });
       if (!navigator.sendBeacon?.("/api/events", new Blob([body], { type: "application/json" }))) {
         void fetch("/api/events", { method: "POST", body, headers: { "content-type": "application/json" }, keepalive: true }).catch(() => {});
       }

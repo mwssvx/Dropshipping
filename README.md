@@ -1132,3 +1132,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Codes for first orders (after launch, part 193)
 
 1. **First order only** (`packages/core/src/discounts.ts`, Marketing → Discount codes): tick "First order only" on a code (say HELLO15 for new customers) and it works only for buyers who never paid for an order at your store before, checked by the email they check out with. Refunded orders still count as an order. The code list says "first orders only", it can't be combined with money off without a code, and store files carry it.
+
+### Sales by source (after launch, part 194)
+
+1. **Which sites and links sell** (`packages/core/src/analytics.ts`, Analytics → Sales by source): each order keeps where the visit it was placed in came from: the referring site (instagram.com) or the link's `utm_source` (add `?utm_source=spring-newsletter` to the links you share, and it wins over the referrer, since apps often hide that). Analytics adds up orders and sales after refunds by source, with Direct for typed-in visits, and the order page says "The buyer came from instagram.com."

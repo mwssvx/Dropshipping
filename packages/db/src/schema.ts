@@ -646,6 +646,8 @@ export const orders = pgTable(
     presentment: jsonb("presentment").$type<Presentment>(),
     // The email campaign the buyer came from, when they clicked one in the last week.
     campaignId: uuid("campaign_id").references((): AnyPgColumn => campaigns.id, { onDelete: "set null" }),
+    // Where the buyer's visit came from: a referring site ("instagram.com") or its utm_source, null when direct.
+    visitSource: text("visit_source"),
     // Placed by an approved wholesale buyer at wholesale prices.
     wholesale: boolean("wholesale").notNull().default(false),
     // Paid in part or in full with a gift card. The card is charged total minus this.
