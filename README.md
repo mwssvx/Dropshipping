@@ -1056,3 +1056,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Product list by collection (after launch, part 174)
 
 1. **In collection**: the Products page can show only the products in one hand-picked collection, with how many each holds. It works with the search, the other filters, the sort, pages, saved views, the spreadsheet download and "Select all in this list", so a whole collection can be repriced or archived at once. Automatic collections aren't offered, since their own page already lists what their rules match (`ProductQuery.collection` in `packages/core/src/products.ts`; no migration).
+
+### Buyer reviews on the home page (after launch, part 175)
+
+1. **Buyer reviews section**: a home page section the merchant adds in the theme editor that fills itself from the store's published reviews of products still on sale, newest first. Each shows the stars, words, first photo, the buyer's name, "Verified buyer" when it came from an order, and a link to the product. The merchant picks a heading, how many to show (3 to 12) and the fewest stars shown (4 by default). The store's average and review count next to the heading count every published review, not only the ones shown, so the section never flatters the store. Nothing can be typed in, unlike Customer quotes (`storeReviews` in `packages/core/src/reviews.ts`, section `reviews` in `packages/core/src/theme-doc.ts`; no migration).

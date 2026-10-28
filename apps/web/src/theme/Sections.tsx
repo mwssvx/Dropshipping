@@ -24,7 +24,8 @@ export type SectionData = {
   base: string;
   currency: string;
   fx?: DisplayFx;
-  catalog: StorefrontCatalog;
+  /** Reviews are left out where no section shows them. */
+  catalog: Omit<StorefrontCatalog, "reviews"> & Partial<Pick<StorefrontCatalog, "reviews">>;
   signup?: { action: (form: FormData) => Promise<void>; status: "sent" | "invalid" | null; offerPercent?: number | null };
   quickAdd?: (form: FormData) => Promise<void>;
   /** The store's fixed words in the buyer's language; English when left out. */
@@ -250,6 +251,59 @@ function Testimonials({ s }: Props<"testimonials">) {
   );
 }
 
+function Stars({ value, label }: { value: number; label: string }) {
+  const full = Math.round(value);
+  return (
+    <span className="text-warning tracking-tight" role="img" aria-label={label}>
+      {"★".repeat(full)}
+      <span className="text-border">{"★".repeat(5 - full)}</span>
+    </span>
+  );
+}
+
+/**
+ * The store's latest real reviews at or above the merchant's star line. The average counts every
+ * published review, not just the ones shown, so it never flatters the store.
+ */
+function BuyerReviews({ s, data }: Props<"reviews">) {
+  const t = data.t ?? storeText(null);
+  const all = data.catalog.reviews;
+  const shown = (all?.latest ?? []).filter((r) => r.rating >= s.minRating).slice(0, s.limit);
+  if (!all || !shown.length) return null;
+  return (
+    <section className="sf-reviews max-w-6xl mx-auto px-4 sm:px-6 py-12 flex flex-col gap-6">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        {s.heading && <h2 className="text-2xl font-bold tracking-tight">{s.heading}</h2>}
+        {all.average != null && (
+          <p className="text-sm flex items-center gap-2">
+            <Stars value={all.average} label={t.stars(all.average)} />
+            <span className="font-semibold num" aria-hidden="true">{all.average.toFixed(1)}</span>
+            <span className="hint">{t.reviewCount(all.count)}</span>
+          </p>
+        )}
+      </div>
+      <ul className="grid gap-4 md:grid-cols-3">
+        {shown.map((r) => (
+          <li key={r.id}>
+            <figure className="card h-full p-5 flex flex-col gap-3">
+              <Stars value={r.rating} label={t.stars(r.rating)} />
+              {r.photoUrl && <img src={r.photoUrl} alt="" width={80} height={80} loading="lazy" decoding="async" className="size-20 rounded-md object-cover" />}
+              {r.body && <blockquote className="leading-relaxed line-clamp-6 whitespace-pre-line">{r.body}</blockquote>}
+              <figcaption className="text-sm mt-auto flex flex-col gap-0.5">
+                <span className="font-semibold">
+                  {r.name}
+                  {r.verified && <span className="hint font-normal"> · {t.verifiedBuyer}</span>}
+                </span>
+                <Link href={`${data.base}/products/${r.productHandle}`} className="hint hover:underline">{r.productTitle}</Link>
+              </figcaption>
+            </figure>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 const ICONS: Record<TrustIcon, React.ReactNode> = {
   shipping: <path d="M3 6h11v9H3zM14 9h4l3 3v3h-7M7 18a1.5 1.5 0 1 0 0-.01M17 18a1.5 1.5 0 1 0 0-.01" />,
   returns: <path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3" />,
@@ -315,6 +369,7 @@ export function SectionView({ section, data, first }: { section: Section; data: 
     case "testimonials": return <Testimonials s={section.settings} data={data} first={first} />;
     case "trust_badges": return <TrustBadges s={section.settings} data={data} first={first} />;
     case "newsletter": return <Newsletter s={section.settings} data={data} first={first} />;
+    case "reviews": return <BuyerReviews s={section.settings} data={data} first={first} />;
   }
 }
 
