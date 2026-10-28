@@ -37,6 +37,12 @@ export async function setCardQuickAdd(db: Db, shopId: string, on: boolean) {
   return on;
 }
 
+/** Whether product pages show share buttons. */
+export async function setShareButtons(db: Db, shopId: string, on: boolean) {
+  await db.update(schema.shops).set({ shareButtons: on, updatedAt: new Date() }).where(eq(schema.shops.id, shopId));
+  return on;
+}
+
 /** Which automatic badges the store's product cards show. */
 export async function setBadgeSettings(db: Db, shopId: string, input: BadgeSettings) {
   const newDays = Number(input.newDays);

@@ -230,6 +230,8 @@ export const shops = pgTable(
     productBadges: jsonb("product_badges").$type<BadgeSettings>().notNull().default({ sale: true, soldOut: true, newDays: 0 }),
     // An "Add to cart" button on product cards, for products with nothing to choose.
     cardQuickAdd: boolean("card_quick_add").notNull().default(true),
+    // Share buttons on product pages: copy the link, WhatsApp, Facebook and Pinterest.
+    shareButtons: boolean("share_buttons").notNull().default(true),
     // Where sold-out products go in collections, search and the home page.
     soldOutProducts: text("sold_out_products", { enum: SOLD_OUT_DISPLAY }).notNull().default("last"),
     // Searches the merchant pointed elsewhere: "lampshade" shows the results for "lamp shade".

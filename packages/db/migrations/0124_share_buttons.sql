@@ -1,0 +1,1 @@
+ALTER TABLE "shops" ADD COLUMN "share_buttons" boolean DEFAULT true NOT NULL;
