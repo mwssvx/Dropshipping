@@ -1,9 +1,9 @@
 "use client";
-import { useActionState } from "react";
+import { startTransition, useActionState, useState } from "react";
 import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import type { FormState } from "../../actions";
-import { issueGiftCardAction, resendGiftCardAction, sellGiftCardsAction, setGiftCardDisabledAction } from "../../gift-card-actions";
+import { bulkGiftCardsAction, issueGiftCardAction, resendGiftCardAction, sellGiftCardsAction, setGiftCardDisabledAction, type BulkGiftCardState } from "../../gift-card-actions";
 
 export function SellForm({ currencySymbol }: { currencySymbol: string }) {
   const [state, action] = useActionState(sellGiftCardsAction, {} as FormState);
@@ -41,6 +41,68 @@ export function IssueForm() {
         <input className="input" id="gc-note" name="note" maxLength={500} placeholder="Sorry your lamp arrived broken. This one's on us." />
       </div>
       <SubmitButton className="btn btn-secondary self-start" pendingText="Sending…">Send gift card</SubmitButton>
+    </form>
+  );
+}
+
+/** Pasted rows of email, amount and name: checked first, then sent. Submitted by hand so the fields stay after each step. */
+export function BulkForm({ days }: { days: { min: string; max: string } }) {
+  const [state, action, pending] = useActionState(bulkGiftCardsAction, {} as BulkGiftCardState);
+  const [changed, setChanged] = useState(false);
+  const preview = !changed && !pending ? state.preview : undefined;
+  return (
+    <form
+      className="flex flex-col gap-3"
+      onChange={() => setChanged(true)}
+      onSubmit={(e) => {
+        e.preventDefault();
+        const data = new FormData(e.currentTarget);
+        const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+        data.set("step", submitter?.value ?? "check");
+        setChanged(false);
+        startTransition(() => action(data));
+      }}
+    >
+      <FormError message={state.error} />
+      {state.done && !changed && !pending && (
+        <p className="banner banner-success" role="status">
+          {state.done.sendOn
+            ? `${state.done.issued} gift cards (${state.done.total} in all) will be emailed on ${state.done.sendOn}.`
+            : `${state.done.sent} of ${state.done.issued} gift cards (${state.done.total} in all) were emailed.${state.done.sent < state.done.issued ? " Use \"Send a new code\" on the others to try again." : ""}`}
+        </p>
+      )}
+      <div className="field">
+        <label className="label" htmlFor="bulk-rows">People and amounts</label>
+        <textarea className="input font-mono text-sm" id="bulk-rows" name="rows" rows={6} required placeholder={"sam@example.com, 50, Sam\nalex@example.com, 25, Alex"} />
+        <span className="hint">One person a row: email, amount and their name (optional). Paste straight from a spreadsheet, up to 500 rows.</span>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div className="field">
+          <label className="label" htmlFor="bulk-from">From (optional)</label>
+          <input className="input" id="bulk-from" name="from" maxLength={60} placeholder="Acme Inc" />
+          <span className="hint">The email then reads as a gift from them, with each person&apos;s name.</span>
+        </div>
+        <div className="field">
+          <label className="label" htmlFor="bulk-send-on">Send on (optional)</label>
+          <input className="input" id="bulk-send-on" name="sendOn" type="date" min={days.min} max={days.max} />
+          <span className="hint">Leave it empty to send now. On the day, each gets a fresh code in the morning.</span>
+        </div>
+      </div>
+      <div className="field">
+        <label className="label" htmlFor="bulk-message">Message (optional)</label>
+        <input className="input" id="bulk-message" name="message" maxLength={300} placeholder="Happy holidays from all of us. Thanks for a great year!" />
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="submit" value="check" className="btn btn-secondary" disabled={pending} aria-busy={pending}>{pending ? "Working…" : "Check"}</button>
+        {preview && (
+          <>
+            <span className="text-sm" role="status">
+              {preview.count} {preview.count === 1 ? "gift card" : "gift cards"}, {preview.total} in all{preview.sendOn ? `, emailed on ${preview.sendOn}` : ", emailed now"}.
+            </span>
+            <button type="submit" value="send" className="btn btn-primary" disabled={pending}>Send {preview.count} {preview.count === 1 ? "gift card" : "gift cards"}</button>
+          </>
+        )}
+      </div>
     </form>
   );
 }

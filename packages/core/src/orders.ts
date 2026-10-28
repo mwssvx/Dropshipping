@@ -19,7 +19,7 @@ import { creditableCampaign } from "./campaigns";
 import { convertAmount, formatMoney, type DisplayFx } from "./money";
 import { checkAddress } from "./address-check";
 import { breakFor, describeBreak, percentOff, wholesaleTermsFor } from "./wholesale";
-import { findGiftCard } from "./gift-cards";
+import { findGiftCard, GIFT_CARD_SEND_DAYS } from "./gift-cards";
 import { bundleSavings, bundlesInCart } from "./bundles";
 import { salePrice, salesFor } from "./sales";
 import { addonsByProduct, type CheckoutAddon } from "./addons";
@@ -384,8 +384,6 @@ const giftSchema = z.object({
     .refine((e) => e === null || z.string().email().safeParse(e).success, "Enter the recipient's email, or leave it empty."),
 });
 
-/** How far ahead a gift card can be set to arrive. */
-export const GIFT_CARD_SEND_DAYS = 90;
 const DAY_MS = 86_400_000;
 
 // A gift card bought for someone else: emailed to them now, or on the day picked (UTC). A day
