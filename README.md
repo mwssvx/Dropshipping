@@ -1002,3 +1002,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Sorting the customer list (after launch, part 161)
 
 1. **Sort**: the Customers page sorts by last order (as before), money spent, number of orders, newest customers, or name (ignoring case, with unnamed customers last). The sort stays with the search, tag filter and pages. Staff who can't see money don't get the money-spent sort (`sort` on `listCustomers` in `packages/core/src/buyers.ts`; the menu is `components/SortSelect.tsx`, shared with the product list; no migration).
+
+### Customer filters (after launch, part 162)
+
+1. **Show**: the Customers page narrows to people subscribed to emails, who bought more than once, who bought before but not in the last 90 days, or who never bought (signed up, were tagged, or asked a question). Filters work with the search, tags, sort and pages, the count shows how many match, and the spreadsheet download takes the same filter (`CUSTOMER_FILTERS` in `packages/core/src/buyers.ts`; no migration).

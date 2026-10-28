@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { can, CUSTOMER_PAGE_SIZE, CUSTOMER_SORTS, customerTags, customerTotals, describeTagRule, formatMoney, listCustomers, listTagRules, productChoices, MAX_TAG_RULES } from "@sf/core";
+import { can, CUSTOMER_FILTERS, CUSTOMER_PAGE_SIZE, CUSTOMER_SORTS, LAPSED_DAYS, customerTags, customerTotals, describeTagRule, formatMoney, listCustomers, listTagRules, productChoices, MAX_TAG_RULES } from "@sf/core";
 import { SortSelect } from "@/components/SortSelect";
 import { requireShop } from "@/lib/server";
 import { deleteTagRuleAction } from "../../tag-rule-actions";
@@ -16,29 +16,40 @@ const SORTS = [
   ["name", "Name A to Z"],
 ] as const;
 
+const FILTERS = [
+  ["subscribed", "Subscribed to emails"],
+  ["repeat", "Bought more than once"],
+  ["lapsed", `No order in ${LAPSED_DAYS} days`],
+  ["never", "Never bought"],
+] as const;
+
 const date = (d: Date | null) => (d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "No orders yet");
 
-export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string; tag?: string; sort?: string; erased?: string; page?: string }> }) {
+export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string; tag?: string; filter?: string; sort?: string; erased?: string; page?: string }> }) {
   const { shop, db, role } = await requireShop("customers");
-  const { q, tag, sort: sortParam, erased, page: pageParam } = await searchParams;
+  const { q, tag, filter: filterParam, sort: sortParam, erased, page: pageParam } = await searchParams;
+  const filter = CUSTOMER_FILTERS.find((f) => f === filterParam);
   const seesMoney = can(role, "money");
   // Staff who can't see money can't rank customers by it either. The default is left out of links.
   const sorts = SORTS.filter(([s]) => seesMoney || s !== "spent");
   const sort = CUSTOMER_SORTS.find((s) => s === sortParam && s !== "recent" && sorts.some(([x]) => x === s));
   const page = Math.max(1, Math.min(10_000, Math.floor(Number(pageParam)) || 1));
   const [customers, totals, tags, rules, products] = await Promise.all([
-    listCustomers(db, shop.id, { query: q, tag, sort, limit: CUSTOMER_PAGE_SIZE, offset: (page - 1) * CUSTOMER_PAGE_SIZE }),
-    customerTotals(db, shop.id, { query: q, tag }),
+    listCustomers(db, shop.id, { query: q, tag, filter, sort, limit: CUSTOMER_PAGE_SIZE, offset: (page - 1) * CUSTOMER_PAGE_SIZE }),
+    customerTotals(db, shop.id, { query: q, tag, filter }),
     customerTags(db, shop.id),
     listTagRules(db, shop.id),
     productChoices(db, shop.id),
   ]);
-  const filtered = !!(q || tag);
-  const pages = Math.ceil(totals.customers / CUSTOMER_PAGE_SIZE);
-  const pageHref = (n: number) => {
-    const params = new URLSearchParams({ ...(q ? { q } : {}), ...(tag ? { tag } : {}), ...(sort ? { sort } : {}), ...(n > 1 ? { page: String(n) } : {}) });
+  const filtered = !!(q || tag || filter);
+  /** A link to the list with some of the search, tag, filter and sort changed; a change goes back to page 1. */
+  const listHref = (next: { q?: string; tag?: string; filter?: string; sort?: string; page?: number }) => {
+    const merged = { q, tag, filter, sort, ...next, page: next.page && next.page > 1 ? String(next.page) : undefined };
+    const params = new URLSearchParams(Object.entries(merged).filter((e): e is [string, string] => !!e[1]));
     return params.size ? `/admin/customers?${params}` : "/admin/customers";
   };
+  const pages = Math.ceil(totals.customers / CUSTOMER_PAGE_SIZE);
+  const pageHref = (n: number) => listHref({ page: n });
   const first = (page - 1) * CUSTOMER_PAGE_SIZE + 1;
 
   return (
@@ -59,14 +70,22 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
           <label className="sr-only" htmlFor="q">Search customers</label>
           <input className="input flex-1 min-w-40" id="q" name="q" type="search" defaultValue={q} placeholder="Name or email" />
           {tag && <input type="hidden" name="tag" value={tag} />}
+          {filter && <input type="hidden" name="filter" value={filter} />}
           <button className="btn btn-secondary">Search</button>
           <SortSelect id="customer-sort" label="Sort customers" value={sort ?? "recent"} options={sorts} />
         </form>
+        {(filtered || totals.customers > 0) && <nav aria-label="Show customers" className="flex flex-wrap gap-2 text-sm">
+          <Link href={listHref({ filter: undefined })} className={`pill ${filter ? "pill-neutral" : "pill-info"}`} aria-current={filter ? undefined : "page"}>Everyone</Link>
+          {FILTERS.map(([f, label]) => (
+            <Link key={f} href={listHref({ filter: f })} className={`pill ${filter === f ? "pill-info" : "pill-neutral"}`} aria-current={filter === f ? "page" : undefined}>{label}</Link>
+          ))}
+        </nav>}
+        {filtered && totals.customers > 0 && <p className="hint">{totals.customers.toLocaleString("en-US")} {totals.customers === 1 ? "customer" : "customers"}</p>}
         {tags.length > 0 && (
           <nav aria-label="Filter by tag" className="flex flex-wrap gap-2 text-sm">
-            <Link href={q || sort ? `/admin/customers?${new URLSearchParams({ ...(q ? { q } : {}), ...(sort ? { sort } : {}) })}` : "/admin/customers"} className={`pill ${tag ? "pill-neutral" : "pill-info"}`} aria-current={tag ? undefined : "page"}>All</Link>
+            <Link href={listHref({ tag: undefined })} className={`pill ${tag ? "pill-neutral" : "pill-info"}`} aria-current={tag ? undefined : "page"}>All</Link>
             {tags.map((t) => (
-              <Link key={t.tag} href={`/admin/customers?${new URLSearchParams({ ...(q ? { q } : {}), tag: t.tag, ...(sort ? { sort } : {}) })}`}
+              <Link key={t.tag} href={listHref({ tag: t.tag })}
                 className={`pill ${tag === t.tag ? "pill-info" : "pill-neutral"}`} aria-current={tag === t.tag ? "page" : undefined}>
                 {t.tag} <span className="hint num">{t.count}</span>
               </Link>
@@ -75,7 +94,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         )}
         {totals.customers > 0 && (
           <p className="text-sm">
-            <a className="underline" href={`/admin/customers/export.csv${filtered ? `?${new URLSearchParams({ ...(q ? { q } : {}), ...(tag ? { tag } : {}) })}` : ""}`} download>
+            <a className="underline" href={`/admin/customers/export.csv${filtered ? `?${new URLSearchParams({ ...(q ? { q } : {}), ...(tag ? { tag } : {}), ...(filter ? { filter } : {}) })}` : ""}`} download>
               Download {filtered ? "these customers" : "all customers"} as a spreadsheet
             </a>
           </p>
@@ -83,7 +102,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         {customers.length === 0 && page > 1 ? (
           <div className="card p-6 hint">There are no more customers. <Link href={pageHref(1)} className="underline">Back to the first page</Link></div>
         ) : customers.length === 0 ? (
-          <div className="card p-6 hint">{q ? `No customers match "${q}".` : tag ? `Nobody is tagged "${tag}".` : "Customers show up here after their first checkout."}</div>
+          <div className="card p-6 hint">{q ? `No customers match "${q}".` : tag ? `Nobody is tagged "${tag}"${filter ? " in this view" : ""}.` : filter ? "No customers here yet." : "Customers show up here after their first checkout."}</div>
         ) : (
           <div className="card overflow-x-auto">
             <table className="w-full text-sm">
