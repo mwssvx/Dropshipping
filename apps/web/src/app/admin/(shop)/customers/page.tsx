@@ -27,31 +27,33 @@ const FILTERS = [
 
 const date = (d: Date | null) => (d ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "No orders yet");
 
-export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string; tag?: string; filter?: string; country?: string; code?: string; sort?: string; erased?: string; page?: string }> }) {
+export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ q?: string; tag?: string; filter?: string; country?: string; code?: string; product?: string; sort?: string; erased?: string; page?: string }> }) {
   const { shop, db, role } = await requireShop("customers");
-  const { q, tag, filter: filterParam, country: countryParam, code: codeParam, sort: sortParam, erased, page: pageParam } = await searchParams;
+  const { q, tag, filter: filterParam, country: countryParam, code: codeParam, product: productParam, sort: sortParam, erased, page: pageParam } = await searchParams;
   const filter = CUSTOMER_FILTERS.find((f) => f === filterParam);
   const country = /^[A-Z]{2}$/.test(countryParam ?? "") ? countryParam : undefined;
   const discountId = /^[0-9a-f-]{36}$/i.test(codeParam ?? "") ? codeParam : undefined;
+  const productId = /^[0-9a-f-]{36}$/i.test(productParam ?? "") ? productParam : undefined;
   const seesMoney = can(role, "money");
   // Staff who can't see money can't rank customers by it either. The default is left out of links.
   const sorts = SORTS.filter(([s]) => seesMoney || s !== "spent");
   const sort = CUSTOMER_SORTS.find((s) => s === sortParam && s !== "recent" && sorts.some(([x]) => x === s));
   const page = Math.max(1, Math.min(10_000, Math.floor(Number(pageParam)) || 1));
-  const [customers, totals, tags, rules, products, views, countries, discount] = await Promise.all([
-    listCustomers(db, shop.id, { query: q, tag, filter, country, discountId, sort, limit: CUSTOMER_PAGE_SIZE, offset: (page - 1) * CUSTOMER_PAGE_SIZE }),
-    customerTotals(db, shop.id, { query: q, tag, filter, country, discountId }),
+  const [customers, totals, tags, rules, products, views, countries, discount, bought] = await Promise.all([
+    listCustomers(db, shop.id, { query: q, tag, filter, country, discountId, productId, sort, limit: CUSTOMER_PAGE_SIZE, offset: (page - 1) * CUSTOMER_PAGE_SIZE }),
+    customerTotals(db, shop.id, { query: q, tag, filter, country, discountId, productId }),
     customerTags(db, shop.id),
     listTagRules(db, shop.id),
     productChoices(db, shop.id),
     listSavedViews(db, shop.id, "customers"),
     customerCountries(db, shop.id),
     discountId ? db.query.discounts.findFirst({ where: (d, { and, eq }) => and(eq(d.id, discountId), eq(d.shopId, shop.id)), columns: { id: true, code: true } }) : null,
+    productId ? db.query.products.findFirst({ where: (p, { and, eq }) => and(eq(p.id, productId), eq(p.shopId, shop.id)), columns: { id: true, title: true } }) : null,
   ]);
-  const filtered = !!(q || tag || filter || country || discountId);
+  const filtered = !!(q || tag || filter || country || discountId || productId);
   /** A link to the list with some of the search, tag, filter and sort changed; a change goes back to page 1. */
-  const listHref = (next: { q?: string; tag?: string; filter?: string; country?: string; code?: string; sort?: string; page?: number }) => {
-    const merged = { q, tag, filter, country, code: discountId, sort, ...next, page: next.page && next.page > 1 ? String(next.page) : undefined };
+  const listHref = (next: { q?: string; tag?: string; filter?: string; country?: string; code?: string; product?: string; sort?: string; page?: number }) => {
+    const merged = { q, tag, filter, country, code: discountId, product: productId, sort, ...next, page: next.page && next.page > 1 ? String(next.page) : undefined };
     const params = new URLSearchParams(Object.entries(merged).filter((e): e is [string, string] => !!e[1]));
     return params.size ? `/admin/customers?${params}` : "/admin/customers";
   };
@@ -73,13 +75,14 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             {totals.customers.toLocaleString("en-US")} {totals.customers === 1 ? "customer" : "customers"} · {totals.repeat.toLocaleString("en-US")} bought more than once · {totals.accounts.toLocaleString("en-US")} signed in to their account
           </p>
         )}
-        <SavedViews list="customers" views={views} params={{ q, tag, filter, country, code: discountId, sort }} />
+        <SavedViews list="customers" views={views} params={{ q, tag, filter, country, code: discountId, product: productId, sort }} />
         <form className="flex flex-wrap gap-2 max-w-2xl" role="search">
           <label className="sr-only" htmlFor="q">Search customers</label>
           <input className="input flex-1 min-w-40" id="q" name="q" type="search" defaultValue={q} placeholder="Name or email" />
           {tag && <input type="hidden" name="tag" value={tag} />}
           {filter && <input type="hidden" name="filter" value={filter} />}
           {discountId && <input type="hidden" name="code" value={discountId} />}
+          {productId && <input type="hidden" name="product" value={productId} />}
           <button className="btn btn-secondary">Search</button>
           {(countries.length > 1 || country) && <AutoSubmitSelect id="customer-country" name="country" label="Bought for delivery to" value={country ?? ""} options={[["", "Every country"], ...countries.map((c) => [c.country, `${countryName(c.country)} (${c.count.toLocaleString("en-US")})`] as const)]} />}
           <AutoSubmitSelect id="customer-sort" label="Sort customers" value={sort ?? "recent"} options={sorts} />
@@ -88,6 +91,12 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
           <p className="text-sm flex flex-wrap items-center gap-2">
             <span>Customers who used <strong className="font-mono">{discount?.code ?? "a deleted code"}</strong></span>
             <Link href={listHref({ code: undefined })} className="underline">Show all customers</Link>
+          </p>
+        )}
+        {productId && (
+          <p className="text-sm flex flex-wrap items-center gap-2">
+            <span>Customers who bought <strong>{bought?.title ?? "a deleted product"}</strong></span>
+            <Link href={listHref({ product: undefined })} className="underline">Show everyone</Link>
           </p>
         )}
         {(filtered || totals.customers > 0) && <nav aria-label="Show customers" className="flex flex-wrap gap-2 text-sm">
@@ -112,12 +121,12 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         {(filtered || totals.customers > 0) && (
           <details className="text-sm">
             <summary className="cursor-pointer underline w-fit">Tag {filtered ? "these customers" : "all customers"}</summary>
-            <TagEveryoneForm count={totals.customers} q={q} tag={tag} filter={filter} country={country} code={discountId} tags={tags.map((t) => t.tag)} />
+            <TagEveryoneForm count={totals.customers} q={q} tag={tag} filter={filter} country={country} code={discountId} product={productId} tags={tags.map((t) => t.tag)} />
           </details>
         )}
         {totals.customers > 0 && (
           <p className="text-sm">
-            <a className="underline" href={`/admin/customers/export.csv${filtered ? `?${new URLSearchParams({ ...(q ? { q } : {}), ...(tag ? { tag } : {}), ...(filter ? { filter } : {}), ...(country ? { country } : {}), ...(discountId ? { code: discountId } : {}) })}` : ""}`} download>
+            <a className="underline" href={`/admin/customers/export.csv${filtered ? `?${new URLSearchParams({ ...(q ? { q } : {}), ...(tag ? { tag } : {}), ...(filter ? { filter } : {}), ...(country ? { country } : {}), ...(discountId ? { code: discountId } : {}), ...(productId ? { product: productId } : {}) })}` : ""}`} download>
               Download {filtered ? "these customers" : "all customers"} as a spreadsheet
             </a>
           </p>
