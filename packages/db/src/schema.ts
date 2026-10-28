@@ -1998,6 +1998,8 @@ export const sales = pgTable(
     endsAt: timestamp("ends_at", { withTimezone: true }),
     // Count down to the end on the store: on the product pages it covers, and in a banner when it covers everything.
     countdown: boolean("countdown").notNull().default(false),
+    // A code that gets subscribers (or tagged customers) the sale price before it starts. It stops when the sale starts.
+    earlyDiscountId: uuid("early_discount_id").references(() => discounts.id, { onDelete: "set null" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

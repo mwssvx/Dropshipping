@@ -1,6 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { createSale, deleteSale, endSale, sendPriceDrops, setLowestPriceNote, UserError } from "@sf/core";
+import { redirect } from "next/navigation";
+import { createSale, deleteSale, endEarlyAccess, endSale, giveEarlyAccess, sendPriceDrops, setLowestPriceNote, UserError } from "@sf/core";
 import { requireShop, stock } from "@/lib/server";
 
 export type SaleState = { error?: string; message?: string; key?: number };
@@ -60,6 +61,28 @@ export async function deleteSaleAction(id: string) {
     if (!(e instanceof UserError)) throw e;
   });
   refresh(shop.handle);
+}
+
+/** Makes a scheduled sale's early access code, for subscribers or tagged customers. */
+export async function giveEarlyAccessAction(id: string, form: FormData) {
+  const { shop, db } = await requireShop("marketing");
+  try {
+    await giveEarlyAccess(db, shop.id, id, { hours: Number(form.get("hours") ?? 0), customerTag: String(form.get("tag") ?? "") || null });
+  } catch (e) {
+    if (!(e instanceof UserError)) throw e;
+    redirect(`/admin/sales?error=${encodeURIComponent(e.message)}`);
+  }
+  revalidatePath("/admin/sales");
+  revalidatePath("/admin/marketing");
+}
+
+export async function endEarlyAccessAction(id: string) {
+  const { shop, db } = await requireShop("marketing");
+  await endEarlyAccess(db, shop.id, id).catch((e) => {
+    if (!(e instanceof UserError)) throw e;
+  });
+  revalidatePath("/admin/sales");
+  revalidatePath("/admin/marketing");
 }
 
 /** Who sees the lowest earlier price under reduced prices. */

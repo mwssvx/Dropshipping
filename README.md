@@ -1218,3 +1218,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **What the store told the buyer** (`disputeEvidence` in `packages/core/src/disputes.ts`): the evidence sent to the bank now lists every email that went to the buyer about the order, with its date and subject (order confirmation, shipping update with tracking, running late, updates from the store), and the dispute's checklist on the order page shows "Emails to the buyer". A buyer who says they never heard anything has a hard time when the bank sees the shipping email.
 2. **One name for each email**: the order timeline and the evidence use the same names (`ORDER_EMAIL_LABELS` in `packages/core/src/fulfillment.ts`).
+
+### Early access to a sale (after launch, part 212)
+
+1. **Let subscribers in first** (`giveEarlyAccess` in `packages/core/src/sales.ts`, Sales → a scheduled sale → Give early access): makes a code like EARLY-BLACKFRIDAY with the sale's percentage off the same products, working from now (or one to three days before the sale) until the sale starts, when everyone gets the price anyway. The Sales page shows the link to send (it puts the code in the buyer's cart), and "Email your subscribers" opens a campaign already written (`earlyAccessEmail`): when the sale starts, what's in it, and a "Shop early" button that applies the code.
+2. **Only for your best customers**: give it a customer tag (say "vip") and only customers with that tag can use it at checkout.
+3. **Stops cleanly**: "Stop early access" turns the code off, and deleting the sale turns its code off too (`sales.early_discount_id`, migration 0137).

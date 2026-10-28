@@ -77,4 +77,31 @@ test("a merchant runs a sale and ends it", async ({ page, browser }, info) => {
   await expect(buyer.getByRole("button", { name: "Add to cart" })).toBeVisible();
   await expect(buyer.getByText(/On sale:/)).toHaveCount(0);
   await expect(buyer.getByText("$13.99").first()).toBeVisible();
+
+  // Early access to the summer sale: a code with its 10% off until it starts, sent as a link.
+  const summer = page.getByRole("listitem", { name: "Summer sale" });
+  await summer.getByLabel("Early access from").selectOption("24");
+  await summer.getByRole("button", { name: "Give early access" }).click();
+  const early = summer.getByLabel("Early access to Summer sale");
+  await expect(early).toContainText("Early access with the code EARLY-SUMMERSALE, from Jun 30");
+  await expect(early).toContainText("for anyone with the link");
+  const link = await early.getByLabel("Link to send (applies the code)").inputValue();
+  expect(link).toMatch(/\/discount\/EARLY-SUMMERSALE$/);
+  await shot(page, "216-early-access");
+  await early.getByRole("button", { name: "Stop early access" }).click();
+  await expect(summer.getByRole("button", { name: "Give early access" })).toBeVisible();
+  // Starting now this time: the buyer follows the link and the cart takes the code.
+  await summer.getByRole("button", { name: "Give early access" }).click();
+  await expect(summer).toContainText("EARLY-SUMMERSALE2 until the sale starts");
+  await expect(summer.getByLabel("Link to send (applies the code)")).toHaveValue(/\/discount\/EARLY-SUMMERSALE2$/);
+  // (The link uses the store's own address; the tests reach the store through the platform's.)
+  await buyer.goto(`${lamp.split("/products/")[0]}/discount/EARLY-SUMMERSALE2`);
+  await buyer.goto(lamp);
+  await buyer.getByRole("button", { name: "Add to cart" }).click();
+  await expect(buyer).toHaveURL(/\/cart$/);
+  await expect(buyer.getByText("EARLY-SUMMERSALE2").first()).toBeVisible();
+  // The announcement comes written, with a button that applies the code.
+  await summer.getByRole("link", { name: "Email your subscribers" }).click();
+  await expect(page.getByLabel("Subject")).toHaveValue("Early access: Summer sale, 10% off");
+  await expect(page.getByLabel("Email", { exact: true })).toHaveValue(/you can shop it now: 10% off everything\.[\s\S]*EARLY-SUMMERSALE2/);
 });
