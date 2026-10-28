@@ -27,6 +27,7 @@ const discountInput = z
     minSubtotalMinor: z.number().int().min(0).default(0),
     usageLimit: z.number().int().min(1, "The limit must be at least 1.").nullish(),
     oncePerCustomer: z.boolean().default(false),
+    firstOrderOnly: z.boolean().default(false),
     customerTag: z
       .string()
       .nullish()
@@ -49,6 +50,7 @@ const discountInput = z
     if (d.automatic && (d.kind === "percent" || d.kind === "amount") && (d.productIds.length || d.collectionId)) {
       ctx.addIssue({ code: "custom", message: "Money off without a code is for the whole order. Give it a code to limit it to some products." });
     }
+    if (d.automatic && d.firstOrderOnly) ctx.addIssue({ code: "custom", message: "Money off without a code is for everyone. Give it a code to keep it for first orders." });
     if (d.automatic && d.customerTag) ctx.addIssue({ code: "custom", message: "Money off without a code is for everyone. Give it a code to limit it to tagged customers." });
     if (d.automatic && d.kind === "free_shipping") ctx.addIssue({ code: "custom", message: "Free shipping over an amount is set under Shipping instead." });
     // Money off without a code needs a minimum order ("Spend more, save more"); money off everything is a sale.
@@ -205,7 +207,7 @@ async function withCollection(db: Db, shopId: string, d: Discount): Promise<Usab
 /**
  * The discount a buyer typed, if it can be used on this cart right now. Throws a message for the
  * buyer otherwise. `email` is checked only at checkout, for once-per-customer codes, codes made
- * for one buyer and codes for tagged customers.
+ * for one buyer, codes for tagged customers and codes for first orders.
  */
 export async function findUsableDiscount(db: Db, shop: Shop, code: string, cart: { subtotalMinor: number; email?: string }, now = new Date()) {
   const clean = code.trim().toUpperCase();
@@ -231,6 +233,14 @@ export async function findUsableDiscount(db: Db, shop: Shop, code: string, cart:
   if (d.oncePerCustomer && cart.email) {
     const [u] = await db.select({ n: count() }).from(schema.orders).where(and(paidWith, eq(schema.orders.email, cart.email.trim().toLowerCase())));
     if (Number(u?.n ?? 0) > 0) throw new UserError(`You've already used ${clean}.`, "discount_invalid");
+  }
+  // Any paid order before, refunded or not, means this isn't their first.
+  if (d.firstOrderOnly && cart.email) {
+    const before = await db.query.orders.findFirst({
+      where: and(eq(schema.orders.shopId, shop.id), eq(schema.orders.email, cart.email.trim().toLowerCase()), inArray(schema.orders.paymentStatus, [...PAID])),
+      columns: { id: true },
+    });
+    if (before) throw new UserError(`${clean} is for a first order only.`, "discount_invalid");
   }
   const usable = await withCollection(db, shop.id, d);
   if (!usable) throw new UserError(`"${clean}" isn't a valid code.`, "discount_invalid");

@@ -1128,3 +1128,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Gift cards for someone else (after launch, part 192)
 
 1. **Send a gift card to a friend** (`packages/core/src/gift-cards.ts`, checkout → Send the gift card to someone): a buyer with gift cards in the cart can tick the box and give the recipient's email, their name, who it's from and a message. The code goes straight to the recipient, not the buyer, and the buyer gets an email saying where it went. Picking a day up to 90 days ahead holds the card until then: the daily job emails it that morning (UTC) with a fresh code, once, and tries again the next day if the email fails. Gift cards → the card shows "Sends on" its day until then, and "Send new code" sends it right away.
+
+### Codes for first orders (after launch, part 193)
+
+1. **First order only** (`packages/core/src/discounts.ts`, Marketing → Discount codes): tick "First order only" on a code (say HELLO15 for new customers) and it works only for buyers who never paid for an order at your store before, checked by the email they check out with. Refunded orders still count as an order. The code list says "first orders only", it can't be combined with money off without a code, and store files carry it.
