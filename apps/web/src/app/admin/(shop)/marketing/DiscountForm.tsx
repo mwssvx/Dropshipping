@@ -4,7 +4,7 @@ import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import { createDiscountAction } from "../../growth-actions";
 
-export function DiscountForm({ currency, products }: { currency: string; products: { id: string; title: string }[] }) {
+export function DiscountForm({ currency, products, tags }: { currency: string; products: { id: string; title: string }[]; tags: string[] }) {
   const [state, action] = useActionState(createDiscountAction, {});
   const [kind, setKind] = useState("percent");
   const symbol = new Intl.NumberFormat("en-US", { style: "currency", currency }).formatToParts(0).find((p) => p.type === "currency")?.value ?? "";
@@ -106,6 +106,14 @@ export function DiscountForm({ currency, products }: { currency: string; product
           <input type="checkbox" name="oncePerCustomer" /> Once per buyer
         </label>
       </div>
+      {kind !== "bxgy" && (
+        <div className="field">
+          <label className="label" htmlFor="customerTag">Only for customers tagged</label>
+          <input className="input sm:max-w-xs" id="customerTag" name="customerTag" maxLength={30} placeholder="Anyone" list="customer-tags" autoComplete="off" />
+          <datalist id="customer-tags">{tags.map((t) => <option key={t} value={t} />)}</datalist>
+          <span className="hint">Say &ldquo;vip&rdquo; and only customers with that tag on their page can use it. Buyers are checked by the email they check out with.</span>
+        </div>
+      )}
       <div><SubmitButton pendingText="Creating…">{kind === "bxgy" ? "Create offer" : "Create code"}</SubmitButton></div>
     </form>
   );

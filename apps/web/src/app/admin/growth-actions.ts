@@ -35,6 +35,7 @@ export async function createDiscountAction(_: FormState, form: FormData): Promis
       minSubtotalMinor: min ? parseMoney(min) : 0,
       usageLimit: limit ? Number.parseInt(limit, 10) : null,
       oncePerCustomer: form.get("oncePerCustomer") === "on",
+      customerTag: kind === "bxgy" ? null : String(form.get("customerTag") ?? ""),
       startsAt: optionalDate(form.get("startsAt")),
       endsAt: optionalDate(form.get("endsAt"), true),
     });

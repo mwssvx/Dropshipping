@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { abandonedCartStats, describeDiscount, listCodeBatches, MAX_BATCH, formatMoney, listDiscounts, productChoices, POST_PURCHASE_MINUTES, postPurchaseStats, referralStats, SUBSCRIBE_WITHIN_DAYS, subscriptionStats, welcomeOfferStats, winbackDueCount, winbackStats } from "@sf/core";
+import { abandonedCartStats, customerTags, describeDiscount, listCodeBatches, MAX_BATCH, formatMoney, listDiscounts, productChoices, POST_PURCHASE_MINUTES, postPurchaseStats, referralStats, SUBSCRIBE_WITHIN_DAYS, subscriptionStats, welcomeOfferStats, winbackDueCount, winbackStats } from "@sf/core";
 import { requireShop, testPayments } from "@/lib/server";
 import { sendOffersNowAction, sendRemindersNowAction, setDiscountActiveAction, setRemindersAction } from "../../growth-actions";
 import { ReminderOfferForm } from "./ReminderOfferForm";
@@ -20,7 +20,7 @@ const date = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "
 
 export default async function MarketingPage() {
   const { shop, db } = await requireShop("marketing");
-  const [discounts, stats, welcome, referrals, products, afterCheckout, subs, winback, winbackDue, batches] = await Promise.all([
+  const [discounts, stats, welcome, referrals, products, afterCheckout, subs, winback, winbackDue, batches, tags] = await Promise.all([
     listDiscounts(db, shop.id),
     abandonedCartStats(db, shop.id, new Date(Date.now() - 30 * DAY)),
     welcomeOfferStats(db, shop.id),
@@ -31,6 +31,7 @@ export default async function MarketingPage() {
     winbackStats(db, shop.id),
     shop.winbackOffer ? winbackDueCount(db, shop, shop.winbackOffer) : null,
     listCodeBatches(db, shop.id),
+    customerTags(db, shop.id),
   ]);
   const money = (m: number) => formatMoney(m, shop.currency);
   const now = new Date();
@@ -65,6 +66,7 @@ export default async function MarketingPage() {
                       <span className="hint">
                         {d.usageLimit !== null && ` · ${d.usageLimit} uses`}
                         {d.oncePerCustomer && " · once per buyer"}
+                        {d.customerTag && ` · customers tagged “${d.customerTag}”`}
                         {d.automatic && " · automatic, no code needed"}
                         {d.endsAt && ` · until ${date(d.endsAt)}`}
                       </span>
@@ -86,7 +88,7 @@ export default async function MarketingPage() {
           )}
           <div className="flex flex-col gap-3 border-t border-border pt-4">
             <h3 className="font-medium text-sm">New code</h3>
-            <DiscountForm currency={shop.currency} products={products.filter((p) => !p.giftCard && p.status !== "archived").map((p) => ({ id: p.id, title: p.title }))} />
+            <DiscountForm currency={shop.currency} products={products.filter((p) => !p.giftCard && p.status !== "archived").map((p) => ({ id: p.id, title: p.title }))} tags={tags.map((t) => t.tag)} />
           </div>
         </section>
 
