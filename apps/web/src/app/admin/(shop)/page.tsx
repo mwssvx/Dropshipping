@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { can, formatMoney, homeCounts, listRequirements, soldOutAtSupplier, twoStepStatus } from "@sf/core";
+import { can, formatMoney, holidayChecklist, holidaySeason, homeCounts, listRequirements, soldOutAtSupplier, twoStepStatus } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "./PageHeader";
 
@@ -10,12 +10,15 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
   const { denied } = await searchParams;
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
-  const [counts, requirements, twoStep, soldOut] = await Promise.all([
+  const season = role === "owner" && holidaySeason();
+  const [counts, requirements, twoStep, soldOut, holiday] = await Promise.all([
     homeCounts(db, shop.id, startOfDay),
     listRequirements(db, shop.id),
     twoStepStatus(db, user.id),
     can(role, "products") ? soldOutAtSupplier(db, shop.id) : [],
+    season ? holidayChecklist(db, shop) : null,
   ]);
+  const holidayLeft = holiday?.filter((c) => !c.done).length ?? 0;
   const seesMoney = can(role, "money");
   const holds = seesMoney ? requirements.filter((r) => r.holdsPayouts) : [];
   const { held, toSend, problems } = counts;
@@ -100,7 +103,17 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
             )}
           </section>
         </div>
-        {role === "owner" && <section className="card p-4 flex flex-col gap-3 self-start">
+        <div className="flex flex-col gap-6 self-start">
+        {holiday && holidayLeft > 0 && (
+          <section className="card p-4 flex flex-col gap-2" aria-labelledby="holiday-card">
+            <h2 id="holiday-card" className="font-semibold">Get ready for the holidays</h2>
+            <p className="text-sm hint">
+              {holiday.length - holidayLeft} of {holiday.length} done. Next: {holiday.find((c) => !c.done)!.title.toLowerCase()}.
+            </p>
+            <Link href="/admin/holidays" className="btn btn-secondary self-start">Open the holiday checklist</Link>
+          </section>
+        )}
+        {role === "owner" && <section className="card p-4 flex flex-col gap-3">
           <div>
             <h2 className="font-semibold">Set up your store</h2>
             <p className="hint">{left === 0 ? "All done." : `${left} ${left === 1 ? "step" : "steps"} left`}</p>
@@ -122,6 +135,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
             ))}
           </ol>
         </section>}
+        </div>
       </div>
     </main>
   );
