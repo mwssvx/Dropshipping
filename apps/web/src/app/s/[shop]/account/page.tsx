@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { buyerOrders, formatDeliveryDate, intervalLabel, subscriptionsForEmail, describeReferralProgram, describeRewards, formatMoney, myReferrals, referralCodeFor, REWARD_STEP, rewardsFor } from "@sf/core";
+import { buyerOrders, formatBirthday, formatDeliveryDate, intervalLabel, subscriptionsForEmail, describeReferralProgram, describeRewards, formatMoney, myReferrals, referralCodeFor, REWARD_STEP, rewardsFor } from "@sf/core";
 import { ReferralCard } from "@/components/ReferralCard";
 import { currentBuyer } from "@/lib/buyer";
 import { db, storeAddress } from "@/lib/server";
@@ -7,6 +7,7 @@ import { loadShop, storeBase, storeT } from "../data";
 import { buyAgainAction, buyerSignOutAction, setBuyerMarketingAction } from "./actions";
 import { SignInForm } from "./SignInForm";
 import { WholesaleForm } from "./WholesaleForm";
+import { BirthdayForm } from "./BirthdayForm";
 import { RedeemForm } from "./RedeemForm";
 
 export const metadata = { title: "Your account", robots: { index: false } };
@@ -61,6 +62,17 @@ export default async function AccountPage({ params }: { params: Promise<{ shop: 
         <span>{buyer.acceptsMarketing ? `You get news and offers from ${shop.name} by email.` : `You don't get marketing emails from ${shop.name}.`}</span>
         <button className="btn btn-secondary">{buyer.acceptsMarketing ? "Stop news and offers" : "Send me news and offers"}</button>
       </form>
+      {shop.birthdayOffer && (
+        <section aria-labelledby="birthday-heading" className="card p-5 flex flex-col gap-3">
+          <h2 id="birthday-heading" className="font-semibold">Your birthday</h2>
+          <p className="text-sm">
+            {buyer.birthday ? `We have ${formatBirthday(buyer.birthday)}. ` : ""}
+            Tell us your birthday and we&apos;ll email you {shop.birthdayOffer.percentOff}% off that day
+            {buyer.acceptsMarketing ? "." : ", once you say yes to news and offers."} We only ask for the month and day.
+          </p>
+          <BirthdayForm handle={handle} birthday={buyer.birthday} />
+        </section>
+      )}
       {shop.wholesaleEnabled && (
         <section id="wholesale" aria-labelledby="wholesale-heading" className="card p-5 flex flex-col gap-3">
           <h2 id="wholesale-heading" className="font-semibold">Buying for a business?</h2>

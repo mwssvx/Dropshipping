@@ -130,6 +130,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       wholesale: { enabled: shop.wholesaleEnabled, percent_off: shop.wholesalePercentOff, min_order_minor: shop.wholesaleMinOrderMinor },
       welcome_offer: shop.welcomeOffer ? { percent_off: shop.welcomeOffer.percentOff, min_subtotal: shop.welcomeOffer.minSubtotalMinor, days: shop.welcomeOffer.days } : null,
       winback_offer: shop.winbackOffer ? { after_days: shop.winbackOffer.afterDays, percent_off: shop.winbackOffer.percentOff, days: shop.winbackOffer.days } : null,
+      birthday_offer: shop.birthdayOffer ? { percent_off: shop.birthdayOffer.percentOff, days: shop.birthdayOffer.days } : null,
       after_checkout_offer: shop.postPurchaseOffer && handleOf.get(shop.postPurchaseOffer.productId)
         ? { product: handleOf.get(shop.postPurchaseOffer.productId)!, percent_off: shop.postPurchaseOffer.percentOff, active: shop.postPurchaseOffer.active }
         : null,
@@ -320,6 +321,7 @@ const importSchema = z.object({
       languages: z.array(z.enum(LANGUAGE_CODES as [string, ...string[]])).max(LANGUAGE_CODES.length).optional(),
       welcome_offer: z.object({ percent_off: z.number().int().min(5).max(50), min_subtotal: z.number().int().min(0), days: z.number().int().min(7).max(90) }).nullable().optional(),
       winback_offer: z.object({ after_days: z.union([z.literal(30), z.literal(60), z.literal(90), z.literal(180)]), percent_off: z.number().int().min(5).max(50), days: z.number().int().min(7).max(60) }).nullable().optional(),
+      birthday_offer: z.object({ percent_off: z.number().int().min(5).max(50), days: z.number().int().min(7).max(60) }).nullable().optional(),
       after_checkout_offer: z.object({ product: handle, percent_off: z.number().int().min(0).max(50), active: z.boolean() }).nullable().optional(),
       subscribe_and_save: z.object({ percent_off: z.number().int().min(0).max(30), active: z.boolean() }).nullable().optional(),
       delivery_estimates: z.object({ enabled: z.boolean(), processing_days: z.number().int().min(0).max(14) }).optional(),
@@ -808,6 +810,10 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
     if (data.store.winback_offer !== undefined) {
       const w = data.store.winback_offer;
       settings.winbackOffer = w ? { afterDays: w.after_days, percentOff: w.percent_off, days: w.days } : null;
+    }
+    if (data.store.birthday_offer !== undefined) {
+      const b = data.store.birthday_offer;
+      settings.birthdayOffer = b ? { percentOff: b.percent_off, days: b.days } : null;
     }
     if (data.store.welcome_offer !== undefined) {
       const w = data.store.welcome_offer;

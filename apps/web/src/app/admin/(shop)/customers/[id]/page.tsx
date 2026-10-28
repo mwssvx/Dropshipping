@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { can, creditFor, customerPoints, formatMoney, getCustomerProfile, NotFoundError, personalCodesFor, RETURN_REASON_LABELS } from "@sf/core";
+import { can, creditFor, formatBirthday, customerPoints, formatMoney, getCustomerProfile, NotFoundError, personalCodesFor, RETURN_REASON_LABELS } from "@sf/core";
 import { FulfilmentStatus, PaymentStatus } from "@/components/Status";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../../PageHeader";
@@ -116,6 +116,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
             <a href={`mailto:${customer.email}`} className="underline break-all">{customer.email}</a>
             <p>{customer.acceptsMarketing ? <span className="pill pill-info">Subscribed to emails</span> : <span className="hint">Not subscribed to emails</span>}</p>
             <p className="hint">{customer.lastSignInAt ? `Signed in to their account ${date(customer.lastSignInAt)}` : "Checks out as a guest"}</p>
+            {customer.birthday && <p>Birthday: {formatBirthday(customer.birthday)}</p>}
             {customer.wholesaleStatus === "approved" && <p><span className="pill pill-success">Wholesale</span> {customer.wholesaleCompany}</p>}
             {profile.storeCreditMinor > 0 && <p>Store credit: <span className="num font-medium">{money(profile.storeCreditMinor)}</span></p>}
           </section>

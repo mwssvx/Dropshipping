@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { applyForWholesale, formatMoney, mergeSaved, normalizeGiftCardCode, redeemPoints, reorderLines, requestBuyerCode, signOutBuyer, subscribeBuyer, unsubscribeBuyer, UserError, verifyBuyerCode } from "@sf/core";
+import { applyForWholesale, formatMoney, setBirthday, mergeSaved, normalizeGiftCardCode, redeemPoints, reorderLines, requestBuyerCode, signOutBuyer, subscribeBuyer, unsubscribeBuyer, UserError, verifyBuyerCode } from "@sf/core";
 import { readCart, writeCart, writeGiftCardCode } from "@/lib/cart";
 import { buyerToken, clearBuyerCookie, currentBuyer, setBuyerCookie } from "@/lib/buyer";
 import { db, mailer, storeAddress } from "@/lib/server";
@@ -104,4 +104,20 @@ export async function redeemPointsAction(handle: string, _: RedeemState, form: F
     if (e instanceof UserError) return { error: e.message };
     throw e;
   }
+}
+
+/** A signed-in buyer gives or removes their birthday, for the store's birthday code. */
+export async function setBirthdayAction(handle: string, _: { error?: string; saved?: boolean }, form: FormData): Promise<{ error?: string; saved?: boolean }> {
+  const shop = await loadShop(handle);
+  const buyer = await currentBuyer(shop.id);
+  if (!buyer) redirect(`${await storeBase(handle)}/account`);
+  const clear = form.get("intent") === "clear";
+  try {
+    await setBirthday(await db(), shop.id, buyer.email, clear ? null : Number(form.get("month")) || null, clear ? null : Number(form.get("day")) || null);
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath(`/s/${handle}/account`);
+  return { saved: true };
 }

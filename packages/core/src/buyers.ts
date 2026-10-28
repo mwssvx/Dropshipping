@@ -70,7 +70,7 @@ export async function verifyBuyerCode(db: Db, shopId: string, emailInput: string
 export async function getBuyer(db: Db, shopId: string, token: string | undefined, now = new Date()) {
   if (!token) return null;
   const [row] = await db
-    .select({ id: schema.customers.id, email: schema.customers.email, name: schema.customers.name, acceptsMarketing: schema.customers.acceptsMarketing, priceAlerts: schema.customers.priceAlerts, savedShareToken: schema.customers.savedShareToken, wholesaleStatus: schema.customers.wholesaleStatus, wholesaleCompany: schema.customers.wholesaleCompany })
+    .select({ id: schema.customers.id, email: schema.customers.email, name: schema.customers.name, acceptsMarketing: schema.customers.acceptsMarketing, priceAlerts: schema.customers.priceAlerts, savedShareToken: schema.customers.savedShareToken, wholesaleStatus: schema.customers.wholesaleStatus, wholesaleCompany: schema.customers.wholesaleCompany, birthday: schema.customers.birthday })
     .from(schema.buyerSessions)
     .innerJoin(schema.customers, eq(schema.customers.id, schema.buyerSessions.customerId))
     .where(and(eq(schema.buyerSessions.tokenHash, sha(token)), eq(schema.buyerSessions.shopId, shopId), gt(schema.buyerSessions.expiresAt, now)))

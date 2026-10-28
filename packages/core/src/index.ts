@@ -90,6 +90,7 @@ export * from "./backups";
 export * from "./post-purchase";
 export * from "./personalization";
 export * from "./winback";
+export * from "./birthday";
 export * from "./price-watch";
 export * from "./preorders";
 export * from "./supplier-scores";
