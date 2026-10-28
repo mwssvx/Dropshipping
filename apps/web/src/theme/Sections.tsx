@@ -28,6 +28,8 @@ export type SectionData = {
   catalog: Omit<StorefrontCatalog, "reviews" | "products"> & Partial<Pick<StorefrontCatalog, "reviews">> & { products: CatalogProduct[] };
   signup?: { action: (form: FormData) => Promise<void>; status: "sent" | "invalid" | null; offerPercent?: number | null };
   quickAdd?: (form: FormData) => Promise<void>;
+  /** Products this shopper looked at, newest first; the editor preview sends a sample. */
+  recentIds?: string[];
   /** The store's fixed words in the buyer's language; English when left out. */
   t?: StoreText;
   /** Which automatic badges product cards show; the defaults when left out. */
@@ -269,6 +271,18 @@ function Stars({ value, label }: { value: number; label: string }) {
  * The store's latest real reviews at or above the merchant's star line. The average counts every
  * published review, not just the ones shown, so it never flatters the store.
  */
+function RecentlyViewedSection({ s, data }: Props<"recently_viewed">) {
+  const t = data.t ?? storeText(null);
+  const shown = (data.recentIds ?? []).map((id) => data.catalog.products.find((p) => p.id === id)).filter((p) => !!p).slice(0, s.limit);
+  if (!shown.length) return null;
+  return (
+    <section className="sf-recent max-w-6xl mx-auto px-4 sm:px-6 py-12 flex flex-col gap-6">
+      <SectionHeading text={s.heading || t.recentlyViewed} base={data.base} />
+      <ProductGrid products={shown} data={data} />
+    </section>
+  );
+}
+
 function BuyerReviews({ s, data }: Props<"reviews">) {
   const t = data.t ?? storeText(null);
   const all = data.catalog.reviews;
@@ -374,6 +388,7 @@ export function SectionView({ section, data, first }: { section: Section; data: 
     case "trust_badges": return <TrustBadges s={section.settings} data={data} first={first} />;
     case "newsletter": return <Newsletter s={section.settings} data={data} first={first} />;
     case "reviews": return <BuyerReviews s={section.settings} data={data} first={first} />;
+    case "recently_viewed": return <RecentlyViewedSection s={section.settings} data={data} first={first} />;
   }
 }
 
