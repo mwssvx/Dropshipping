@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { schema, type Db, type PersonalizationValue } from "@sf/db";
 import { z } from "zod";
-import { formatDeliveryWindow, orderDelivery } from "./delivery";
+import { cartDelivery, formatDeliveryWindow, orderDelivery } from "./delivery";
 import { NotFoundError, UserError } from "./errors";
 import type { Mailer } from "./email";
 import { formatMoney } from "./money";
@@ -19,6 +19,26 @@ import { describePersonalization } from "./personalization";
 import { formatShipsBy, preorderWaitingOn } from "./preorders";
 
 /** A personalised item's text, under it in emails. */
+/**
+ * "Order by Dec 15 to get it in time for Christmas." for a cart reminder, while the store has a
+ * holiday order-by date and there's still time. Nothing once it's too late: a reminder shouldn't
+ * promise what the store can't keep.
+ */
+async function holidayReminder(db: Db, shop: Shop, order: Order, lines: { variantId: string | null }[]) {
+  if (!shop.holidayDeadline) return [];
+  const ids = lines.map((l) => l.variantId).filter((v): v is string => !!v);
+  if (!ids.length) return [];
+  const rows = await db
+    .select({ variantId: schema.variants.id, giftCard: schema.products.giftCard, digital: schema.products.digital })
+    .from(schema.variants)
+    .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
+    .where(inArray(schema.variants.id, ids));
+  const holiday = (await cartDelivery(db, shop, rows, { country: order.shippingAddress.country }))?.holiday;
+  if (!holiday?.orderBy) return [];
+  const day = holiday.today ? "today" : `by ${holiday.orderBy.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`;
+  return [``, `Order ${day} to get it in time for ${holiday.name}.`];
+}
+
 const personalised = (l: { personalization: PersonalizationValue[] | null }) => (l.personalization ? [`    ${describePersonalization(l.personalization)}`] : []);
 
 type Order = typeof schema.orders.$inferSelect;
@@ -551,6 +571,7 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
         ``,
         `Total: ${formatMoney(paid.totalMinor, paid.currency)}`,
         ...(paid.giftCardMinor ? [`Left to pay after your gift card: ${formatMoney(paid.chargedMinor, paid.currency)}`] : []),
+        ...(await holidayReminder(ctx.db, shop, order, lines)),
         ``,
         `Finish your order: ${pay}`,
         ``,
@@ -578,6 +599,7 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
         `    ${code.code}`,
         ``,
         `It works once, with this email address, until ${until}.`,
+        ...(await holidayReminder(ctx.db, shop, order, lines)),
         ``,
         `Back to your cart, with the code added: ${pay}/cart?code=${code.code}`,
         ``,
