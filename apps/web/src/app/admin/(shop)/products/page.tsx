@@ -8,11 +8,20 @@ import { RestockAlertForm } from "./RestockAlertForm";
 import { BadgeSettingsForm } from "./BadgeSettingsForm";
 import { SoldOutForm } from "./SoldOutForm";
 import { PriceImportForm } from "./PriceImportForm";
-import { SortSelect } from "./SortSelect";
+import { SortSelect } from "@/components/SortSelect";
 
 export const metadata = { title: "Products" };
 
 const STATUSES = [["active", "On sale"], ["draft", "Drafts"], ["archived", "Archived"]] as const;
+const SORTS = [
+  ["newest", "Newest first"],
+  ["oldest", "Oldest first"],
+  ["title", "Title A to Z"],
+  ["title_desc", "Title Z to A"],
+  ["updated", "Recently changed"],
+  ["price", "Price, low to high"],
+  ["price_desc", "Price, high to low"],
+] as const;
 
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; tag?: string; sort?: string; page?: string }> }) {
   const { shop, db, role } = await requireShop("products");
@@ -105,7 +114,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
               {status && <input type="hidden" name="status" value={status} />}
               {tag && <input type="hidden" name="tag" value={tag} />}
               <button className="btn btn-secondary">Search</button>
-              <SortSelect value={sort ?? "newest"} />
+              <SortSelect id="product-sort" label="Sort products" value={sort ?? "newest"} options={SORTS} />
             </form>
             <nav className="flex flex-wrap gap-1" aria-label="Product filters">
               <Link href={href({ status: undefined })} className={`chip text-sm ${!status ? "font-semibold border-accent" : ""}`} aria-current={!status ? "page" : undefined}>All</Link>
