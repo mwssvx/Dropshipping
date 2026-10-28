@@ -91,6 +91,8 @@ export type ShopifyProduct = {
   imageAlts: Record<string, string>;
   seoTitle: string | null;
   seoDescription: string | null;
+  /** Shopify's comma-separated tags, cleaned the way ours are. */
+  tags: string[];
   variants: ShopifyVariant[];
 };
 
@@ -133,6 +135,7 @@ export function readShopifyProducts(text: string) {
         imageAlts: {},
         seoTitle: get(r, "seo title").slice(0, SEO_TITLE_MAX) || null,
         seoDescription: get(r, "seo description").slice(0, SEO_DESCRIPTION_MAX) || null,
+        tags: [...new Set(get(r, "tags").split(",").map((t) => t.trim().toLowerCase().replace(/\s+/g, " ").slice(0, 30).trim()).filter(Boolean))].slice(0, 20),
         variants: [],
         optionNames: [1, 2, 3].map((i) => get(r, `option${i} name`)).filter(Boolean),
         photos: [],
@@ -237,6 +240,7 @@ export async function importShopifyProducts(db: Db, shopId: string, text: string
           status: opts.keepStatus ? p.status : "draft",
           seoTitle: p.seoTitle,
           seoDescription: p.seoDescription,
+          tags: p.tags,
           ...photoColumns(p.images),
           imageAlts: p.imageAlts,
         })

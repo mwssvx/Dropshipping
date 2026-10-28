@@ -15,6 +15,7 @@ const condition = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("in_stock") }),
   z.object({ kind: z.literal("added_within_days"), days: z.number().int().min(1, "Use at least 1 day.").max(365, "Use 365 days or fewer.") }),
   z.object({ kind: z.literal("option_is"), name: z.string().trim().min(1, "Enter the option, like Color.").max(40), value: z.string().trim().min(1, "Enter the option's value, like Red.").max(60) }),
+  z.object({ kind: z.literal("tagged"), tag: z.string().trim().toLowerCase().min(1, "Enter the tag, like summer.").max(30, "Tags are up to 30 characters.") }),
 ]);
 
 export const collectionRulesSchema = z.object({
@@ -26,6 +27,7 @@ export const collectionRulesSchema = z.object({
 /** What a rule needs to know about a product. */
 export type RuleProduct = {
   title: string;
+  tags?: string[];
   createdAt: Date | string;
   variants: { priceMinor: number; compareAtMinor: number | null; stock: number | null; options?: Record<string, string> | null }[];
 };
@@ -50,6 +52,8 @@ export function meetsCondition(p: RuleProduct, c: CollectionCondition, now: Date
     case "option_is":
       // Any option with that name and value, in any of the product's variants ("Color: Red").
       return p.variants.some((v) => Object.entries(v.options ?? {}).some(([k, val]) => same(k, c.name) && same(val, c.value)));
+    case "tagged":
+      return (p.tags ?? []).some((t) => same(t, c.tag));
   }
 }
 
@@ -87,6 +91,8 @@ export function describeCondition(c: CollectionCondition, money: (minor: number)
       return `Added in the last ${c.days} ${c.days === 1 ? "day" : "days"}`;
     case "option_is":
       return `${c.name} is ${c.value}`;
+    case "tagged":
+      return `Tagged "${c.tag}"`;
   }
 }
 
@@ -115,6 +121,7 @@ export function rulesFromForm(json: string): CollectionRules {
     }
     if (d.kind === "title_contains") return { kind: d.kind, text: d.text ?? "" };
     if (d.kind === "option_is") return { kind: d.kind, name: d.name ?? "", value: d.value ?? "" };
+    if (d.kind === "tagged") return { kind: d.kind, tag: d.tag ?? "" };
     return { kind: d.kind };
   });
   const parsed = collectionRulesSchema.safeParse({ match: raw.match, sort: raw.sort, conditions });

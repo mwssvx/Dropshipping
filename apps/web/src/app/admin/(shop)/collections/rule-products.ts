@@ -9,6 +9,7 @@ export function ruleProducts(products: Awaited<ReturnType<typeof listProducts>>)
     imageUrl: p.imageUrl,
     status: p.status,
     createdAt: p.createdAt.toISOString(),
+    tags: p.tags,
     variants: p.variants.map((v) => ({ priceMinor: v.priceMinor, compareAtMinor: v.compareAtMinor, stock: v.stock, options: v.options ?? {} })),
   }));
 }

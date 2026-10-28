@@ -343,6 +343,8 @@ export const products = pgTable(
     soldOutNotifiedAt: timestamp("sold_out_notified_at", { withTimezone: true }),
     // A draft goes on sale by itself at this time. Cleared when it does, or when its status changes.
     publishAt: timestamp("publish_at", { withTimezone: true }),
+    // The merchant's own labels ("summer", "gift idea"), lowercase. Collections can fill by tag.
+    tags: jsonb("tags").$type<string[]>().notNull().default([]),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -502,7 +504,8 @@ export type CollectionCondition =
   | { kind: "on_sale" }
   | { kind: "in_stock" }
   | { kind: "added_within_days"; days: number }
-  | { kind: "option_is"; name: string; value: string };
+  | { kind: "option_is"; name: string; value: string }
+  | { kind: "tagged"; tag: string };
 export type CollectionRules = {
   /** "all": a product must meet every condition; "any": one is enough. */
   match: "all" | "any";

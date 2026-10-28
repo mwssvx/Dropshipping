@@ -9,12 +9,13 @@ export type RuleProductView = {
   imageUrl: string | null;
   status: string;
   createdAt: string;
+  tags: string[];
   variants: { priceMinor: number; compareAtMinor: number | null; stock: number | null; options: Record<string, string> }[];
 };
 
 type Kind = CollectionCondition["kind"];
 /** A condition as typed, before it's checked: prices stay text until saved. */
-export type DraftCondition = { kind: Kind; text: string; price: string; days: string; name: string; value: string };
+export type DraftCondition = { kind: Kind; text: string; price: string; days: string; name: string; value: string; tag: string };
 
 const KINDS: { kind: Kind; label: string }[] = [
   { kind: "title_contains", label: "Title contains" },
@@ -24,9 +25,10 @@ const KINDS: { kind: Kind; label: string }[] = [
   { kind: "in_stock", label: "Is in stock" },
   { kind: "added_within_days", label: "Was added in the last" },
   { kind: "option_is", label: "Has an option" },
+  { kind: "tagged", label: "Is tagged" },
 ];
 
-const blank = (kind: Kind = "title_contains"): DraftCondition => ({ kind, text: "", price: "", days: "30", name: "", value: "" });
+const blank = (kind: Kind = "title_contains"): DraftCondition => ({ kind, text: "", price: "", days: "30", name: "", value: "", tag: "" });
 
 export function toDraft(c: CollectionCondition): DraftCondition {
   const d = blank(c.kind);
@@ -34,6 +36,7 @@ export function toDraft(c: CollectionCondition): DraftCondition {
   if (c.kind === "price_at_least" || c.kind === "price_at_most") d.price = (c.minor / 100).toFixed(2);
   if (c.kind === "added_within_days") d.days = String(c.days);
   if (c.kind === "option_is") Object.assign(d, { name: c.name, value: c.value });
+  if (c.kind === "tagged") d.tag = c.tag;
   return d;
 }
 
@@ -53,6 +56,8 @@ function fromDraft(d: DraftCondition): CollectionCondition | null {
       return /^\d+$/.test(d.days.trim()) && Number(d.days) > 0 ? { kind: d.kind, days: Number(d.days) } : null;
     case "option_is":
       return d.name.trim() && d.value.trim() ? { kind: d.kind, name: d.name, value: d.value } : null;
+    case "tagged":
+      return d.tag.trim() ? { kind: d.kind, tag: d.tag } : null;
     default:
       return { kind: d.kind };
   }
@@ -98,6 +103,7 @@ export function RulesEditor({ initial, products, currency }: { initial: Collecti
                 <span className="text-sm">days</span>
               </>
             )}
+            {c.kind === "tagged" && <input className="input w-auto flex-1 min-w-32" aria-label={`Tag ${i + 1}`} placeholder="summer" value={c.tag} onChange={(e) => set(i, { tag: e.target.value })} />}
             {c.kind === "option_is" && (
               <>
                 <input className="input w-28" aria-label={`Option ${i + 1}`} placeholder="Color" value={c.name} onChange={(e) => set(i, { name: e.target.value })} />
