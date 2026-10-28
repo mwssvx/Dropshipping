@@ -362,6 +362,12 @@ function margin(s: State): BetaContentBlock[] {
 function assistant(s: State, req: ModelRequest): BetaContentBlock[] {
   const ask = s.prompt.split("\n\n(Today is")[0]!.toLowerCase();
   const num = ask.match(/#?\b(\d{4,})\b/)?.[1];
+  // A skill is on when it's listed in the instructions.
+  const skill = (name: string) => req.system.includes(`\n- ${name}: `);
+  const trends = () => {
+    const focus = ask.match(/\bfor ([a-z0-9 '&-]{3,60})/)?.[1]?.trim();
+    return toolCall("find_trends", focus ? { focus } : {});
+  };
   if (!s.called.length) {
     if (/\b(human|person|support team|ticket|payout|hold|frozen|bug)\b/.test(ask)) {
       return [toolCall("open_ticket", { subject: ask.slice(0, 80).replace(/^\w/, (c) => c.toUpperCase()), details: `The merchant asked: “${ask.slice(0, 1500)}”. Please get in touch with them.` })];
@@ -371,6 +377,12 @@ function assistant(s: State, req: ModelRequest): BetaContentBlock[] {
     }
     if (/\b(tax|vat)\b/.test(ask) && /\b(include|included|including|inclusive|add|added|on top)\b/.test(ask)) {
       return [toolCall("change_setting", { setting: "prices_include_tax", value: /on top|added|add\b|exclud/.test(ask) ? "false" : "true" })];
+    }
+    if (/\b(trend(s|ing)?|viral|sell next|what (should|could|to) i sell|what to sell|product ideas?)\b/.test(ask)) {
+      return [skill("trend_research") ? toolCall("use_skill", { skill: "trend_research" }) : trends()];
+    }
+    if (/\b(review|improve|analy[sz]e|analysis|grow)\b/.test(ask) && /\b(store|shop|business|sales|customers?)\b/.test(ask)) {
+      return [skill("data_analysis") ? toolCall("use_skill", { skill: "data_analysis" }) : toolCall("review_store", {})];
     }
     if (num) return [toolCall("read_order", { order_number: Number(num) })];
     if (/\b(sell|selling|sales|best ?sellers?|visitors?|conversion)\b/.test(ask)) return [toolCall("read_sales", { days: /\bweek\b|7 days/.test(ask) ? 7 : /90|quarter|3 months/.test(ask) ? 90 : 30 })];
@@ -385,6 +397,18 @@ function assistant(s: State, req: ModelRequest): BetaContentBlock[] {
   if (c.isError) return [text(`I couldn't do that: ${strip(c.result)}`)];
   const r = c.result;
   switch (c.name) {
+    case "use_skill":
+      return [c.input.skill === "trend_research" ? trends() : toolCall("review_store", {})];
+    case "review_store":
+    case "find_trends": {
+      const rep = r.latest ?? r;
+      const items = (rep.items as { title: string; action: string }[]).slice(0, 3).map((i) => `• ${i.title}: ${i.action}`);
+      return [
+        text(
+          `${r.note ? `${r.note} Here's the latest one, from ${rep.made_on}.` : rep.summary}\n${items.join("\n")}\n\nThe full ${c.name === "review_store" ? "review" : "list, with sources,"} is on the Insights page.`,
+        ),
+      ];
+    }
     case "open_ticket":
       return [text("I've asked our support team to look into it. They usually reply within one working day, right here in this chat.")];
     case "resend_email":

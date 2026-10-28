@@ -75,3 +75,31 @@ test("the trend scout suggests products to add, once a day", async ({ page, brow
   await page.getByRole("button", { name: "Find trending products" }).click();
   await expect(page.getByText(/try again tomorrow/)).toBeVisible();
 });
+
+test("the assistant uses its skills: trend research starts the trend scout, and skills can be switched off", async ({ page }, info) => {
+  const id = `${info.project.name}-${Date.now()}`;
+  await page.goto("/signup");
+  await page.getByLabel("Email").fill(`skills-${id}@example.com`);
+  await page.getByLabel("Password").fill("correct horse battery");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByLabel("Store name").fill(`Skills ${id}`);
+  await page.getByRole("button", { name: "Create store" }).click();
+  await expect(page.getByRole("heading", { name: /Welcome to Skills/ })).toBeVisible();
+
+  await page.goto("/admin/assistant");
+  await page.getByRole("button", { name: "What's trending that I could sell?" }).click();
+  await expect(page.getByText(/The full list, with sources, is on the Insights page/)).toBeVisible();
+  await shot(page, "147-assistant-skills");
+  // The ideas it found are saved where the trend scout keeps them.
+  await page.goto("/admin/insights");
+  await expect(page.getByText(/^Demo mode/)).toBeVisible();
+
+  await page.goto("/admin/ai");
+  await expect(page.getByRole("cell", { name: "Trend scout" }).first()).toBeVisible();
+  await page.getByLabel(/^Marketing/).uncheck();
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Saved.")).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel(/^Marketing/)).not.toBeChecked();
+  await expect(page.getByLabel(/^Data analyst/)).toBeChecked();
+});
