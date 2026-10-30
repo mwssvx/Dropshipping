@@ -1296,3 +1296,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Holiday look on the checklist (after launch, part 225)
 
 1. **"Schedule a holiday look"** is now on the holiday checklist, after the sale line. It ticks itself once a look is scheduled or a scheduled look is live, and links to the theme editor's Schedule button (part 224).
+
+### Logo row (after launch, part 226)
+
+1. **"As seen in" and brands you carry** (`apps/web/src/theme/Sections.tsx`): a new home page section in the theme editor. Add up to 12 logos, each with an image, a name and an optional link, under a short heading. The name is what screen readers read and what shows if the image can't load.
+2. **Quiet by default**: logos show in grey and turn to full color when a shopper points at them, so a row of brand colors doesn't fight the store's own. Pick "Full color" to keep them as they are. A logo with no image yet stays hidden, so a half-filled row never shows a gap.
+3. **Safe links only**: images must be https, and links go to a store page or an https address, like every other section. No migration: it lives in the theme.

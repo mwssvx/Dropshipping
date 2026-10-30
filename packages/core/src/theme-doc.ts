@@ -74,6 +74,9 @@ export function featuredViewAll(handle: string, show: FeaturedShow) {
 /** The most products one "Shop the look" section holds. */
 export const LOOK_MAX = 6;
 
+/** The most logos one logo row holds. */
+export const LOGOS_MAX = 12;
+
 const menuItem = z.object({ label: z.string().trim().min(1, "Every menu item needs a label.").max(40), href: link });
 
 const sectionSchemas = {
@@ -147,6 +150,15 @@ const sectionSchemas = {
     imageUrl,
     productIds: z.array(z.string().uuid()).max(LOOK_MAX, `A look holds up to ${LOOK_MAX} products.`).default([]),
   }),
+  // Press, partners or brands the store carries. A logo with no image yet isn't shown.
+  logo_list: z.object({
+    heading: text(120),
+    tone: z.enum(["grey", "full"]).default("grey"),
+    items: z
+      .array(z.object({ imageUrl, name: text(80), link }))
+      .max(LOGOS_MAX, `A logo row holds up to ${LOGOS_MAX} logos.`)
+      .default([]),
+  }),
 } as const;
 
 export type SectionType = keyof typeof sectionSchemas;
@@ -166,6 +178,7 @@ export const SECTION_LABELS: Record<SectionType, { name: string; about: string }
   reviews: { name: "Buyer reviews", about: "The latest real reviews from your buyers, with their stars and your store's average. It fills itself as reviews come in." },
   recently_viewed: { name: "Recently viewed", about: "The products each shopper looked at last, so they can find them again. Shoppers who haven't looked at any yet don't see it." },
   shop_the_look: { name: "Shop the look", about: "One photo beside the products in it, like a styled room or an outfit, with a button that adds them all to the cart." },
+  logo_list: { name: "Logo row", about: "A row of logos, like magazines that wrote about you or brands you carry. Use only logos you may show." },
 };
 
 const sectionId = z.string().regex(/^[a-z0-9]{4,24}$/, "Section ids are short lowercase codes.");
