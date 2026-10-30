@@ -30,6 +30,7 @@ export default async function ThemePage() {
       publishedAt={theme.publishedAt?.toISOString() ?? null}
       links={links}
       collections={collections.map((c) => ({ id: c.id, title: c.title }))}
+      products={products.filter((p) => p.status === "active" && !p.giftCard).map((p) => ({ id: p.id, title: p.title }))}
       storeLink={storeLink}
       shopName={shop.name}
     />

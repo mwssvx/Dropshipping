@@ -71,6 +71,9 @@ export function featuredViewAll(handle: string, show: FeaturedShow) {
   return show === "best_selling" ? `${path}?sort=best_selling` : show === "newest" ? `${path}?sort=newest` : show === "on_sale" ? `${path}?sale=1` : path;
 }
 
+/** The most products one "Shop the look" section holds. */
+export const LOOK_MAX = 6;
+
 const menuItem = z.object({ label: z.string().trim().min(1, "Every menu item needs a label.").max(40), href: link });
 
 const sectionSchemas = {
@@ -137,6 +140,13 @@ const sectionSchemas = {
     heading: text(120),
     limit: z.number().int().min(2).max(12).default(4),
   }),
+  // One photo beside the products in it, picked by hand.
+  shop_the_look: z.object({
+    heading: text(120),
+    text: text(600),
+    imageUrl,
+    productIds: z.array(z.string().uuid()).max(LOOK_MAX, `A look holds up to ${LOOK_MAX} products.`).default([]),
+  }),
 } as const;
 
 export type SectionType = keyof typeof sectionSchemas;
@@ -155,6 +165,7 @@ export const SECTION_LABELS: Record<SectionType, { name: string; about: string }
   newsletter: { name: "Email signup", about: "Buyers leave their email to hear about news and offers. They confirm it by email first." },
   reviews: { name: "Buyer reviews", about: "The latest real reviews from your buyers, with their stars and your store's average. It fills itself as reviews come in." },
   recently_viewed: { name: "Recently viewed", about: "The products each shopper looked at last, so they can find them again. Shoppers who haven't looked at any yet don't see it." },
+  shop_the_look: { name: "Shop the look", about: "One photo beside the products in it, like a styled room or an outfit, with a button that adds them all to the cart." },
 };
 
 const sectionId = z.string().regex(/^[a-z0-9]{4,24}$/, "Section ids are short lowercase codes.");

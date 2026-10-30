@@ -28,6 +28,8 @@ export type SectionData = {
   catalog: Omit<StorefrontCatalog, "reviews" | "products"> & Partial<Pick<StorefrontCatalog, "reviews">> & { products: CatalogProduct[] };
   signup?: { action: (form: FormData) => Promise<void>; status: "sent" | "invalid" | null; offerPercent?: number | null };
   quickAdd?: (form: FormData) => Promise<void>;
+  /** Adds a "Shop the look" section's pieces; the button is greyed out when it's left out. */
+  addLook?: (form: FormData) => Promise<void>;
   /** Products this shopper looked at, newest first; the editor preview sends a sample. */
   recentIds?: string[];
   /** The store's fixed words in the buyer's language; English when left out. */
@@ -203,6 +205,51 @@ function ImageWithText({ s, data }: Props<"image_with_text">) {
         {s.heading && <h2 className="text-3xl font-bold tracking-tight">{s.heading}</h2>}
         <Paragraphs text={s.text} className="text-muted leading-relaxed" />
         <Button label={s.buttonLabel} href={s.buttonLink} base={data.base} variant="secondary" />
+      </div>
+    </section>
+  );
+}
+
+function ShopTheLook({ s, data }: Props<"shop_the_look">) {
+  const t = data.t ?? storeText(null);
+  const pieces = s.productIds.map((id) => data.catalog.products.find((p) => p.id === id)).filter((p) => !!p);
+  if (!pieces.length) return null;
+  const ready = pieces.flatMap((p) => (p.quickAdd ? [p.quickAdd] : []));
+  const heading = s.heading || t.shopLook;
+  const label = ready.length === pieces.length ? t.shopLookAddAll : t.shopLookAddSome(ready.length);
+  return (
+    <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12 grid gap-8 md:grid-cols-2 items-start" aria-label={heading}>
+      <div className="aspect-[4/5] rounded-lg bg-sunken overflow-hidden">
+        {s.imageUrl && <img src={s.imageUrl} alt="" loading="lazy" decoding="async" className="size-full object-cover" />}
+      </div>
+      <div className="flex flex-col gap-5">
+        <h2 className="text-3xl font-bold tracking-tight">{heading}</h2>
+        {s.text && <Paragraphs text={s.text} className="text-muted leading-relaxed" />}
+        <ul className="flex flex-col divide-y divide-border border-y border-border">
+          {pieces.map((p) => (
+            <li key={p.id}>
+              <Link href={`${data.base}/products/${p.handle}`} className="group flex items-center gap-4 py-3">
+                <span className="size-16 shrink-0 rounded-md bg-sunken overflow-hidden">
+                  {p.imageUrl && <img src={p.imageUrl} alt="" width={64} height={64} loading="lazy" decoding="async" className="size-full object-cover" />}
+                </span>
+                <span className="flex-1 min-w-0 flex flex-col">
+                  <span className="font-medium group-hover:underline truncate">{p.title}</span>
+                  {p.soldOut && <span className="text-sm text-muted">{t.soldOut}</span>}
+                </span>
+                <Price minor={p.priceMinor} compareAt={p.compareAtMinor} currency={data.currency} fx={data.fx} />
+              </Link>
+            </li>
+          ))}
+        </ul>
+        {ready.length > 0 && (
+          <form action={data.addLook} className="flex flex-col gap-2">
+            {ready.map((v) => <input key={v} type="hidden" name="variantId" value={v} />)}
+            {data.addLook
+              ? <SubmitButton className="btn btn-primary btn-lg" pendingText={t.adding}>{label}</SubmitButton>
+              : <button type="button" className="btn btn-primary btn-lg" disabled>{label}</button>}
+          </form>
+        )}
+        {ready.length < pieces.filter((p) => !p.soldOut).length && <p className="hint">{t.shopLookChoose}</p>}
       </div>
     </section>
   );
@@ -389,6 +436,7 @@ export function SectionView({ section, data, first }: { section: Section; data: 
     case "newsletter": return <Newsletter s={section.settings} data={data} first={first} />;
     case "reviews": return <BuyerReviews s={section.settings} data={data} first={first} />;
     case "recently_viewed": return <RecentlyViewedSection s={section.settings} data={data} first={first} />;
+    case "shop_the_look": return <ShopTheLook s={section.settings} data={data} first={first} />;
   }
 }
 

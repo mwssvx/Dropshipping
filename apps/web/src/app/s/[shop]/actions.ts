@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, cancelOrderByBuyer, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, visitSource, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, MAX_SAVED, saveItem, setPriceAlerts, shareSaved, stopSharingSaved, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer, answerSurvey, chooseBankTransfer, joinLaunchList, toggleCompareId } from "@sf/core";
+import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, cancelOrderByBuyer, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, visitSource, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, MAX_SAVED, saveItem, setPriceAlerts, shareSaved, stopSharingSaved, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer, answerSurvey, chooseBankTransfer, joinLaunchList, toggleCompareId, lookVariants } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
 import { agents, campaigns, db, fulfillment, payments, platformUrl, refunds, subscriptions, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
@@ -43,6 +43,23 @@ export async function addToCartAction(handle: string, form: FormData) {
   else cart.push(added);
   await writeCart(shop.id, cart);
   await track(shop.id, "add_to_cart", variant?.productId);
+  redirect(`${await storeBase(handle)}/cart`);
+}
+
+/** Adds one of each piece in a home page "Shop the look" section that has nothing to choose. */
+export async function addLookAction(handle: string, form: FormData) {
+  const shop = await loadShop(handle);
+  const variantIds = await lookVariants(await db(), shop.id, form.getAll("variantId").map(String));
+  const cart = await readCart(shop.id);
+  for (const variantId of variantIds) {
+    const line = cart.find((l) => l.variantId === variantId && !l.custom);
+    if (line) line.quantity = Math.min(99, line.quantity + 1);
+    else cart.push({ variantId, quantity: 1 });
+  }
+  if (variantIds.length) {
+    await writeCart(shop.id, cart);
+    await track(shop.id, "add_to_cart");
+  }
   redirect(`${await storeBase(handle)}/cart`);
 }
 

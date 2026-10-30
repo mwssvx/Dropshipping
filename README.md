@@ -1280,3 +1280,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **One link, a full cart** (`packages/core/src/cart-links.ts`): from Marketing, pick up to 10 products with quantities and, if you like, one of your codes. The link (`<store>/cart/link/…`) adds them to the shopper's cart with the code and opens the cart, for a DM, an ad or a creator's post (`cart_links`, migration 0143). Shopify has cart permalinks too, but they're typed by hand from variant ids.
 2. **Always safe to open**: anything sold out, a draft or no longer on sale when someone opens it is left out, and what's already in their cart stays.
 3. **Counted**: each link shows its clicks, and the orders and sales from visits that came through it, which also show under Sales by source as "link-" and its name.
+
+### Shop the look (after launch, part 223)
+
+1. **A styled photo that sells** (`packages/core/src/shop-the-look.ts`): a new home page section in the theme editor. Add one photo (a styled room, an outfit, a desk set), a heading and a line of text, then pick up to 6 products. Shoppers see the photo beside the pieces in it, each with its price and a link to its page.
+2. **The whole look in one tap**: one button adds every piece with nothing to choose to the cart. Pieces with sizes or colours to pick, or personalisation, are added from their own page, and the section says so. Sold-out, draft and hidden products never slip in, even if someone edits the page.
+3. **In every store language**: the heading falls back to "Shop the look" in the shopper's language when left empty. No migration: it lives in the theme like every other section.

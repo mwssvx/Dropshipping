@@ -1,6 +1,6 @@
 "use client";
 import { useId } from "react";
-import { TRUST_ICONS, type MenuItem, type SectionSettings, type SectionType, type TrustIcon } from "@sf/core/theme";
+import { LOOK_MAX, TRUST_ICONS, type MenuItem, type SectionSettings, type SectionType, type TrustIcon } from "@sf/core/theme";
 
 /*
  * Form controls for the theme editor. Every control is labelled and edits one value.
@@ -9,12 +9,13 @@ import { TRUST_ICONS, type MenuItem, type SectionSettings, type SectionType, typ
 
 export type LinkOption = { label: string; href: string };
 export type CollectionOption = { id: string; title: string };
+export type ProductOption = { id: string; title: string };
 
 type Field =
   | { key: string; label: string; kind: "text" | "textarea" | "image" | "link"; hint?: string; max?: number }
   | { key: string; label: string; kind: "select"; options: { value: string; label: string }[] }
   | { key: string; label: string; kind: "number"; min: number; max: number }
-  | { key: string; label: string; kind: "collection" | "collections" | "faq" | "quotes" | "badges" };
+  | { key: string; label: string; kind: "collection" | "collections" | "faq" | "quotes" | "badges" | "products" };
 
 export const TRUST_ICON_LABELS: Record<TrustIcon, string> = {
   shipping: "Delivery truck",
@@ -97,7 +98,35 @@ export const SECTION_FIELDS: Record<SectionType, Field[]> = {
     { key: "limit", label: "How many to show", kind: "number", min: 3, max: 12 },
     { key: "minRating", label: "Fewest stars shown", kind: "number", min: 1, max: 5 },
   ],
+  shop_the_look: [
+    { key: "heading", label: "Heading", kind: "text", max: 120, hint: "Leave empty for “Shop the look” in the shopper's language." },
+    { key: "text", label: "Text", kind: "textarea", max: 600 },
+    { key: "imageUrl", label: "Photo of the look", kind: "image" },
+    { key: "productIds", label: "Piece", kind: "products" },
+  ],
 };
+
+/** One select per piece of a look, plus an empty one to add the next until the look is full. */
+function PieceSelects({ id, label, value, products, onChange }: { id: string; label: string; value: string[]; products: ProductOption[]; onChange: (v: string[]) => void }) {
+  const slots = value.length < LOOK_MAX ? [...value, ""] : value;
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className="label mb-1">Products in the look</legend>
+      {products.length === 0 && <span className="hint">You have no products on sale yet.</span>}
+      {products.length > 0 && <span className="hint">{`Up to ${LOOK_MAX}. Pieces with nothing to pick go into the cart with one button.`}</span>}
+      {products.length > 0 && slots.map((picked, i) => (
+        <div key={i} className="flex flex-col gap-1">
+          <label className="text-sm" htmlFor={`${id}-${i}`}>{`${label} ${i + 1}`}</label>
+          <select id={`${id}-${i}`} className="input" value={picked}
+            onChange={(e) => onChange(slots.map((x, j) => (j === i ? e.target.value : x)).filter((x, j, all) => x && all.indexOf(x) === j))}>
+            <option value="">{picked ? "Remove this piece" : "Pick a product"}</option>
+            {products.map((p) => <option key={p.id} value={p.id} disabled={p.id !== picked && value.includes(p.id)}>{p.title}</option>)}
+          </select>
+        </div>
+      ))}
+    </fieldset>
+  );
+}
 
 export function LinkInput({ id, value, onChange, links }: { id: string; value: string; onChange: (v: string) => void; links: LinkOption[] }) {
   const listId = `${id}-links`;
@@ -115,12 +144,14 @@ export function SectionForm<T extends SectionType>({
   onChange,
   links,
   collections,
+  products,
 }: {
   type: T;
   settings: SectionSettings[T];
   onChange: (next: SectionSettings[T]) => void;
   links: LinkOption[];
   collections: CollectionOption[];
+  products: ProductOption[];
 }) {
   const base = useId();
   const values = settings as Record<string, unknown>;
@@ -132,7 +163,7 @@ export function SectionForm<T extends SectionType>({
         const v = values[f.key];
         return (
           <div key={f.key} className="field">
-            {!["faq", "collections", "quotes", "badges"].includes(f.kind) && <label className="label" htmlFor={id}>{f.label}</label>}
+            {!["faq", "collections", "quotes", "badges", "products"].includes(f.kind) && <label className="label" htmlFor={id}>{f.label}</label>}
             {f.kind === "text" && <input id={id} className="input" value={String(v ?? "")} maxLength={f.max} onChange={(e) => set(f.key, e.target.value)} />}
             {f.kind === "textarea" && <textarea id={id} className="input" rows={4} value={String(v ?? "")} maxLength={f.max} onChange={(e) => set(f.key, e.target.value)} />}
             {f.kind === "image" && (
@@ -174,6 +205,7 @@ export function SectionForm<T extends SectionType>({
                 })}
               </fieldset>
             )}
+            {f.kind === "products" && <PieceSelects id={id} label={f.label} value={v as string[]} products={products} onChange={(x) => set(f.key, x)} />}
             {f.kind === "faq" && <FaqItems label={f.label} items={v as { question: string; answer: string }[]} onChange={(x) => set(f.key, x)} />}
             {f.kind === "quotes" && (
               <ListItems label={f.label} items={v as Record<string, string>[]} onChange={(x) => set(f.key, x)} max={12} noun="quote"
