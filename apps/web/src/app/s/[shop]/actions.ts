@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, cancelOrderByBuyer, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, visitSource, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, MAX_SAVED, saveItem, setPriceAlerts, shareSaved, stopSharingSaved, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer, answerSurvey, chooseBankTransfer, joinLaunchList } from "@sf/core";
+import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, cancelOrderByBuyer, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, visitSource, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, MAX_SAVED, saveItem, setPriceAlerts, shareSaved, stopSharingSaved, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer, answerSurvey, chooseBankTransfer, joinLaunchList, toggleCompareId } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
 import { agents, campaigns, db, fulfillment, payments, platformUrl, refunds, subscriptions, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
@@ -14,6 +14,7 @@ import { currentBuyer } from "@/lib/buyer";
 import { readOrderEdit } from "@/lib/order-edit";
 import type { OrderEditState } from "@/components/OrderEditForm";
 import { readGuestSaved, writeGuestSaved } from "@/lib/saved";
+import { readCompare, writeCompare } from "@/lib/compare";
 
 /** The visit id the store's tracker set, for the funnel. */
 async function track(shopId: string, kind: "add_to_cart" | "checkout_start", productId?: string | null) {
@@ -407,6 +408,24 @@ export async function stockAlertAction(handle: string, productHandle: string, fo
     status = e.code === "in_stock" ? "back" : e.code === "too_many" ? "many" : "invalid";
   }
   redirect(`${await storeBase(handle)}/products/${productHandle}?alert=${status}#stock-alert`);
+}
+
+/** Adds a product to the shopper's compare list, or takes it off. Comes back to where it was pressed. */
+export async function toggleCompareAction(handle: string, productId: string, back: "product" | "compare", form: FormData) {
+  const shop = await loadShop(handle);
+  const on = form.get("on") === "1";
+  const { ids, full } = toggleCompareId(await readCompare(shop.id), productId, on);
+  if (!full) await writeCompare(shop.id, ids);
+  const base = await storeBase(handle);
+  if (back === "compare") redirect(`${base}/compare`);
+  redirect(`${base}/products/${String(form.get("handle") ?? "")}?compare=${full ? "full" : on ? "added" : "removed"}#compare`);
+}
+
+/** Empties the compare list. */
+export async function clearCompareAction(handle: string) {
+  const shop = await loadShop(handle);
+  await writeCompare(shop.id, []);
+  redirect(`${await storeBase(handle)}/compare`);
 }
 
 /** A shopper asks to be emailed when a coming-soon product goes on sale. */

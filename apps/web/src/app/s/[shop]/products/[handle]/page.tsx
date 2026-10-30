@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, formatDeliveryWindow, giftCardBonusNow, holidayReturnsNow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, comingSoonProduct, defaultCutoffZone, countdownTo, shipsToCountry, recentSalesCount, RECENT_SALES_DAYS } from "@sf/core";
+import { bundlesForProduct, formatDeliveryWindow, giftCardBonusNow, holidayReturnsNow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, comingSoonProduct, COMPARE_MAX, defaultCutoffZone, countdownTo, shipsToCountry, recentSalesCount, RECENT_SALES_DAYS } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { ShareButtons } from "@/components/ShareButtons";
 import { SaleCountdown } from "@/components/SaleCountdown";
@@ -14,7 +14,8 @@ import { currentBuyer } from "@/lib/buyer";
 import { db } from "@/lib/server";
 import { buyerCountry, buyerFx } from "@/lib/currency";
 import { SubmitButton } from "@/components/SubmitButton";
-import { addBundleAction, addToCartAction, askQuestionAction, launchListAction, stockAlertAction, toggleSavedAction } from "../../actions";
+import { addBundleAction, addToCartAction, askQuestionAction, launchListAction, stockAlertAction, toggleCompareAction, toggleSavedAction } from "../../actions";
+import { readCompare } from "@/lib/compare";
 import { savedIds } from "@/lib/saved";
 import { loadShop, localProducts, storeBase, storeLang, storeT, missing } from "../../data";
 import { Price } from "@/components/Price";
@@ -99,7 +100,7 @@ const ASKED_MESSAGES = {
   invalid: { key: "askInvalid", ok: false },
 } as const;
 
-export default async function ProductPage({ params, searchParams }: { params: Promise<{ shop: string; handle: string }>; searchParams: Promise<{ alert?: string; saved?: string; asked?: string; launch?: string }> }) {
+export default async function ProductPage({ params, searchParams }: { params: Promise<{ shop: string; handle: string }>; searchParams: Promise<{ alert?: string; saved?: string; asked?: string; launch?: string; compare?: string }> }) {
   const { shop: shopHandle, handle } = await params;
   const query = await searchParams;
   const t = await storeT(shopHandle);
@@ -143,6 +144,8 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const wholesale = await wholesaleTermsFor(await db(), shop, buyer?.email);
   const soldOut = product.variants.filter((x) => x.stock !== null && x.stock <= 0);
   const isSaved = (await savedIds(shop.id)).includes(product.id);
+  const comparing = await readCompare(shop.id);
+  const isCompared = comparing.includes(product.id);
   const tiers = wholesale ? [] : product.quantityBreaks;
   // What ad tags hear about: each option's price as shown (sales included), in the store's currency.
   const tracking = !!storePixels(shop);
@@ -369,6 +372,16 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           )}
           {query.saved === "full" && <span role="status" className="text-sm text-critical">{t.savedFull}</span>}
         </form>
+        {!product.giftCard && (
+          <form id="compare" action={toggleCompareAction.bind(null, shopHandle, product.id, "product")} className="flex flex-wrap items-center gap-3 -mt-2">
+            <input type="hidden" name="handle" value={product.handle} />
+            <input type="hidden" name="on" value={isCompared ? "0" : "1"} />
+            <button className="text-sm underline" aria-pressed={isCompared}>{isCompared ? t.compareRemove : t.compare}</button>
+            {comparing.length > 0 && <Link href={`${base}/compare`} className="text-sm font-medium underline">{t.compareSee(comparing.length)}</Link>}
+            {query.compare === "added" && isCompared && <span role="status" className="text-sm hint">{t.compareAdded}</span>}
+            {query.compare === "full" && <span role="status" className="text-sm text-critical">{t.compareFull(COMPARE_MAX)}</span>}
+          </form>
+        )}
         {shop.shareButtons && <ShareButtons title={product.title} imageUrl={productPhotos(product)[0] ?? product.variants.find((x) => x.imageUrl)?.imageUrl} t={{ share: t.share, copyLink: t.copyLink, linkCopied: t.linkCopied, shareOn: t.shareOn("%s") }} />}
         {(soldOut.length > 0 || alert) && (
           <form id="stock-alert" action={stockAlertAction.bind(null, shopHandle, product.handle)} className="card p-4 flex flex-col gap-3" aria-labelledby="stock-alert-h">

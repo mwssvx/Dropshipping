@@ -86,6 +86,7 @@ export * from "./welcome";
 export * from "./size-charts";
 export * from "./order-lookup";
 export * from "./recently-viewed";
+export * from "./compare";
 export * from "./risk";
 export * from "./referrals";
 export * from "./bulk-edit";
