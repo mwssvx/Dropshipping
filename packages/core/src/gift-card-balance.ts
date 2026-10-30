@@ -12,7 +12,7 @@ export async function giftCardBalance(db: Db, shopId: string, code: string) {
   if (!normalized) return null;
   const card = await db.query.giftCards.findFirst({
     where: and(eq(schema.giftCards.shopId, shopId), eq(schema.giftCards.codeHash, createHash("sha256").update(normalized).digest("hex"))),
-    columns: { last4: true, currency: true, initialMinor: true, balanceMinor: true, disabledAt: true },
+    columns: { last4: true, currency: true, initialMinor: true, balanceMinor: true, disabledAt: true, usableFrom: true, expiresAt: true },
   });
   if (!card) return null;
   return {
@@ -20,6 +20,9 @@ export async function giftCardBalance(db: Db, shopId: string, code: string) {
     currency: card.currency,
     initialMinor: card.initialMinor,
     balanceMinor: card.balanceMinor,
+    /** A bonus card's dates: it can be spent from `usableFrom`, and not from `expiresAt`. */
+    usableFrom: card.usableFrom,
+    expiresAt: card.expiresAt,
     status: card.disabledAt ? ("off" as const) : card.balanceMinor <= 0 ? ("used" as const) : ("ok" as const),
   };
 }

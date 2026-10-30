@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { checkBulkGiftCards, createGiftCardProduct, formatMoney, issueBulkGiftCards, issueGiftCard, parseMoney, resendGiftCard, setGiftCardDisabled, UserError } from "@sf/core";
+import { checkBulkGiftCards, createGiftCardProduct, formatMoney, issueBulkGiftCards, issueGiftCard, parseMoney, resendGiftCard, setGiftCardBonus, setGiftCardDisabled, UserError } from "@sf/core";
 import { campaigns, logged, requireShop } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -45,6 +45,28 @@ export async function issueGiftCardAction(_: FormState, form: FormData): Promise
     await logged({ shop, user, db }, `Gave a ${formatMoney(amountMinor, shop.currency)} gift card to ${email}`, { href: "/admin/gift-cards" });
     if (!sent) throw new UserError("The gift card was made but the email didn't go out. Use \"Send a new code\" on it to try again.");
   });
+}
+
+/** "A $10 bonus card for every $50 in gift cards" between two days, or off (step "off"). */
+export async function giftCardBonusAction(_: FormState, form: FormData): Promise<FormState> {
+  const { shop, user, db } = await requireShop("gift_cards");
+  const off = form.get("step") === "off";
+  const state = await attempt(async () => {
+    const value = off
+      ? null
+      : await setGiftCardBonus(db, shop.id, {
+          everyMinor: amount(String(form.get("every") ?? "")),
+          bonusMinor: amount(String(form.get("bonus") ?? "")),
+          from: String(form.get("from") ?? ""),
+          to: String(form.get("to") ?? ""),
+          usableFrom: String(form.get("usableFrom") ?? "") || null,
+          usableUntil: String(form.get("usableUntil") ?? "") || null,
+        });
+    if (off) await setGiftCardBonus(db, shop.id, null);
+    await logged({ shop, user, db }, value ? `Set a gift card bonus: ${formatMoney(value.bonusMinor, shop.currency)} for every ${formatMoney(value.everyMinor, shop.currency)}` : "Ended the gift card bonus", { href: "/admin/gift-cards" });
+  });
+  revalidatePath(`/s/${shop.handle}`, "layout");
+  return state;
 }
 
 export async function resendGiftCardAction(id: string, _: FormState, _form: FormData): Promise<FormState> {

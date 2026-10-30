@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { formatMoney, GIFT_CARD_PAGE_SIZE, GIFT_CARD_SEND_DAYS, giftCardProduct, listGiftCards, type GiftCardStatus } from "@sf/core";
+import { formatMoney, giftCardBonusNow, GIFT_CARD_PAGE_SIZE, GIFT_CARD_SEND_DAYS, giftCardProduct, listGiftCards, type GiftCardStatus } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
-import { BulkForm, CardActions, IssueForm, SellForm } from "./GiftCardForms";
+import { BonusForm, BulkForm, CardActions, IssueForm, SellForm } from "./GiftCardForms";
 
 export const metadata = { title: "Gift cards" };
 
@@ -36,6 +36,8 @@ export default async function GiftCardsPage({ searchParams }: { searchParams: Pr
   };
   const money = (m: number) => formatMoney(m, shop.currency);
   const symbol = money(0).replace(/[\d.,\s]/g, "");
+  // Past offers are dropped from the page once their last day is gone.
+  const bonus = shop.giftCardBonus && shop.giftCardBonus.to >= new Date().toISOString().slice(0, 10) ? shop.giftCardBonus : null;
   return (
     <main className="pb-12">
       <PageHeader title="Gift cards" />
@@ -58,6 +60,31 @@ export default async function GiftCardsPage({ searchParams }: { searchParams: Pr
             </>
           )}
         </section>
+        {product && (
+          <section className="card p-5 flex flex-col gap-3" aria-labelledby="gc-bonus">
+            <div>
+              <h2 id="gc-bonus" className="font-semibold">Bonus card with gift cards</h2>
+              <p className="text-sm hint">
+                &quot;Buy {money(5000)} in gift cards, get a {money(1000)} bonus card&quot;: a holiday favourite that brings buyers back. While the dates
+                last, the gift card&apos;s page says so, and anyone who buys gift cards gets a bonus card of their own by email once they pay. Refunding
+                the order turns the bonus card off too.
+              </p>
+            </div>
+            {bonus && (
+              <p className="text-sm" role="status" aria-label="Bonus offer">
+                {giftCardBonusNow(shop) ? <span className="pill pill-success mr-2">On now</span> : <span className="pill pill-info mr-2">Set</span>}
+                {money(bonus.bonusMinor)} for every {money(bonus.everyMinor)}, on gift cards bought {date.format(new Date(`${bonus.from}T12:00:00Z`))} to {date.format(new Date(`${bonus.to}T12:00:00Z`))}.
+                {bonus.usableFrom ? ` Usable from ${date.format(new Date(`${bonus.usableFrom}T12:00:00Z`))}.` : ""}
+                {bonus.usableUntil ? ` Expires after ${date.format(new Date(`${bonus.usableUntil}T12:00:00Z`))}.` : ""}
+              </p>
+            )}
+            <BonusForm
+              on={!!bonus}
+              currencySymbol={symbol}
+              value={bonus && { every: (bonus.everyMinor / 100).toFixed(2), bonus: (bonus.bonusMinor / 100).toFixed(2), from: bonus.from, to: bonus.to, usableFrom: bonus.usableFrom ?? "", usableUntil: bonus.usableUntil ?? "" }}
+            />
+          </section>
+        )}
         <section className="card p-5 flex flex-col gap-3" aria-labelledby="gc-give">
           <div>
             <h2 id="gc-give" className="font-semibold">Give a gift card</h2>
@@ -112,7 +139,9 @@ export default async function GiftCardsPage({ searchParams }: { searchParams: Pr
                         ···· {c.last4} <span className={`ml-1 pill ${status === "Active" ? "pill-success" : "pill-neutral"}`}>{status}</span>
                       </span>
                       <span className="text-sm hint">
-                        {c.email} · {c.orderNumber ? `Bought on order #${c.orderNumber}` : c.fromName ? `Given by you, from ${c.fromName}` : "Given by you"} · {date.format(c.createdAt)}
+                        {c.email} · {c.bonus && c.orderNumber ? `Bonus with order #${c.orderNumber}` : c.orderNumber ? `Bought on order #${c.orderNumber}` : c.fromName ? `Given by you, from ${c.fromName}` : "Given by you"} · {date.format(c.createdAt)}
+                        {c.usableFrom && c.usableFrom > new Date() ? ` · Usable from ${date.format(c.usableFrom)}` : ""}
+                        {c.expiresAt ? ` · ${c.expiresAt <= new Date() ? "Expired" : "Expires"} ${date.format(new Date(c.expiresAt.getTime() - 1))}` : ""}
                         {!c.sentAt && (c.scheduledFor ? ` · Sends on ${c.scheduledFor.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" })}` : " · Email not sent")}
                       </span>
                     </div>

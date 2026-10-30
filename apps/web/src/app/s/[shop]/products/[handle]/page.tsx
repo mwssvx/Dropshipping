@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, formatDeliveryWindow, holidayReturnsNow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, countdownTo, shipsToCountry, recentSalesCount, RECENT_SALES_DAYS } from "@sf/core";
+import { bundlesForProduct, formatDeliveryWindow, giftCardBonusNow, holidayReturnsNow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, countdownTo, shipsToCountry, recentSalesCount, RECENT_SALES_DAYS } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { ShareButtons } from "@/components/ShareButtons";
 import { SaleCountdown } from "@/components/SaleCountdown";
@@ -172,6 +172,8 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const saleEnds = countdownTo(product.sale);
   const dayFormat = new Intl.DateTimeFormat(lang, { month: "short", day: "numeric", timeZone: "UTC" });
   const holidayReturnsUntil = holidayReturnsNow(shop);
+  // "Get a $10 bonus card for every $50 in gift cards", on the gift card while the offer is on.
+  const bonus = product.giftCard ? giftCardBonusNow(shop) : null;
   const shipsBy = (d: string) => new Intl.DateTimeFormat(lang, { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
   const jsonLd = JSON.stringify(productJsonLd(product, shop.currency, reviews)).replace(/</g, "\\u003c");
   return (
@@ -323,6 +325,14 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
         )}
         {holidayReturnsUntil && !product.giftCard && !product.digital && (
           <p id="holiday-returns" className="text-sm hint">{t.holidayReturns(new Intl.DateTimeFormat(lang, { month: "long", day: "numeric", timeZone: "UTC" }).format(holidayReturnsUntil))}</p>
+        )}
+        {bonus && (
+          <p id="gift-card-bonus" className="text-sm font-medium text-accent">
+            {t.giftCardBonus(shownMoney(bonus.bonusMinor), shownMoney(bonus.everyMinor), new Intl.DateTimeFormat(lang, { month: "long", day: "numeric", timeZone: "UTC" }).format(new Date(`${bonus.to}T12:00:00Z`)))}
+            {bonus.usableFrom && bonus.usableFrom > new Date().toISOString().slice(0, 10) && (
+              <span className="hint font-normal"> {t.giftCardBonusFrom(new Intl.DateTimeFormat(lang, { month: "long", day: "numeric", timeZone: "UTC" }).format(new Date(`${bonus.usableFrom}T12:00:00Z`)))}</span>
+            )}
+          </p>
         )}
         {chart && (
           <SizeChartDialog

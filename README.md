@@ -1251,3 +1251,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **One product a day** (`packages/core/src/daily-deals.ts`): on the Sales page, pick a product for each day (up to 14), the first day and the price cut. Each deal is a sale on that one product from midnight to midnight in the store's time zone, with a countdown, so the cart, the countdown and the sale results work as they do for any sale (`sales.daily_deal`, migration 0139). A run that starts today starts now.
 2. **One link for the whole run** (store page `/deal`): it goes to the product that's on today. Between deals it says when the next one starts.
 3. **One deal a day**: a new run can't land on days that already have a deal, every product has to be on the store, and the deals have to fit in the store's 50 sales. Deals travel in the store file.
+
+### Gift card bonus (after launch, part 218)
+
+1. **"Buy $50, get a $10 bonus card"** (`packages/core/src/gift-card-bonus.ts`): on the Gift cards page, set the bonus, how much in gift cards earns it, and the days the offer runs (`shops.gift_card_bonus`, migration 0140). The gift card's page says so while it's on, in every store language.
+2. **For the buyer, after they pay**: an order with gift cards gets one bonus card for every step it reaches ($125 earns $20), emailed to the buyer even when the gift cards go to someone else. It's made once per order, and refunding the order turns it off with the rest.
+3. **Its own dates**: a bonus card can wait until a later day ("use it from January 1", which brings buyers back after the holidays) and can expire, since nobody paid for it (`gift_cards.bonus`, `usable_from`, `expires_at`). The cart, the balance page and the admin list say when. Bought gift cards still never expire.
