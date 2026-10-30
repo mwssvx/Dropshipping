@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { applyThemePreset, compactProducts, currentPreset, defaultTheme, parseTheme, secondPhoto, type ActiveProduct } from "../src";
+import { applyThemePreset, compactProducts, currentPreset, defaultTheme, parseTheme, secondPhoto } from "../src";
+
+type ActiveProduct = Parameters<typeof compactProducts>[0][number];
 
 describe("second photo on product cards", () => {
   it("is the next photo after the main one, or none", () => {
