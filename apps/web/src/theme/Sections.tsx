@@ -435,6 +435,41 @@ function LogoList({ s, data }: Props<"logo_list">) {
   );
 }
 
+// Two columns sit side by side from small screens, three or more need the room of a wide one.
+const COLUMN_GRID: Record<number, string> = {
+  1: "max-w-xl mx-auto",
+  2: "sm:grid-cols-2",
+  3: "sm:grid-cols-2 lg:grid-cols-3",
+  4: "sm:grid-cols-2 lg:grid-cols-4",
+  5: "sm:grid-cols-2 lg:grid-cols-3",
+  6: "sm:grid-cols-2 lg:grid-cols-3",
+};
+
+function Columns({ s, data }: Props<"columns">) {
+  const columns = s.items.filter((c) => c.imageUrl || c.title || c.text);
+  if (!columns.length) return null;
+  const center = s.align === "center";
+  return (
+    <section className="sf-columns max-w-6xl mx-auto px-4 sm:px-6 py-12 flex flex-col gap-8" aria-label={s.heading || undefined}>
+      {s.heading && <h2 className="text-3xl font-bold tracking-tight text-center">{s.heading}</h2>}
+      <ul className={`grid gap-8 grid-cols-1 ${COLUMN_GRID[columns.length]}`}>
+        {columns.map((c, i) => (
+          <li key={i} className={`flex flex-col gap-3 ${center ? "items-center text-center" : ""}`}>
+            {c.imageUrl && <img src={c.imageUrl} alt="" loading="lazy" decoding="async" className="sf-media w-full aspect-[4/3] object-cover rounded-lg" />}
+            {c.title && <h3 className="text-lg font-semibold">{c.title}</h3>}
+            {c.text && <Paragraphs text={c.text} className="text-muted leading-relaxed" />}
+            {c.link && c.linkLabel && (
+              <a href={storeHref(data.base, c.link)} rel={c.link.startsWith("/") ? undefined : "noopener"} className="font-medium underline underline-offset-4">
+                {c.linkLabel}
+              </a>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function VideoBlock({ s, data }: Props<"video">) {
   const t = data.t ?? storeText(null);
   const video = parseVideo(s.videoUrl);
@@ -494,6 +529,7 @@ export function SectionView({ section, data, first }: { section: Section; data: 
     case "shop_the_look": return <ShopTheLook s={section.settings} data={data} first={first} />;
     case "logo_list": return <LogoList s={section.settings} data={data} first={first} />;
     case "video": return <VideoBlock s={section.settings} data={data} first={first} />;
+    case "columns": return <Columns s={section.settings} data={data} first={first} />;
   }
 }
 

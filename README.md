@@ -1390,3 +1390,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **"We accept" in every store's footer** (`paymentMethods` in `packages/core/src/bank-transfer.ts`): Visa, Mastercard, American Express, Apple Pay and Google Pay, which come through Stripe, plus "Bank transfer" (in the buyer's language) when the store takes transfers on a paid plan. Buyers trust a new store more when they see their own way to pay before they reach checkout.
 2. **Only what's true, and easy to hide**: the list follows the store's own settings, never a stock row of logos, and theme editor → Style → "Show how buyers can pay in the footer" turns it off.
+
+### Columns (after launch, part 244)
+
+1. **"How it works" and "Why shop with us"** (`apps/web/src/theme/Sections.tsx`): a new home page section in the theme editor. Add up to six columns side by side, each with a picture, a title, a few words and a link, under an optional heading. Text can sit centered or on the left.
+2. **Fits any number**: two columns sit side by side from small screens; three, four, five or six spread out on wide screens and stack on phones. A column with no picture, title or text yet stays hidden, so a half-filled row never shows a gap. A link shows only when it has a label.
+3. **Safe links only**: pictures must be https, and links go to a store page or an https address, like every other section. No migration: it lives in the theme.
