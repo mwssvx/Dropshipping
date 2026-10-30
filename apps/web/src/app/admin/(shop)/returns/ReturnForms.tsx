@@ -83,7 +83,8 @@ function Choice({ value, children, className }: { value: string; children: React
   return <button type="submit" name="decision" value={value} className={className} disabled={pending} aria-busy={pending}>{children}</button>;
 }
 
-export function DecideForm({ id, approved, exchange, amount, max }: { id: string; approved: boolean; exchange: boolean; amount: string; max: string }) {
+/** `gift`: the recipient sent it back, so only store credit (or approve, or decline) keeps it from the buyer. */
+export function DecideForm({ id, approved, gift = false, exchange, amount, max }: { id: string; approved: boolean; gift?: boolean; exchange: boolean; amount: string; max: string }) {
   const [state, action] = useActionState(decideReturnAction.bind(null, id), {} as FormState);
   return (
     <form action={action} className="flex flex-col gap-3 border-t border-border pt-3">
@@ -95,7 +96,7 @@ export function DecideForm({ id, approved, exchange, amount, max }: { id: string
           <span className="hint">Up to {max}</span>
         </div>
         <div className="field">
-          <label className="label" htmlFor={`message-${id}`}>Message to the buyer</label>
+          <label className="label" htmlFor={`message-${id}`}>{gift ? "Message to them" : "Message to the buyer"}</label>
           <textarea className="input" id={`message-${id}`} name="message" rows={2} maxLength={1000}
             placeholder={approved ? "Optional" : "Optional for approving (your usual instructions are sent). Needed to decline."} />
         </div>
@@ -103,9 +104,9 @@ export function DecideForm({ id, approved, exchange, amount, max }: { id: string
       <div className="flex flex-wrap gap-2">
         {exchange && <Choice value="exchange" className="btn btn-primary">Send the exchange</Choice>}
         {!approved && <Choice value="approve" className="btn btn-secondary">Approve</Choice>}
-        <Choice value="refund" className={exchange ? "btn btn-secondary" : "btn btn-primary"}>Refund</Choice>
-        <Choice value="credit" className="btn btn-secondary">Give store credit</Choice>
-        <Choice value="replace" className="btn btn-secondary">Send a replacement</Choice>
+        {!gift && <Choice value="refund" className={exchange ? "btn btn-secondary" : "btn btn-primary"}>Refund</Choice>}
+        <Choice value="credit" className={gift ? "btn btn-primary" : "btn btn-secondary"}>Give store credit</Choice>
+        {!gift && <Choice value="replace" className="btn btn-secondary">Send a replacement</Choice>}
         <Choice value="decline" className="btn btn-secondary text-critical">Decline</Choice>
       </div>
     </form>

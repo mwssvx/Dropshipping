@@ -30,7 +30,7 @@ describe("gift orders", () => {
     await expect(start({ from: "Ada", recipientEmail: "grace at navy" })).rejects.toThrow("recipient's email");
     await expect(start({ from: "Ada", message: "x".repeat(301) })).rejects.toThrow("under 300 characters");
     const { order } = await start({ from: "Ada Lovelace", message: "  ", recipientEmail: "" });
-    expect(order.gift).toEqual({ from: "Ada Lovelace", message: null, recipientEmail: null });
+    expect(order.gift).toEqual({ from: "Ada Lovelace", message: null, recipientEmail: null, returnCode: expect.stringMatching(/^[A-HJ-NP-Z2-9]{5}-[A-HJ-NP-Z2-9]{5}$/) });
     // A gift card on its own is emailed to the buyer, so it can't be a gift order.
     const card = await createGiftCardProduct(f.db, shop, [2500]);
     const [cardVariant] = await f.variants(card.id);
@@ -42,7 +42,7 @@ describe("gift orders", () => {
     const f = await setup();
     const before = f.mailer.sent.length;
     const order = await f.buy({ from: "Ada Lovelace", message: "Happy birthday! Light up your evenings.", recipientEmail: "Grace@Example.com" });
-    expect(order.gift).toEqual({ from: "Ada Lovelace", message: "Happy birthday! Light up your evenings.", recipientEmail: "grace@example.com" });
+    expect(order.gift).toEqual({ from: "Ada Lovelace", message: "Happy birthday! Light up your evenings.", recipientEmail: "grace@example.com", returnCode: expect.stringMatching(/^[A-HJ-NP-Z2-9]{5}-[A-HJ-NP-Z2-9]{5}$/) });
     const confirmation = f.mailer.sent.slice(before).find((m) => m.subject === `Order #${order.number} confirmed`)!;
     expect(confirmation.to).toBe("ada@example.com");
     expect(confirmation.text).toMatch(/^Hi Ada,/);
@@ -74,7 +74,7 @@ describe("gift orders", () => {
 
     const customer = (await f.db.query.customers.findFirst({ where: eq(schema.customers.email, "ada@example.com") }))!;
     const shop = await f.shop();
-    expect((await exportCustomerData(f.db, shop, customer.id)).orders[0]!.gift).toEqual({ from: "Ada", message: "For you", recipientEmail: null });
+    expect((await exportCustomerData(f.db, shop, customer.id)).orders[0]!.gift).toMatchObject({ from: "Ada", message: "For you", recipientEmail: null });
     await f.db.update(schema.orders).set({ fulfillmentStatus: "delivered" }).where(eq(schema.orders.id, order.id));
     await eraseCustomer(f.db, shop.id, customer.id, { confirmEmail: "ada@example.com" });
     expect((await f.db.query.orders.findFirst({ where: eq(schema.orders.id, order.id) }))!.gift).toBeNull();

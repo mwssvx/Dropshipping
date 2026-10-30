@@ -4,7 +4,8 @@ import { countryNames } from "@/lib/store-text";
 const day = new Intl.DateTimeFormat("en-US", { dateStyle: "long", timeZone: "UTC" });
 const country = countryNames("en");
 
-type Store = { name: string; address: string | null; note: string | null };
+/** `giftReturns`: the store's page where a gift's recipient returns it with the code on the slip. */
+type Store = { name: string; address: string | null; note: string | null; giftReturns?: string };
 
 /** One order's packing slip: who it's for and what goes in the box, with no prices. */
 export function PackingSlipView({ slip, store }: { slip: PackingSlip; store: Store }) {
@@ -60,6 +61,11 @@ export function PackingSlipView({ slip, store }: { slip: PackingSlip; store: Sto
         <section className="border border-border rounded-md p-4" aria-label="Gift message">
           <p className="font-semibold">A gift from {slip.gift.from}</p>
           {slip.gift.message && <p className="whitespace-pre-line mt-1">{slip.gift.message}</p>}
+          {slip.gift.returnCode && store.giftReturns && (
+            <p className="mt-3 text-muted" aria-label="Gift return">
+              Not quite right? Return it for store credit at {store.giftReturns.replace(/^https?:\/\//, "")} with the code <span className="font-mono font-semibold text-ink">{slip.gift.returnCode}</span>. {slip.gift.from} won&apos;t be told.
+            </p>
+          )}
         </section>
       )}
       {slip.giftWrap && <p className="no-print font-semibold">Gift wrap this order. The buyer paid for wrapping (not printed).</p>}

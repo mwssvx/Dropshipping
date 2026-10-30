@@ -76,22 +76,29 @@ async function exchangeChoices(db: Db, lines: (typeof schema.orderLines.$inferSe
   return choices;
 }
 
-/** For the buyer's order page: whether they can ask, why not, and any request already made. */
-export async function returnOptions(db: Db, shop: Shop, order: Order, now = new Date()) {
-  const [requests, lines, start] = await Promise.all([
+/**
+ * For the buyer's order page, or a gift's recipient on the gift return page: whether they can ask,
+ * why not, and their own request already made. Neither sees the other's request.
+ */
+export async function returnOptions(db: Db, shop: Shop, order: Order, now = new Date(), viewer: "buyer" | "gift" = "buyer") {
+  const [all, lines, start] = await Promise.all([
     db.query.returnRequests.findMany({ where: eq(schema.returnRequests.orderId, order.id), orderBy: desc(schema.returnRequests.createdAt) }),
     returnableLines(db, order.id),
     windowStart(db, order),
   ]);
   const exchanges = await exchangeChoices(db, lines);
+  const requests = all.filter((r) => !!r.giftReturn === (viewer === "gift"));
   const open = requests.find((r) => r.status === "requested" || r.status === "approved") ?? null;
+  // Only one return is open on an order at a time, the buyer's or the recipient's.
+  const otherOpen = all.some((r) => !!r.giftReturn !== (viewer === "gift") && (r.status === "requested" || r.status === "approved"));
   const normal = start ? new Date(start.getTime() + shop.returnWindowDays * DAY) : null;
   // Orders paid in the holiday stretch stay returnable until its date, when that's later.
   const holiday = holidayReturnsUntil(shop, order.paidAt);
   const longer = holiday && (!normal || holiday > normal) ? holiday : null;
   const closesAt = longer ?? normal;
   let blocked: string | null = null;
-  if (!shop.returnWindowDays) blocked = `${shop.name} handles returns by email. Reply to your order confirmation to ask.`;
+  if (!shop.returnWindowDays) blocked = viewer === "gift" ? `${shop.name} handles returns by email. Ask the person who sent the gift.` : `${shop.name} handles returns by email. Reply to your order confirmation to ask.`;
+  else if (otherOpen) blocked = viewer === "gift" ? "The store is already handling a return for this gift. Ask the person who sent it." : "There's already a return open for this order. Reply to your order confirmation to ask about it.";
   else if (!["paid", "partially_refunded"].includes(order.paymentStatus)) blocked = order.paymentStatus === "refunded" ? "This order has been refunded." : "This order isn't paid.";
   else if (!lines.length) blocked = "Nothing in this order can be returned.";
   else if (closesAt && closesAt < now)
@@ -101,6 +108,13 @@ export async function returnOptions(db: Db, shop: Shop, order: Order, now = new 
 
 const requestSchema = z.object({
   reason: z.enum(RETURN_REASONS, { error: "Pick a reason." }),
+  // The gift's recipient, asking with the gift's return code.
+  gift: z
+    .object({
+      name: z.string().trim().min(1, "Add your name.").max(60, "Keep your name under 60 characters."),
+      email: z.string().trim().toLowerCase().email("Enter your email, so the store can answer you."),
+    })
+    .optional(),
   note: z.string().trim().max(1000, "Keep the note under 1,000 characters.").optional(),
   items: z.array(z.object({ lineId: z.string().uuid(), quantity: z.number().int().min(0).max(99), exchangeVariantId: z.string().optional() })),
 });
@@ -118,7 +132,7 @@ function valueOf(order: Order, lines: (typeof schema.orderLines.$inferSelect)[],
 export async function requestReturn(db: Db, shop: Shop, order: Order, input: z.input<typeof requestSchema>, now = new Date()) {
   const parsed = requestSchema.safeParse(input);
   if (!parsed.success) throw new UserError(parsed.error.issues[0]!.message);
-  const options = await returnOptions(db, shop, order, now);
+  const options = await returnOptions(db, shop, order, now, parsed.data.gift ? "gift" : "buyer");
   if (options.open) throw new UserError("You've already asked to return items from this order. We'll email you when the store answers.");
   if (!options.canRequest) throw new UserError(options.blocked!);
   const wanted = parsed.data.items.filter((i) => i.quantity > 0);
@@ -129,6 +143,8 @@ export async function requestReturn(db: Db, shop: Shop, order: Order, input: z.i
     if (i.quantity > line.quantity) throw new UserError(`You bought ${line.quantity} of ${line.title}.`);
     if (i.exchangeVariantId && !options.exchanges[i.lineId]?.some((c) => c.variantId === i.exchangeVariantId)) throw new UserError(`That option of ${line.title} can't be swapped for right now.`);
   }
+  // A gift comes back for store credit, so there's nothing to swap.
+  if (parsed.data.gift) for (const i of wanted) delete i.exchangeVariantId;
   const swapping = wanted.filter((i) => i.exchangeVariantId);
   if (swapping.length && swapping.length < wanted.length) throw new UserError("Swap every item you're sending back, or none of them. You can ask about the others once this is answered.");
   const items: ReturnItem[] = wanted.map((i) => {
@@ -144,6 +160,7 @@ export async function requestReturn(db: Db, shop: Shop, order: Order, input: z.i
       note: parsed.data.note || null,
       items,
       suggestedMinor: valueOf(order, options.lines, wanted),
+      giftReturn: parsed.data.gift ?? null,
     })
     .onConflictDoNothing()
     .returning();
@@ -234,6 +251,11 @@ export async function decideReturn(ctx: ReturnContext, shop: Shop, requestId: st
   const order = (await ctx.db.query.orders.findFirst({ where: eq(schema.orders.id, request.orderId) }))!;
   const message = decision.message?.trim().slice(0, 1000) || null;
   const money = (m: number) => formatMoney(m, order.currency);
+  // A gift sent back by its recipient: store credit for them, never a refund the buyer would see.
+  const gift = request.giftReturn;
+  if (gift && !["approve", "credit", "decline"].includes(decision.action)) {
+    throw new UserError(`${gift.name} returned a gift, so give them store credit. A refund or a new order would tell the buyer.`);
+  }
 
   let update: Partial<ReturnRequest> = {};
   let email: string;
@@ -270,9 +292,9 @@ export async function decideReturn(ctx: ReturnContext, shop: Shop, requestId: st
       email = `${shop.name} refunded ${money(decision.amountMinor)} for your return. You'll get a separate refund email with the details.`;
     } else {
       const { card, sent } = await issueGiftCard(ctx, shop, {
-        email: order.email,
+        email: gift?.email ?? order.email,
         amountMinor: decision.amountMinor,
-        note: `Store credit for your return from order #${order.number}.`,
+        note: gift ? "Store credit for the gift you returned." : `Store credit for your return from order #${order.number}.`,
       });
       if (!sent) throw new UserError("The store credit was made but its email didn't go out. Send a new code from Gift cards.");
       update = { status: "credited", resolvedMinor: decision.amountMinor, giftCardId: card.id, resolvedAt: new Date() };
@@ -284,12 +306,13 @@ export async function decideReturn(ctx: ReturnContext, shop: Shop, requestId: st
     .set({ ...update, merchantMessage: update.merchantMessage ?? message, updatedAt: new Date() })
     .where(and(eq(schema.returnRequests.id, request.id), inArray(schema.returnRequests.status, ["requested", "approved"])))
     .returning();
-  const link = await ctx.orderStatusUrl(shop, order);
+  // The order's page shows what was paid, so the gift's recipient doesn't get its link.
+  const link = gift ? null : await ctx.orderStatusUrl(shop, order);
   await ctx.mailer
     .send({
-      to: order.email,
-      subject: `Your return for order #${order.number}`,
-      text: `Hi ${order.shippingAddress.name.split(" ")[0]},\n\n${email}\n\nItems: ${request.items.map((i) => `${i.title} × ${i.quantity}`).join(", ")}\n\nOrder status: ${link}\n`,
+      to: gift?.email ?? order.email,
+      subject: gift ? `The gift you're returning to ${shop.name}` : `Your return for order #${order.number}`,
+      text: `Hi ${(gift?.name ?? order.shippingAddress.name).split(" ")[0]},\n\n${email}\n\nItems: ${request.items.map((i) => `${i.title} × ${i.quantity}`).join(", ")}\n${link ? `\nOrder status: ${link}\n` : ""}`,
     })
     .catch(() => {});
   return row ?? request;

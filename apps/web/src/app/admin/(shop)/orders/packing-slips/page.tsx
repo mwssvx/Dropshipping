@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { MAX_PACKING_SLIPS, packingSlips } from "@sf/core";
-import { requireShop } from "@/lib/server";
+import { requireShop, storeAddress } from "@/lib/server";
 import { PackingSlipView } from "@/components/PackingSlipView";
 import { PrintButton } from "@/components/PrintButton";
 import { PackingSlipNoteForm } from "./PackingSlipNoteForm";
@@ -13,6 +13,7 @@ export default async function PackingSlipsPage({ searchParams }: { searchParams:
   const { shop, db } = await requireShop("orders");
   const picked = ids ? ids.split(",").filter(Boolean) : null;
   const { store, slips } = await packingSlips(db, shop.id, picked ? { orderIds: picked } : "waiting");
+  const giftReturns = `${await storeAddress(shop)}/gift-return`;
   return (
     <main className="px-4 sm:px-8 py-6 pb-12 flex flex-col gap-4 max-w-4xl">
       <div className="flex flex-wrap items-center gap-3 justify-between">
@@ -34,7 +35,7 @@ export default async function PackingSlipsPage({ searchParams }: { searchParams:
         <div className="card p-10 text-center hint">{picked ? "None of the picked orders were found." : "No orders are waiting to ship."}</div>
       ) : (
         <div className="print-sheets flex flex-col gap-6">
-          {slips.map((s) => <PackingSlipView key={s.orderId} slip={s} store={store} />)}
+          {slips.map((s) => <PackingSlipView key={s.orderId} slip={s} store={{ ...store, giftReturns }} />)}
         </div>
       )}
     </main>
