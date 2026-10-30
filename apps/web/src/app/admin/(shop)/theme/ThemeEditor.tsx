@@ -18,7 +18,7 @@ import {
   type ThemeFont,
 } from "@sf/core/theme";
 import { discardThemeAction, publishThemeAction, saveThemeAction } from "../../store-actions";
-import { MenuEditor, SectionForm, type CollectionOption, type LinkOption } from "./fields";
+import { MenuEditor, SectionForm, type CollectionOption, type LinkOption, type ProductOption } from "./fields";
 
 type Tab = "themes" | "sections" | "style" | "menus" | "seo";
 type Save = { state: "saved" | "saving" | "unsaved" | "error"; message?: string };
@@ -59,6 +59,7 @@ export function ThemeEditor({
   publishedAt,
   links,
   collections,
+  products,
   storeLink,
   shopName,
 }: {
@@ -67,6 +68,7 @@ export function ThemeEditor({
   publishedAt: string | null;
   links: LinkOption[];
   collections: CollectionOption[];
+  products: ProductOption[];
   storeLink: string;
   shopName: string;
 }) {
@@ -221,7 +223,7 @@ export function ThemeEditor({
                   <h2 className="font-bold">{SECTION_LABELS[current.type].name}</h2>
                   <p className="hint">{SECTION_LABELS[current.type].about}</p>
                 </div>
-                <SectionForm type={current.type} settings={current.settings} links={links} collections={collections}
+                <SectionForm type={current.type} settings={current.settings} links={links} collections={collections} products={products}
                   onChange={(settings) => updateSection(current.id, { settings } as Partial<Section>)} />
                 <label className="flex items-center gap-2 text-sm">
                   <input type="checkbox" checked={current.hidden} onChange={() => updateSection(current.id, { hidden: !current.hidden })} />
