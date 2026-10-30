@@ -1323,3 +1323,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **A third color warning** (theme editor → Style): besides text on the background and text on buttons, the editor now warns when the button color is too light or too dark to read as link text on the background (links like "View all" use it), with the ratio and what to aim for (4.5:1). Yellow buttons with dark text are fine; yellow links on a white page aren't.
 2. **Ready-made themes stay readable**: a test checks all three ratios for all seven themes, so a new theme can't ship with hard-to-read text, buttons or links.
+
+### Announcements that take turns (after launch, part 231)
+
+1. **Up to five messages** (theme editor → Announcement bar): besides its message, the bar takes up to four more, each with an optional link, like "Free shipping over $50", "30-day returns" and "Gift wrap for $3". They take turns every few seconds (3 to 15, five by default). A bar with one message looks the same as before.
+2. **Shoppers stay in control**: arrows step back and forth, a pause button stops it, and it holds still while the shopper points at it or tabs into it. Shoppers whose device asks for less motion see it paused until they press play. The buttons are translated into the six store languages, and the extra messages show up on the Languages page like the first one.

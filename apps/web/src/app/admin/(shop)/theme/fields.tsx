@@ -1,6 +1,6 @@
 "use client";
 import { useId } from "react";
-import { LOGOS_MAX, LOOK_MAX, TRUST_ICONS, type MenuItem, type SectionSettings, type SectionType, type TrustIcon } from "@sf/core/theme";
+import { ANNOUNCE_MAX, LOGOS_MAX, LOOK_MAX, TRUST_ICONS, type MenuItem, type SectionSettings, type SectionType, type TrustIcon } from "@sf/core/theme";
 
 /*
  * Form controls for the theme editor. Every control is labelled and edits one value.
@@ -15,7 +15,7 @@ type Field =
   | { key: string; label: string; kind: "text" | "textarea" | "image" | "link"; hint?: string; max?: number }
   | { key: string; label: string; kind: "select"; options: { value: string; label: string }[] }
   | { key: string; label: string; kind: "number"; min: number; max: number }
-  | { key: string; label: string; kind: "collection" | "collections" | "faq" | "quotes" | "badges" | "products" | "logos" };
+  | { key: string; label: string; kind: "collection" | "collections" | "faq" | "quotes" | "badges" | "products" | "logos" | "messages" };
 
 export const TRUST_ICON_LABELS: Record<TrustIcon, string> = {
   shipping: "Delivery truck",
@@ -30,6 +30,8 @@ export const SECTION_FIELDS: Record<SectionType, Field[]> = {
   announcement: [
     { key: "text", label: "Message", kind: "text", max: 160 },
     { key: "link", label: "Link (optional)", kind: "link" },
+    { key: "more", label: "More messages (they take turns)", kind: "messages" },
+    { key: "seconds", label: "Seconds per message", kind: "number", min: 3, max: 15 },
   ],
   hero: [
     { key: "heading", label: "Heading", kind: "text", max: 120 },
@@ -174,7 +176,7 @@ export function SectionForm<T extends SectionType>({
         const v = values[f.key];
         return (
           <div key={f.key} className="field">
-            {!["faq", "collections", "quotes", "badges", "products", "logos"].includes(f.kind) && <label className="label" htmlFor={id}>{f.label}</label>}
+            {!["faq", "collections", "quotes", "badges", "products", "logos", "messages"].includes(f.kind) && <label className="label" htmlFor={id}>{f.label}</label>}
             {f.kind === "text" && <input id={id} className="input" value={String(v ?? "")} maxLength={f.max} onChange={(e) => set(f.key, e.target.value)} />}
             {f.kind === "textarea" && <textarea id={id} className="input" rows={4} value={String(v ?? "")} maxLength={f.max} onChange={(e) => set(f.key, e.target.value)} />}
             {f.kind === "image" && (
@@ -237,6 +239,10 @@ export function SectionForm<T extends SectionType>({
                   { key: "name", label: "Logo name" },
                   { key: "link", label: "Logo link" },
                 ]} blank={{ imageUrl: "", name: "", link: "" }} />
+            )}
+            {f.kind === "messages" && (
+              <ListItems label={f.label} items={v as Record<string, string>[]} onChange={(x) => set(f.key, x)} max={ANNOUNCE_MAX - 1} noun="message"
+                fields={[{ key: "text", label: "Extra message" }, { key: "link", label: "Extra message link" }]} blank={{ text: "", link: "" }} />
             )}
             {"hint" in f && f.hint && <span className="hint">{f.hint}</span>}
           </div>

@@ -84,10 +84,22 @@ export const LOOK_MAX = 6;
 /** The most logos one logo row holds. */
 export const LOGOS_MAX = 12;
 
+/** The most messages one announcement bar takes turns showing. */
+export const ANNOUNCE_MAX = 5;
+
 const menuItem = z.object({ label: z.string().trim().min(1, "Every menu item needs a label.").max(40), href: link });
 
 const sectionSchemas = {
-  announcement: z.object({ text: text(160), link }),
+  // One message, or up to ANNOUNCE_MAX taking turns every few seconds.
+  announcement: z.object({
+    text: text(160),
+    link,
+    more: z
+      .array(z.object({ text: text(160), link }))
+      .max(ANNOUNCE_MAX - 1, `An announcement bar takes turns with up to ${ANNOUNCE_MAX} messages.`)
+      .default([]),
+    seconds: z.number().int().min(3).max(15).default(5),
+  }),
   hero: z.object({
     heading: text(120),
     text: text(400),
@@ -179,7 +191,7 @@ export type SectionType = keyof typeof sectionSchemas;
 export const SECTION_TYPES = Object.keys(sectionSchemas) as SectionType[];
 
 export const SECTION_LABELS: Record<SectionType, { name: string; about: string }> = {
-  announcement: { name: "Announcement bar", about: "A thin strip for a short message, like free shipping." },
+  announcement: { name: "Announcement bar", about: "A thin strip for a short message, like free shipping. Add more messages and they take turns." },
   hero: { name: "Hero banner", about: "A big heading, a line of text and a button, over an optional image." },
   featured_products: { name: "Featured products", about: "A grid of products from one collection, or from all products." },
   collection_list: { name: "Collection list", about: "Tiles that link to your collections." },
@@ -227,6 +239,14 @@ const themeDoc = z.object({
 });
 
 export type SectionSettings = { [K in SectionType]: z.infer<(typeof sectionSchemas)[K]> };
+
+/** The messages an announcement bar shows, in turn: the first message, then the extra ones, skipping empty ones. */
+export function announcementMessages(s: Pick<SectionSettings["announcement"], "text" | "link"> & { more?: { text: string; link: string }[] }) {
+  return [{ text: s.text, link: s.link }, ...(s.more ?? [])]
+    .map((m) => ({ text: m.text.trim(), link: m.link }))
+    .filter((m) => m.text)
+    .slice(0, ANNOUNCE_MAX);
+}
 export type Section = { [K in SectionType]: { id: string; type: K; hidden: boolean; settings: SectionSettings[K] } }[SectionType];
 export type ThemeDoc = Omit<z.infer<typeof themeDoc>, "home"> & { home: Section[] };
 export type MenuItem = z.infer<typeof menuItem>;
