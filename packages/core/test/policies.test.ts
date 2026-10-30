@@ -9,15 +9,18 @@ describe("store policies", () => {
     const f = await makeFixture(new DemoModel());
     const shop = await f.shop();
     await f.db.update(schema.shops).set({ returnWindowDays: 14, processingDays: 3, invoiceLegalName: "Lamp Co Ltd", adPixels: { meta: "123", tiktok: null, google: null } }).where(eq(schema.shops.id, shop.id));
-    const drafts = await draftPolicies(f.db, await f.shop());
+    const drafts = await draftPolicies(f.db, await f.shop(), new Date("2026-11-02T12:00:00Z"));
     const body = (k: string) => drafts.find((d) => d.kind === k)!.body;
-    expect(drafts.map((d) => d.title)).toEqual(["Returns and refunds", "Shipping", "Privacy policy", "Terms of service"]);
+    expect(drafts.map((d) => d.title)).toEqual(["Returns and refunds", "Shipping", "Privacy policy", "Terms of service", "Accessibility statement"]);
     expect(body("returns")).toContain("within 14 days of delivery");
     expect(body("returns")).toContain("cancel from your order page");
     expect(body("shipping")).toContain("within 3 business days");
     expect(body("shipping")).toMatch(/Everywhere we ship: Standard, \$[\d.]+/);
     expect(body("privacy")).toContain("advertising tags");
     expect(body("terms")).toContain("run by Lamp Co Ltd");
+    expect(body("accessibility")).toContain("WCAG) 2.1 at level AA");
+    expect(body("accessibility")).toContain("write to us through our contact page");
+    expect(body("accessibility")).toContain("written on November 2, 2026.");
 
     await f.db.update(schema.shops).set({ returnWindowDays: 0, adPixels: null }).where(eq(schema.shops.id, shop.id));
     const off = await draftPolicies(f.db, await f.shop());
