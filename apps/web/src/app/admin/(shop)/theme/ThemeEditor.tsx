@@ -248,7 +248,7 @@ export function ThemeEditor({
             {tab === "menus" && (
               <>
                 <p className="hint">Menus link to your collections, pages and products. Add pages under Pages first.</p>
-                <MenuEditor title="Header menu" items={doc.menus.header} links={links} onChange={(header) => change({ ...doc, menus: { ...doc.menus, header } })} />
+                <MenuEditor title="Header menu" dropdowns items={doc.menus.header} links={links} onChange={(header) => change({ ...doc, menus: { ...doc.menus, header } })} />
                 <MenuEditor title="Footer menu" items={doc.menus.footer} links={links} onChange={(footer) => change({ ...doc, menus: { ...doc.menus, footer } })} />
               </>
             )}

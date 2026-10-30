@@ -1,6 +1,6 @@
 "use client";
 import { useId } from "react";
-import { ANNOUNCE_MAX, LOGOS_MAX, LOOK_MAX, TRUST_ICONS, type MenuItem, type SectionSettings, type SectionType, type TrustIcon } from "@sf/core/theme";
+import { ANNOUNCE_MAX, LOGOS_MAX, LOOK_MAX, MENU_CHILDREN_MAX, TRUST_ICONS, type MenuItem, type MenuLink, type SectionSettings, type SectionType, type TrustIcon } from "@sf/core/theme";
 
 /*
  * Form controls for the theme editor. Every control is labelled and edits one value.
@@ -324,42 +324,77 @@ function ListItems({ label, items, onChange, fields, blank, max, noun }: {
   );
 }
 
-export function MenuEditor({ title, items, onChange, links }: { title: string; items: MenuItem[]; onChange: (v: MenuItem[]) => void; links: LinkOption[] }) {
+/** A menu's links. The header menu's links can each open a dropdown of more links. */
+export function MenuEditor({ title, items, onChange, links, dropdowns = false }: {
+  title: string;
+  items: MenuItem[];
+  onChange: (v: MenuItem[]) => void;
+  links: LinkOption[];
+  dropdowns?: boolean;
+}) {
   const base = useId();
   const move = (i: number, d: -1 | 1) => {
     const next = [...items];
     [next[i], next[i + d]] = [next[i + d]!, next[i]!];
     onChange(next);
   };
+  const update = (i: number, patch: Partial<MenuItem>) => onChange(items.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   return (
     <fieldset className="flex flex-col gap-3">
       <legend className="font-semibold mb-1">{title}</legend>
       {items.length === 0 && <p className="hint">No links yet.</p>}
-      {items.map((item, i) => (
-        <div key={i} className="card p-3 flex flex-col gap-2">
-          <div className="field">
-            <label className="label" htmlFor={`${base}-l${i}`}>Label</label>
-            <input id={`${base}-l${i}`} className="input" value={item.label} maxLength={40}
-              onChange={(e) => onChange(items.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} />
+      {items.map((item, i) => {
+        const children = item.children ?? [];
+        const setChild = (k: number, patch: Partial<MenuLink>) => update(i, { children: children.map((c, j) => (j === k ? { ...c, ...patch } : c)) });
+        return (
+          <div key={i} className="card p-3 flex flex-col gap-2" role="group" aria-label={`${title}: ${item.label || `link ${i + 1}`}`}>
+            <div className="field">
+              <label className="label" htmlFor={`${base}-l${i}`}>Label</label>
+              <input id={`${base}-l${i}`} className="input" value={item.label} maxLength={40} onChange={(e) => update(i, { label: e.target.value })} />
+            </div>
+            <div className="field">
+              <label className="label" htmlFor={`${base}-h${i}`}>Goes to</label>
+              <LinkInput id={`${base}-h${i}`} value={item.href} links={links} onChange={(href) => update(i, { href })} />
+              {dropdowns && children.length > 0 && <span className="hint">Shoppers see it first in the dropdown. Leave it empty for a label that only opens the dropdown.</span>}
+            </div>
+            {dropdowns && children.length > 0 && (
+              <ol className="flex flex-col gap-2 border-l-2 border-border pl-3">
+                {children.map((c, k) => (
+                  <li key={k} className="flex flex-col gap-2">
+                    <div className="field">
+                      <label className="label" htmlFor={`${base}-cl${i}-${k}`}>Dropdown label {k + 1}</label>
+                      <input id={`${base}-cl${i}-${k}`} className="input" value={c.label} maxLength={40} onChange={(e) => setChild(k, { label: e.target.value })} />
+                    </div>
+                    <div className="field">
+                      <label className="label" htmlFor={`${base}-ch${i}-${k}`}>Dropdown link {k + 1}</label>
+                      <LinkInput id={`${base}-ch${i}-${k}`} value={c.href} links={links} onChange={(href) => setChild(k, { href })} />
+                    </div>
+                    <button type="button" className="hint hover:text-critical self-end" onClick={() => update(i, { children: children.filter((_, j) => j !== k) })}>
+                      Remove {c.label || `dropdown link ${k + 1}`}
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            )}
+            <div className="flex gap-3 justify-end hint flex-wrap">
+              {dropdowns && children.length < MENU_CHILDREN_MAX && (
+                <button type="button" className="hover:text-ink mr-auto" onClick={() => update(i, { children: [...children, { label: "New link", href: "/" }] })}>
+                  Add a dropdown link
+                </button>
+              )}
+              <button type="button" disabled={i === 0} className="hover:text-ink disabled:opacity-40" onClick={() => move(i, -1)} aria-label={`Move ${item.label} up`}>Up</button>
+              <button type="button" disabled={i === items.length - 1} className="hover:text-ink disabled:opacity-40" onClick={() => move(i, 1)} aria-label={`Move ${item.label} down`}>Down</button>
+              <button type="button" className="hover:text-critical" onClick={() => onChange(items.filter((_, j) => j !== i))}>Remove</button>
+            </div>
           </div>
-          <div className="field">
-            <label className="label" htmlFor={`${base}-h${i}`}>Goes to</label>
-            <LinkInput id={`${base}-h${i}`} value={item.href} links={links}
-              onChange={(href) => onChange(items.map((x, j) => (j === i ? { ...x, href } : x)))} />
-          </div>
-          <div className="flex gap-3 justify-end hint">
-            <button type="button" disabled={i === 0} className="hover:text-ink disabled:opacity-40" onClick={() => move(i, -1)} aria-label={`Move ${item.label} up`}>Up</button>
-            <button type="button" disabled={i === items.length - 1} className="hover:text-ink disabled:opacity-40" onClick={() => move(i, 1)} aria-label={`Move ${item.label} down`}>Down</button>
-            <button type="button" className="hover:text-critical" onClick={() => onChange(items.filter((_, j) => j !== i))}>Remove</button>
-          </div>
-        </div>
-      ))}
-      <AddLink onAdd={(l) => onChange([...items, l])} links={links} />
+        );
+      })}
+      <AddLink onAdd={(l) => onChange([...items, { ...l, children: [] }])} links={links} />
     </fieldset>
   );
 }
 
-function AddLink({ onAdd, links }: { onAdd: (l: MenuItem) => void; links: LinkOption[] }) {
+function AddLink({ onAdd, links }: { onAdd: (l: MenuLink) => void; links: LinkOption[] }) {
   const id = useId();
   return (
     <div className="flex gap-2">
