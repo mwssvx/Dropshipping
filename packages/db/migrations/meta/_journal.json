@@ -1002,6 +1002,13 @@
       "when": 1793389401624,
       "tag": "0143_cart_links",
       "breakpoints": true
+    },
+    {
+      "idx": 143,
+      "version": "7",
+      "when": 1793390900399,
+      "tag": "0144_theme_schedule",
+      "breakpoints": true
     }
   ]
 }

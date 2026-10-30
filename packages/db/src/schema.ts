@@ -846,8 +846,14 @@ export const themes = pgTable("themes", {
   draft: jsonb("draft").$type<Record<string, unknown>>().notNull(),
   published: jsonb("published").$type<Record<string, unknown>>().notNull(),
   publishedAt: timestamp("published_at", { withTimezone: true }),
+  /** A copy of the draft that goes live by itself at `at`, and the time to switch back, if any. */
+  schedule: jsonb("schedule").$type<ThemeSchedule | null>(),
+  /** The look a scheduled change replaced, put back at `at`. */
+  revert: jsonb("revert").$type<ThemeRevert | null>(),
   updatedAt: updatedAt(),
 });
+export type ThemeSchedule = { doc: Record<string, unknown>; at: string; until: string | null };
+export type ThemeRevert = { doc: Record<string, unknown>; at: string };
 
 /** How a collection's page lists its products before the buyer picks another order. */
 export const COLLECTION_SORTS = ["featured", "best_selling", "newest", "price_asc", "price_desc"] as const;
