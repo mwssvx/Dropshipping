@@ -58,9 +58,12 @@ test("a buyer gets a bonus card with gift cards, usable from a later day", async
   await expect(buyer.getByRole("heading", { name: "Thank you, Ada!" })).toBeVisible();
 
   const inbox = await page.context().newPage();
-  await inbox.goto("/dev/mail");
   const mail = inbox.getByRole("article").filter({ hasText: email }).filter({ hasText: "Your $10.00 bonus card for" }).first();
-  await expect(mail).toContainText("You can use it from");
+  // The bonus card goes out just after payment, so look again until it's there.
+  await expect(async () => {
+    await inbox.goto("/dev/mail");
+    await expect(mail).toContainText("You can use it from", { timeout: 2000 });
+  }).toPass({ timeout: 20_000 });
   const code = (await mail.textContent())!.match(/Gift card code: ([A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4})/)![1]!;
   await inbox.close();
 
