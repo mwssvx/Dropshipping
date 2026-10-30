@@ -37,6 +37,12 @@ export async function setCardQuickAdd(db: Db, shopId: string, on: boolean) {
   return on;
 }
 
+/** Whether "Add to cart" keeps the shopper on the page they were on, with a note, instead of opening the cart. */
+export async function setStayAfterAdd(db: Db, shopId: string, on: boolean) {
+  await db.update(schema.shops).set({ stayAfterAdd: on, updatedAt: new Date() }).where(eq(schema.shops.id, shopId));
+  return on;
+}
+
 /** Whether product pages show share buttons. */
 export async function setShareButtons(db: Db, shopId: string, on: boolean) {
   await db.update(schema.shops).set({ shareButtons: on, updatedAt: new Date() }).where(eq(schema.shops.id, shopId));

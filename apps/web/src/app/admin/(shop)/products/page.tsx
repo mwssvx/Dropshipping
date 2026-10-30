@@ -8,6 +8,7 @@ import { RestockAlertForm } from "./RestockAlertForm";
 import { BadgeSettingsForm } from "./BadgeSettingsForm";
 import { SoldOutForm } from "./SoldOutForm";
 import { QuickAddForm } from "./QuickAddForm";
+import { AfterAddForm } from "./AfterAddForm";
 import { ShareButtonsForm } from "./ShareButtonsForm";
 import { RecentSalesForm } from "./RecentSalesForm";
 import { PriceImportForm } from "./PriceImportForm";
@@ -320,6 +321,16 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
             </p>
           </div>
           <QuickAddForm on={shop.cardQuickAdd} />
+        </section>
+        <section className="card p-5 mt-6 flex flex-col gap-3 max-w-3xl" aria-labelledby="after-add-heading">
+          <div>
+            <h2 id="after-add-heading" className="font-semibold">After &ldquo;Add to cart&rdquo;</h2>
+            <p className="hint">
+              Opening the cart suits stores where most buyers get one thing. Staying on the page suits stores where buyers pick several:
+              they see &ldquo;Added to your cart&rdquo; with buttons to the cart and checkout, and keep browsing.
+            </p>
+          </div>
+          <AfterAddForm stay={shop.stayAfterAdd} />
         </section>
         <section className="card p-5 mt-6 flex flex-col gap-3 max-w-3xl" aria-labelledby="share-heading">
           <div>

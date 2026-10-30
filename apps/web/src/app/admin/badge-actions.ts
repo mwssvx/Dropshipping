@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { setBadgeSettings, setCardQuickAdd, setProductBadge, setRecentSales, setShareButtons, setSoldOutDisplay, UserError } from "@sf/core";
+import { setBadgeSettings, setCardQuickAdd, setProductBadge, setRecentSales, setShareButtons, setSoldOutDisplay, setStayAfterAdd, UserError } from "@sf/core";
 import { requireShop } from "@/lib/server";
 
 export type BadgeState = { error?: string; saved?: boolean };
@@ -71,5 +71,13 @@ export async function quickAddAction(_: BadgeState, form: FormData): Promise<Bad
   await setCardQuickAdd(db, shop.id, form.get("quickAdd") === "on");
   revalidatePath("/admin/products");
   revalidatePath(`/s/${shop.handle}`, "layout");
+  return { saved: true };
+}
+
+/** What "Add to cart" does in the store: open the cart, or stay on the page with a note. */
+export async function stayAfterAddAction(_: BadgeState, form: FormData): Promise<BadgeState> {
+  const { shop, db } = await requireShop("products");
+  await setStayAfterAdd(db, shop.id, form.get("afterAdd") === "stay");
+  revalidatePath("/admin/products");
   return { saved: true };
 }

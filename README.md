@@ -1338,3 +1338,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **One tick** (theme editor → Style → Layout): "Keep the header on screen while shoppers scroll" pins the logo, menu, search and cart to the top of the screen on every store page, so on a long collection or product page the cart is one tap away. Off by default, and it stays as set when you switch to another ready-made theme.
 2. **Nothing hides behind it**: the checkout's order summary, which also stays on screen on wide screens, sits below the header instead of under it.
+
+### Stay on the page after "Add to cart" (after launch, part 234)
+
+1. **A choice per store** (Products → After "Add to cart"): open the cart, as before, or keep the shopper on the page they were on. Staying suits stores where buyers pick several things: a note says "Added to your cart." with buttons to the cart and checkout, the cart count in the header goes up, and the shopper keeps browsing. It works from product pages, product cards, bundles and "Shop the look".
+2. **Safe and quiet**: the store only goes back to one of its own pages (never checkout or payment pages, and never another site), the note shows once and closes by itself after a few seconds, and it's translated into the six store languages.

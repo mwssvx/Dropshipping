@@ -1,9 +1,9 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, cancelOrderByBuyer, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, visitSource, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, MAX_SAVED, saveItem, setPriceAlerts, shareSaved, stopSharingSaved, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer, answerSurvey, chooseBankTransfer, joinLaunchList, toggleCompareId, lookVariants } from "@sf/core";
+import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, cancelOrderByBuyer, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, visitSource, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, MAX_SAVED, saveItem, setPriceAlerts, shareSaved, stopSharingSaved, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer, answerSurvey, chooseBankTransfer, joinLaunchList, toggleCompareId, lookVariants, stayPathAfterAdd } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
 import { agents, campaigns, db, fulfillment, payments, platformUrl, refunds, subscriptions, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
@@ -25,6 +25,12 @@ async function track(shopId: string, kind: "add_to_cart" | "checkout_start", pro
   });
 }
 
+/** After adding to the cart: the cart, or back to the page the shopper was on when the store keeps them there. */
+async function afterAdd(shop: { stayAfterAdd: boolean }, base: string): Promise<never> {
+  const back = shop.stayAfterAdd ? stayPathAfterAdd((await headers()).get("referer"), base) : null;
+  redirect(back ?? `${base}/cart`);
+}
+
 export async function addToCartAction(handle: string, form: FormData) {
   const shop = await loadShop(handle);
   const variantId = String(form.get("variantId") ?? "");
@@ -43,7 +49,7 @@ export async function addToCartAction(handle: string, form: FormData) {
   else cart.push(added);
   await writeCart(shop.id, cart);
   await track(shop.id, "add_to_cart", variant?.productId);
-  redirect(`${await storeBase(handle)}/cart`);
+  await afterAdd(shop, await storeBase(handle));
 }
 
 /** Adds one of each piece in a home page "Shop the look" section that has nothing to choose. */
@@ -60,7 +66,7 @@ export async function addLookAction(handle: string, form: FormData) {
     await writeCart(shop.id, cart);
     await track(shop.id, "add_to_cart");
   }
-  redirect(`${await storeBase(handle)}/cart`);
+  await afterAdd(shop, await storeBase(handle));
 }
 
 /** Adds one of each product in a bundle, with the options the buyer picked. */
@@ -81,7 +87,7 @@ export async function addBundleAction(handle: string, bundleId: string, form: Fo
   }
   await writeCart(shop.id, cart);
   await track(shop.id, "add_to_cart");
-  redirect(`${base}/cart`);
+  await afterAdd(shop, base);
 }
 
 /**

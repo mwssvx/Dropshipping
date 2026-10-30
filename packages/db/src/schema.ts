@@ -249,6 +249,8 @@ export const shops = pgTable(
     productBadges: jsonb("product_badges").$type<BadgeSettings>().notNull().default({ sale: true, soldOut: true, newDays: 0 }),
     // An "Add to cart" button on product cards, for products with nothing to choose.
     cardQuickAdd: boolean("card_quick_add").notNull().default(true),
+    // After "Add to cart", stay on the page with a note instead of opening the cart.
+    stayAfterAdd: boolean("stay_after_add").notNull().default(false),
     // Share buttons on product pages: copy the link, WhatsApp, Facebook and Pinterest.
     shareButtons: boolean("share_buttons").notNull().default(true),
     // "12 sold in the last 7 days" on product pages, from real paid orders. Off until the merchant turns it on.

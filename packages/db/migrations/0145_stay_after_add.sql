@@ -1,0 +1,1 @@
+ALTER TABLE "shops" ADD COLUMN "stay_after_add" boolean DEFAULT false NOT NULL;
