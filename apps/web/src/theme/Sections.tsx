@@ -8,6 +8,8 @@ import type { DisplayFx } from "@sf/core/money";
 import { Price } from "@/components/Price";
 import { UnitPrice } from "@/components/UnitPrice";
 import { SubmitButton } from "@/components/SubmitButton";
+import { parseVideo } from "@sf/core/video-link";
+import { SectionVideo } from "./SectionVideo";
 import { storeHref } from "./style";
 
 /*
@@ -421,6 +423,26 @@ function LogoList({ s, data }: Props<"logo_list">) {
   );
 }
 
+function VideoBlock({ s, data }: Props<"video">) {
+  const t = data.t ?? storeText(null);
+  const video = parseVideo(s.videoUrl);
+  if (!video) return null;
+  const title = s.heading || t.productVideo;
+  return (
+    <section className="max-w-4xl mx-auto px-4 sm:px-6 py-12 flex flex-col gap-5" aria-label={title}>
+      {(s.heading || s.text) && (
+        <div className="flex flex-col gap-2 text-center">
+          {s.heading && <h2 className="text-3xl font-bold tracking-tight">{s.heading}</h2>}
+          {s.text && <Paragraphs text={s.text} className="text-muted leading-relaxed" />}
+        </div>
+      )}
+      <div className="sf-media aspect-video rounded-xl bg-ink overflow-hidden">
+        <SectionVideo key={s.videoUrl} video={video} cover={s.coverUrl} title={title} play={t.playVideo} />
+      </div>
+    </section>
+  );
+}
+
 function Newsletter({ s, data }: Props<"newsletter">) {
   const status = data.signup?.status ?? null;
   const t = data.t ?? storeText(null);
@@ -459,6 +481,7 @@ export function SectionView({ section, data, first }: { section: Section; data: 
     case "recently_viewed": return <RecentlyViewedSection s={section.settings} data={data} first={first} />;
     case "shop_the_look": return <ShopTheLook s={section.settings} data={data} first={first} />;
     case "logo_list": return <LogoList s={section.settings} data={data} first={first} />;
+    case "video": return <VideoBlock s={section.settings} data={data} first={first} />;
   }
 }
 

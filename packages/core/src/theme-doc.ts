@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { UserError } from "./errors";
+import { parseVideo } from "./video-link";
 
 /*
  * A store's look is one JSON document: style settings, two menus and an ordered list of
@@ -37,6 +38,12 @@ export function isSafeLink(href: string) {
   return /^(https?:\/\/|mailto:)[^\s]+$/i.test(href);
 }
 const link = z.string().trim().max(500).refine(isSafeLink, "Links must start with /, https:// or mailto:.").default("");
+const videoLink = z
+  .string()
+  .trim()
+  .max(2000)
+  .refine((u) => u === "" || !!parseVideo(u), "Paste a YouTube or Vimeo link, or the https address of a video file ending in .mp4, .webm or .mov.")
+  .default("");
 
 /** Icons a trust badge can show. Drawn by the storefront's section library. */
 export const TRUST_ICONS = ["shipping", "returns", "secure", "support", "quality", "eco"] as const;
@@ -159,6 +166,13 @@ const sectionSchemas = {
       .max(LOGOS_MAX, `A logo row holds up to ${LOGOS_MAX} logos.`)
       .default([]),
   }),
+  // One video that only loads from YouTube or Vimeo once the shopper presses play.
+  video: z.object({
+    heading: text(120),
+    text: text(400),
+    videoUrl: videoLink,
+    coverUrl: imageUrl,
+  }),
 } as const;
 
 export type SectionType = keyof typeof sectionSchemas;
@@ -179,6 +193,7 @@ export const SECTION_LABELS: Record<SectionType, { name: string; about: string }
   recently_viewed: { name: "Recently viewed", about: "The products each shopper looked at last, so they can find them again. Shoppers who haven't looked at any yet don't see it." },
   shop_the_look: { name: "Shop the look", about: "One photo beside the products in it, like a styled room or an outfit, with a button that adds them all to the cart." },
   logo_list: { name: "Logo row", about: "A row of logos, like magazines that wrote about you or brands you carry. Use only logos you may show." },
+  video: { name: "Video", about: "A YouTube or Vimeo video, or a video file, with a heading. Nothing loads from YouTube or Vimeo until a shopper presses play." },
 };
 
 const sectionId = z.string().regex(/^[a-z0-9]{4,24}$/, "Section ids are short lowercase codes.");

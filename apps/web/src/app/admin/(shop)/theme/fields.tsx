@@ -109,6 +109,12 @@ export const SECTION_FIELDS: Record<SectionType, Field[]> = {
     { key: "tone", label: "Logo look", kind: "select", options: [{ value: "grey", label: "Grey, in color on hover" }, { value: "full", label: "Full color" }] },
     { key: "items", label: "Logos", kind: "logos" },
   ],
+  video: [
+    { key: "heading", label: "Heading", kind: "text", max: 120 },
+    { key: "text", label: "Text", kind: "textarea", max: 400 },
+    { key: "videoUrl", label: "Video link", kind: "text", max: 2000, hint: "A YouTube or Vimeo link, or the https address of an .mp4, .webm or .mov file." },
+    { key: "coverUrl", label: "Cover image (optional)", kind: "image" },
+  ],
 };
 
 /** One select per piece of a look, plus an empty one to add the next until the look is full. */
