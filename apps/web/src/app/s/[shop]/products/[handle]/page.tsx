@@ -8,7 +8,8 @@ import { SaleCountdown } from "@/components/SaleCountdown";
 import { RecentlyViewed } from "@/components/RecentlyViewed";
 import { RememberView } from "@/components/RememberView";
 import { readRecent, recentCookie } from "@/lib/recent";
-import { ProductGallery } from "@/components/ProductGallery";
+import { ProductGallery, type GalleryText } from "@/components/ProductGallery";
+import type { StoreText } from "@/lib/store-text";
 import { badgeLabel } from "@/theme/Sections";
 import { currentBuyer } from "@/lib/buyer";
 import { db } from "@/lib/server";
@@ -197,7 +198,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-10 md:grid-cols-2">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
-      <ProductGallery title={product.title} alts={product.imageAlts} photos={[...new Set([...productPhotos(product), ...product.variants.flatMap((x) => (x.imageUrl ? [x.imageUrl] : []))])]} video={parseVideo(product.videoUrl)} text={{ video: t.productVideo, play: t.playVideo }} />
+      <ProductGallery title={product.title} alts={product.imageAlts} photos={[...new Set([...productPhotos(product), ...product.variants.flatMap((x) => (x.imageUrl ? [x.imageUrl] : []))])]} video={parseVideo(product.videoUrl)} text={galleryText(t)} />
       <div className="flex flex-col gap-5">
         <Track shopId={shop.id} kind="product_view" productId={product.id} />
         {tracking && v && <PixelEvent name="view_item" data={{ ids: [v.id], value: pixelPrices[v.id]!, currency: shop.currency }} />}
@@ -566,6 +567,13 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   );
 }
 
+function galleryText(t: StoreText): GalleryText {
+  return {
+    video: t.productVideo, play: t.playVideo, open: t.photoOpen, close: t.photoClose, previous: t.photoPrevious, next: t.photoNext,
+    count: t.photoCount, zoomIn: t.photoZoomIn, zoomOut: t.photoZoomOut, more: t.morePhotos, show: t.showPhoto,
+  };
+}
+
 function Stars({ value, label }: { value: number; label: string }) {
   const full = Math.round(value);
   return (
@@ -590,7 +598,7 @@ async function ComingSoon({ shopHandle, shop, product, launch, t }: NonNullable<
   const joined = launch === "joined" ? { text: t.launchJoined, ok: true } : launch === "invalid" ? { text: t.launchInvalid, ok: false } : null;
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-10 md:grid-cols-2">
-      <ProductGallery title={product.title} alts={product.imageAlts} photos={[...new Set([...productPhotos(product), ...product.variants.flatMap((x) => (x.imageUrl ? [x.imageUrl] : []))])]} video={parseVideo(product.videoUrl)} text={{ video: t.productVideo, play: t.playVideo }} />
+      <ProductGallery title={product.title} alts={product.imageAlts} photos={[...new Set([...productPhotos(product), ...product.variants.flatMap((x) => (x.imageUrl ? [x.imageUrl] : []))])]} video={parseVideo(product.videoUrl)} text={galleryText(t)} />
       <div className="flex flex-col gap-5">
         <p className="flex gap-2">
           <span className="sf-badge rounded-full bg-ink text-surface px-2.5 py-0.5 text-xs font-semibold">{t.comingSoon}</span>

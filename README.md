@@ -1343,3 +1343,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **A choice per store** (Products → After "Add to cart"): open the cart, as before, or keep the shopper on the page they were on. Staying suits stores where buyers pick several things: a note says "Added to your cart." with buttons to the cart and checkout, the cart count in the header goes up, and the shopper keeps browsing. It works from product pages, product cards, bundles and "Shop the look".
 2. **Safe and quiet**: the store only goes back to one of its own pages (never checkout or payment pages, and never another site), the note shows once and closes by itself after a few seconds, and it's translated into the six store languages.
+
+### Bigger photos (after launch, part 235)
+
+1. **Full screen on every product page**: pressing the large photo opens it over the whole screen. Buyers step through the photos with the arrows, the arrow keys or a swipe on a phone, and zoom in to look closely (the zoom follows the pointer). Closing it, with the button or Escape, leaves the page on the photo they stopped at. There is nothing to set up.
+2. **For every buyer**: it works with a keyboard and screen readers, each photo keeps the description the merchant wrote for it, and the buttons and "Photo 2 of 5" are translated into the six store languages, along with the thumbnail labels that were English only before.
