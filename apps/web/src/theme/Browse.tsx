@@ -52,7 +52,7 @@ export function BrowseBar({ action, params, sort, natural: naturalSort = "featur
             defaultValue={params.q ?? ""}
             placeholder={t.searchProducts}
             autoFocus={!params.q}
-            labels={{ search: t.search, suggestions: t.suggestions, soldOut: t.soldOut, seeAll: t.seeAllResults("%s") }}
+            labels={{ search: t.search, suggestions: t.suggestions, soldOut: t.soldOut, seeAll: t.seeAllResults("%s"), kinds: { collection: t.linkCollection, page: t.linkPage, post: t.linkPost } }}
           />
           <button className="btn btn-primary">{t.search}</button>
         </div>
