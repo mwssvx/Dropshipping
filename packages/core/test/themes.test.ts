@@ -29,7 +29,7 @@ describe("ready-made themes", () => {
     });
     const kept = applyThemePreset(mine, "boutique", { replaceSections: false, shopName: "Glow" });
     expect(kept.settings).toMatchObject({ logoText: "GLOW", seo: { title: "Glow lamps" }, headingFont: "playfair", layout: { header: "centered", buttons: "outline" } });
-    expect(kept.menus.header).toEqual([{ label: "Lamps", href: "/collections/lamps" }]);
+    expect(kept.menus.header).toEqual([{ label: "Lamps", href: "/collections/lamps", children: [] }]);
     expect(kept.home.map((s) => s.id)).toEqual(["mine0001"]);
     const replaced = applyThemePreset(mine, "boutique", { replaceSections: true, shopName: "Glow" });
     expect(replaced.home.map((s) => s.type)).toContain("newsletter");

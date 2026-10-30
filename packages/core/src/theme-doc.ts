@@ -87,7 +87,14 @@ export const LOGOS_MAX = 12;
 /** The most messages one announcement bar takes turns showing. */
 export const ANNOUNCE_MAX = 5;
 
-const menuItem = z.object({ label: z.string().trim().min(1, "Every menu item needs a label.").max(40), href: link });
+/** The most links one dropdown in the header menu holds. */
+export const MENU_CHILDREN_MAX = 10;
+
+const menuLink = z.object({ label: z.string().trim().min(1, "Every menu item needs a label.").max(40), href: link });
+// A header menu item can open a dropdown of links, one level deep. The footer shows only the top level.
+const menuItem = menuLink.extend({
+  children: z.array(menuLink).max(MENU_CHILDREN_MAX, `A dropdown holds up to ${MENU_CHILDREN_MAX} links.`).default([]),
+});
 
 const sectionSchemas = {
   // One message, or up to ANNOUNCE_MAX taking turns every few seconds.
@@ -250,6 +257,7 @@ export function announcementMessages(s: Pick<SectionSettings["announcement"], "t
 export type Section = { [K in SectionType]: { id: string; type: K; hidden: boolean; settings: SectionSettings[K] } }[SectionType];
 export type ThemeDoc = Omit<z.infer<typeof themeDoc>, "home"> & { home: Section[] };
 export type MenuItem = z.infer<typeof menuItem>;
+export type MenuLink = z.infer<typeof menuLink>;
 
 /** Validates a theme document from the editor. Errors are safe to show to the merchant. */
 export function parseTheme(input: unknown): ThemeDoc {

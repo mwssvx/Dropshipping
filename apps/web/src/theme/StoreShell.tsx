@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { Fragment } from "react";
 import { themeFontsHref, type ThemeDoc } from "@sf/core/theme";
 import { BRAND } from "@/lib/brand";
 import { storeText, type StoreText } from "@/lib/store-text";
 import { SectionView } from "./Sections";
 import { CurrencyPicker } from "./CurrencyPicker";
 import { LanguagePicker } from "./LanguagePicker";
+import { MenuDropdown } from "./MenuDropdown";
 import { storeHref, themeLayoutAttrs, themeStyle } from "./style";
 
 /** Header, announcement bar and footer around every storefront page, styled by the theme. */
@@ -47,7 +49,14 @@ export function StoreShell({
   const data = { base, currency, t, catalog: { products: [], collections: [] } };
   // classic: menu beside the logo; centered: logo in the middle with the menu below; minimal: menu behind a button.
   const header = settings.layout.header;
-  const links = menus.header.map((m, i) => <Link key={i} href={storeHref(base, m.href)} className="hover:text-accent">{m.label}</Link>);
+  const links = menus.header.map((m, i) =>
+    m.children?.length ? (
+      <MenuDropdown key={i} label={m.label} href={m.href ? storeHref(base, m.href) : ""}
+        links={m.children.map((c) => ({ label: c.label, href: storeHref(base, c.href) }))} />
+    ) : (
+      <Link key={i} href={storeHref(base, m.href)} className="hover:text-accent">{m.label}</Link>
+    ),
+  );
   return (
     <div className="store min-h-dvh flex flex-col" lang={languages?.current} style={themeStyle(settings)} {...themeLayoutAttrs(settings)}>
       {fonts && (
@@ -71,9 +80,20 @@ export function StoreShell({
               <details className={`relative ${header === "minimal" ? "" : "md:hidden"}`}>
                 <summary className="btn btn-secondary list-none" aria-label={t.menu}>{t.menu}</summary>
                 <nav aria-label="Main" className="absolute right-0 mt-2 w-56 card p-2 flex flex-col z-20 shadow-lg">
-                  {menus.header.map((m, i) => (
-                    <Link key={i} href={storeHref(base, m.href)} className="px-3 py-2.5 rounded-md hover:bg-sunken">{m.label}</Link>
-                  ))}
+                  {menus.header.map((m, i) => {
+                    const top = m.href
+                      ? <Link href={storeHref(base, m.href)} className="px-3 py-2.5 rounded-md hover:bg-sunken">{m.label}</Link>
+                      : <span className="px-3 pt-2.5 pb-1 hint font-semibold">{m.label}</span>;
+                    if (!m.children?.length) return <Fragment key={i}>{top}</Fragment>;
+                    return (
+                      <div key={i} className="flex flex-col">
+                        {top}
+                        {m.children.map((c, k) => (
+                          <Link key={k} href={storeHref(base, c.href)} className="pl-6 pr-3 py-2 rounded-md hover:bg-sunken text-sm">{c.label}</Link>
+                        ))}
+                      </div>
+                    );
+                  })}
                 </nav>
               </details>
             )}
