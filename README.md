@@ -1333,3 +1333,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Links under a menu item** (theme editor → Menus → Header menu): "Add a dropdown link" puts up to 10 links under any header menu item, like Desk lamps, Floor lamps and Bulbs under Lamps. The item's own link, if it has one, comes first in the dropdown; leave it empty for a label that only opens the dropdown. One level deep, which keeps menus easy to use. Older menus keep working as they were.
 2. **Wide screens and phones**: on a computer the item opens a dropdown on click, which closes with Escape, a click elsewhere or once a link is followed, and passes the accessibility check from part 228. In the phone menu the links are listed under their item. Dropdown labels are translated with the rest of the menu.
+
+### Header that stays on screen (after launch, part 233)
+
+1. **One tick** (theme editor → Style → Layout): "Keep the header on screen while shoppers scroll" pins the logo, menu, search and cart to the top of the screen on every store page, so on a long collection or product page the cart is one tap away. Off by default, and it stays as set when you switch to another ready-made theme.
+2. **Nothing hides behind it**: the checkout's order summary, which also stays on screen on wide screens, sits below the header instead of under it.

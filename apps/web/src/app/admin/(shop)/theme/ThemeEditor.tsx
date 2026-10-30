@@ -378,6 +378,10 @@ function StylePanel({ doc, onChange }: { doc: ThemeDoc; onChange: (d: ThemeDoc) 
             </select>
           </div>
         ))}
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-0.5" checked={s.stickyHeader} onChange={(e) => set({ stickyHeader: e.target.checked })} />
+          <span>Keep the header on screen while shoppers scroll<span className="block hint">The menu, search and cart stay one tap away on long pages.</span></span>
+        </label>
       </fieldset>
       <fieldset className="flex flex-col gap-2">
         <legend className="font-semibold mb-1">Corners</legend>

@@ -66,7 +66,7 @@ export function StoreShell({
         </>
       )}
       {announcement && <SectionView section={announcement} data={data} first={false} />}
-      <header className="border-b border-border">
+      <header className={`border-b border-border ${settings.stickyHeader ? "sticky top-0 z-30 bg-surface" : ""}`}>
         <div className={`max-w-6xl mx-auto px-4 sm:px-6 flex items-center gap-4 ${header === "centered" ? "h-20 md:grid md:grid-cols-[1fr_auto_1fr]" : "h-16 justify-between"}`}>
           {header === "centered" && <div className="hidden md:block" aria-hidden />}
           <Link href={base || "/"} className={`text-xl font-bold tracking-tight truncate flex items-center gap-2 ${header === "centered" ? "md:text-2xl md:justify-center mr-auto md:mr-0" : ""}`}>
