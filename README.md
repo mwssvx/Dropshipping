@@ -1318,3 +1318,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **A fifth policy page** (`packages/core/src/policies.ts`): Pages → Store policies now also drafts an Accessibility statement at /pages/accessibility, which the European Accessibility Act asks EU stores to publish. It names the standard the store aims for (WCAG 2.1 AA), how the shopping pages are checked (the automatic check from part 228), what may not be accessible yet (photos without a description, videos without captions) and how to get help ordering another way.
 2. **Honest and dated**: it only claims what the platform tests, and says the day it was written. Like the other policies it's an ordinary page the merchant can edit, and an existing page at the same address is never replaced.
+
+### Readable links (after launch, part 230)
+
+1. **A third color warning** (theme editor → Style): besides text on the background and text on buttons, the editor now warns when the button color is too light or too dark to read as link text on the background (links like "View all" use it), with the ratio and what to aim for (4.5:1). Yellow buttons with dark text are fine; yellow links on a white page aren't.
+2. **Ready-made themes stay readable**: a test checks all three ratios for all seven themes, so a new theme can't ship with hard-to-read text, buttons or links.

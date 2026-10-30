@@ -342,6 +342,8 @@ function StylePanel({ doc, onChange }: { doc: ThemeDoc; onChange: (d: ThemeDoc) 
   const ids = { heading: useId(), body: useId(), logo: useId(), logoUrl: useId(), layout: useId() };
   const textContrast = contrastRatio(s.colors.text, s.colors.background);
   const buttonContrast = contrastRatio(s.colors.accentText, s.colors.accent);
+  // Links like "View all" use the button color as text on the page background.
+  const linkContrast = contrastRatio(s.colors.accent, s.colors.background);
   return (
     <div className="flex flex-col gap-5">
       <fieldset className="flex flex-col gap-3">
@@ -352,6 +354,7 @@ function StylePanel({ doc, onChange }: { doc: ThemeDoc; onChange: (d: ThemeDoc) 
         <ColorField label="Button text" value={s.colors.accentText} onChange={(v) => setColor("accentText", v)} />
         {textContrast < 4.5 && <p className="banner banner-critical">Text is hard to read on this background ({textContrast.toFixed(1)}:1). Aim for 4.5:1 or more.</p>}
         {buttonContrast < 4.5 && <p className="banner banner-critical">Button text is hard to read ({buttonContrast.toFixed(1)}:1). Aim for 4.5:1 or more.</p>}
+        {linkContrast < 4.5 && <p className="banner banner-critical">Links are hard to read on this background ({linkContrast.toFixed(1)}:1). Pick a darker or lighter button color, aiming for 4.5:1 or more.</p>}
       </fieldset>
       <fieldset className="flex flex-col gap-3">
         <legend className="font-semibold mb-1">Fonts</legend>
