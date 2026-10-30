@@ -1796,6 +1796,23 @@ export const blogPosts = pgTable(
 
 // Back-in-stock requests: a buyer leaves their email on a sold-out option and gets one email when
 // it can be bought again. Requests for things that never come back are dropped after six months.
+// Cart links: one link that fills a shopper's cart with chosen products (and a code), for a DM, an ad
+// or a post. Clicks are counted here; orders through it are those whose visit came from its source.
+export const cartLinks = pgTable(
+  "cart_links",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    token: text("token").notNull(),
+    lines: jsonb("lines").$type<{ variantId: string; quantity: number }[]>().notNull(),
+    discountCode: text("discount_code"),
+    clicks: integer("clicks").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("cart_links_token_uq").on(t.token), index("cart_links_shop_idx").on(t.shopId)],
+);
+
 export const stockAlerts = pgTable(
   "stock_alerts",
   {

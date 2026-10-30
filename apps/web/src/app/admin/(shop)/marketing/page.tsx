@@ -63,6 +63,13 @@ export default async function MarketingPage() {
           </div>
           <Link href="/admin/quiz" className="btn btn-secondary">{shop.productQuiz ? "Edit the quiz" : "Make a quiz"}</Link>
         </section>
+        <section className="card p-5 flex flex-wrap items-center gap-3" aria-labelledby="cart-links-heading">
+          <div className="flex-1 min-w-56">
+            <h2 id="cart-links-heading" className="font-semibold">Cart links</h2>
+            <p className="hint">One link that fills a shopper&apos;s cart with the products you pick, and a code, for a DM, an ad or a creator.</p>
+          </div>
+          <Link href="/admin/cart-links" className="btn btn-secondary">Open cart links</Link>
+        </section>
         <section className="card p-5 flex flex-col gap-4" aria-labelledby="codes-heading">
           <div>
             <h2 id="codes-heading" className="font-semibold">Discount codes</h2>

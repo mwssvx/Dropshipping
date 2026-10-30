@@ -1274,3 +1274,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Side by side** (`packages/core/src/compare.ts`): shoppers tap Compare on up to 4 product pages, then open `/compare` to see them in one table: price (with any sale), rating from published reviews, whether it's in stock, the options (sizes, colours) and every line of the products' details tables, lined up by label ("Material", "Weight").
 2. **Nothing to set up**: the picks are kept on the shopper's device as product ids only, the page isn't indexed by search engines, and it's in every store language. Drafts, archived products and gift cards drop out by themselves.
+
+### Cart links (after launch, part 222)
+
+1. **One link, a full cart** (`packages/core/src/cart-links.ts`): from Marketing, pick up to 10 products with quantities and, if you like, one of your codes. The link (`<store>/cart/link/…`) adds them to the shopper's cart with the code and opens the cart, for a DM, an ad or a creator's post (`cart_links`, migration 0143). Shopify has cart permalinks too, but they're typed by hand from variant ids.
+2. **Always safe to open**: anything sold out, a draft or no longer on sale when someone opens it is left out, and what's already in their cart stays.
+3. **Counted**: each link shows its clicks, and the orders and sales from visits that came through it, which also show under Sales by source as "link-" and its name.
