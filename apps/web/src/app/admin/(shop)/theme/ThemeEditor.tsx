@@ -4,16 +4,22 @@ import {
   applyThemePreset,
   contrastRatio,
   currentPreset,
+  isSocialLink,
   newSectionId,
   SECTION_LABELS,
   SECTION_TYPES,
   sectionDefaults,
+  socialHref,
+  socialLinkProblem,
+  SOCIAL_KEYS,
+  SOCIAL_NETWORKS,
   THEME_FONTS,
   THEME_PRESET_IDS,
   THEME_PRESETS,
   type ThemePresetId,
   type Section,
   type SectionType,
+  type SocialNetwork,
   type ThemeDoc,
   type ThemeFont,
 } from "@sf/core/theme";
@@ -250,6 +256,7 @@ export function ThemeEditor({
                 <p className="hint">Menus link to your collections, pages and products. Add pages under Pages first.</p>
                 <MenuEditor title="Header menu" dropdowns items={doc.menus.header} links={links} onChange={(header) => change({ ...doc, menus: { ...doc.menus, header } })} />
                 <MenuEditor title="Footer menu" items={doc.menus.footer} links={links} onChange={(footer) => change({ ...doc, menus: { ...doc.menus, footer } })} />
+                <SocialPanel doc={doc} onChange={change} />
               </>
             )}
             {tab === "seo" && <SeoPanel doc={doc} onChange={change} storeLink={storeLink} />}
@@ -472,6 +479,46 @@ function ThemesPanel({ doc, onChange, shopName }: { doc: ThemeDoc; onChange: (d:
           );
         })}
       </ul>
+    </div>
+  );
+}
+
+function SocialPanel({ doc, onChange }: { doc: ThemeDoc; onChange: (d: ThemeDoc) => void }) {
+  const social = doc.settings.social;
+  const set = (k: SocialNetwork, href: string) => onChange({ ...doc, settings: { ...doc.settings, social: { ...social, [k]: href } } });
+  return (
+    <fieldset className="flex flex-col gap-3">
+      <legend className="font-semibold mb-1">Social media</legend>
+      <p className="hint">Icons in the footer link to your pages. Paste a link or type your @name. Leave a network empty to skip it.</p>
+      {SOCIAL_KEYS.map((k) => <SocialField key={k} network={k} value={social[k]} onChange={(href) => set(k, href)} />)}
+    </fieldset>
+  );
+}
+
+function SocialField({ network, value, onChange }: { network: SocialNetwork; value: string; onChange: (href: string) => void }) {
+  const id = useId();
+  const [text, setText] = useState(value);
+  const [checked, setChecked] = useState(false);
+  // Follow the draft (undo, another theme) but keep what's typed when it already says the same.
+  useEffect(() => setText((t) => (socialHref(network, t) === value ? t : value)), [network, value]);
+  const href = socialHref(network, text);
+  const bad = !isSocialLink(network, href);
+  return (
+    <div className="field">
+      <label className="label" htmlFor={id}>{SOCIAL_NETWORKS[network].label}</label>
+      <input id={id} className="input" value={text} maxLength={300} placeholder={SOCIAL_NETWORKS[network].profile("yourstore")}
+        aria-invalid={checked && bad} aria-describedby={checked && bad ? `${id}-error` : undefined}
+        onChange={(e) => {
+          setText(e.target.value);
+          const next = socialHref(network, e.target.value);
+          // Only good links reach the draft, so a half-typed one doesn't stop it saving.
+          if (isSocialLink(network, next) && next !== value) onChange(next);
+        }}
+        onBlur={() => {
+          setChecked(true);
+          if (!bad) setText(href);
+        }} />
+      {checked && bad && <span id={`${id}-error`} className="text-sm text-critical">{socialLinkProblem(network)}</span>}
     </div>
   );
 }

@@ -1,4 +1,6 @@
+import { headers } from "next/headers";
 import { storefrontCatalog } from "@sf/core";
+import { socialLinks } from "@sf/core/theme";
 import { db } from "@/lib/server";
 import { buyerFx } from "@/lib/currency";
 import { HomeSections } from "@/theme/Sections";
@@ -13,9 +15,23 @@ export default async function StoreHome({ params, searchParams }: { params: Prom
   const raw = await storefrontCatalog(await db(), shop.id);
   // The cookie is only read when a section shows it.
   const recentIds = theme.home.some((s) => s.type === "recently_viewed" && !s.hidden) ? await readRecent(shop.id) : undefined;
+  // Tells search engines which social pages are the store's own.
+  const asked = await headers();
+  const sameAs = socialLinks(theme.settings.social).map((l) => l.href);
+  const orgLd = sameAs.length
+    ? JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        name: shop.name,
+        url: `${asked.get("x-forwarded-proto") ?? "https"}://${asked.get("host")}${base}`,
+        ...(theme.settings.logoUrl ? { logo: theme.settings.logoUrl } : {}),
+        sameAs,
+      }).replace(/</g, "\\u003c")
+    : null;
   const catalog = { products: await localProducts(param, raw.products), collections: await localCollections(param, raw.collections), reviews: raw.reviews };
   return (
     <main>
+      {orgLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: orgLd }} />}
       <h1 className="sr-only">{theme.settings.seo.title || shop.name}</h1>
       <HomeSections sections={theme.home} data={{
         base,
