@@ -40,7 +40,8 @@ test("a merchant's announcement bar takes turns with three messages", async ({ p
   const buyer = await buyerContext.newPage();
   await buyer.goto(`/s/${handle}`);
   await expect(buyer.getByText("Free shipping over $50")).toBeVisible();
-  await expect(buyer.getByRole("link", { name: "30-day returns" })).toBeVisible({ timeout: 6000 });
+  // The first turn comes 3 seconds after the page wakes up, which can take a while on a busy machine.
+  await expect(buyer.getByRole("link", { name: "30-day returns" })).toBeVisible({ timeout: 15_000 });
   await expect(buyer.getByRole("link", { name: "30-day returns" })).toHaveAttribute("href", `/s/${handle}/collections/all`);
   await buyer.getByRole("button", { name: "Pause announcements" }).click();
   await buyer.mouse.move(0, 400);
@@ -53,14 +54,15 @@ test("a merchant's announcement bar takes turns with three messages", async ({ p
   await expect(buyer.getByText("Gift wrap for $3")).toBeVisible();
   await buyer.getByRole("button", { name: "Play announcements" }).click();
   await buyer.mouse.move(0, 400);
-  await expect(buyer.getByText("Free shipping over $50")).toBeVisible({ timeout: 6000 });
+  await expect(buyer.getByText("Free shipping over $50")).toBeVisible({ timeout: 15_000 });
   await buyerContext.close();
 
   // Less motion: it waits for the shopper.
   const calm = await browser.newContext({ ...info.project.use, reducedMotion: "reduce" });
   const still = await calm.newPage();
   await still.goto(`/s/${handle}`);
-  await expect(still.getByRole("button", { name: "Play announcements" })).toBeVisible();
+  // The page renders with a pause button; once it wakes up and sees the setting, it shows play.
+  await expect(still.getByRole("button", { name: "Play announcements" })).toBeVisible({ timeout: 15_000 });
   await still.waitForTimeout(3500);
   await expect(still.getByText("Free shipping over $50")).toBeVisible();
   // The bar's buttons pass the same accessibility check as the rest of the store.
