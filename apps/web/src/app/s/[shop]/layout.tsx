@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { AddedToCart } from "@/theme/AddedToCart";
 import { readCart } from "@/lib/cart";
 import { Track } from "@/components/Track";
 import { StoreShell } from "@/theme/StoreShell";
@@ -74,6 +76,11 @@ export default async function StoreLayout({ children, params }: { children: Reac
     <StoreShell doc={theme} shopName={shop.name} currency={shop.currency} base={base} cartCount={count} closed={shop.status !== "active"} notice={notice} verified={!!shop.verifiedAt && shop.status === "active"} picker={picker} t={t} languages={langs.length ? { root, current: lang ?? "en", options: [{ code: "en", name: "English" }, ...langs.map((l) => ({ code: l, name: LANGUAGES[l].name }))] } : undefined}>
       <Track shopId={shop.id} kind="page_view" />
       {children}
+      {shop.stayAfterAdd && (
+        <Suspense>
+          <AddedToCart base={base} text={{ added: t.addedToCart, viewCart: t.viewCart, checkOut: t.checkOut, close: t.close }} />
+        </Suspense>
+      )}
       {popup && (
         <SignupPopup
           shopId={shop.id}

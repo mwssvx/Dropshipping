@@ -1009,6 +1009,13 @@
       "when": 1793390900399,
       "tag": "0144_theme_schedule",
       "breakpoints": true
+    },
+    {
+      "idx": 144,
+      "version": "7",
+      "when": 1793396513285,
+      "tag": "0145_stay_after_add",
+      "breakpoints": true
     }
   ]
 }
