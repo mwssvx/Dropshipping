@@ -10,6 +10,7 @@ import { buyerAmounts } from "./currency";
 import { SupplierError, type ProblemCode, type Suppliers } from "./suppliers";
 import { sendPurchaseOrder, supplierLabel } from "./own-suppliers";
 import { issueGiftCardsForOrder } from "./gift-cards";
+import { giftReturnCode } from "./gift-returns";
 import { DOWNLOADS_PER_ITEM, nothingToShip, orderDownloads } from "./digital";
 import { earnPoints } from "./rewards";
 import { applyTagRulesForOrder } from "./tag-rules";
@@ -491,6 +492,8 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
     const shipped = await ctx.db.query.fulfillments.findMany({
       where: and(eq(schema.fulfillments.orderId, order.id), isNotNull(schema.fulfillments.trackingNumber)),
     });
+    const returnCode = shop.returnWindowDays ? await giftReturnCode(ctx.db, order) : null;
+    const returnsAt = ctx.storeAddress ? await ctx.storeAddress(shop) : new URL(link).origin;
     return {
       to: gift.recipientEmail!,
       subject: `${gift.from} sent you a gift from ${shop.name}`,
@@ -500,6 +503,7 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
         `${gift.from} sent you a gift from ${shop.name}, and it's on its way.`,
         ...(gift.message ? [``, `Their message:`, gift.message] : []),
         ...(shipped.length ? [``, `Track it:`, ...shipped.map((f) => `  ${f.carrier}: ${f.trackingNumber}${f.trackingUrl ? `  ${f.trackingUrl}` : ""}`)] : []),
+        ...(returnCode ? [``, `Not quite right? You can return it for store credit at ${returnsAt}/gift-return with the code ${returnCode}. ${gift.from} won't be told.`] : []),
         ``,
         `${gift.from} asked us to let you know. We won't email you about anything else.`,
       ].join("\n"),

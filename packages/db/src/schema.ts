@@ -517,7 +517,11 @@ export type PersonalizationField = { id: string; label: string; required: boolea
 export type PersonalizationValue = { fieldId: string; label: string; value: string };
 
 /** A gift order: who it's from, their message, and who to tell when it ships. */
-export type OrderGift = { from: string; message: string | null; recipientEmail: string | null };
+/** `returnCode` is printed on the packing slip and in the recipient's email, so they can return the gift for store credit. */
+export type OrderGift = { from: string; message: string | null; recipientEmail: string | null; returnCode?: string };
+
+/** Who sent a gift back: the recipient, who gets the store credit and the emails instead of the buyer. */
+export type GiftReturn = { name: string; email: string };
 
 /** Gift cards bought for someone else: emailed to them, with a message, now or on a day the buyer picked ("2026-12-24"). */
 export type GiftCardDelivery = { email: string; name: string | null; from: string; message: string | null; sendOn: string | null };
@@ -1739,6 +1743,8 @@ export const returnRequests = pgTable(
     giftCardId: uuid("gift_card_id").references(() => giftCards.id, { onDelete: "set null" }),
     // The free order sent instead, when the merchant chose to replace or exchange the items.
     replacementOrderId: uuid("replacement_order_id").references((): AnyPgColumn => orders.id, { onDelete: "set null" }),
+    // Set when the gift's recipient asked, with the code on the packing slip. The buyer isn't told.
+    giftReturn: jsonb("gift_return").$type<GiftReturn>(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),

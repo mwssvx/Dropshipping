@@ -1239,3 +1239,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **What's next on the calendar** (`upcomingSaleDates` in `packages/core/src/sale-calendar.ts`, top of the Sales page): the next four shopping dates for the store's country in the coming four months, like Halloween, Singles' Day, Black Friday through Cyber Monday, Boxing Day (UK, Ireland, Canada, Australia, New Zealand) or the after-Christmas sale elsewhere, Valentine's Day, and Mother's and Father's Day on each country's own date (Mothering Sunday in the UK is three weeks before Easter).
 2. **Plan a sale**: fills in the sale form with the name and the days, so only the discount and what's on sale are left. A date with a sale already covering it says "Planned". The holiday checklist's Black Friday line opens it filled in.
+
+### Gift returns (after launch, part 216)
+
+1. **A code with every gift** (`packages/core/src/gift-returns.ts`): gift orders get a return code at checkout (older ones when their slip is printed). It's on the packing slip under the gift message and in the recipient's "it's on its way" email, when the store takes returns.
+2. **Returned without asking the buyer** (store page `/gift-return`): the recipient enters the code, sees what's in the parcel (never what it cost), picks what goes back and why, and gives their name and email (`return_requests.gift_return`, migration 0138).
+3. **Store credit for the recipient, nothing for the buyer to notice**: on the Returns page a gift return can only get store credit, be approved or be declined, since a refund would show on the buyer's card. The emails and the gift card go to the recipient, and the buyer's order page doesn't show the return.

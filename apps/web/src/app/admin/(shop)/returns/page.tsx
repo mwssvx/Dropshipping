@@ -77,7 +77,7 @@ export default async function ReturnsPage({ searchParams }: { searchParams: Prom
                         <Link href={`/admin/orders/${r.orderId}`} className="underline">Order #{r.orderNumber}</Link>
                         <span className={`ml-2 pill ${STATUS[r.status][1]}`}>{STATUS[r.status][0]}</span>
                       </span>
-                      <span className="text-sm hint">{r.email} · {date.format(r.createdAt)}</span>
+                      <span className="text-sm hint">{r.giftReturn ? `${r.giftReturn.name} (${r.giftReturn.email}), who got it as a gift` : r.email} · {date.format(r.createdAt)}</span>
                     </div>
                     <div className="text-sm flex flex-col gap-1">
                       <p><span className="hint">Items:</span> {r.items.map((i) => `${i.title} × ${i.quantity}`).join(", ")}</p>
@@ -86,10 +86,11 @@ export default async function ReturnsPage({ searchParams }: { searchParams: Prom
                       )}
                       <p><span className="hint">Why:</span> {RETURN_REASON_LABELS[r.reason]}</p>
                       {r.note && <p className="border-l-2 border-border pl-3 whitespace-pre-line">{r.note}</p>}
-                      <p className="hint num">They paid {formatMoney(r.suggestedMinor, r.currency)} for these items.</p>
+                      <p className="hint num">{r.giftReturn ? "The buyer" : "They"} paid {formatMoney(r.suggestedMinor, r.currency)} for these items.</p>
+                      {r.giftReturn && <p className="hint">A gift return: give {r.giftReturn.name} store credit, and the buyer isn&apos;t refunded or told.</p>}
                       {r.status === "approved" && r.merchantMessage && <p className="hint">You told them: {r.merchantMessage}</p>}
                     </div>
-                    <DecideForm id={r.id} approved={r.status === "approved"} exchange={r.items.some((i) => i.exchangeVariantId)} amount={decimal(Math.min(r.suggestedMinor, left))} max={formatMoney(left, r.currency)} />
+                    <DecideForm id={r.id} approved={r.status === "approved"} gift={!!r.giftReturn} exchange={r.items.some((i) => i.exchangeVariantId)} amount={decimal(Math.min(r.suggestedMinor, left))} max={formatMoney(left, r.currency)} />
                   </li>
                 );
               })}

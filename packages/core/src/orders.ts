@@ -21,6 +21,7 @@ import { checkAddress } from "./address-check";
 import { breakFor, describeBreak, percentOff, wholesaleTermsFor } from "./wholesale";
 import { findGiftCard, GIFT_CARD_SEND_DAYS } from "./gift-cards";
 import { bundleSavings, bundlesInCart } from "./bundles";
+import { withReturnCode } from "./gift-returns";
 import { salePrice, salesFor } from "./sales";
 import { addonsByProduct, type CheckoutAddon } from "./addons";
 import { FREE_GIFT_NOTE, freeGiftFor } from "./free-gift";
@@ -644,7 +645,8 @@ export async function startCheckout(
         pickup: cart.pickingUp,
         localDelivery: cart.deliveringLocally,
         // Only something that ships can be a gift; gift cards are emailed to the buyer.
-        gift: gift && cart.needsShipping ? gift : null,
+        // With a code the recipient can return it with, without asking the buyer.
+        gift: gift && cart.needsShipping ? withReturnCode(gift) : null,
         giftCardDelivery: parsed.data.giftCardTo && cart.items.some((i) => i.giftCard) ? parsed.data.giftCardTo : null,
         buyerNote: parsed.data.note,
         taxExemptId,

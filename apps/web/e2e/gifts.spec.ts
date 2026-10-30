@@ -74,4 +74,34 @@ test("a buyer sends a gift and the recipient hears when it ships", async ({ page
   await expect(mail).not.toContainText("$");
   await buyer.goto(statusUrl);
   await expect(buyer.getByRole("heading", { name: "Tracking" })).toBeVisible();
+
+  // Grace returns it with the code on the slip, for store credit, and Ada isn't told.
+  const code = mail.getByText(/Not quite right\?/);
+  await expect(code).toContainText("/gift-return with the code");
+  await page.getByRole("link", { name: "Packing slip", exact: true }).click();
+  const onSlip = (await page.getByLabel("Gift return").innerText()).match(/[A-Z2-9]{5}-[A-Z2-9]{5}/)![0];
+  await expect(mail).toContainText(onSlip);
+  const grace = await (await browser.newContext({ ...info.project.use })).newPage();
+  await grace.goto(`${lamp.split("/products/")[0]}/gift-return`);
+  await grace.getByLabel("Gift return code").fill(onSlip.toLowerCase());
+  await grace.getByRole("button", { name: "Find the gift" }).click();
+  await expect(grace.getByText("A gift from Ada Lovelace")).toBeVisible();
+  await expect(grace.getByRole("main")).not.toContainText("$");
+  await grace.getByLabel("Why?").selectOption({ label: "I changed my mind" });
+  await grace.getByLabel("Your name").fill("Grace Hopper");
+  await grace.getByLabel("Your email").fill(recipient);
+  await grace.getByRole("button", { name: "Ask to return it" }).click();
+  await expect(grace.getByRole("status")).toContainText("You asked to return");
+  await shot(grace, "217-gift-return");
+  await buyer.reload();
+  await expect(buyer.locator("#returns")).not.toContainText("asked for a return");
+
+  await page.goto("/admin/returns");
+  const request = page.getByRole("listitem", { name: "Return for order #1001" });
+  await expect(request).toContainText(`Grace Hopper (${recipient}), who got it as a gift`);
+  await expect(request.getByRole("button", { name: "Refund" })).toHaveCount(0);
+  await request.getByRole("button", { name: "Give store credit" }).click();
+  await expect(page.getByText("No returns to answer.")).toBeVisible();
+  await grace.reload();
+  await expect(grace.getByRole("status")).toContainText("sent your store credit by email");
 });

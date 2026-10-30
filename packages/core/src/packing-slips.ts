@@ -6,6 +6,7 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { schema, type Address, type Db } from "@sf/db";
 import { NotFoundError, UserError } from "./errors";
+import { giftReturnCode } from "./gift-returns";
 import { describePersonalization } from "./personalization";
 import { ordersWaitingForTracking } from "./tracking-import";
 import { groupBy } from "./group";
@@ -21,7 +22,8 @@ export type PackingSlip = {
   placedAt: Date;
   shipTo: Address;
   items: { title: string; sku: string | null; quantity: number; personalization: string | null; preorder: boolean }[];
-  gift: { from: string; message: string | null } | null;
+  /** `returnCode`: the recipient can return the gift for store credit with it (when the store takes returns). */
+  gift: { from: string; message: string | null; returnCode: string | null } | null;
   /** The buyer paid to have it gift wrapped. */
   giftWrap: boolean;
   buyerNote: string | null;
@@ -54,6 +56,8 @@ export async function packingSlips(db: Db, shopId: string, scope: { orderId: str
     (variantIds.length ? await db.query.variants.findMany({ where: inArray(schema.variants.id, variantIds), columns: { id: true, sku: true } }) : []).map((v) => [v.id, v.sku]),
   );
   const linesOf = groupBy(lines, (l) => l.orderId);
+  const codes = new Map<string, string | null>();
+  if (shop.returnWindowDays) for (const o of orders) if (o.gift) codes.set(o.id, await giftReturnCode(db, o));
   const slips: PackingSlip[] = orders.map((o) => ({
     orderId: o.id,
     number: o.number,
@@ -67,7 +71,7 @@ export async function packingSlips(db: Db, shopId: string, scope: { orderId: str
         personalization: describePersonalization(l.personalization),
         preorder: l.preorder,
       })),
-    gift: o.gift ? { from: o.gift.from, message: o.gift.message } : null,
+    gift: o.gift ? { from: o.gift.from, message: o.gift.message, returnCode: codes.get(o.id) ?? null } : null,
     giftWrap: o.giftWrapMinor > 0,
     buyerNote: o.buyerNote,
   }));

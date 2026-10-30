@@ -206,7 +206,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
           )}
           {returns[0] && (returns[0].status === "requested" || returns[0].status === "approved") && (
             <p className="banner banner-warning" role="status">
-              {returns[0].status === "requested" ? "The buyer asked to return items from this order." : "You approved a return on this order and haven't refunded it yet."}{" "}
+              {returns[0].status === "requested" ? (returns[0].giftReturn ? `${returns[0].giftReturn.name}, who got it as a gift, asked to return items from this order.` : "The buyer asked to return items from this order.") : "You approved a return on this order and haven't refunded it yet."}{" "}
               <Link href="/admin/returns" className="underline">Answer it in Returns</Link>
             </p>
           )}
