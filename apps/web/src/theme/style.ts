@@ -25,6 +25,7 @@ export function themeLayoutAttrs(settings: ThemeDoc["settings"]) {
   return {
     "data-header": l.header, "data-image": l.productImage, "data-cols": String(l.columns), "data-cards": l.cards, "data-buttons": l.buttons,
     "data-sticky": settings.stickyHeader ? "on" : "off",
+    "data-hover-photo": settings.hoverPhoto ? "on" : "off",
   };
 }
 

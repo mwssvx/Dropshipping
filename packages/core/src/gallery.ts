@@ -31,6 +31,13 @@ export function productPhotos(p: { images: string[]; imageUrl: string | null }) 
   return p.images.length ? p.images : p.imageUrl ? [p.imageUrl] : [];
 }
 
+/** The photo a product card switches to when a shopper points at it: the next one after the main photo. */
+export function secondPhoto(p: { images: string[]; imageUrl: string | null }) {
+  const photos = productPhotos(p);
+  const main = p.imageUrl ?? photos[0];
+  return photos.find((u) => u !== main) ?? null;
+}
+
 export const PHOTO_TEXT_MAX = 125;
 
 /** What a photo shows: the merchant's description, else the product's name and the photo's place. */

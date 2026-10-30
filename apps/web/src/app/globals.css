@@ -97,6 +97,14 @@
 }
 /* With a sticky header, other sticky parts (the checkout summary) sit below it. */
 .store[data-sticky="on"] { --sticky-offset: 4rem; }
+/* A product card's second photo stays out of the page (and unloaded) unless the theme asks for it,
+   then fades in while a shopper points at the card. */
+.sf-hover-photo { display: none; }
+@media (hover: hover) {
+  .store[data-hover-photo="on"] .sf-hover-photo { display: block; opacity: 0; transition: opacity 0.3s; }
+  .store[data-hover-photo="on"] .sf-card:hover .sf-hover-photo { opacity: 1; }
+}
+@media (hover: hover) and (prefers-reduced-motion: reduce) { .store[data-hover-photo="on"] .sf-hover-photo { transition: none; } }
 @media (min-width: 48rem) { .store[data-sticky="on"][data-header="centered"] { --sticky-offset: 8.5rem; } }
 .store h1, .store h2, .store h3 { font-family: var(--store-heading-font); }
 .store .btn { border-radius: var(--radius-md); }
