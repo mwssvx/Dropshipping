@@ -3,7 +3,7 @@ import { startTransition, useActionState, useState } from "react";
 import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import type { FormState } from "../../actions";
-import { bulkGiftCardsAction, issueGiftCardAction, resendGiftCardAction, sellGiftCardsAction, setGiftCardDisabledAction, type BulkGiftCardState } from "../../gift-card-actions";
+import { bulkGiftCardsAction, giftCardBonusAction, issueGiftCardAction, resendGiftCardAction, sellGiftCardsAction, setGiftCardDisabledAction, type BulkGiftCardState } from "../../gift-card-actions";
 
 export function SellForm({ currencySymbol }: { currencySymbol: string }) {
   const [state, action] = useActionState(sellGiftCardsAction, {} as FormState);
@@ -16,6 +16,63 @@ export function SellForm({ currencySymbol }: { currencySymbol: string }) {
         <span className="hint">Separate them with commas. You can change them later on the product.</span>
       </div>
       <SubmitButton className="btn btn-primary self-start">Start selling gift cards</SubmitButton>
+    </form>
+  );
+}
+
+type Bonus = { every: string; bonus: string; from: string; to: string; usableFrom: string; usableUntil: string };
+
+/** The gift card bonus offer. Submitted by hand so what was typed stays when it's refused. */
+export function BonusForm({ value, on, currencySymbol }: { value: Bonus | null; on: boolean; currencySymbol: string }) {
+  const [state, action] = useActionState(giftCardBonusAction, {} as FormState);
+  return (
+    <form
+      className="flex flex-col gap-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const data = new FormData(e.currentTarget);
+        data.set("step", ((e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null)?.value ?? "save");
+        startTransition(() => action(data));
+      }}
+    >
+      <FormError message={state.error} />
+      {state.saved && <p className="banner banner-success" role="status">Saved.</p>}
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div className="field">
+          <label className="label" htmlFor="bonus-amount">Bonus card ({currencySymbol})</label>
+          <input className="input num" id="bonus-amount" name="bonus" inputMode="decimal" placeholder="10" defaultValue={value?.bonus} required />
+        </div>
+        <div className="field">
+          <label className="label" htmlFor="bonus-every">For every ({currencySymbol} in gift cards)</label>
+          <input className="input num" id="bonus-every" name="every" inputMode="decimal" placeholder="50" defaultValue={value?.every} required />
+        </div>
+        <div className="field">
+          <label className="label" htmlFor="bonus-from">Bought from</label>
+          <input className="input" id="bonus-from" name="from" type="date" defaultValue={value?.from} required />
+        </div>
+        <div className="field">
+          <label className="label" htmlFor="bonus-to">Bought until</label>
+          <input className="input" id="bonus-to" name="to" type="date" defaultValue={value?.to} required />
+        </div>
+        <div className="field">
+          <label className="label" htmlFor="bonus-usable-from">Bonus usable from (optional)</label>
+          <input className="input" id="bonus-usable-from" name="usableFrom" type="date" defaultValue={value?.usableFrom} />
+          <span className="hint">Like January 1, so it brings buyers back after the holidays.</span>
+        </div>
+        <div className="field">
+          <label className="label" htmlFor="bonus-usable-until">Bonus expires after (optional)</label>
+          <input className="input" id="bonus-usable-until" name="usableUntil" type="date" defaultValue={value?.usableUntil} />
+          <span className="hint">Bought gift cards never expire; a bonus card can, since nobody paid for it.</span>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-3 items-center">
+        <button className="btn btn-secondary" value="save">{on ? "Save the bonus" : "Start the bonus"}</button>
+        {on && (
+          <button className="hint hover:text-critical text-sm" value="off" formNoValidate>
+            End the bonus
+          </button>
+        )}
+      </div>
     </form>
   );
 }

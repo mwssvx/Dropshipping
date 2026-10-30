@@ -8,6 +8,7 @@ import { schema, type Db } from "@sf/db";
 import { z } from "zod";
 import type { Mailer } from "./email";
 import { NotFoundError, UserError } from "./errors";
+import { giftCardBonusFor } from "./gift-card-bonus";
 import { formatMoney, parseMoney } from "./money";
 
 type Shop = typeof schema.shops.$inferSelect;
@@ -34,8 +35,10 @@ export function normalizeGiftCardCode(input: string) {
 
 const hash = (normalized: string) => createHash("sha256").update(normalized).digest("hex");
 
+const dayWords = (d: Date) => d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+
 /** A usable card for this code, or a message for the buyer. */
-export async function findGiftCard(db: Db, shop: Shop, code: string) {
+export async function findGiftCard(db: Db, shop: Shop, code: string, now = new Date()) {
   const normalized = normalizeGiftCardCode(code);
   const card = normalized
     ? await db.query.giftCards.findFirst({ where: and(eq(schema.giftCards.shopId, shop.id), eq(schema.giftCards.codeHash, hash(normalized))) })
@@ -43,6 +46,8 @@ export async function findGiftCard(db: Db, shop: Shop, code: string) {
   if (!card || card.currency !== shop.currency) throw new UserError("That gift card code isn't right. Check it against your email.", "gift_card_invalid");
   if (card.disabledAt) throw new UserError("That gift card has been turned off. Contact the store if you think that's a mistake.", "gift_card_invalid");
   if (card.balanceMinor <= 0) throw new UserError("That gift card has been used up.", "gift_card_invalid");
+  if (card.usableFrom && card.usableFrom > now) throw new UserError(`That bonus card can be used from ${dayWords(card.usableFrom)}.`, "gift_card_invalid");
+  if (card.expiresAt && card.expiresAt <= now) throw new UserError(`That bonus card expired on ${dayWords(new Date(card.expiresAt.getTime() - 1))}.`, "gift_card_invalid");
   return card;
 }
 
@@ -63,16 +68,24 @@ async function insertCard(db: Db, values: Omit<typeof schema.giftCards.$inferIns
   return card ? { card, code } : null;
 }
 
+/** When a card can be spent, for its email. */
+function cardDates(card: Pick<GiftCard, "usableFrom" | "expiresAt">) {
+  const until = card.expiresAt ? dayWords(new Date(card.expiresAt.getTime() - 1)) : null;
+  if (card.usableFrom) return `You can use it from ${dayWords(card.usableFrom)}${until ? ` until ${until}` : ""}, and whatever you don't spend stays on the card.`;
+  if (until) return `You can use it until ${until}, and whatever you don't spend stays on the card.`;
+  return "It never expires, and whatever you don't spend stays on the card.";
+}
+
 async function sendCode(ctx: GiftCardContext, shop: Shop, card: GiftCard, code: string, intro: string, gift?: { name: string | null; from: string }) {
   const store = await ctx.storeAddress(shop);
   try {
     await ctx.mailer.send({
       to: card.email,
-      subject: gift ? `${gift.from} sent you a ${formatMoney(card.balanceMinor, card.currency)} gift card for ${shop.name}` : `Your ${formatMoney(card.balanceMinor, card.currency)} gift card for ${shop.name}`,
+      subject: gift ? `${gift.from} sent you a ${formatMoney(card.balanceMinor, card.currency)} gift card for ${shop.name}` : `Your ${formatMoney(card.balanceMinor, card.currency)} ${card.bonus ? "bonus card" : "gift card"} for ${shop.name}`,
       text:
         `Hi${gift?.name ? ` ${gift.name}` : ""},\n\n${intro}\n\nGift card code: ${code}\nBalance: ${formatMoney(card.balanceMinor, card.currency)}\n` +
         (card.note ? (gift ? `\nMessage from ${gift.from}: ${card.note}\n` : `\nNote: ${card.note}\n`) : "") +
-        `\nShop at ${store} and enter the code in your cart. It never expires, and whatever you don't spend stays on the card.\n` +
+        `\nShop at ${store} and enter the code in your cart. ${cardDates(card)}\n` +
         `\nCheck what's left on it: ${store}/gift-cards\n`,
     });
     await ctx.db.update(schema.giftCards).set({ sentAt: new Date() }).where(eq(schema.giftCards.id, card.id));
@@ -147,6 +160,7 @@ export async function issueGiftCardsForOrder(ctx: GiftCardContext, orderId: stri
       else await sendCode(ctx, shop, made.card, made.code, `Thanks for your order #${order.number}. Here's the gift card you bought. Forward this email to give it to someone.`);
     }
   }
+  const bonus = await issueBonusCard(ctx, shop, order, lines.filter((l) => l.giftCard).reduce((sum, { line }) => sum + line.unitPriceMinor * line.quantity, 0));
   // The buyer hears where their gift cards went, and when.
   if (to && issued) {
     const when = scheduledFor ? `will be emailed to ${to.email} on ${sendDay(to.sendOn!)}` : `went to ${to.email}`;
@@ -160,7 +174,31 @@ export async function issueGiftCardsForOrder(ctx: GiftCardContext, orderId: stri
       })
       .catch(() => undefined);
   }
-  return { issued, onlyGiftCards: lines.length > 0 && lines.every((l) => l.giftCard) };
+  return { issued, bonusMinor: bonus?.initialMinor ?? 0, onlyGiftCards: lines.length > 0 && lines.every((l) => l.giftCard) };
+}
+
+/** Where a bonus card sits among an order's cards, so it's only ever made once. */
+const BONUS_INDEX = -1;
+
+/** The store's bonus card for the gift cards on a paid order, emailed to the buyer. Null when the offer doesn't apply or it was already made. */
+async function issueBonusCard(ctx: GiftCardContext, shop: Shop, order: typeof schema.orders.$inferSelect, giftCardsMinor: number) {
+  const bonus = giftCardBonusFor(shop, giftCardsMinor, order.paidAt ?? order.createdAt);
+  if (!bonus) return null;
+  const made = await insertCard(ctx.db, {
+    shopId: shop.id,
+    currency: order.currency,
+    initialMinor: bonus.amountMinor,
+    balanceMinor: bonus.amountMinor,
+    email: order.email,
+    sourceOrderId: order.id,
+    sourceIndex: BONUS_INDEX,
+    bonus: true,
+    usableFrom: bonus.usableFrom,
+    expiresAt: bonus.expiresAt,
+  });
+  if (!made) return null;
+  await sendCode(ctx, shop, made.card, made.code, `Thanks for buying gift cards on order #${order.number}. Here's a bonus card for you to keep.`);
+  return made.card;
 }
 
 const giftIntro = (shop: Shop, from: string) => `${from} sent you a gift card for ${shop.name}.`;

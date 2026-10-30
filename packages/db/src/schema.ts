@@ -190,6 +190,8 @@ export const shops = pgTable(
     returnInstructions: text("return_instructions"),
     // Longer returns for orders paid in a holiday stretch ("Nov 1 to Dec 24, returnable until Jan 31"), or null.
     holidayReturns: jsonb("holiday_returns").$type<HolidayReturns | null>(),
+    // "A $10 bonus card for every $50 in gift cards" while the dates last, or null.
+    giftCardBonus: jsonb("gift_card_bonus").$type<GiftCardBonus | null>(),
     // How supplier cost becomes a retail price, for imports and "reprice everything".
     pricingRule: jsonb("pricing_rule").$type<PricingRule>(),
     // Supplier price watch: warn when a cost rise leaves less than this margin, and optionally
@@ -1657,6 +1659,10 @@ export const giftCards = pgTable(
     sentAt: timestamp("sent_at", { withTimezone: true }),
     // A card the buyer asked to arrive later: the daily job emails it (with a fresh code) from then.
     scheduledFor: timestamp("scheduled_for", { withTimezone: true }),
+    // A bonus card given with gift cards bought: it can have its own dates to be spent between.
+    bonus: boolean("bonus").notNull().default(false),
+    usableFrom: timestamp("usable_from", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
     disabledAt: timestamp("disabled_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
@@ -1713,6 +1719,11 @@ export const shippingRates = pgTable(
 export const RETURN_REASONS = ["never_arrived", "damaged", "wrong_item", "not_as_described", "too_small_or_big", "changed_mind", "other"] as const;
 /** Holiday returns: orders paid from `from` to `to` (YYYY-MM-DD, inclusive) can be returned until `until`. */
 export type HolidayReturns = { from: string; to: string; until: string };
+/**
+ * A bonus card for buying gift cards: `bonusMinor` for every `everyMinor` of gift cards on an order
+ * paid from `from` to `to` (YYYY-MM-DD), spendable between `usableFrom` and `usableUntil` when set.
+ */
+export type GiftCardBonus = { everyMinor: number; bonusMinor: number; from: string; to: string; usableFrom: string | null; usableUntil: string | null };
 /** "Running late" emails: after `days` without shipping, with the merchant's own words added when set. */
 export type LateOrderNotice = { days: number; message: string | null };
 
