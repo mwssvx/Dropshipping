@@ -2,8 +2,9 @@ import "server-only";
 import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { notFound, permanentRedirect, redirect } from "next/navigation";
-import { findRedirect, getShopByHandle, publishDueProducts, hasStoreAccess, storeAccessCookie, getShopByHostname, localizeCollections, localizedTheme, localizeProducts, NotFoundError, shopLanguages, withSales, type Language } from "@sf/core";
-import { db } from "@/lib/server";
+import { after } from "next/server";
+import { findRedirect, getShopByHandle, publishDueProducts, hasStoreAccess, storeAccessCookie, getShopByHostname, localizeCollections, localizedTheme, localizeProducts, NotFoundError, sendStockAlerts, shopLanguages, withSales, type Language } from "@sf/core";
+import { db, stock } from "@/lib/server";
 import { STORE_HOST_HEADER, STORE_LANG_HEADER, STORE_PATH_HEADER } from "@/lib/brand";
 import { storeText } from "@/lib/store-text";
 
@@ -35,8 +36,9 @@ const OPEN_PATHS = /^\/(?:password|robots\.txt)$|^\/(?:orders|unsubscribe|subscr
  */
 export const loadShop = cache(async (param: string) => {
   const shop = await findShop(param);
-  // Drafts scheduled to go on sale by now do so before the first page that would show them.
-  await publishDueProducts(await db(), shop.id);
+  // Drafts scheduled to go on sale by now do so before the first page that would show them, and
+  // shoppers waiting on a coming-soon page hear it's out once the page has been sent.
+  if ((await publishDueProducts(await db(), shop.id)).length) after(async () => void (await sendStockAlerts(await stock(), { shopId: shop.id })));
   if (shop.closure) {
     const h = await headers();
     const path = h.get(STORE_PATH_HEADER) ?? "/";

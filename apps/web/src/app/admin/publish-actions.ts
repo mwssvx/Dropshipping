@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { schedulePublish, UserError } from "@sf/core";
+import { schedulePublish, setComingSoon, UserError } from "@sf/core";
 import { logged, requireShop } from "@/lib/server";
 
 export type PublishLaterState = { error?: string; saved?: "scheduled" | "cleared" };
@@ -20,4 +20,12 @@ export async function publishLaterAction(productId: string, title: string, _: Pu
   revalidatePath(`/admin/products/${productId}`);
   revalidatePath("/admin/products");
   return { saved: value ? "scheduled" : "cleared" };
+}
+
+/** Turns the product's coming-soon page on or off while it waits to go on sale. */
+export async function comingSoonAction(productId: string, title: string, on: boolean) {
+  const { shop, db, user } = await requireShop("products");
+  await setComingSoon(db, shop.id, productId, on);
+  await logged({ shop, user, db }, on ? `Turned on the coming-soon page of “${title}”` : `Turned off the coming-soon page of “${title}”`, { href: `/admin/products/${productId}` });
+  revalidatePath(`/admin/products/${productId}`);
 }

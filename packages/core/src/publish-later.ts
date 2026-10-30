@@ -21,7 +21,8 @@ export async function schedulePublish(db: Db, shopId: string, productId: string,
     if (at.getTime() <= now.getTime() + 60_000) throw new UserError("Pick a time in the future, or put it on sale now.");
     if (at.getTime() > now.getTime() + PUBLISH_LATER_MAX_DAYS * DAY) throw new UserError(`Pick a time within ${PUBLISH_LATER_MAX_DAYS} days.`);
   }
-  await db.update(schema.products).set({ publishAt: at, updatedAt: now }).where(eq(schema.products.id, productId));
+  // Cancelling the time also takes down the coming-soon page that counted down to it.
+  await db.update(schema.products).set({ publishAt: at, ...(at ? {} : { comingSoon: false }), updatedAt: now }).where(eq(schema.products.id, productId));
 }
 
 /** Puts drafts whose time has come on sale, for one store or all of them. Returns what went live. */
