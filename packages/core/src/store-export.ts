@@ -282,6 +282,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
         starts_at: x.startsAt.toISOString(),
         ends_at: iso(x.endsAt),
         countdown: x.countdown,
+        daily_deal: x.dailyDeal,
       })),
     // Products, collections and pages are matched by handle; the theme has none.
     translations: translationRows.flatMap((t) => {
@@ -528,6 +529,7 @@ const importSchema = z.object({
         starts_at: z.string().datetime({ offset: true }),
         ends_at: z.string().datetime({ offset: true }).nullable(),
         countdown: z.boolean().optional(),
+        daily_deal: z.boolean().optional(),
       }),
     )
     .max(MAX_SALES)
@@ -986,6 +988,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
             startsAt: new Date(x.starts_at),
             endsAt: x.ends_at ? new Date(x.ends_at) : null,
             countdown: !!x.countdown && !!x.ends_at,
+            dailyDeal: !!x.daily_deal,
           });
           salesAdded++;
         } catch (e) {

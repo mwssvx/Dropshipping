@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createSale, deleteSale, endEarlyAccess, endSale, extendSale, giveEarlyAccess, sendPriceDrops, setLowestPriceNote, UserError } from "@sf/core";
+import { createSale, deleteSale, endEarlyAccess, endSale, extendSale, giveEarlyAccess, planDailyDeals, sendPriceDrops, setLowestPriceNote, UserError } from "@sf/core";
 import { requireShop, stock } from "@/lib/server";
 
 export type SaleState = { error?: string; message?: string; key?: number };
@@ -45,6 +45,26 @@ export async function createSaleAction(_: SaleState, form: FormData): Promise<Sa
   if (started) await sendPriceDrops(await stock(), { shopId: shop.id });
   refresh(shop.handle);
   return { message: started ? "Sale added. It's on the store now." : "Sale scheduled. It starts by itself.", key: Date.now() };
+}
+
+/** A run of deals of the day, one product a day from the first day picked. */
+export async function planDailyDealsAction(_: SaleState, form: FormData): Promise<SaleState> {
+  const { shop, db } = await requireShop("marketing");
+  let deals;
+  try {
+    deals = await planDailyDeals(db, shop, {
+      productIds: form.getAll("dealProductIds").map(String),
+      percentOff: Number(form.get("dealPercent") ?? ""),
+      startDate: String(form.get("dealStart") ?? ""),
+    });
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  const started = deals[0]!.startsAt <= new Date();
+  if (started) await sendPriceDrops(await stock(), { shopId: shop.id });
+  refresh(shop.handle);
+  return { message: `${deals.length} deals planned, one a day.${started ? " The first is on now." : ""}`, key: Date.now() };
 }
 
 export async function endSaleAction(id: string) {

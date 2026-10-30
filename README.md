@@ -1245,3 +1245,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **A code with every gift** (`packages/core/src/gift-returns.ts`): gift orders get a return code at checkout (older ones when their slip is printed). It's on the packing slip under the gift message and in the recipient's "it's on its way" email, when the store takes returns.
 2. **Returned without asking the buyer** (store page `/gift-return`): the recipient enters the code, sees what's in the parcel (never what it cost), picks what goes back and why, and gives their name and email (`return_requests.gift_return`, migration 0138).
 3. **Store credit for the recipient, nothing for the buyer to notice**: on the Returns page a gift return can only get store credit, be approved or be declined, since a refund would show on the buyer's card. The emails and the gift card go to the recipient, and the buyer's order page doesn't show the return.
+
+### Deal of the day (after launch, part 217)
+
+1. **One product a day** (`packages/core/src/daily-deals.ts`): on the Sales page, pick a product for each day (up to 14), the first day and the price cut. Each deal is a sale on that one product from midnight to midnight in the store's time zone, with a countdown, so the cart, the countdown and the sale results work as they do for any sale (`sales.daily_deal`, migration 0139). A run that starts today starts now.
+2. **One link for the whole run** (store page `/deal`): it goes to the product that's on today. Between deals it says when the next one starts.
+3. **One deal a day**: a new run can't land on days that already have a deal, every product has to be on the store, and the deals have to fit in the store's 50 sales. Deals travel in the store file.

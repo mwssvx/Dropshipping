@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { bundleProductChoices, EARLY_ACCESS_HOURS, formatMoney, listCollections, listSales, defaultCutoffZone, LAST_CHANCE_MS, MAX_SALES, SALE_EXTEND_DAYS, saleResults, upcomingSaleDates, type SaleOutcome } from "@sf/core";
+import { bundleProductChoices, DAILY_DEALS_MAX, EARLY_ACCESS_HOURS, formatMoney, listCollections, listSales, defaultCutoffZone, LAST_CHANCE_MS, MAX_SALES, SALE_EXTEND_DAYS, saleResults, upcomingDailyDeals, upcomingSaleDates, type SaleOutcome } from "@sf/core";
 import { requireShop, storeAddress } from "@/lib/server";
 import { deleteSaleAction, endEarlyAccessAction, endSaleAction, extendSaleAction, giveEarlyAccessAction } from "../../sale-actions";
 import { PageHeader } from "../PageHeader";
 import { SaleForm } from "./SaleForm";
+import { DailyDealsForm } from "./DailyDealsForm";
 import { LowestPriceForm } from "./LowestPriceForm";
 
 export const metadata = { title: "Sales" };
@@ -22,9 +23,21 @@ const saleDays = (d: { id: string; start: string; end: string }) => {
 export default async function SalesPage({ searchParams }: { searchParams: Promise<{ error?: string; plan?: string }> }) {
   const { shop, db } = await requireShop("marketing");
   const { error, plan } = await searchParams;
-  const [sales, products, collections, store] = await Promise.all([listSales(db, shop.id), bundleProductChoices(db, shop.id), listCollections(db, shop.id), storeAddress(shop)]);
+  const [sales, products, collections, store, deals] = await Promise.all([
+    listSales(db, shop.id),
+    bundleProductChoices(db, shop.id),
+    listCollections(db, shop.id),
+    storeAddress(shop),
+    upcomingDailyDeals(db, shop.id),
+  ]);
+  const zone = shop.shipCutoff?.timeZone ?? defaultCutoffZone(shop.country);
   // The shopping dates coming up, each with the sale already planned for it, if any.
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: shop.shipCutoff?.timeZone ?? defaultCutoffZone(shop.country) });
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: zone });
+  // A new run of deals starts the day after the last one ends.
+  const lastDeal = deals.at(-1);
+  const firstFree = lastDeal ? lastDeal.endsAt.toLocaleDateString("en-CA", { timeZone: zone }) : today;
+  const dealDay = (d: Date) => d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: zone });
+  const sellable = products.filter((p) => p.status === "active");
   const ahead = upcomingSaleDates(shop.country, today).map((d) => ({
     ...d,
     // Days on the calendar against exact times: a day either side is close enough to match.
@@ -79,6 +92,35 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
               // Already under way (Halloween week): it starts when it's added.
               plan={picked ? { title: picked.saleTitle, starts: picked.start > today ? `${picked.start}T00:00` : "", ends: `${picked.end}T00:00` } : null}
             />
+          )}
+        </section>
+        <section className="card p-5 flex flex-col gap-4" aria-labelledby="deals-heading">
+          <div>
+            <h2 id="deals-heading" className="font-semibold">Deal of the day</h2>
+            <p className="hint">
+              One product a day at a lower price, from midnight to midnight, for up to {DAILY_DEALS_MAX} days: an advent calendar of deals, or a
+              week of them before a holiday. Each deal is a sale with a countdown, so buyers see the hours left. Share one link for the whole run: it
+              always goes to the deal that&apos;s on.
+            </p>
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="deal-link">Link to share</label>
+            <input className="input font-mono text-xs" id="deal-link" readOnly value={`${store}/deal`} />
+          </div>
+          {deals.length > 0 && (
+            <ol className="flex flex-col divide-y divide-border text-sm" aria-label="Deals planned">
+              {deals.map((d) => (
+                <li key={d.saleId} className="flex flex-wrap justify-between gap-x-3 py-1.5">
+                  <span>{d.startsAt <= new Date() ? <span className="pill pill-success mr-2">On now</span> : <span className="hint mr-2">{dealDay(d.startsAt)}</span>}{d.product.title}</span>
+                  <span className="hint num">{d.percentOff}% off</span>
+                </li>
+              ))}
+            </ol>
+          )}
+          {sellable.length < 2 ? (
+            <p className="hint">Publish at least two products to plan deals.</p>
+          ) : (
+            <DailyDealsForm products={sellable.map((p) => ({ id: p.id, title: p.title }))} today={today} firstFree={firstFree} max={Math.min(DAILY_DEALS_MAX, sellable.length)} />
           )}
         </section>
         <section className="flex flex-col gap-3" aria-labelledby="list-heading">

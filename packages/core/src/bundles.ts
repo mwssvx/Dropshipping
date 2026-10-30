@@ -108,7 +108,7 @@ export async function listBundles(db: Db, shopId: string) {
 export async function bundleProductChoices(db: Db, shopId: string) {
   return db.query.products.findMany({
     where: and(eq(schema.products.shopId, shopId), ne(schema.products.status, "archived"), eq(schema.products.giftCard, false)),
-    columns: { id: true, title: true },
+    columns: { id: true, title: true, status: true },
     orderBy: asc(schema.products.title),
   });
 }
