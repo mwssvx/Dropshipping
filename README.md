@@ -1212,7 +1212,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Gift guides (after launch, part 210)
 
 1. **In one click** (`createGiftGuides` in `packages/core/src/gift-guides.ts`, Collections → Gift guides): makes "Gifts under $25", "Gifts under $50" and "Gifts under $100" (in the store's currency), each filling itself by rules with what's in stock at that price or less, best sellers first, so they stay right as prices and stock change. Only the missing ones are made, and the card goes away once all three exist.
-2. **On the holiday checklist**: "Make gift guides" is now one of its eleven lines, ticked once all three exist.
+2. **On the holiday checklist**: "Make gift guides" is now one of its lines, ticked once all three exist.
 
 ### Emails in dispute evidence (after launch, part 211)
 
@@ -1292,3 +1292,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **A holiday look that goes live by itself** (`packages/core/src/themes.ts`): in the theme editor, Schedule takes a copy of the draft and a time. At that time the store switches to it on its own, on the first visit after (`themes.schedule`, migration 0144). Edits made after scheduling stay in the draft and don't change what's scheduled.
 2. **And switches back**: add a switch-back time and the look before it returns then (`themes.revert`), so a Black Friday look runs from Friday to Monday night without anyone at the computer. "Keep this look" drops the switch-back, and "Cancel schedule" calls it off. A whole window that passed before anyone visited leaves the store as it was.
 3. **In the merchant's own time**: times are typed and shown in the browser's time zone, and each change is in the Activity log.
+
+### Holiday look on the checklist (after launch, part 225)
+
+1. **"Schedule a holiday look"** is now on the holiday checklist, after the sale line. It ticks itself once a look is scheduled or a scheduled look is live, and links to the theme editor's Schedule button (part 224).

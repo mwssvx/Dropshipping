@@ -24,7 +24,7 @@ export function holidaySeason(now = new Date()) {
 export async function holidayChecklist(db: Db, shop: Shop, now = new Date()): Promise<HolidayCheck[]> {
   const today = now.toISOString().slice(0, 10);
   const o = schema.orders;
-  const [giftCards, sale, guides, best] = await Promise.all([
+  const [giftCards, sale, guides, best, theme] = await Promise.all([
     db.query.products.findFirst({ where: and(eq(schema.products.shopId, shop.id), eq(schema.products.giftCard, true), eq(schema.products.status, "active")), columns: { id: true } }),
     db.query.sales.findFirst({ where: and(eq(schema.sales.shopId, shop.id), or(isNull(schema.sales.endsAt), gt(schema.sales.endsAt, now))), columns: { id: true } }),
     existingGiftGuides(db, shop),
@@ -47,6 +47,7 @@ export async function holidayChecklist(db: Db, shop: Shop, now = new Date()): Pr
       .groupBy(schema.products.id)
       .orderBy(desc(sql`sum(${schema.orderLines.quantity})`))
       .limit(BEST_SELLERS),
+    db.query.themes.findFirst({ where: eq(schema.themes.shopId, shop.id), columns: { schedule: true, revert: true } }),
   ]);
   const noBackup = best.filter((p) => !p.backup || p.backup.gone);
   const holiday = shop.holidayDeadline && shop.holidayDeadline.arriveBy >= today ? shop.holidayDeadline : null;
@@ -108,6 +109,17 @@ export async function holidayChecklist(db: Db, shop: Shop, now = new Date()): Pr
       done: !!sale,
       detail: sale ? "You have a sale running or coming up." : "Schedule it now; it starts and ends by itself, with a countdown if you like.",
       href: "/admin/sales?plan=black-friday#new-heading",
+    },
+    {
+      key: "look",
+      title: "Schedule a holiday look",
+      done: !!(theme?.schedule || theme?.revert),
+      detail: theme?.schedule
+        ? `A new look goes live by itself${theme.schedule.until ? " and switches back after" : ""}.`
+        : theme?.revert
+          ? "Your holiday look is live and switches back by itself."
+          : "Dress the store for Black Friday now, and it goes live and switches back by itself.",
+      href: "/admin/theme",
     },
     {
       key: "reminders",
