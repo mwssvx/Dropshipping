@@ -44,7 +44,10 @@ test("a merchant lists orders by total", async ({ page, browser }, info) => {
   await page.getByLabel("Order total").selectOption({ label: fits });
   await expect(page).toHaveURL(/total=[a-z\d]/);
   await expect(page.getByRole("checkbox", { name: /^Pick order #/ })).toHaveCount(1);
+  // Wait for the list to reload with the other range before counting again.
+  const fitsUrl = page.url();
   await page.getByLabel("Order total").selectOption({ label: other });
+  await expect(page).not.toHaveURL(fitsUrl);
   await expect(page.getByRole("checkbox", { name: /^Pick order #/ })).toHaveCount(0);
   await page.getByLabel("Order total").selectOption({ label: "Any total" });
   await expect(page).not.toHaveURL(/total=[a-z\d]/);

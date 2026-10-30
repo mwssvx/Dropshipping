@@ -371,6 +371,8 @@ export const products = pgTable(
     soldOutNotifiedAt: timestamp("sold_out_notified_at", { withTimezone: true }),
     // A draft goes on sale by itself at this time. Cleared when it does, or when its status changes.
     publishAt: timestamp("publish_at", { withTimezone: true }),
+    // While it waits for publishAt, the store shows a coming-soon page where shoppers can ask to be emailed.
+    comingSoon: boolean("coming_soon").notNull().default(false),
     // The merchant's own labels ("summer", "gift idea"), lowercase. Collections can fill by tag.
     tags: jsonb("tags").$type<string[]>().notNull().default([]),
     createdAt: createdAt(),
@@ -1801,6 +1803,8 @@ export const stockAlerts = pgTable(
     shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
     variantId: uuid("variant_id").notNull().references(() => variants.id, { onDelete: "cascade" }),
     email: text("email").notNull(),
+    // Asked on a coming-soon page: the email says it's out, not that it's back.
+    launch: boolean("launch").notNull().default(false),
     notifiedAt: timestamp("notified_at", { withTimezone: true }),
     createdAt: createdAt(),
   },

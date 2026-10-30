@@ -152,3 +152,4 @@ export * from "./barcode";
 export * from "./pick-list";
 export * from "./policies";
 export * from "./quiz";
+export * from "./coming-soon";

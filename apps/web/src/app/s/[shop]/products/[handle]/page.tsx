@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, formatDeliveryWindow, giftCardBonusNow, holidayReturnsNow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, countdownTo, shipsToCountry, recentSalesCount, RECENT_SALES_DAYS } from "@sf/core";
+import { bundlesForProduct, formatDeliveryWindow, giftCardBonusNow, holidayReturnsNow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, comingSoonProduct, defaultCutoffZone, countdownTo, shipsToCountry, recentSalesCount, RECENT_SALES_DAYS } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { ShareButtons } from "@/components/ShareButtons";
 import { SaleCountdown } from "@/components/SaleCountdown";
@@ -14,7 +14,7 @@ import { currentBuyer } from "@/lib/buyer";
 import { db } from "@/lib/server";
 import { buyerCountry, buyerFx } from "@/lib/currency";
 import { SubmitButton } from "@/components/SubmitButton";
-import { addBundleAction, addToCartAction, askQuestionAction, stockAlertAction, toggleSavedAction } from "../../actions";
+import { addBundleAction, addToCartAction, askQuestionAction, launchListAction, stockAlertAction, toggleSavedAction } from "../../actions";
 import { savedIds } from "@/lib/saved";
 import { loadShop, localProducts, storeBase, storeLang, storeT, missing } from "../../data";
 import { Price } from "@/components/Price";
@@ -35,8 +35,21 @@ async function load(shopHandle: string, handle: string, count = true) {
   }
 }
 
+/** A draft with its coming-soon page on, until it goes on sale. */
+async function teaser(shopHandle: string, handle: string) {
+  const shop = await loadShop(shopHandle);
+  const found = await comingSoonProduct(await db(), shop.id, handle);
+  return found ? { shop, product: (await localProducts(shopHandle, [found]))[0]! } : null;
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ shop: string; handle: string }> }) {
   const { shop, handle } = await params;
+  const soon = await teaser(shop, handle);
+  if (soon) {
+    const t = await storeT(shop);
+    const photos = productPhotos(soon.product);
+    return { title: `${soon.product.title} · ${t.comingSoon}`, description: summary(soon.product.descriptionHtml) || undefined, openGraph: { title: soon.product.title, images: photos.length ? photos.map((url) => ({ url })) : undefined } };
+  }
   const { product } = await load(shop, handle, false);
   // The merchant's search listing is written in the store's main language.
   const own = !(await storeLang(shop));
@@ -86,10 +99,12 @@ const ASKED_MESSAGES = {
   invalid: { key: "askInvalid", ok: false },
 } as const;
 
-export default async function ProductPage({ params, searchParams }: { params: Promise<{ shop: string; handle: string }>; searchParams: Promise<{ alert?: string; saved?: string; asked?: string }> }) {
+export default async function ProductPage({ params, searchParams }: { params: Promise<{ shop: string; handle: string }>; searchParams: Promise<{ alert?: string; saved?: string; asked?: string; launch?: string }> }) {
   const { shop: shopHandle, handle } = await params;
   const query = await searchParams;
   const t = await storeT(shopHandle);
+  const soon = await teaser(shopHandle, handle);
+  if (soon) return <ComingSoon shopHandle={shopHandle} {...soon} launch={query.launch} t={t} />;
   const alertKind = ALERT_MESSAGES[(query.alert ?? "") as keyof typeof ALERT_MESSAGES];
   const alert = alertKind ? { text: t[alertKind.key], ok: alertKind.ok } : undefined;
   const { shop, product } = await load(shopHandle, handle);
@@ -545,5 +560,50 @@ function Stars({ value, label }: { value: number; label: string }) {
       {"★".repeat(full)}
       <span className="text-border">{"★".repeat(5 - full)}</span>
     </span>
+  );
+}
+
+/**
+ * The page a product has before it goes on sale: photos, price, when it goes on sale with a
+ * countdown, and a box to be emailed when it's out. Nothing can be bought yet.
+ */
+async function ComingSoon({ shopHandle, shop, product, launch, t }: NonNullable<Awaited<ReturnType<typeof teaser>>> & { shopHandle: string; launch?: string; t: Awaited<ReturnType<typeof storeT>> }) {
+  const lang = (await storeLang(shopHandle)) ?? "en-US";
+  const fx = await buyerFx(shop);
+  const buyer = await currentBuyer(shop.id);
+  const v = product.variants[0]!;
+  const zone = shop.shipCutoff?.timeZone ?? defaultCutoffZone(shop.country);
+  const when = new Intl.DateTimeFormat(lang, { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: zone, timeZoneName: "short" }).format(product.publishAt);
+  const joined = launch === "joined" ? { text: t.launchJoined, ok: true } : launch === "invalid" ? { text: t.launchInvalid, ok: false } : null;
+  return (
+    <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-10 md:grid-cols-2">
+      <ProductGallery title={product.title} alts={product.imageAlts} photos={[...new Set([...productPhotos(product), ...product.variants.flatMap((x) => (x.imageUrl ? [x.imageUrl] : []))])]} video={parseVideo(product.videoUrl)} text={{ video: t.productVideo, play: t.playVideo }} />
+      <div className="flex flex-col gap-5">
+        <p className="flex gap-2">
+          <span className="sf-badge rounded-full bg-ink text-surface px-2.5 py-0.5 text-xs font-semibold">{t.comingSoon}</span>
+        </p>
+        <h1 className="text-3xl font-bold tracking-tight">{product.title}</h1>
+        <div className="text-xl">
+          <Price minor={v.priceMinor} compareAt={v.compareAtMinor} currency={shop.currency} fx={fx} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <p className="font-medium">{t.comingSoonOn(when)}</p>
+          <SaleCountdown endsAt={product.publishAt.toISOString()} lang={lang} text={{ endsIn: t.comingSoonIn, ended: t.comingSoonOut }} className="text-sm hint num" />
+        </div>
+        <form id="launch-list" action={launchListAction.bind(null, shopHandle, product.handle, product.id)} className="card p-4 flex flex-col gap-3" aria-labelledby="launch-list-h">
+          <h2 id="launch-list-h" className="font-semibold">{t.launchTitle}</h2>
+          {joined && <p role="status" className={`banner ${joined.ok ? "banner-success" : "banner-critical"}`}>{joined.text}</p>}
+          <div className="flex flex-wrap gap-2 items-end">
+            <div className="field flex-1 min-w-48">
+              <label className="label" htmlFor="launch-email">{t.email}</label>
+              <input className="input" id="launch-email" name="email" type="email" required autoComplete="email" defaultValue={buyer?.email ?? ""} placeholder="you@example.com" />
+            </div>
+            <SubmitButton className="btn btn-primary">{t.notifyMe}</SubmitButton>
+          </div>
+          <p className="hint text-sm">{t.launchNote}</p>
+        </form>
+        {product.descriptionHtml && <div className="text-muted whitespace-pre-line leading-relaxed">{product.descriptionHtml}</div>}
+      </div>
+    </main>
   );
 }

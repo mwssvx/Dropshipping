@@ -180,15 +180,15 @@ export async function sendStockAlerts(ctx: Pick<StockContext, "db" | "mailer" | 
     try {
       await ctx.mailer.send({
         to: d.alert.email,
-        subject: `Back in stock: ${d.product.title}`,
+        subject: d.alert.launch ? `Out now: ${d.product.title}` : `Back in stock: ${d.product.title}`,
         text: [
           `Hi,`,
           ``,
-          `${name} is back in stock at ${shop.name}. You asked us to let you know.`,
+          d.alert.launch ? `${d.product.title} is on sale now at ${shop.name}. You asked us to let you know.` : `${name} is back in stock at ${shop.name}. You asked us to let you know.`,
           ``,
           `Get it here: ${link}`,
           ``,
-          `This is the only email you'll get about it. Stock can run out again, so don't wait too long.`,
+          d.alert.launch ? `This is the only email you'll get about it. There may not be many, so don't wait too long.` : `This is the only email you'll get about it. Stock can run out again, so don't wait too long.`,
         ].join("\n"),
       });
       sent++;
@@ -224,7 +224,7 @@ export async function waitingForProduct(db: Db, shopId: string, productId: strin
     .select({ variantId: schema.stockAlerts.variantId, n: sql<number>`count(*)`.mapWith(Number) })
     .from(schema.stockAlerts)
     .innerJoin(schema.variants, eq(schema.variants.id, schema.stockAlerts.variantId))
-    .where(and(eq(schema.stockAlerts.shopId, shopId), eq(schema.variants.productId, productId), isNull(schema.stockAlerts.notifiedAt)))
+    .where(and(eq(schema.stockAlerts.shopId, shopId), eq(schema.variants.productId, productId), isNull(schema.stockAlerts.notifiedAt), eq(schema.stockAlerts.launch, false)))
     .groupBy(schema.stockAlerts.variantId);
   return new Map(rows.map((r) => [r.variantId, r.n]));
 }
@@ -236,7 +236,7 @@ export async function mostWanted(db: Db, shopId: string, limit = 10) {
     .from(schema.stockAlerts)
     .innerJoin(schema.variants, eq(schema.variants.id, schema.stockAlerts.variantId))
     .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
-    .where(and(eq(schema.stockAlerts.shopId, shopId), isNull(schema.stockAlerts.notifiedAt)))
+    .where(and(eq(schema.stockAlerts.shopId, shopId), isNull(schema.stockAlerts.notifiedAt), eq(schema.stockAlerts.launch, false)))
     .groupBy(schema.products.id, schema.products.title)
     .orderBy(sql`count(*) desc`)
     .limit(limit);

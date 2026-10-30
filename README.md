@@ -1263,3 +1263,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **A few questions, the right products** (`packages/core/src/quiz.ts`): from the Marketing page, write up to 5 questions ("Who's it for?") with up to 5 answers each, and pick the product tag each answer leads to (`shops.product_quiz`, migration 0141). A tag no product uses is refused, so every answer leads somewhere.
 2. **On the store at `/quiz`**: one tap per question, then "See my picks" shows up to 6 products with the most of the chosen tags, best sellers first, never sold out or gift cards. It's a plain form with the answers in the address, so a result can be shared, and the buttons are in every store language.
 3. **One link**: the editor gives the quiz's link to put in the store menu, a bio or a campaign. On Shopify, quiz apps charge monthly for this.
+
+### Coming soon pages (after launch, part 220)
+
+1. **A teaser before the launch** (`packages/core/src/coming-soon.ts`): a draft scheduled to go on sale later can show a coming-soon page at its usual address, with its photos, price, the time it goes on sale (in the store's time zone) and a live countdown. Nothing can be bought until then (`products.coming_soon`, migration 0142).
+2. **A list of who wants it**: shoppers leave their email on the page (`stock_alerts.launch`). The admin shows how many are waiting, and those requests don't count as waiting for a restock.
+3. **Emailed the moment it's out**: when the product goes live, with the first store visit after its time or the daily run, everyone on the list gets one "Out now" email with the link. Cancelling the scheduled time also takes the page down.

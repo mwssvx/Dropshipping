@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { can, formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts, detailsText, MAX_DETAILS, stockHistory, incomingStock, countryName, SHIPPING_COUNTRIES, productSwatches, digitalFileFor, formatFileSize, MAX_DIGITAL_FILE_BYTES, DOWNLOADS_PER_ITEM, CONTENT_UNITS, CONTENT_UNIT_LABELS, unitPrice, formatUnitPrice, type StockMovement } from "@sf/core";
+import { can, formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts, launchListCount, detailsText, MAX_DETAILS, stockHistory, incomingStock, countryName, SHIPPING_COUNTRIES, productSwatches, digitalFileFor, formatFileSize, MAX_DIGITAL_FILE_BYTES, DOWNLOADS_PER_ITEM, CONTENT_UNITS, CONTENT_UNIT_LABELS, unitPrice, formatUnitPrice, type StockMovement } from "@sf/core";
 import { requireShop, storeAddress, suppliers } from "@/lib/server";
 import { duplicateProductAction, updateProductAction } from "../../../actions";
+import { comingSoonAction } from "../../../publish-actions";
+import { SubmitButton } from "@/components/SubmitButton";
 import { setUpsellAction } from "../../../growth-actions";
 import { setProductSupplierAction } from "../../../supplier-actions";
 import { PageHeader } from "../../PageHeader";
@@ -46,6 +48,7 @@ export default async function EditProductPage({ params, searchParams }: { params
   const link = found.supplierId ? await getSupplierLink(db, shop.id, found.supplierId) : undefined;
   const label = link ? supplierLabel(suppliers(), link) : undefined;
   const product = { ...found, supplier: label ? { label } : null };
+  const launchWaiting = found.comingSoon ? await launchListCount(db, shop.id, found.id) : 0;
   const own = await listOwnSuppliers(db, shop.id);
   const backupLink = found.backup ? await getSupplierLink(db, shop.id, found.backup.supplierId) : undefined;
   const backup: BackupView | null = found.backup
@@ -156,6 +159,22 @@ export default async function EditProductPage({ params, searchParams }: { params
               <p className="hint">For a launch or a drop you announce ahead: it goes on sale by itself at this time, with the first visitor after it.</p>
             </div>
             <PublishLaterPanel productId={product.id} title={product.title} publishAt={product.publishAt?.toISOString() ?? null} />
+            {product.publishAt && (
+              <form action={comingSoonAction.bind(null, product.id, product.title, !product.comingSoon)} className="flex flex-col gap-2 border-t border-border pt-3" aria-labelledby="coming-soon-heading">
+                <h3 id="coming-soon-heading" className="font-medium">Coming-soon page</h3>
+                {product.comingSoon ? (
+                  <p className="text-sm" role="status">
+                    Shoppers at <a className="underline" href={`${await storeAddress(shop)}/products/${product.handle}`} target="_blank" rel="noreferrer">its usual address</a> see the price, a countdown and a box to be emailed when it&apos;s out.{" "}
+                    {launchWaiting === 1 ? "1 shopper is waiting for that email." : `${launchWaiting} shoppers are waiting for that email.`} It goes out as soon as it&apos;s on sale.
+                  </p>
+                ) : (
+                  <p className="hint text-sm">Until then, show a page at its usual address with the price, a countdown and a box to be emailed the moment it&apos;s out.</p>
+                )}
+                <div>
+                  <SubmitButton className="btn btn-secondary">{product.comingSoon ? "Turn off the coming-soon page" : "Show a coming-soon page"}</SubmitButton>
+                </div>
+              </form>
+            )}
           </section>
         )}
         <ProductForm key={product.updatedAt.getTime()} action={updateProductAction.bind(null, product.id)} currency={shop.currency} submitLabel="Save changes"
