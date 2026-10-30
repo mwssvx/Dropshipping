@@ -288,7 +288,7 @@ function SectionList({
       <p className="hint">Your home page, top to bottom. Pick a section to edit it.</p>
       <ol className="flex flex-col gap-2">
         {doc.home.map((s, i) => (
-          <li key={s.id} className={`card p-2 flex items-center gap-2 ${s.hidden ? "opacity-60" : ""}`}>
+          <li key={s.id} className={`card p-2 flex items-center gap-2 ${s.hidden ? "border-dashed bg-sunken" : ""}`}>
             <button type="button" className="flex-1 min-w-0 text-left px-2 py-1 rounded-md hover:bg-sunken" onClick={() => onSelect(s.id)}>
               <span className="block text-sm font-semibold truncate">{sectionTitle(s)}</span>
               <span className="block hint truncate">{SECTION_LABELS[s.type].name}{s.hidden ? " · hidden" : ""}</span>

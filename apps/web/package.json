@@ -22,6 +22,7 @@
     "server-only": "^0.0.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.10.2",
     "@playwright/test": "1.56.1",
     "@tailwindcss/postcss": "^4.1.0",
     "@types/node": "^22.0.0",

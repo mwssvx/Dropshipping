@@ -1308,3 +1308,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **A video section** (`apps/web/src/theme/SectionVideo.tsx`): a new home page section in the theme editor with a heading, a line of text, a video link and an optional cover image. It takes the same links as product videos (part 68): YouTube, Vimeo, or the https address of an .mp4, .webm or .mov file. Any other link is refused with a reason before it can be published.
 2. **Nothing loads until play**: shoppers see the cover (or a dark frame) with a play button, and YouTube or Vimeo is only contacted once they press it, through YouTube's no-cookie player. A video file plays in the browser's own player.
 3. **One parser for both**: the link check moved to `packages/core/src/video-link.ts`, which has no database imports, so the editor and the storefront use the same rules as product pages. No migration.
+
+### Accessibility check (after launch, part 228)
+
+1. **Every store page, every theme** (`apps/web/e2e/accessibility.spec.ts`): the tests now run axe, the standard accessibility checker, against WCAG 2.1 AA on the pages every shopper goes through: home, collections, search, a product, the cart, checkout, contact, order tracking, the account page, gift cards and the blog, and the home and product pages of all seven ready-made themes. Any broken rule fails the build. The European Accessibility Act has asked this of online stores selling in the EU since June 2025, and Shopify leaves it to each theme and app.
+2. **The admin too**: sign-up, sign-in and the main admin pages are checked the same way. The one problem it found, the grey text of a hidden section in the theme editor, now has full contrast, with the row marked by a dashed border instead of being faded.
