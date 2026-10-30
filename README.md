@@ -1269,3 +1269,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **A teaser before the launch** (`packages/core/src/coming-soon.ts`): a draft scheduled to go on sale later can show a coming-soon page at its usual address, with its photos, price, the time it goes on sale (in the store's time zone) and a live countdown. Nothing can be bought until then (`products.coming_soon`, migration 0142).
 2. **A list of who wants it**: shoppers leave their email on the page (`stock_alerts.launch`). The admin shows how many are waiting, and those requests don't count as waiting for a restock.
 3. **Emailed the moment it's out**: when the product goes live, with the first store visit after its time or the daily run, everyone on the list gets one "Out now" email with the link. Cancelling the scheduled time also takes the page down.
+
+### Compare products (after launch, part 221)
+
+1. **Side by side** (`packages/core/src/compare.ts`): shoppers tap Compare on up to 4 product pages, then open `/compare` to see them in one table: price (with any sale), rating from published reviews, whether it's in stock, the options (sizes, colours) and every line of the products' details tables, lined up by label ("Material", "Weight").
+2. **Nothing to set up**: the picks are kept on the shopper's device as product ids only, the page isn't indexed by search engines, and it's in every store language. Drafts, archived products and gift cards drop out by themselves.
