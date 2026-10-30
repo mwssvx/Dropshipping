@@ -151,3 +151,4 @@ export * from "./blocklist";
 export * from "./barcode";
 export * from "./pick-list";
 export * from "./policies";
+export * from "./quiz";

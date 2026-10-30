@@ -192,6 +192,8 @@ export const shops = pgTable(
     holidayReturns: jsonb("holiday_returns").$type<HolidayReturns | null>(),
     // "A $10 bonus card for every $50 in gift cards" while the dates last, or null.
     giftCardBonus: jsonb("gift_card_bonus").$type<GiftCardBonus | null>(),
+    // A few questions that point buyers to products by tag ("Who's it for?"), or null.
+    productQuiz: jsonb("product_quiz").$type<ProductQuiz | null>(),
     // How supplier cost becomes a retail price, for imports and "reprice everything".
     pricingRule: jsonb("pricing_rule").$type<PricingRule>(),
     // Supplier price watch: warn when a cost rise leaves less than this margin, and optionally
@@ -1723,6 +1725,8 @@ export type HolidayReturns = { from: string; to: string; until: string };
  * A bonus card for buying gift cards: `bonusMinor` for every `everyMinor` of gift cards on an order
  * paid from `from` to `to` (YYYY-MM-DD), spendable between `usableFrom` and `usableUntil` when set.
  */
+/** The store's product finder: each answer points to a product tag, and `on` shows it on the store. */
+export type ProductQuiz = { title: string; intro: string | null; on: boolean; questions: { text: string; answers: { label: string; tag: string }[] }[] };
 export type GiftCardBonus = { everyMinor: number; bonusMinor: number; from: string; to: string; usableFrom: string | null; usableUntil: string | null };
 /** "Running late" emails: after `days` without shipping, with the merchant's own words added when set. */
 export type LateOrderNotice = { days: number; message: string | null };

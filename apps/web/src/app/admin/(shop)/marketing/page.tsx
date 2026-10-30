@@ -56,6 +56,13 @@ export default async function MarketingPage() {
           </div>
           <Link href="/admin/campaigns" className="btn btn-secondary">Open campaigns</Link>
         </section>
+        <section className="card p-5 flex flex-wrap items-center gap-3" aria-labelledby="quiz-link-heading">
+          <div className="flex-1 min-w-56">
+            <h2 id="quiz-link-heading" className="font-semibold">Product quiz</h2>
+            <p className="hint">{shop.productQuiz?.on ? `"${shop.productQuiz.title}" is on your store.` : "A few questions that point shoppers to the right products, using your product tags."}</p>
+          </div>
+          <Link href="/admin/quiz" className="btn btn-secondary">{shop.productQuiz ? "Edit the quiz" : "Make a quiz"}</Link>
+        </section>
         <section className="card p-5 flex flex-col gap-4" aria-labelledby="codes-heading">
           <div>
             <h2 id="codes-heading" className="font-semibold">Discount codes</h2>
