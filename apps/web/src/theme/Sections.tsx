@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { featuredViewAll, pickFeatured, type Section, type SectionSettings, type TrustIcon } from "@sf/core/theme";
+import { announcementMessages, featuredViewAll, pickFeatured, type Section, type SectionSettings, type TrustIcon } from "@sf/core/theme";
 import type { StorefrontCatalog } from "@sf/core";
 import { cardBadges, type Badge, type BadgeFacts } from "@sf/core/badges";
 import type { BadgeSettings } from "@sf/db";
@@ -10,6 +10,7 @@ import { UnitPrice } from "@/components/UnitPrice";
 import { SubmitButton } from "@/components/SubmitButton";
 import { parseVideo } from "@sf/core/video-link";
 import { SectionVideo } from "./SectionVideo";
+import { AnnouncementBar } from "./AnnouncementBar";
 import { storeHref } from "./style";
 
 /*
@@ -53,11 +54,20 @@ function Button({ label, href, base, variant = "primary" }: { label: string; hre
 }
 
 function Announcement({ s, data }: Props<"announcement">) {
-  if (!s.text) return null;
-  const body = <span>{s.text}</span>;
+  const messages = announcementMessages(s);
+  if (!messages.length) return null;
+  if (messages.length > 1) {
+    const t = data.t ?? storeText(null);
+    return (
+      <AnnouncementBar messages={messages.map((m) => ({ text: m.text, href: m.link ? storeHref(data.base, m.link) : "" }))} seconds={s.seconds ?? 5}
+        labels={{ previous: t.announcementPrevious, next: t.announcementNext, pause: t.announcementPause, play: t.announcementPlay }} />
+    );
+  }
+  const m = messages[0]!;
+  const body = <span>{m.text}</span>;
   return (
     <div className="bg-accent text-accent-ink text-center text-sm font-medium px-4 py-2">
-      {s.link ? <Link href={storeHref(data.base, s.link)} className="hover:underline">{body}</Link> : body}
+      {m.link ? <Link href={storeHref(data.base, m.link)} className="hover:underline">{body}</Link> : body}
     </div>
   );
 }
