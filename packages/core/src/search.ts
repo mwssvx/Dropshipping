@@ -9,6 +9,7 @@ import { listActiveProducts } from "./products";
 import { placeSoldOut, productSoldOut, quickAddVariant, soldOutDisplay } from "./badges";
 import { fixedSearch } from "./search-terms";
 import { cardSwatches } from "./swatches";
+import { secondPhoto } from "./gallery";
 
 type ActiveProduct = Awaited<ReturnType<typeof listActiveProducts>>[number];
 
@@ -191,6 +192,7 @@ export const compactProducts = (products: ActiveProduct[]) =>
       title: p.title,
       handle: p.handle,
       imageUrl: p.imageUrl,
+      hoverImageUrl: secondPhoto(p),
       priceMinor: cheapest?.priceMinor ?? 0,
       contents: cheapest?.contents ?? null,
       compareAtMinor: cheapest?.compareAtMinor ?? null,

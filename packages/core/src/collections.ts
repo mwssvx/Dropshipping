@@ -8,6 +8,7 @@ import { listActiveProducts } from "./products";
 import { placeSoldOut, productSoldOut, quickAddVariant, soldOutDisplay } from "./badges";
 import { cardSwatches } from "./swatches";
 import { storeReviews } from "./reviews";
+import { secondPhoto } from "./gallery";
 import { unitsSold } from "./search";
 
 /** "all" is every active product. It isn't stored, so no collection can take that handle. */
@@ -175,6 +176,7 @@ export async function storefrontCatalog(db: Db, shopId: string) {
     title: p.title,
     handle: p.handle,
     imageUrl: p.imageUrl,
+    hoverImageUrl: secondPhoto(p),
     priceMinor: p.variants[0]?.priceMinor ?? 0,
     compareAtMinor: p.variants[0]?.compareAtMinor ?? null,
     contents: p.variants[0]?.contents ?? null,

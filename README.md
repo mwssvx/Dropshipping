@@ -1353,3 +1353,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **On every product page**: a small trail above the photo, Home › Night lights › Sunset Projection Lamp, so shoppers who land on a product from an ad or a search can go up to the collection and keep browsing. The middle step is the collection the shopper came from when the product is in it, else the first collection the product was added to by hand, else the first automatic one. Products in no collection show Home › the product.
 2. **For search engines too**: the same trail goes to Google as breadcrumb data, which it can show in results instead of a bare web address. The labels are translated into the six store languages.
+
+### Second photo on product cards (after launch, part 237)
+
+1. **One tick in the theme editor** (Style → Layout): while a shopper points at a product card on the home page, a collection or search, the card fades to the product's second photo, so they see another side of it without opening it. Products with one photo stay as they are.
+2. **Light on phones**: touch screens have nothing to point with, so they keep the main photo and never load the second one, and the fade is instant for shoppers who ask for less motion. It's off until the merchant turns it on.

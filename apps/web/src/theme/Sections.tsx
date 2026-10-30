@@ -100,7 +100,7 @@ export function badgeLabel(b: Badge, t: StoreText) {
 }
 
 type CatalogProduct = Omit<StorefrontCatalog["products"][number], "sold"> & { sold?: number };
-type GridProduct = Omit<StorefrontCatalog["products"][number], "badge" | "createdAt" | "soldOut" | "swatches" | "contents" | "quickAdd" | "sold"> & BadgeFacts & Partial<Pick<StorefrontCatalog["products"][number], "swatches" | "contents" | "quickAdd" | "sold">>;
+type GridProduct = Omit<StorefrontCatalog["products"][number], "badge" | "createdAt" | "soldOut" | "swatches" | "contents" | "quickAdd" | "sold" | "hoverImageUrl"> & BadgeFacts & Partial<Pick<StorefrontCatalog["products"][number], "swatches" | "contents" | "quickAdd" | "sold" | "hoverImageUrl">>;
 
 export function ProductGrid({ products, data }: { products: GridProduct[]; data: SectionData }) {
   const t = data.t ?? storeText(null);
@@ -117,6 +117,7 @@ export function ProductGrid({ products, data }: { products: GridProduct[]; data:
                 <img src={p.imageUrl} alt={p.title} width={600} height={600} loading="lazy" decoding="async"
                   className="size-full object-cover group-hover:scale-[1.02] transition-transform" />
               )}
+              {p.imageUrl && p.hoverImageUrl && <img src={p.hoverImageUrl} alt="" width={600} height={600} loading="lazy" decoding="async" className="sf-hover-photo absolute inset-0 size-full object-cover" />}
               {badges.length > 0 && (
                 <span className="absolute top-2 left-2 flex flex-col items-start gap-1">
                   {badges.map((b) => (

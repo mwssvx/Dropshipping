@@ -239,6 +239,8 @@ const themeDoc = z.object({
       .prefault({}),
     // The header stays at the top of the screen while shoppers scroll.
     stickyHeader: z.boolean().default(false),
+    // Product cards show the product's second photo while a shopper points at them.
+    hoverPhoto: z.boolean().default(false),
     logoText: text(60),
     logoUrl: imageUrl,
     seo: z.object({ title: text(70), description: text(320) }).prefault({}),

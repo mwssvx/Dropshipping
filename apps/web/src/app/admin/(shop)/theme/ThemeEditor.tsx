@@ -382,6 +382,10 @@ function StylePanel({ doc, onChange }: { doc: ThemeDoc; onChange: (d: ThemeDoc) 
           <input type="checkbox" className="mt-0.5" checked={s.stickyHeader} onChange={(e) => set({ stickyHeader: e.target.checked })} />
           <span>Keep the header on screen while shoppers scroll<span className="block hint">The menu, search and cart stay one tap away on long pages.</span></span>
         </label>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-0.5" checked={s.hoverPhoto} onChange={(e) => set({ hoverPhoto: e.target.checked })} />
+          <span>Show a product&rsquo;s second photo when shoppers point at its card<span className="block hint">Shoppers see another side of the product without opening it. Products with one photo stay as they are.</span></span>
+        </label>
       </fieldset>
       <fieldset className="flex flex-col gap-2">
         <legend className="font-semibold mb-1">Corners</legend>
