@@ -26,7 +26,7 @@ test("a merchant adds policy pages written from their settings", async ({ page, 
   await expect(policies.getByText(/You can ask for a return within 30 days of delivery/)).toBeVisible();
   await policies.getByRole("checkbox", { name: /Terms of service/ }).uncheck();
   await policies.getByRole("button", { name: "Add policy pages" }).click();
-  await expect(page.getByText("Added Returns and refunds, Shipping, Privacy policy.")).toBeVisible();
+  await expect(page.getByText("Added Returns and refunds, Shipping, Privacy policy, Accessibility statement.")).toBeVisible();
   await expect(page.getByRole("table").getByRole("link", { name: "Shipping", exact: true })).toBeVisible();
   await expect(policies.getByRole("checkbox", { name: /Terms of service/ })).toBeVisible();
 
@@ -34,6 +34,9 @@ test("a merchant adds policy pages written from their settings", async ({ page, 
   await buyer.goto(`${store}/pages/returns`);
   await expect(buyer.getByRole("heading", { name: "Returns and refunds" })).toBeVisible();
   await expect(buyer.getByText(/You can ask for a return within 30 days of delivery/)).toBeVisible();
+  await buyer.goto(`${store}/pages/accessibility`);
+  await expect(buyer.getByRole("heading", { name: "Accessibility statement" })).toBeVisible();
+  await expect(buyer.getByText(/WCAG\) 2\.1 at level AA/)).toBeVisible();
   await buyer.goto(`${store}/pages/terms`);
   await expect(buyer.getByRole("heading", { name: "Terms of service" })).toHaveCount(0);
 });

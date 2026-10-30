@@ -1313,3 +1313,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Every store page, every theme** (`apps/web/e2e/accessibility.spec.ts`): the tests now run axe, the standard accessibility checker, against WCAG 2.1 AA on the pages every shopper goes through: home, collections, search, a product, the cart, checkout, contact, order tracking, the account page, gift cards and the blog, and the home and product pages of all seven ready-made themes. Any broken rule fails the build. The European Accessibility Act has asked this of online stores selling in the EU since June 2025, and Shopify leaves it to each theme and app.
 2. **The admin too**: sign-up, sign-in and the main admin pages are checked the same way. The one problem it found, the grey text of a hidden section in the theme editor, now has full contrast, with the row marked by a dashed border instead of being faded.
+
+### Accessibility statement (after launch, part 229)
+
+1. **A fifth policy page** (`packages/core/src/policies.ts`): Pages → Store policies now also drafts an Accessibility statement at /pages/accessibility, which the European Accessibility Act asks EU stores to publish. It names the standard the store aims for (WCAG 2.1 AA), how the shopping pages are checked (the automatic check from part 228), what may not be accessible yet (photos without a description, videos without captions) and how to get help ordering another way.
+2. **Honest and dated**: it only claims what the platform tests, and says the day it was written. Like the other policies it's an ordinary page the merchant can edit, and an existing page at the same address is never replaced.

@@ -1,7 +1,8 @@
 // Store policies. Buyers, banks deciding a chargeback and ad platforms all look for a returns,
 // shipping, privacy and terms page before they trust a store. Writing them is a chore, so the
 // store drafts them from its own settings (return window, shipping zones and times, pickup,
-// cancelling, ad tracking) and adds them as ordinary pages the merchant can edit. A page that
+// cancelling, ad tracking) and adds them as ordinary pages the merchant can edit. The
+// accessibility statement is what the European Accessibility Act asks EU stores to publish. A page that
 // already exists at the same address is never replaced. They're a starting point, not legal advice.
 import { and, eq, inArray } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
@@ -13,7 +14,7 @@ import { countryName, listShippingZones } from "./shipping";
 
 type Shop = typeof schema.shops.$inferSelect;
 
-export const POLICY_KINDS = ["returns", "shipping", "privacy", "terms"] as const;
+export const POLICY_KINDS = ["returns", "shipping", "privacy", "terms", "accessibility"] as const;
 export type PolicyKind = (typeof POLICY_KINDS)[number];
 
 export const POLICY_TITLES: Record<PolicyKind, string> = {
@@ -21,6 +22,7 @@ export const POLICY_TITLES: Record<PolicyKind, string> = {
   shipping: "Shipping",
   privacy: "Privacy policy",
   terms: "Terms of service",
+  accessibility: "Accessibility statement",
 };
 
 const list = (items: string[]) => (items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`);
@@ -106,8 +108,19 @@ function termsPolicy(shop: Shop) {
   ].join("\n\n");
 }
 
+function accessibilityPolicy(shop: Shop, now: Date) {
+  return [
+    `${shop.name} wants everyone to be able to shop here, including people who use a screen reader, a keyboard instead of a mouse, zoom or voice control.`,
+    "Our aim: this store aims to meet the Web Content Accessibility Guidelines (WCAG) 2.1 at level AA, the standard behind the European Accessibility Act (EN 301 549).",
+    "How it's checked: the pages you shop on, from the home page to checkout, are tested automatically against WCAG 2.1 AA each time the software behind this store changes. They work with a keyboard, have headings and labels for screen readers, and keep enough contrast between text and background.",
+    "What may not be fully accessible yet: some product photos may not have a written description, and videos from YouTube or Vimeo may not have captions. Ask us and we'll describe a product for you.",
+    "Need help? If anything on this store is hard to use, write to us through our contact page. Tell us which page and what you were trying to do, and we'll help you place your order another way.",
+    `This statement was written on ${longDay.format(now)}.`,
+  ].join("\n\n");
+}
+
 /** The policy pages this store would get, with any that already exist at the same address. */
-export async function draftPolicies(db: Db, shop: Shop) {
+export async function draftPolicies(db: Db, shop: Shop, now = new Date()) {
   const existing = await db.query.pages.findMany({
     where: and(eq(schema.pages.shopId, shop.id), inArray(schema.pages.handle, [...POLICY_KINDS])),
     columns: { id: true, handle: true },
@@ -117,6 +130,7 @@ export async function draftPolicies(db: Db, shop: Shop) {
     shipping: await shippingPolicy(db, shop),
     privacy: privacyPolicy(shop),
     terms: termsPolicy(shop),
+    accessibility: accessibilityPolicy(shop, now),
   };
   return POLICY_KINDS.map((kind) => ({ kind, title: POLICY_TITLES[kind], handle: kind, body: bodies[kind], existingId: existing.find((p) => p.handle === kind)?.id ?? null }));
 }
