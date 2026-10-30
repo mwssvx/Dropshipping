@@ -12,6 +12,9 @@ import {
   deletePage,
   discardThemeDraft,
   publishTheme,
+  scheduleTheme,
+  cancelThemeSchedule,
+  keepScheduledTheme,
   removeDomain,
   saveThemeDraft,
   setPrimaryDomain,
@@ -56,6 +59,30 @@ export async function publishThemeAction(doc: unknown) {
   await logged({ shop, user, db }, "Published changes to the store's look", { href: "/admin/theme" });
   refreshStore(shop.handle);
   return { publishedAt: r.ok.publishedAt.toISOString() };
+}
+
+/** Saves the draft, then schedules a copy of it to go live by itself (and, with until, to switch back). */
+export async function scheduleThemeAction(doc: unknown, at: string, until: string | null) {
+  const { shop, db, user } = await requireShop("theme");
+  const r = await userErrors(async () => {
+    await saveThemeDraft(db, shop, doc);
+    return scheduleTheme(db, shop, { at: new Date(at), until: until ? new Date(until) : null });
+  });
+  if ("error" in r) return r;
+  await logged({ shop, user, db }, "Scheduled a new look for the store", { href: "/admin/theme" });
+  return { schedule: r.ok };
+}
+
+export async function cancelThemeScheduleAction() {
+  const { shop, db, user } = await requireShop("theme");
+  await cancelThemeSchedule(db, shop.id);
+  await logged({ shop, user, db }, "Cancelled the store's scheduled look", { href: "/admin/theme" });
+}
+
+export async function keepScheduledThemeAction() {
+  const { shop, db, user } = await requireShop("theme");
+  await keepScheduledTheme(db, shop.id);
+  await logged({ shop, user, db }, "Kept the store's scheduled look instead of switching back", { href: "/admin/theme" });
 }
 
 export async function discardThemeAction(): Promise<{ doc: ThemeDoc }> {

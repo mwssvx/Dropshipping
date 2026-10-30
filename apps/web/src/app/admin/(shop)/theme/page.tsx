@@ -31,6 +31,8 @@ export default async function ThemePage() {
       links={links}
       collections={collections.map((c) => ({ id: c.id, title: c.title }))}
       products={products.filter((p) => p.status === "active" && !p.giftCard).map((p) => ({ id: p.id, title: p.title }))}
+      schedule={theme.schedule}
+      revertAt={theme.revertAt}
       storeLink={storeLink}
       shopName={shop.name}
     />

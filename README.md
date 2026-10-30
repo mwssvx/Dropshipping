@@ -1286,3 +1286,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **A styled photo that sells** (`packages/core/src/shop-the-look.ts`): a new home page section in the theme editor. Add one photo (a styled room, an outfit, a desk set), a heading and a line of text, then pick up to 6 products. Shoppers see the photo beside the pieces in it, each with its price and a link to its page.
 2. **The whole look in one tap**: one button adds every piece with nothing to choose to the cart. Pieces with sizes or colours to pick, or personalisation, are added from their own page, and the section says so. Sold-out, draft and hidden products never slip in, even if someone edits the page.
 3. **In every store language**: the heading falls back to "Shop the look" in the shopper's language when left empty. No migration: it lives in the theme like every other section.
+
+### Scheduled looks (after launch, part 224)
+
+1. **A holiday look that goes live by itself** (`packages/core/src/themes.ts`): in the theme editor, Schedule takes a copy of the draft and a time. At that time the store switches to it on its own, on the first visit after (`themes.schedule`, migration 0144). Edits made after scheduling stay in the draft and don't change what's scheduled.
+2. **And switches back**: add a switch-back time and the look before it returns then (`themes.revert`), so a Black Friday look runs from Friday to Monday night without anyone at the computer. "Keep this look" drops the switch-back, and "Cancel schedule" calls it off. A whole window that passed before anyone visited leaves the store as it was.
+3. **In the merchant's own time**: times are typed and shown in the browser's time zone, and each change is in the Activity log.

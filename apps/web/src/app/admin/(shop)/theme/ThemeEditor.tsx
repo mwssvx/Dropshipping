@@ -18,6 +18,7 @@ import {
   type ThemeFont,
 } from "@sf/core/theme";
 import { discardThemeAction, publishThemeAction, saveThemeAction } from "../../store-actions";
+import { SchedulePanel, type ThemeScheduleView } from "./SchedulePanel";
 import { MenuEditor, SectionForm, type CollectionOption, type LinkOption, type ProductOption } from "./fields";
 
 type Tab = "themes" | "sections" | "style" | "menus" | "seo";
@@ -60,6 +61,8 @@ export function ThemeEditor({
   links,
   collections,
   products,
+  schedule: initialSchedule,
+  revertAt: initialRevert,
   storeLink,
   shopName,
 }: {
@@ -69,6 +72,8 @@ export function ThemeEditor({
   links: LinkOption[];
   collections: CollectionOption[];
   products: ProductOption[];
+  schedule: ThemeScheduleView;
+  revertAt: string | null;
   storeLink: string;
   shopName: string;
 }) {
@@ -81,6 +86,9 @@ export function ThemeEditor({
   const [unpublished, setUnpublished] = useState(initialChanges);
   const [published, setPublished] = useState(publishedAt);
   const [publishing, setPublishing] = useState(false);
+  const [later, setLater] = useState(false);
+  const [schedule, setSchedule] = useState(initialSchedule);
+  const [revertAt, setRevertAt] = useState(initialRevert);
   const frame = useRef<HTMLIFrameElement>(null);
   const lastSaved = useRef(JSON.stringify(initial));
 
@@ -196,10 +204,14 @@ export function ThemeEditor({
         </div>
         {unpublished && <button type="button" className="btn btn-secondary" onClick={discard}>Discard changes</button>}
         <a href={storeLink} target="_blank" className="btn btn-secondary">View live store ↗</a>
+        <button type="button" className="btn btn-secondary" aria-expanded={later} onClick={() => setLater(!later)}>
+          {schedule || revertAt ? "Schedule (set)" : "Schedule"}
+        </button>
         <button type="button" className="btn btn-primary" onClick={publish} disabled={publishing || (!unpublished && save.state === "saved")}>
           {publishing ? "Publishing…" : "Publish"}
         </button>
       </div>
+      {later && <SchedulePanel doc={doc} schedule={schedule} setSchedule={setSchedule} revertAt={revertAt} setRevertAt={setRevertAt} onClose={() => setLater(false)} />}
 
       <div className="flex-1 min-h-0 grid lg:grid-cols-[360px_1fr]">
         <aside className="border-r border-border bg-surface overflow-y-auto min-h-0">
