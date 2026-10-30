@@ -17,13 +17,13 @@ test("the holiday checklist ticks what's set up and links to the rest", async ({
 
   if (inSeason(new Date())) {
     const card = page.getByRole("region", { name: "Get ready for the holidays" });
-    await expect(card).toContainText("3 of 11 done. Next: set a last day to order.");
+    await expect(card).toContainText("3 of 12 done. Next: set a last day to order.");
     await card.getByRole("link", { name: "Open the holiday checklist" }).click();
   } else {
     await page.goto("/admin/holidays");
   }
   await expect(page.getByRole("heading", { name: "Holiday checklist" })).toBeVisible();
-  await expect(page.getByRole("status")).toHaveText("3 of 11 done");
+  await expect(page.getByRole("status")).toHaveText("3 of 12 done");
   await expect(page.getByRole("listitem", { name: "Show delivery dates: done" })).toBeVisible();
   await page.getByRole("listitem", { name: "Email buyers when an order runs late: to do" }).getByRole("link").click();
   await expect(page).toHaveURL(/\/admin\/shipping#late-heading$/);
@@ -32,7 +32,7 @@ test("the holiday checklist ticks what's set up and links to the rest", async ({
   await page.getByRole("button", { name: "Save running late email" }).click();
   await expect(page.getByRole("status")).toContainText("Saved.");
   await page.goto("/admin/holidays");
-  await expect(page.getByRole("status")).toHaveText("4 of 11 done");
+  await expect(page.getByRole("status")).toHaveText("4 of 12 done");
   await expect(page.getByRole("listitem", { name: "Email buyers when an order runs late: done" })).toContainText("hasn't shipped after 7 days");
 
   // Gift guides in one click, from the checklist.
@@ -43,5 +43,5 @@ test("the holiday checklist ticks what's set up and links to the rest", async ({
   await expect(page.getByRole("link", { name: "Gifts under $25" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Gift guides" })).toHaveCount(0);
   await page.goto("/admin/holidays");
-  await expect(page.getByRole("status")).toHaveText("5 of 11 done");
+  await expect(page.getByRole("status")).toHaveText("5 of 12 done");
 });
