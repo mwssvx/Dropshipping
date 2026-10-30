@@ -39,6 +39,8 @@ test("a merchant's announcement bar takes turns with three messages", async ({ p
   const buyerContext = await browser.newContext({ ...info.project.use });
   const buyer = await buyerContext.newPage();
   await buyer.goto(`/s/${handle}`);
+  // The pointer starts at the top left corner, over the bar, and pointing at the bar holds it still.
+  await buyer.mouse.move(0, 400);
   await expect(buyer.getByText("Free shipping over $50")).toBeVisible();
   // The first turn comes 3 seconds after the page wakes up, which can take a while on a busy machine.
   await expect(buyer.getByRole("link", { name: "30-day returns" })).toBeVisible({ timeout: 15_000 });
