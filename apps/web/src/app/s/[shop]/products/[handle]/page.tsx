@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, formatDeliveryWindow, giftCardBonusNow, holidayReturnsNow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, comingSoonProduct, COMPARE_MAX, defaultCutoffZone, countdownTo, shipsToCountry, recentSalesCount, RECENT_SALES_DAYS } from "@sf/core";
+import { bundlesForProduct, formatDeliveryWindow, giftCardBonusNow, holidayReturnsNow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, breadcrumbCollection, collectionFromReferer, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, comingSoonProduct, COMPARE_MAX, defaultCutoffZone, countdownTo, shipsToCountry, recentSalesCount, RECENT_SALES_DAYS } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { ShareButtons } from "@/components/ShareButtons";
 import { SaleCountdown } from "@/components/SaleCountdown";
@@ -18,7 +18,8 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { addBundleAction, addToCartAction, askQuestionAction, launchListAction, stockAlertAction, toggleCompareAction, toggleSavedAction } from "../../actions";
 import { readCompare } from "@/lib/compare";
 import { savedIds } from "@/lib/saved";
-import { loadShop, localProducts, storeBase, storeLang, storeT, missing } from "../../data";
+import { loadShop, localCollections, localProducts, storeBase, storeLang, storeT, missing } from "../../data";
+import { headers } from "next/headers";
 import { Price } from "@/components/Price";
 import { UnitPrice } from "@/components/UnitPrice";
 import type { Contents } from "@sf/db";
@@ -30,7 +31,7 @@ async function load(shopHandle: string, handle: string, count = true) {
   const shop = await loadShop(shopHandle);
   try {
     const product = await getActiveProductByHandle(await db(), shop.id, handle);
-    return { shop, product: (await localProducts(shopHandle, [product]))[0]! };
+    return { shop, product: (await localProducts(shopHandle, [product]))[0]!, raw: product };
   } catch (e) {
     if (e instanceof NotFoundError) return missing(shopHandle, `/products/${handle}`, count);
     throw e;
@@ -109,7 +110,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   if (soon) return <ComingSoon shopHandle={shopHandle} {...soon} launch={query.launch} t={t} />;
   const alertKind = ALERT_MESSAGES[(query.alert ?? "") as keyof typeof ALERT_MESSAGES];
   const alert = alertKind ? { text: t[alertKind.key], ok: alertKind.ok } : undefined;
-  const { shop, product } = await load(shopHandle, handle);
+  const { shop, product, raw } = await load(shopHandle, handle);
   // The merchant's own label and "New" by the title; the price already shows a sale, and the options what's sold out.
   const headBadges = cardBadges(shop.productBadges, { badge: product.badge, priceMinor: 0, createdAt: product.createdAt }).filter((b) => b.kind === "custom" || b.kind === "new");
   const buyable = product.variants.filter((x) => x.stock === null || x.stock > 0);
@@ -138,6 +139,10 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
     shop.recentSales ? recentSalesCount(await db(), shop.id, product.id) : null,
   ]);
   const recent = await localProducts(shopHandle, rawRecent);
+  const asked = await headers();
+  const crumbFound = await breadcrumbCollection(await db(), shop.id, raw, collectionFromReferer(asked.get("referer"), base));
+  const crumb = crumbFound ? (await localCollections(shopHandle, [crumbFound]))[0]! : null;
+  const origin = `${asked.get("x-forwarded-proto") ?? "https"}://${asked.get("host")}${base}`;
   const askedKind = ASKED_MESSAGES[(query.asked ?? "") as keyof typeof ASKED_MESSAGES];
   const upsells = await localProducts(shopHandle, rawUpsells);
   const together = (await localProducts(shopHandle, await boughtTogether(await db(), shop.id, [product.id]))).filter((p) => !upsells.some((u) => u.id === p.id));
@@ -195,9 +200,26 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const bonus = product.giftCard ? giftCardBonusNow(shop) : null;
   const shipsBy = (d: string) => new Intl.DateTimeFormat(lang, { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
   const jsonLd = JSON.stringify(productJsonLd(product, shop.currency, reviews)).replace(/</g, "\\u003c");
+  const trail = [{ title: t.breadcrumbHome, path: "" }, ...(crumb ? [{ title: crumb.title, path: `/collections/${crumb.handle}` }] : []), { title: product.title, path: `/products/${product.handle}` }];
+  const trailLd = JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: trail.map((c, i) => ({ "@type": "ListItem", position: i + 1, name: c.title, item: `${origin}${c.path}` })),
+  }).replace(/</g, "\\u003c");
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-10 md:grid-cols-2">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: trailLd }} />
+      <nav aria-label={t.breadcrumb} className="md:col-span-2 -mb-6 text-sm text-muted">
+        <ol className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          {trail.map((c, i) => (
+            <li key={c.path} className="flex items-center gap-2 min-w-0">
+              {i > 0 && <span aria-hidden>›</span>}
+              {i < trail.length - 1 ? <Link href={`${base}${c.path || "/"}`} className="underline-offset-2 hover:underline hover:text-ink">{c.title}</Link> : <span aria-current="page" className="text-ink truncate">{c.title}</span>}
+            </li>
+          ))}
+        </ol>
+      </nav>
       <ProductGallery title={product.title} alts={product.imageAlts} photos={[...new Set([...productPhotos(product), ...product.variants.flatMap((x) => (x.imageUrl ? [x.imageUrl] : []))])]} video={parseVideo(product.videoUrl)} text={galleryText(t)} />
       <div className="flex flex-col gap-5">
         <Track shopId={shop.id} kind="product_view" productId={product.id} />

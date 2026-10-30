@@ -95,7 +95,8 @@ test("collections, pages and menus show up on the store, with search basics", as
 
   // Product pages carry a description and structured data for search engines.
   await page.goto(`${store}/products/moon-lamp`);
-  const ld = JSON.parse((await page.locator('script[type="application/ld+json"]').textContent())!);
+  // Besides the product, the page describes its breadcrumb trail.
+  const ld = (await page.locator('script[type="application/ld+json"]').allTextContents()).map((t) => JSON.parse(t)).find((d) => d["@type"] === "Product");
   expect(ld).toMatchObject({ "@type": "Product", name: "Moon Lamp", offers: [{ price: "24.99" }] });
 
   const sitemap = await page.request.get(`${store}/sitemap.xml`);
