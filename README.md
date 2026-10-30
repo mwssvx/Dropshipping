@@ -1380,3 +1380,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Search finds more than products** (`packages/core/src/search-pages.ts`): searching the store also lists up to four collections and four pages or blog posts with every typed word in their title, above the products, so "shipping" leads to the Shipping page and "desk lamp" to the Desk lamps collection. Unpublished pages and draft posts stay out.
 2. **As the buyer types**: the suggestions under the search box add the best two collections and pages after the products, each marked Collection, Page or Article, and the arrow keys reach them too.
 3. **In the buyer's language**: titles match in the store's own words and the buyer's translation, and show in the buyer's language. The merchant's search fixes apply, as they do for products.
+
+### Search from the header (after launch, part 242)
+
+1. **Search on any page**: the magnifier in the store's header now opens a search box right under the header instead of leaving the page, with the same suggestions as the search page (products, then collections and pages) as the shopper types. Enter runs the whole search; picking a suggestion opens it.
+2. **Easy to put away**: Escape (once the suggestions are closed), the Close button or a click elsewhere closes it and puts focus back on the magnifier. Without JavaScript the magnifier is still a link to the search page.

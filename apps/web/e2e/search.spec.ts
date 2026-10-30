@@ -34,8 +34,9 @@ test("buyers search the store, then sort and filter the results", async ({ page 
   const id = `${info.project.name}-${Date.now()}`;
   const store = await newMerchantWithProducts(page, id);
   await page.goto(store);
+  // The header's search button opens a search box on the page the shopper is on.
   await page.getByRole("link", { name: "Search", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Search" })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Search" })).toBeFocused();
   await page.getByRole("combobox", { name: "Search" }).fill("lamps");
   await page.getByRole("button", { name: "Search", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Results for “lamps”" })).toBeVisible();
