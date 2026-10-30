@@ -400,6 +400,27 @@ function TrustBadges({ s }: Props<"trust_badges">) {
   );
 }
 
+function LogoList({ s, data }: Props<"logo_list">) {
+  const logos = s.items.filter((l) => l.imageUrl);
+  if (!logos.length) return null;
+  const tone = s.tone === "grey" ? "grayscale opacity-70 hover:grayscale-0 hover:opacity-100 transition" : "";
+  return (
+    <section className="max-w-6xl mx-auto px-4 sm:px-6 py-10 flex flex-col gap-6" aria-label={s.heading || undefined}>
+      {s.heading && <h2 className="text-sm font-semibold uppercase tracking-wider text-muted text-center">{s.heading}</h2>}
+      <ul className="flex flex-wrap items-center justify-center gap-x-10 gap-y-6">
+        {logos.map((l, i) => {
+          const img = <img src={l.imageUrl} alt={l.name} height={40} loading="lazy" decoding="async" className={`h-10 w-auto max-w-36 object-contain ${tone}`} />;
+          return (
+            <li key={i}>
+              {l.link ? <a href={storeHref(data.base, l.link)} rel={l.link.startsWith("/") ? undefined : "noopener"}>{img}</a> : img}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 function Newsletter({ s, data }: Props<"newsletter">) {
   const status = data.signup?.status ?? null;
   const t = data.t ?? storeText(null);
@@ -437,6 +458,7 @@ export function SectionView({ section, data, first }: { section: Section; data: 
     case "reviews": return <BuyerReviews s={section.settings} data={data} first={first} />;
     case "recently_viewed": return <RecentlyViewedSection s={section.settings} data={data} first={first} />;
     case "shop_the_look": return <ShopTheLook s={section.settings} data={data} first={first} />;
+    case "logo_list": return <LogoList s={section.settings} data={data} first={first} />;
   }
 }
 

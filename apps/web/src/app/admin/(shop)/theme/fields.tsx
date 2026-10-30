@@ -1,6 +1,6 @@
 "use client";
 import { useId } from "react";
-import { LOOK_MAX, TRUST_ICONS, type MenuItem, type SectionSettings, type SectionType, type TrustIcon } from "@sf/core/theme";
+import { LOGOS_MAX, LOOK_MAX, TRUST_ICONS, type MenuItem, type SectionSettings, type SectionType, type TrustIcon } from "@sf/core/theme";
 
 /*
  * Form controls for the theme editor. Every control is labelled and edits one value.
@@ -15,7 +15,7 @@ type Field =
   | { key: string; label: string; kind: "text" | "textarea" | "image" | "link"; hint?: string; max?: number }
   | { key: string; label: string; kind: "select"; options: { value: string; label: string }[] }
   | { key: string; label: string; kind: "number"; min: number; max: number }
-  | { key: string; label: string; kind: "collection" | "collections" | "faq" | "quotes" | "badges" | "products" };
+  | { key: string; label: string; kind: "collection" | "collections" | "faq" | "quotes" | "badges" | "products" | "logos" };
 
 export const TRUST_ICON_LABELS: Record<TrustIcon, string> = {
   shipping: "Delivery truck",
@@ -104,6 +104,11 @@ export const SECTION_FIELDS: Record<SectionType, Field[]> = {
     { key: "imageUrl", label: "Photo of the look", kind: "image" },
     { key: "productIds", label: "Piece", kind: "products" },
   ],
+  logo_list: [
+    { key: "heading", label: "Heading (optional)", kind: "text", max: 120, hint: "For example “As seen in” or “Brands we carry”." },
+    { key: "tone", label: "Logo look", kind: "select", options: [{ value: "grey", label: "Grey, in color on hover" }, { value: "full", label: "Full color" }] },
+    { key: "items", label: "Logos", kind: "logos" },
+  ],
 };
 
 /** One select per piece of a look, plus an empty one to add the next until the look is full. */
@@ -163,7 +168,7 @@ export function SectionForm<T extends SectionType>({
         const v = values[f.key];
         return (
           <div key={f.key} className="field">
-            {!["faq", "collections", "quotes", "badges", "products"].includes(f.kind) && <label className="label" htmlFor={id}>{f.label}</label>}
+            {!["faq", "collections", "quotes", "badges", "products", "logos"].includes(f.kind) && <label className="label" htmlFor={id}>{f.label}</label>}
             {f.kind === "text" && <input id={id} className="input" value={String(v ?? "")} maxLength={f.max} onChange={(e) => set(f.key, e.target.value)} />}
             {f.kind === "textarea" && <textarea id={id} className="input" rows={4} value={String(v ?? "")} maxLength={f.max} onChange={(e) => set(f.key, e.target.value)} />}
             {f.kind === "image" && (
@@ -219,6 +224,14 @@ export function SectionForm<T extends SectionType>({
                   { key: "text", label: "Text" },
                 ]} blank={{ icon: "shipping", title: "New badge", text: "" }} />
             )}
+            {f.kind === "logos" && (
+              <ListItems label={f.label} items={v as Record<string, string>[]} onChange={(x) => set(f.key, x)} max={LOGOS_MAX} noun="logo"
+                fields={[
+                  { key: "imageUrl", label: "Logo image", url: true },
+                  { key: "name", label: "Logo name" },
+                  { key: "link", label: "Logo link" },
+                ]} blank={{ imageUrl: "", name: "", link: "" }} />
+            )}
             {"hint" in f && f.hint && <span className="hint">{f.hint}</span>}
           </div>
         );
@@ -251,9 +264,9 @@ function FaqItems({ label, items, onChange }: { label: string; items: { question
   );
 }
 
-type ItemField = { key: string; label: string; textarea?: boolean; options?: { value: string; label: string }[] };
+type ItemField = { key: string; label: string; textarea?: boolean; url?: boolean; options?: { value: string; label: string }[] };
 
-/** A short list of small records (quotes, badges), each edited with its own labelled fields. */
+/** A short list of small records (quotes, badges, logos), each edited with its own labelled fields. */
 function ListItems({ label, items, onChange, fields, blank, max, noun }: {
   label: string;
   items: Record<string, string>[];
@@ -281,6 +294,8 @@ function ListItems({ label, items, onChange, fields, blank, max, noun }: {
                   </select>
                 ) : f.textarea ? (
                   <textarea id={id} className="input" rows={3} value={item[f.key] ?? ""} onChange={(e) => update(i, f.key, e.target.value)} />
+                ) : f.url ? (
+                  <input id={id} className="input" type="url" inputMode="url" placeholder="https://…" value={item[f.key] ?? ""} onChange={(e) => update(i, f.key, e.target.value)} />
                 ) : (
                   <input id={id} className="input" value={item[f.key] ?? ""} onChange={(e) => update(i, f.key, e.target.value)} />
                 )}
