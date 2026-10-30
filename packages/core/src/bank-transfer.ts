@@ -122,3 +122,10 @@ export async function countWaitingTransfers(db: Db, shopId: string) {
     .where(and(eq(schema.orders.shopId, shopId), eq(schema.orders.manualPayment, "bank_transfer"), eq(schema.orders.paymentStatus, "pending")));
   return row?.n ?? 0;
 }
+
+/** The ways a buyer can pay this store, in the order the footer shows them. Cards and wallets come through Stripe. */
+export function paymentMethods(shop: Pick<Shop, "bankTransfer" | "plan">) {
+  const methods: ("visa" | "mastercard" | "amex" | "apple_pay" | "google_pay" | "bank_transfer")[] = ["visa", "mastercard", "amex", "apple_pay", "google_pay"];
+  if (shop.bankTransfer && shop.plan !== "free") methods.push("bank_transfer");
+  return methods;
+}

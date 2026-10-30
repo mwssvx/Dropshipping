@@ -1385,3 +1385,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Search on any page**: the magnifier in the store's header now opens a search box right under the header instead of leaving the page, with the same suggestions as the search page (products, then collections and pages) as the shopper types. Enter runs the whole search; picking a suggestion opens it.
 2. **Easy to put away**: Escape (once the suggestions are closed), the Close button or a click elsewhere closes it and puts focus back on the magnifier. Without JavaScript the magnifier is still a link to the search page.
+
+### Ways to pay in the footer (after launch, part 243)
+
+1. **"We accept" in every store's footer** (`paymentMethods` in `packages/core/src/bank-transfer.ts`): Visa, Mastercard, American Express, Apple Pay and Google Pay, which come through Stripe, plus "Bank transfer" (in the buyer's language) when the store takes transfers on a paid plan. Buyers trust a new store more when they see their own way to pay before they reach checkout.
+2. **Only what's true, and easy to hide**: the list follows the store's own settings, never a stock row of logos, and theme editor → Style → "Show how buyers can pay in the footer" turns it off.
