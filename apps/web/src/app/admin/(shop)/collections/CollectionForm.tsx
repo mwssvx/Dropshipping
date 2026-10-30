@@ -56,7 +56,7 @@ export function CollectionForm({
           <div className="field">
             <label className="label" htmlFor="imageUrl">Cover image address</label>
             <input className="input" id="imageUrl" type="url" {...field("imageUrl")} placeholder="https://…" />
-            <span className="hint">Leave empty to use the first product's picture.</span>
+            <span className="hint">Shown on collection tiles and, unless the theme turns it off, as a banner on the collection&apos;s page. Leave empty to use the first product&apos;s picture on tiles.</span>
           </div>
         </section>
         <fieldset className="card p-5 flex flex-col gap-2">

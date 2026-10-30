@@ -393,6 +393,10 @@ function StylePanel({ doc, onChange }: { doc: ThemeDoc; onChange: (d: ThemeDoc) 
           <input type="checkbox" className="mt-0.5" checked={s.hoverPhoto} onChange={(e) => set({ hoverPhoto: e.target.checked })} />
           <span>Show a product&rsquo;s second photo when shoppers point at its card<span className="block hint">Shoppers see another side of the product without opening it. Products with one photo stay as they are.</span></span>
         </label>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-0.5" checked={s.collectionBanner} onChange={(e) => set({ collectionBanner: e.target.checked })} />
+          <span>Show a collection&rsquo;s photo behind its title<span className="block hint">A banner at the top of each collection&rsquo;s page, from the cover image you give the collection. Collections without one show just the title.</span></span>
+        </label>
       </fieldset>
       <fieldset className="flex flex-col gap-2">
         <legend className="font-semibold mb-1">Corners</legend>

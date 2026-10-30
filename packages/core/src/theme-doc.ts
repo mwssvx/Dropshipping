@@ -251,6 +251,8 @@ const themeDoc = z.object({
     stickyHeader: z.boolean().default(false),
     // Product cards show the product's second photo while a shopper points at them.
     hoverPhoto: z.boolean().default(false),
+    // A collection's page shows its photo behind the title, when it has one.
+    collectionBanner: z.boolean().default(true),
     logoText: text(60),
     logoUrl: imageUrl,
     // The store's pages on social networks, as icons in the footer. Empty ones don't show.
