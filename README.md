@@ -1302,3 +1302,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **"As seen in" and brands you carry** (`apps/web/src/theme/Sections.tsx`): a new home page section in the theme editor. Add up to 12 logos, each with an image, a name and an optional link, under a short heading. The name is what screen readers read and what shows if the image can't load.
 2. **Quiet by default**: logos show in grey and turn to full color when a shopper points at them, so a row of brand colors doesn't fight the store's own. Pick "Full color" to keep them as they are. A logo with no image yet stays hidden, so a half-filled row never shows a gap.
 3. **Safe links only**: images must be https, and links go to a store page or an https address, like every other section. No migration: it lives in the theme.
+
+### Video on the home page (after launch, part 227)
+
+1. **A video section** (`apps/web/src/theme/SectionVideo.tsx`): a new home page section in the theme editor with a heading, a line of text, a video link and an optional cover image. It takes the same links as product videos (part 68): YouTube, Vimeo, or the https address of an .mp4, .webm or .mov file. Any other link is refused with a reason before it can be published.
+2. **Nothing loads until play**: shoppers see the cover (or a dark frame) with a play button, and YouTube or Vimeo is only contacted once they press it, through YouTube's no-cookie player. A video file plays in the browser's own player.
+3. **One parser for both**: the link check moved to `packages/core/src/video-link.ts`, which has no database imports, so the editor and the storefront use the same rules as product pages. No migration.
