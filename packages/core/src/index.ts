@@ -123,6 +123,7 @@ export * from "./review-import";
 export * from "./contact";
 export * from "./badges";
 export * from "./after-add";
+export * from "./breadcrumbs";
 export * from "./shopify-import";
 export * from "./publish-later";
 export * from "./weekly-summary";

@@ -1348,3 +1348,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Full screen on every product page**: pressing the large photo opens it over the whole screen. Buyers step through the photos with the arrows, the arrow keys or a swipe on a phone, and zoom in to look closely (the zoom follows the pointer). Closing it, with the button or Escape, leaves the page on the photo they stopped at. There is nothing to set up.
 2. **For every buyer**: it works with a keyboard and screen readers, each photo keeps the description the merchant wrote for it, and the buttons and "Photo 2 of 5" are translated into the six store languages, along with the thumbnail labels that were English only before.
+
+### Breadcrumbs (after launch, part 236)
+
+1. **On every product page**: a small trail above the photo, Home › Night lights › Sunset Projection Lamp, so shoppers who land on a product from an ad or a search can go up to the collection and keep browsing. The middle step is the collection the shopper came from when the product is in it, else the first collection the product was added to by hand, else the first automatic one. Products in no collection show Home › the product.
+2. **For search engines too**: the same trail goes to Google as breadcrumb data, which it can show in results instead of a bare web address. The labels are translated into the six store languages.
