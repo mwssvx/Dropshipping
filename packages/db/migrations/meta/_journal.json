@@ -981,6 +981,13 @@
       "when": 1793370900243,
       "tag": "0140_gift_card_bonus",
       "breakpoints": true
+    },
+    {
+      "idx": 140,
+      "version": "7",
+      "when": 1793371751833,
+      "tag": "0141_product_quiz",
+      "breakpoints": true
     }
   ]
 }

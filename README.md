@@ -1257,3 +1257,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **"Buy $50, get a $10 bonus card"** (`packages/core/src/gift-card-bonus.ts`): on the Gift cards page, set the bonus, how much in gift cards earns it, and the days the offer runs (`shops.gift_card_bonus`, migration 0140). The gift card's page says so while it's on, in every store language.
 2. **For the buyer, after they pay**: an order with gift cards gets one bonus card for every step it reaches ($125 earns $20), emailed to the buyer even when the gift cards go to someone else. It's made once per order, and refunding the order turns it off with the rest.
 3. **Its own dates**: a bonus card can wait until a later day ("use it from January 1", which brings buyers back after the holidays) and can expire, since nobody paid for it (`gift_cards.bonus`, `usable_from`, `expires_at`). The cart, the balance page and the admin list say when. Bought gift cards still never expire.
+
+### Product quiz (after launch, part 219)
+
+1. **A few questions, the right products** (`packages/core/src/quiz.ts`): from the Marketing page, write up to 5 questions ("Who's it for?") with up to 5 answers each, and pick the product tag each answer leads to (`shops.product_quiz`, migration 0141). A tag no product uses is refused, so every answer leads somewhere.
+2. **On the store at `/quiz`**: one tap per question, then "See my picks" shows up to 6 products with the most of the chosen tags, best sellers first, never sold out or gift cards. It's a plain form with the answers in the address, so a result can be shared, and the buttons are in every store language.
+3. **One link**: the editor gives the quiz's link to put in the store menu, a bio or a campaign. On Shopify, quiz apps charge monthly for this.
