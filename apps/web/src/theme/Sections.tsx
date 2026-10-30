@@ -102,15 +102,16 @@ export function badgeLabel(b: Badge, t: StoreText) {
 type CatalogProduct = Omit<StorefrontCatalog["products"][number], "sold"> & { sold?: number };
 type GridProduct = Omit<StorefrontCatalog["products"][number], "badge" | "createdAt" | "soldOut" | "swatches" | "contents" | "quickAdd" | "sold" | "hoverImageUrl"> & BadgeFacts & Partial<Pick<StorefrontCatalog["products"][number], "swatches" | "contents" | "quickAdd" | "sold" | "hoverImageUrl">>;
 
-export function ProductGrid({ products, data }: { products: GridProduct[]; data: SectionData }) {
+/** Numbered grids give each card an id (item-1, item-2...), so "Show more" can land on the first new one. */
+export function ProductGrid({ products, data, numbered = false }: { products: GridProduct[]; data: SectionData; numbered?: boolean }) {
   const t = data.t ?? storeText(null);
   const now = new Date();
   return (
     <ul className="sf-grid grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-8">
-      {products.map((p) => {
+      {products.map((p, i) => {
         const badges = cardBadges(data.badges, p, now);
         return (
-        <li key={p.id} className="flex flex-col gap-2">
+        <li key={p.id} id={numbered ? `item-${i + 1}` : undefined} className="flex flex-col gap-2 scroll-mt-[calc(var(--sticky-offset,0px)+1rem)]">
           <Link href={`${data.base}/products/${p.handle}`} className="sf-card group flex flex-col gap-2 flex-1">
             <div className="sf-media relative aspect-square rounded-lg bg-sunken overflow-hidden">
               {p.imageUrl && (
