@@ -71,7 +71,7 @@ function local(at: Date, timeZone: string) {
 }
 
 /** The instant a local day (as UTC midnight of that date) reaches `hour` in a time zone. */
-function instantAt(day: number, hour: number, timeZone: string) {
+export function instantAt(day: number, hour: number, timeZone: string) {
   let guess = day + hour * 3_600_000;
   // Two passes settle the offset, daylight saving changes included.
   for (let i = 0; i < 2; i++) {

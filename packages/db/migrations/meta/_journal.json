@@ -967,6 +967,13 @@
       "when": 1793195786764,
       "tag": "0138_gift_returns",
       "breakpoints": true
+    },
+    {
+      "idx": 138,
+      "version": "7",
+      "when": 1793369689320,
+      "tag": "0139_daily_deals",
+      "breakpoints": true
     }
   ]
 }

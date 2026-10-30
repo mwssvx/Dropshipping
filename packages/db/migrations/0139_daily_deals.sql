@@ -1,0 +1,1 @@
+ALTER TABLE "sales" ADD COLUMN "daily_deal" boolean DEFAULT false NOT NULL;

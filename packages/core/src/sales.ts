@@ -30,6 +30,7 @@ const saleInput = z
     startsAt: z.date({ error: "Pick when the sale starts." }),
     endsAt: z.date().nullish(),
     countdown: z.boolean().default(false),
+    dailyDeal: z.boolean().default(false),
   })
   .refine((s) => !s.endsAt || s.endsAt > s.startsAt, { message: "The sale has to end after it starts." })
   .refine((s) => s.scope !== "collection" || !!s.collectionId, { message: "Pick the collection that's on sale." })
@@ -71,6 +72,7 @@ export async function createSale(db: Db, shopId: string, input: SaleInput, now =
       startsAt: data.startsAt < now ? now : data.startsAt,
       endsAt: data.endsAt ?? null,
       countdown: data.countdown,
+      dailyDeal: data.dailyDeal,
     })
     .returning();
   return row!;

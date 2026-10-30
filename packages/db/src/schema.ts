@@ -2006,6 +2006,8 @@ export const sales = pgTable(
     countdown: boolean("countdown").notNull().default(false),
     // A code that gets subscribers (or tagged customers) the sale price before it starts. It stops when the sale starts.
     earlyDiscountId: uuid("early_discount_id").references(() => discounts.id, { onDelete: "set null" }),
+    // One of a run of one-product, one-day deals: the store's /deal link goes to whichever is on.
+    dailyDeal: boolean("daily_deal").notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
