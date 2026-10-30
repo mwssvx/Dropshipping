@@ -95,6 +95,9 @@
   color: var(--color-ink);
   font-family: var(--store-body-font);
 }
+/* With a sticky header, other sticky parts (the checkout summary) sit below it. */
+.store[data-sticky="on"] { --sticky-offset: 4rem; }
+@media (min-width: 48rem) { .store[data-sticky="on"][data-header="centered"] { --sticky-offset: 8.5rem; } }
 .store h1, .store h2, .store h3 { font-family: var(--store-heading-font); }
 .store .btn { border-radius: var(--radius-md); }
 

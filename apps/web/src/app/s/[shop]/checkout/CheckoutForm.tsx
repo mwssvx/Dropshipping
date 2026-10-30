@@ -97,7 +97,7 @@ export function Checkout({ summary, footer, taxLabel, totalLabel, totalWithoutSh
         <h1 className="text-3xl font-bold tracking-tight">{t.checkout}</h1>
         <CheckoutForm {...form} country={country} onCountry={setCountry} onPostal={setPostal} rates={rates} rate={rate} onRate={setRateId} protect={protect} onProtect={setProtect} gift={gift} onGift={setGift} wrap={wrap} onWrap={setWrap} tipPercent={tipPercent} onTip={setTipPercent} />
       </div>
-      <aside className="card p-5 flex flex-col gap-4 md:sticky md:top-6 bg-sunken border-0">
+      <aside className="card p-5 flex flex-col gap-4 md:sticky md:top-[calc(var(--sticky-offset,0px)+1.5rem)] bg-sunken border-0">
         <h2 className="font-semibold">{t.orderSummary}</h2>
         {summary}
         <dl className="grid grid-cols-[1fr_auto] gap-y-1 num text-sm -mt-3">

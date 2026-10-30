@@ -237,6 +237,8 @@ const themeDoc = z.object({
         buttons: z.enum(["filled", "outline"]).default("filled"),
       })
       .prefault({}),
+    // The header stays at the top of the screen while shoppers scroll.
+    stickyHeader: z.boolean().default(false),
     logoText: text(60),
     logoUrl: imageUrl,
     seo: z.object({ title: text(70), description: text(320) }).prefault({}),

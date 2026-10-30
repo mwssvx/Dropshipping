@@ -22,7 +22,10 @@ export function themeStyle(settings: ThemeDoc["settings"]): CSSProperties {
 /** Layout choices as data attributes; globals.css turns them into grid, card, image and button styles. */
 export function themeLayoutAttrs(settings: ThemeDoc["settings"]) {
   const l = settings.layout;
-  return { "data-header": l.header, "data-image": l.productImage, "data-cols": String(l.columns), "data-cards": l.cards, "data-buttons": l.buttons };
+  return {
+    "data-header": l.header, "data-image": l.productImage, "data-cols": String(l.columns), "data-cards": l.cards, "data-buttons": l.buttons,
+    "data-sticky": settings.stickyHeader ? "on" : "off",
+  };
 }
 
 /** Turns a theme link into a real address: store paths get the store's base, others pass through. */
