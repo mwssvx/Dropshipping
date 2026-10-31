@@ -56,6 +56,13 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  cancelInvite,
+  changeRole,
+  inviteMember,
+  PLANS,
+  removeMember,
+  ROLES,
+  teamSeats,
   cancelSubscriptionForBuyer,
   intervalLabel,
   listSubscriptions,
@@ -600,6 +607,50 @@ const routes: Record<string, Handler> = {
     const row = await unblockBuyer(db, shop.id, params.id!);
     await logged({ shop, user, db }, `Unblocked ${row.label} in the app`, { href: "/admin/blocked" });
     return { ok: true, message: `${row.label} can check out again.` };
+  },
+  // The team: who can help run the store, invites waiting, and the seats the plan includes.
+  "GET team": async ({ db, shop, user }) => {
+    const { members, invites } = await listTeam(db, shop.id);
+    return {
+      plan: PLANS[shop.plan].name,
+      seats: teamSeats(shop.plan),
+      used: members.filter((m) => m.role !== "owner").length + invites.length,
+      roles: { admin: ROLES.admin.summary, staff: ROLES.staff.summary },
+      members: members.map((m) => ({ userId: m.userId, email: m.email, name: m.name, role: m.role, since: m.since, you: m.userId === user.id })),
+      invites: invites.map((i) => ({ id: i.id, email: i.email, role: i.role, expiresAt: i.expiresAt })),
+    };
+  },
+  "POST team/invites": async ({ req, db, shop, user }) => {
+    const b = await body<{ email?: unknown; role?: unknown }>(req);
+    const email = str(b.email).trim().toLowerCase();
+    const role = str(b.role);
+    const base = platformUrl("/invite/");
+    await inviteMember({ db, mailer: mailer(), brand: BRAND, inviteUrl: (t) => `${base}${t}` }, shop, user, { email, role });
+    await logged({ shop, user, db }, `Invited ${email} as ${role === "admin" ? "admin" : "staff"} in the app`, { href: "/admin/team" });
+    return { ok: true, message: `Invite sent to ${email}. The link works for a week.` };
+  },
+  "DELETE team/invites/:id": async ({ params, db, shop, user }) => {
+    const invite = await db.query.shopInvites.findFirst({ where: (i, { and, eq }) => and(eq(i.id, params.id!), eq(i.shopId, shop.id)), columns: { email: true } });
+    if (!invite) throw new NotFoundError("Invite");
+    await cancelInvite(db, shop.id, params.id!);
+    await logged({ shop, user, db }, `Cancelled the invite for ${invite.email} in the app`, { href: "/admin/team" });
+    return { ok: true, message: `The invite for ${invite.email} no longer works.` };
+  },
+  "PATCH team/members/:id": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ role?: unknown }>(req);
+    if (params.id === user.id) throw new UserError("You can't change your own role.");
+    const role = str(b.role);
+    await changeRole(db, shop.id, params.id!, role);
+    const who = (await db.query.users.findFirst({ where: (u, { eq }) => eq(u.id, params.id!), columns: { email: true } }))?.email ?? "someone";
+    await logged({ shop, user, db }, `Made ${who} ${role === "admin" ? "an admin" : "staff"} in the app`, { href: "/admin/team" });
+    return { ok: true, message: `${who} is ${role === "admin" ? "an admin" : "staff"} now.` };
+  },
+  "DELETE team/members/:id": async ({ params, db, shop, user }) => {
+    if (params.id === user.id) throw new UserError("To leave the store yourself, use Team on the website.");
+    const who = (await db.query.users.findFirst({ where: (u, { eq }) => eq(u.id, params.id!), columns: { email: true } }))?.email ?? "someone";
+    await removeMember(db, shop.id, params.id!);
+    await logged({ shop, user, db }, `Removed ${who} from the team in the app`, { href: "/admin/team" });
+    return { ok: true, message: `${who} can't open the store any more.` };
   },
   "GET questions": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
@@ -1171,7 +1222,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("questions")) return "reviews";
   if (path.startsWith("payment-links")) return "orders";
   if (path.startsWith("analytics")) return "analytics";
-  if (path.startsWith("activity")) return "team";
+  if (path.startsWith("activity") || path.startsWith("team")) return "team";
   if (path.startsWith("subscriptions")) return "orders";
   if (path.startsWith("blocked")) return "customers";
   if (path.startsWith("checkouts")) return "orders";

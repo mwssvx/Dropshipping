@@ -1932,3 +1932,7 @@ The Orders tab has Subscriptions: buyers who get their order again every few wee
 ### Blocked buyers in the app (after launch, part 363)
 
 The app's Customers screen ends with Blocked buyers: every email and delivery address checkout turns away, why (a note only the team sees), and the order it came from. Block an email straight from the phone after a chargeback or a stolen card, or unblock someone so they can check out again, as on the website.
+
+### The team in the app (after launch, part 364)
+
+Settings in the app has People, for the store's owner: everyone on the team with their role, invites still waiting (send again or cancel), and a box to invite someone by email as staff or admin, with what each role can do. Change someone from staff to admin or back, or take them off the team, from the phone. On a plan without staff accounts it says which plan has them.
