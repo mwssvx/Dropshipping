@@ -1023,6 +1023,26 @@ export type AiReportItem = {
   search?: string;
 };
 
+// Outside accounts a store connected for its Assistant (Google for Gmail and Calendar). Tokens are
+// sealed by core's connectors module when CONNECTOR_SECRET is set.
+export const connectors = pgTable(
+  "connectors",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["google"] }).notNull(),
+    accountEmail: text("account_email"),
+    accessToken: text("access_token").notNull(),
+    refreshToken: text("refresh_token"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    scopes: jsonb("scopes").$type<string[]>().notNull().default([]),
+    connectedBy: uuid("connected_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("connectors_shop_kind_uq").on(t.shopId, t.kind)],
+);
+
 // The store's to-do list: things the owner wrote down, or asked the Assistant to remind them of.
 export const tasks = pgTable(
   "tasks",

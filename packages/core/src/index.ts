@@ -122,3 +122,4 @@ export * from "./insights";
 export * from "./watch";
 export * from "./churn";
 export * from "./tasks";
+export * from "./connectors/google";

@@ -400,6 +400,21 @@ function assistant(s: State, req: ModelRequest): BetaContentBlock[] {
         toolCall("create_discount", { code, kind: pct ? "percent" : "free_shipping", value: pct ? Number(pct) : 0, min_order: over ? Number(over) : null, days: days ? Number(days) : null, usage_limit: null, once_per_customer: /once (per|a) (customer|buyer)/.test(ask) }),
       ];
     }
+    if (/\b(my (e-?mails?|inbox)|new e-?mails?|any e-?mails?|e-?mails? from|check (my )?(e-?mail|inbox))\b/.test(ask)) {
+      const from = ask.match(/\b(?:e-?mails? )?from ([a-z0-9 .@'-]{2,40}?)(?:\?|$|\s(?:about|in|today|this))/)?.[1]?.trim();
+      return [toolCall("read_emails", { query: from ? `from:${from}` : null, max: 5 })];
+    }
+    if (/\b(what('s| is) on my calendar|my calendar|my (schedule|agenda)|calendar (this|next) week)\b/.test(ask) && !/\b(add|put|schedule|book)\b/.test(ask)) {
+      return [toolCall("read_calendar", { days: /\bmonth\b/.test(ask) ? 30 : 7 })];
+    }
+    const cal = ask.match(/\b(?:add|put|schedule|book) (?:a |an |the )?(.{2,80}?) (?:on|to|in) my calendar(?: (?:on|for|at) (\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2})?))?/);
+    if (cal) return [toolCall("add_calendar_event", { title: cal[1]!.replace(/^\w/, (c) => c.toUpperCase()), start: cal[2] ?? new Date(Date.now() + 86_400_000).toISOString().slice(0, 10), end: null, description: null, location: null })];
+    const mail = ask.match(/\b(?:e-?mail|write to|send (?:an )?e-?mail to) ([^\s@]+@[^\s@]+\.[a-z]{2,})\b(?:.*?\b(?:about|saying|that) (.+))?/);
+    if (mail) {
+      const store = req.system.match(/admin of (.+?), an online store/)?.[1] ?? "us";
+      const about = mail[2]?.replace(/[.!]+$/, "").trim();
+      return [toolCall("send_email", { to: mail[1], subject: about ? about.replace(/^\w/, (c) => c.toUpperCase()).slice(0, 150) : `A note from ${store}`, text: `Hi,\n\n${about ? `${about.replace(/^\w/, (c) => c.toUpperCase())}.` : "Just getting in touch."}\n\nBest wishes,\n${store}` })];
+    }
     if (/\b(remind me|add .{2,80} to (my|the) (to[- ]?do )?list|note (this |that )?down|to[- ]?do:)/.test(ask)) {
       const title = ask.replace(/^.*?\b(?:remind me to|remind me|add|note down|note|to[- ]?do:)\s*/i, "").replace(/\s+to (my|the) (to[- ]?do )?list\b.*$/i, "").replace(/\s+(?:by|on|before) \d{4}-\d{2}-\d{2}\b.*$/i, "").replace(/\s+tomorrow\b.*$/i, "").replace(/[.!]+$/, "").trim();
       const when = ask.match(/\b(?:on|by|before) (\d{4}-\d{2}-\d{2})\b/)?.[1] ?? (/\btomorrow\b/.test(ask) ? new Date(Date.now() + 86_400_000).toISOString().slice(0, 10) : null);
@@ -439,6 +454,18 @@ function assistant(s: State, req: ModelRequest): BetaContentBlock[] {
   if (c.isError) return [text(`I couldn't do that: ${strip(c.result)}`)];
   const r = c.result;
   switch (c.name) {
+    case "read_emails": {
+      const emails = r.emails as { from: string; subject: string; when: string }[];
+      if (!emails.length) return [text("Nothing matched in your inbox.")];
+      return [text(`${emails.length === 1 ? "1 email" : `${emails.length} emails`} in ${r.account ?? "your inbox"}:\n${emails.map((m) => `• ${m.from.replace(/\s*<.*>$/, "")}: ${m.subject} (${m.when})`).join("\n")}`)];
+    }
+    case "read_email":
+      return [text(`From ${String(r.from).replace(/\s*<.*>$/, "")}, “${r.subject}”:\n${String(r.text).replace(/<\/?untrusted_data[^>]*>/g, "").trim().slice(0, 600)}`)];
+    case "read_calendar": {
+      const events = r.events as { title: string; when: string }[];
+      if (!events.length) return [text(`Nothing on your calendar in the next ${r.days} days.`)];
+      return [text(`Next ${r.days} days:\n${events.map((e) => `• ${String(e.title).replace(/<\/?untrusted_data[^>]*>/g, "").trim()}: ${e.when}`).join("\n")}`)];
+    }
     case "add_task":
       return [text(`Added to your list: “${r.added}”${r.due ? `, due ${r.due}` : ""}. It's on Today and the To do page.`)];
     case "read_tasks": {
@@ -473,6 +500,10 @@ function assistant(s: State, req: ModelRequest): BetaContentBlock[] {
         ),
       ];
     }
+    case "send_email":
+      return [text(waiting(c) ? `I've written the email; it's waiting for your OK next to this chat, with the full text.` : `Sent.`)];
+    case "add_calendar_event":
+      return [text(waiting(c) ? `It's ready to add; it's waiting for your OK next to this chat.` : `Added to your calendar.`)];
     case "draft_winback_email":
     case "create_discount":
     case "create_collection":

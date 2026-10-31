@@ -1,11 +1,18 @@
 import { schema, type AgentName } from "@sf/db";
 import type { RefundContext } from "../refunds";
+import type { GoogleProvider } from "../connectors/google";
 import type { ModelClient } from "./model";
 
 export type Shop = typeof schema.shops.$inferSelect;
 
 /** Everything the agents talk to: the store's services plus the model. */
-export type AgentContext = RefundContext & { model: ModelClient };
+export type AgentContext = RefundContext & {
+  model: ModelClient;
+  /** The owner's connected Google account (Gmail and Calendar), when the platform has it set up. */
+  google?: GoogleProvider;
+  /** Seals the connected account's tokens at rest; see connectors/google.ts. */
+  connectorSecret?: string;
+};
 
 /** One agent run, as the tools see it. Rebuilt from the run row when an approved action executes later. */
 export type RunScope = {
