@@ -87,3 +87,35 @@ export async function handoverSchedule(db: Db, shopId: string, days: HandoverDay
 export function handoverParam(value: string | null | undefined) {
   return value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T12:00:00Z`)) ? value : undefined;
 }
+
+/**
+ * The day's sheet to print: the paid pickups and local deliveries due that day (or earlier and
+ * still waiting, with `late`) that haven't been handed over, with what's in each. Deliveries come
+ * by postal code, so they read in a sensible driving order; pickups by name, to find them on the shelf.
+ */
+export async function handoverSheet(db: Db, shopId: string, day: string, today: string) {
+  const o = schema.orders;
+  const orders = await db.query.orders.findMany({
+    where: and(eq(o.shopId, shopId), day === today ? lte(o.handoverOn, day) : eq(o.handoverOn, day), inArray(o.paymentStatus, ["paid", "partially_refunded"]), ne(o.fulfillmentStatus, "delivered")),
+  });
+  const lines = orders.length ? await db.query.orderLines.findMany({ where: inArray(schema.orderLines.orderId, orders.map((x) => x.id)) }) : [];
+  const rows = orders.map((x) => ({
+    id: x.id,
+    number: x.number,
+    pickup: x.pickup,
+    late: x.handoverOn! < day,
+    name: x.shippingAddress.name,
+    phone: x.shippingAddress.phone ?? null,
+    email: x.email,
+    address: x.pickup ? null : [x.shippingAddress.line1, x.shippingAddress.line2, x.shippingAddress.city, x.shippingAddress.postalCode].filter(Boolean).join(", "),
+    postalCode: x.shippingAddress.postalCode,
+    note: x.buyerNote,
+    ready: !!x.pickupReadyAt,
+    items: lines.filter((l) => l.orderId === x.id).map((l) => ({ title: l.title, quantity: l.quantity })),
+  }));
+  const byName = (a: (typeof rows)[number], b: (typeof rows)[number]) => a.name.localeCompare(b.name) || a.number - b.number;
+  return {
+    pickups: rows.filter((r) => r.pickup).sort(byName),
+    deliveries: rows.filter((r) => !r.pickup).sort((a, b) => a.postalCode.localeCompare(b.postalCode) || a.number - b.number),
+  };
+}

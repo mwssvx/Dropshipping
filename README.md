@@ -1617,3 +1617,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **From the order page** (`moveHandoverDay` in `packages/core/src/handover-change.ts`): under "Collecting on …" or "Deliver on …", "Move to another day" lists every day from today to the end of the buyer's window, open days or not, since the store can make an exception. Moving it emails the buyer "New pickup day for order #1042 from …" with the new day, and the order's history says who moved it from when to when.
 2. Handed-over and unpaid orders can't move. The email shows on the order's timeline, and the day-before reminder follows the new day. No migration.
+
+### Day sheet (after launch, part 288)
+
+1. **One page to print** (`handoverSheet` in `packages/core/src/handover-days.ts`, page `/admin/orders/day-sheet`): "Print the day sheet" on the order list shows a day's pickups and local deliveries with a tick box, the buyer's name and phone, the order number, what's in it and the buyer's note. Pickups come by name, to find them on the shelf, and say whether they're packed; deliveries come by postal code with the address, in a sensible driving order.
+2. Today's sheet also lists anyone from earlier days who hasn't come yet, marked "Due earlier". Chips switch between the days of the coming week. No migration.

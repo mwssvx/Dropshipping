@@ -87,7 +87,10 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         </nav>
         {schedule && (
           <section className="card p-4 flex flex-col gap-2 max-w-4xl" aria-labelledby="handover-schedule">
-            <h2 id="handover-schedule" className="font-semibold text-sm">Pickups and deliveries</h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 id="handover-schedule" className="font-semibold text-sm">Pickups and deliveries</h2>
+              <Link href={`/admin/orders/day-sheet${day && day !== "overdue" ? `?day=${day}` : ""}`} className="text-sm underline">Print the day sheet</Link>
+            </div>
             <ul className="flex flex-wrap gap-2 text-sm">
               {schedule.overdue > 0 && (
                 <li>

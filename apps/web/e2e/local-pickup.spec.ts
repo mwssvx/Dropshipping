@@ -156,4 +156,12 @@ test("a buyer picks the day they'll collect their order", async ({ page, browser
   await expect(page.getByText(`Collecting on ${storeDay}`)).toBeVisible();
   await buyer.reload();
   await expect(buyer.getByText(`Pickup day: ${storeDay}`)).toBeVisible();
+
+  // The day's sheet to print lists the buyer under the pickups.
+  await page.goto("/admin/orders");
+  await page.getByRole("link", { name: "Print the day sheet" }).click();
+  await expect(page.getByRole("heading", { name: "Day sheet" })).toBeVisible();
+  const sheet = page.getByRole("article", { name: "Pickups" });
+  await expect(sheet.getByText("Linus Pauling")).toBeVisible();
+  await expect(sheet.getByText("1 × Stoneware Bowl")).toBeVisible();
 });
