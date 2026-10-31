@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { schema } from "@sf/db";
-import { createProduct, createShop, DemoModel, productPage, setRestockAlert, signUp, type ProductStockFilter } from "../src";
+import { createProduct, createShop, DemoModel, listProducts, productPage, setRestockAlert, signUp, stockLevel, type ProductStockFilter } from "../src";
 import { makeFixture } from "../evals/fixture";
 
 describe("product list stock filter", () => {
@@ -21,6 +21,10 @@ describe("product list stock filter", () => {
     // The store's running-low number starts at 3; an option at 0 counts while others still sell.
     expect(await titles("low")).toEqual(["Half Gone Cap", "Last Few Bag"]);
     expect(await titles("in_stock")).toEqual(["Half Gone Cap", "Last Few Bag", "Plenty Tee", "Untracked Print"]);
+    // One product at a time (the app's list) gives the same answer.
+    const levels = async (at: number) => Object.fromEntries((await listProducts(f.db, shop.id)).map((p) => [p.title, stockLevel(p, at)]));
+    expect(await levels(3)).toEqual({ "Gone Mug": "sold_out", "Half Gone Cap": "low", "Last Few Bag": "low", "Plenty Tee": null, "Untracked Print": null });
+    expect((await levels(50))["Plenty Tee"]).toBe("low");
     await setRestockAlert(f.db, shop.id, 50);
     expect(await titles("low")).toEqual(["Half Gone Cap", "Last Few Bag", "Plenty Tee"]);
     // A product with no options isn't sold out, it just can't be bought.

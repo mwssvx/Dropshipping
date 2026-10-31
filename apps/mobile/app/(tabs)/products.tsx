@@ -10,11 +10,23 @@ export default function ProductsScreen() {
   const router = useRouter();
   const list = useApi<{ products: Product[] }>("products");
   const cur = useSession().me?.shop.currency ?? "USD";
-  const [show, setShow] = useState<"all" | "missing">("all");
+  const [show, setShow] = useState<"all" | "low" | "sold_out" | "missing">("all");
   const all = list.data?.products ?? [];
   // Archived products are off the store, so what they lack doesn't matter.
   const incomplete = all.filter((p) => p.status !== "archived" && p.missing.length > 0);
-  const products = show === "missing" ? incomplete : all;
+  const low = all.filter((p) => p.status === "active" && p.stockLevel === "low");
+  const soldOut = all.filter((p) => p.status === "active" && p.stockLevel === "sold_out");
+  const lists = { all, low, sold_out: soldOut, missing: incomplete };
+  const products = lists[show];
+  // Only the lists with something in them, and the one already picked.
+  const tabs = (
+    [
+      ["all", "All"],
+      ["low", `Low (${low.length})`],
+      ["sold_out", `Sold out (${soldOut.length})`],
+      ["missing", `Needs details (${incomplete.length})`],
+    ] as [keyof typeof lists, string][]
+  ).filter(([k]) => k === "all" || k === show || lists[k].length > 0);
   return (
     <Screen title="Products" onRefresh={list.reload} refreshing={list.loading && !!list.data} right={<Button label="Import" onPress={() => router.push("/import")} a11y="Import from a supplier link" />}>
       <LoadError error={list.error} stale={list.stale} retry={list.reload} />
@@ -24,9 +36,8 @@ export default function ProductsScreen() {
         <EmptyState heading="No products yet" body="Paste a link from your supplier, or share it to this app from the supplier's app or website." />
       ) : (
         <>
-          {incomplete.length > 0 || show === "missing" ? (
-            <Segmented label="Which products" value={show} onChange={setShow} options={[["all", "All"], ["missing", `Needs details (${incomplete.length})`]]} />
-          ) : null}
+          {tabs.length > 1 ? <Segmented label="Which products" value={show} onChange={setShow} options={tabs} /> : null}
+          {(show === "low" || show === "sold_out") && products.length === 0 ? <Body muted>{show === "low" ? "Nothing on sale is running low." : "Nothing on sale is sold out."}</Body> : null}
           {show === "missing" ? (
             <Body muted>
               {incomplete.length
