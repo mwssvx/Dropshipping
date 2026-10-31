@@ -56,6 +56,7 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  setHolidayReturns,
   setWelcomeOffer,
   describeWelcomeOffer,
   setSignupPopup,
@@ -1463,6 +1464,30 @@ const routes: Record<string, Handler> = {
       message: seconds === null ? "Saved. Visitors aren't asked for their email in a pop-up." : seconds === SIGNUP_POPUP_ON_LEAVE ? "Saved. Visitors are asked for their email when they look about to leave." : `Saved. Visitors are asked for their email ${seconds} seconds after they arrive.`,
     };
   },
+  // Holiday returns: orders paid in a stretch (Nov 1 to Dec 24) can come back until a later day (Jan 31).
+  "GET holiday-returns": async ({ shop }) => {
+    const now = new Date();
+    // Suggested dates: this season, or next year's once this one's last order day has passed.
+    const y = now.getUTCMonth() === 11 && now.getUTCDate() > 24 ? now.getUTCFullYear() + 1 : now.getUTCFullYear();
+    return {
+      holiday: shop.holidayReturns,
+      windowDays: shop.returnWindowDays,
+      suggested: { from: `${y}-11-01`, to: `${y}-12-24`, until: `${y + 1}-01-31` },
+    };
+  },
+  "PUT holiday-returns": async ({ req, db, shop, user }) => {
+    const b = await body<{ on?: unknown; from?: unknown; to?: unknown; until?: unknown }>(req);
+    const saved = await setHolidayReturns(db, shop, b.on === true ? { from: str(b.from), to: str(b.to), until: str(b.until) } : null);
+    await logged({ shop, user, db }, saved ? `Kept holiday orders returnable until ${saved.until} in the app` : "Turned off holiday returns in the app", { href: "/admin/returns#holiday-returns" });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    const day = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+    return {
+      ok: true,
+      message: saved
+        ? `Saved. Orders paid ${day(saved.from)} to ${day(saved.to)} can be returned until ${day(saved.until)}.`
+        : `Saved. Every order has your usual ${shop.returnWindowDays} days to come back.`,
+    };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -1504,6 +1529,7 @@ const routes: Record<string, Handler> = {
       sale: { path: "/sales", area: "marketing" },
       "gift-guides": { path: "/collections", area: "collections" },
       "gift-wrap": { path: "/gift-wrap", area: "shipping" },
+      returns: { path: "/holiday-returns", area: "returns" },
       popup: { path: "/signup", area: "marketing" },
       reminders: { path: "/checkouts", area: "marketing", also: "orders" },
     };
@@ -2185,6 +2211,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("gift-cards")) return "gift_cards";
   if (path.startsWith("sales")) return "marketing";
   if (path.startsWith("returns")) return "returns";
+  if (path.startsWith("holiday-returns")) return "returns";
   if (path === "today") return "home";
   if (path === "holiday-checklist") return "home";
   return null;

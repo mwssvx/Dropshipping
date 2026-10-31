@@ -2,7 +2,7 @@ import { useState } from "react";
 import { View } from "react-native";
 import { send, useApi } from "../../src/api";
 import { money, parseMoney, when } from "../../src/format";
-import { BackLink, Banner, Body, Button, Card, EmptyState, Field, Heading, LoadError, Loading, Pill, Screen, Segmented } from "../../src/ui";
+import { BackLink, Banner, Body, Button, Card, EmptyState, Field, Heading, List, LoadError, Loading, Pill, Row, Screen, Segmented } from "../../src/ui";
 import { space, type Tone } from "../../src/theme";
 
 type Return = {
@@ -58,6 +58,9 @@ export default function ReturnsScreen() {
       ) : (
         rows.map((r) => <ReturnCard key={r.id} r={r} done={(text, ok) => (setNote({ tone: ok ? "success" : "critical", text }), ok && list.reload())} />)
       )}
+      <List>
+        <Row href="/holiday-returns" title="Holiday returns" subtitle="Let gifts bought for the holidays come back later, until the end of January" />
+      </List>
     </Screen>
   );
 }
