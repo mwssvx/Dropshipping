@@ -56,6 +56,13 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  addStarterReplies,
+  deleteSavedReply,
+  listSavedReplies,
+  MAX_SAVED_REPLIES,
+  REPLY_FIELDS,
+  saveSavedReply,
+  STARTER_REPLIES,
   preordersSold,
   setPreorder,
   setPurchaseLimit,
@@ -1178,6 +1185,30 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, "Marked the bank transfer for order {order} as paid in the app", { orderId: o.id });
     return { ok: true, message: "Marked as paid. It goes to the supplier now, and the buyer gets their confirmation." };
   },
+  // Saved replies: the store's own answers to what buyers ask most, put into an inbox reply with a tap.
+  "GET saved-replies": async ({ db, shop }) => {
+    const replies = await listSavedReplies(db, shop.id);
+    const have = new Set(replies.map((r) => r.title.toLowerCase()));
+    return {
+      replies: replies.map((r) => ({ id: r.id, title: r.title, body: r.body })),
+      fields: Object.entries(REPLY_FIELDS).map(([field, means]) => ({ field, means })),
+      max: MAX_SAVED_REPLIES,
+      startersMissing: STARTER_REPLIES.filter((r) => !have.has(r.title.toLowerCase())).length,
+    };
+  },
+  "POST saved-replies": async ({ req, db, shop }) => {
+    const b = await body<{ id?: unknown; title?: unknown; body?: unknown }>(req);
+    const reply = await saveSavedReply(db, shop.id, { id: str(b.id) || undefined, title: str(b.title), body: str(b.body) });
+    return { ok: true, id: reply.id, message: `Saved "${reply.title}".` };
+  },
+  "POST saved-replies/starters": async ({ db, shop }) => {
+    const n = await addStarterReplies(db, shop.id);
+    return { ok: true, message: n ? `Added ${n === 1 ? "1 reply" : `${n} replies`} to start from. Change them to sound like you.` : "You already have them." };
+  },
+  "DELETE saved-replies/:id": async ({ params, db, shop }) => {
+    await deleteSavedReply(db, shop.id, params.id!);
+    return { ok: true, message: "Deleted." };
+  },
   "GET questions": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
     const rows = await listQuestions(db, shop.id);
@@ -1765,6 +1796,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("money")) return "money";
   if (path.startsWith("assistant") || path.startsWith("actions")) return "assistant";
   if (path.startsWith("inbox")) return "inbox";
+  if (path.startsWith("saved-replies")) return "inbox";
   if (path.startsWith("reviews")) return "reviews";
   if (path.startsWith("customers")) return "customers";
   if (path.startsWith("codes")) return "marketing";

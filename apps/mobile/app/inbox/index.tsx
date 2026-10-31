@@ -48,6 +48,11 @@ export default function InboxScreen() {
           ))}
         </List>
       )}
+      {rows ? (
+        <List>
+          <Row href="/saved-replies" title="Saved replies" subtitle="Your answers to what buyers ask most, to start a reply from" right={<Pill label="See" />} />
+        </List>
+      ) : null}
     </Screen>
   );
 }

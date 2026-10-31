@@ -1755,3 +1755,41 @@ test("pre-orders and purchase limits set on a product in the app", async ({ page
   await expect(buyer.getByText(`Pre-order: ships by ${long}`)).toBeVisible();
   await expect(buyer.getByText("Up to 2 per order")).toBeVisible();
 });
+
+test("saved replies written in the app, and used in a conversation", async ({ page, browser }) => {
+  const id = `sr${Date.now()}`;
+  const { email } = await merchant(browser, id);
+  const buyer = await (await browser.newContext()).newPage();
+  await buyer.goto(`${WEB}/s/pocket-shop-${id}/contact`);
+  await buyer.getByLabel("Your name").fill("Grace Hopper");
+  await buyer.getByLabel("Email").fill(`grace-${id}@example.com`);
+  await buyer.getByLabel("Message").fill("Do your lamps work with UK plugs?");
+  await buyer.getByRole("button", { name: "Send message" }).click();
+  await expect(buyer.getByText("Thanks, your message is on its way.")).toBeVisible();
+
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Buyer inbox" }).click();
+  await page.getByRole("link", { name: /^Saved replies/ }).click();
+  await expect(page.getByRole("heading", { name: "Saved replies", level: 1 })).toBeVisible();
+  await expect(page.getByText("No saved replies yet")).toBeVisible();
+  await page.getByRole("button", { name: "Add replies to start from" }).click();
+  await expect(page.getByText("Added 3 replies to start from. Change them to sound like you.")).toBeVisible();
+  await expect(page.getByRole("group", { name: "Where is my order" })).toBeVisible();
+
+  await page.getByRole("textbox", { name: "Name" }).fill("UK plugs");
+  await page.getByRole("textbox", { name: "Reply" }).fill("Hi {first_name}, every lamp from {store_name} comes with a UK plug.");
+  await page.getByRole("button", { name: "Save reply" }).click();
+  await expect(page.getByText('Saved "UK plugs".')).toBeVisible();
+
+  await page.getByRole("button", { name: "Delete Returns…" }).click();
+  await page.getByRole("button", { name: "Delete Returns", exact: true }).click();
+  await expect(page.getByText("Deleted.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Returns" })).toHaveCount(0);
+  await expect(page.getByText("Your replies (3 of 30)")).toBeVisible();
+  await shot(page, "377-app-saved-replies");
+
+  await page.getByRole("link", { name: "Inbox" }).click();
+  await page.getByText("Message from Grace Hopper").click();
+  await page.getByRole("button", { name: "UK plugs" }).click();
+  await expect(page.getByRole("textbox", { name: "Your reply" })).toHaveValue(/^Hi Grace, every lamp from Pocket Shop .* comes with a UK plug\.$/);
+});
