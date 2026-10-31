@@ -104,4 +104,14 @@ test("a supplier refusal becomes a problem order the merchant fixes by shipping 
   await page.goto("/admin/orders");
   await expect(page.getByRole("link", { name: "#1001" })).toBeVisible();
   await expect(page.getByRole("region", { name: /Past their delivery date/ })).toHaveCount(0);
+
+  // Hand-added tracking never reports a delivery, so the buyer says it arrived.
+  await expect(buyer.getByText("Got your order? Let the store know it arrived.")).toBeVisible();
+  await buyer.getByRole("button", { name: "It arrived" }).click();
+  await expect(buyer.getByRole("status").filter({ hasText: "Thanks! Your order is marked as delivered." })).toBeVisible();
+  await buyer.reload();
+  await expect(buyer.getByRole("button", { name: "It arrived" })).toHaveCount(0);
+  await expect(buyer.getByLabel("Order progress").getByText("Delivered")).toHaveClass(/font-semibold/);
+  await page.goto((await page.getByRole("link", { name: "#1001" }).getAttribute("href"))!);
+  await expect(page.getByText("Changed by the customer: Said it arrived")).toBeVisible();
 });

@@ -77,6 +77,7 @@ export * from "./replacements";
 export * from "./subscriptions";
 export * from "./delivery";
 export * from "./past-delivery";
+export * from "./buyer-arrived";
 export * from "./disputes";
 export * from "./redirects";
 export * from "./saved";

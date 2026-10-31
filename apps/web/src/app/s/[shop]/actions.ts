@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, cancelOrderByBuyer, changeHandoverDay, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, visitPost, visitSource, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, MAX_SAVED, saveItem, setPriceAlerts, shareSaved, stopSharingSaved, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer, answerSurvey, chooseBankTransfer, joinLaunchList, toggleCompareId, lookVariants, stayPathAfterAdd, toggleHelpful, reportReview, rewardReview, VOTER_PATTERN, reviewsQuery, reviewSort, starsFilter } from "@sf/core";
+import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, cancelOrderByBuyer, changeHandoverDay, markArrivedByBuyer, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, visitPost, visitSource, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, MAX_SAVED, saveItem, setPriceAlerts, shareSaved, stopSharingSaved, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer, answerSurvey, chooseBankTransfer, joinLaunchList, toggleCompareId, lookVariants, stayPathAfterAdd, toggleHelpful, reportReview, rewardReview, VOTER_PATTERN, reviewsQuery, reviewSort, starsFilter } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
 import { agents, campaigns, db, fulfillment, mailer, payments, platformUrl, refunds, storeAddress, subscriptions, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
@@ -593,6 +593,22 @@ export async function changeHandoverDayAction(handle: string, ref: string, _: Ch
     throw e;
   }
   revalidatePath(`${await storeBase(handle)}/orders/${ref}`);
+  return { done: true };
+}
+
+export type ArrivedState = { done?: boolean; error?: string };
+
+/** The buyer says their parcel arrived, from their order page. */
+export async function markArrivedAction(handle: string, ref: string, _: ArrivedState, _form: FormData): Promise<ArrivedState> {
+  const shop = await loadShop(handle);
+  try {
+    const order = await getOrderByPaymentIntent(await db(), shop.id, ref);
+    await markArrivedByBuyer(await db(), shop.id, order.id);
+  } catch (e) {
+    if (e instanceof UserError || e instanceof NotFoundError) return { error: e.message };
+    throw e;
+  }
+  // Not revalidated: the page would drop the form before the buyer sees the thank-you. The next visit shows it delivered.
   return { done: true };
 }
 

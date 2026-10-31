@@ -1664,3 +1664,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **An email for late parcels** (`sendLateOrderEmails` in `packages/core/src/late-orders.ts`): the running late email on the Shipping page gains "Also when a shipped parcel is past its delivery date". With it ticked, a buyer whose parcel is a day past the last day of its window (the same count as "Past their delivery date" on the Orders page) gets one "still on its way" email with the tracking link and the store's own words, which heads off most "where is my order?" emails and disputes.
 2. It runs in the same job as the running late email, shows on the order's timeline as "Still on its way", and leaves parcels more than two weeks past their date alone, so turning it on doesn't email old orders. It's kept in the store file. No migration.
+
+### It arrived (after launch, part 298)
+
+1. **Buyers say it arrived** (`markArrivedByBuyer` in `packages/core/src/buyer-arrived.ts`): a shipped order's page asks "Got your order? Let the store know it arrived." with one button, in the buyer's language. Many carriers, and every parcel a store adds tracking to by hand, never report a delivery, so orders sat at "Shipped" for good. Pressing it marks the parcels delivered that day, which starts the return window and review requests like a carrier's delivery scan.
+2. It shows on the order's timeline as "Changed by the customer: Said it arrived", sends no email, takes the order off "Past their delivery date", and stops the "still on its way" email, which now points buyers at the button. Pickups and local deliveries have their own buttons for the store. No migration.

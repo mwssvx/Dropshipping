@@ -126,7 +126,7 @@ async function sendTransitLateEmails(ctx: FulfillmentContext, scope: { shopId?: 
           ``,
           `Your order: ${await ctx.orderStatusUrl(shop, order)}`,
           ``,
-          `If it still hasn't arrived in a week, reply to this email and we'll sort it out.`,
+          `Already got it? Press "It arrived" on your order page. If it still hasn't arrived in a week, reply to this email and we'll sort it out.`,
         ].join("\n"),
       });
       if (result.status === "sent") sent++;
