@@ -848,7 +848,7 @@ export const emails = pgTable(
     id: id(),
     shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
     orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
-    kind: text("kind", { enum: ["order_confirmation", "shipping_update", "delivered", "refund", "support_reply", "abandoned_cart", "payment_link", "gift_shipped", "order_link", "order_updated", "abandoned_cart_offer", "pickup_ready", "bank_transfer", "bank_transfer_lapsed", "order_news", "order_late"] }).notNull(),
+    kind: text("kind", { enum: ["order_confirmation", "shipping_update", "delivered", "refund", "support_reply", "abandoned_cart", "payment_link", "gift_shipped", "order_link", "order_updated", "abandoned_cart_offer", "pickup_ready", "bank_transfer", "bank_transfer_lapsed", "order_news", "order_late", "handover_reminder"] }).notNull(),
     // Tells apart emails of a kind that can repeat (one per refund). Empty for once-only kinds.
     ref: text("ref").notNull().default(""),
     to: text("to").notNull(),

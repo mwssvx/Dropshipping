@@ -1602,3 +1602,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Who's coming** (`handoverSchedule` in `packages/core/src/handover-days.ts`): for a store whose buyers pick a pickup or delivery day, the order list opens with "Pickups and deliveries": today, then each day of the coming week with something due ("Thursday, November 5: 2 pickups, 1 delivery"), counted in the store's time zone. Paid orders count until they're marked picked up or delivered.
 2. **One click to the list**: each day links to the orders due that day (`?day=2026-11-05`), and "Still waiting from earlier days" catches anyone who didn't show. The filter works with the other filters and the spreadsheet download. No migration.
+
+### The day before (after launch, part 285)
+
+1. **A reminder** (`sendHandoverReminders` in `packages/core/src/handover-reminders.ts`): a buyer who picked a day to collect their order gets "See you tomorrow: order #1042 from …" the day before, with the pickup address and how to collect; one getting a local delivery gets "… arrives tomorrow" with their address. Both say to reply if the day no longer works, so fewer orders sit on the shelf and fewer drivers knock on an empty house.
+2. **Once, and only when it helps**: "tomorrow" is the store's own tomorrow, orders paid in the last 12 hours (the buyer just picked the day) and orders already handed over are skipped, and each order hears once. It runs with the "running late" emails, so no new scheduled job, and shows on the order's timeline. No migration.

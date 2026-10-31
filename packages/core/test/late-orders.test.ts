@@ -12,7 +12,7 @@ describe("running late emails", () => {
     const late = (to: string) => f.mailer.sent.filter((m) => m.to === to && m.subject.includes("taking a little longer"));
 
     const waiting = await f.waitingOrder();
-    expect(await sendLateOrderEmails(at(10 * DAY))).toEqual({ sent: 0 });
+    expect(await sendLateOrderEmails(at(10 * DAY))).toMatchObject({ sent: 0 });
 
     await expect(setLateOrderNotice(f.db, shop.id, { days: 4 })).rejects.toThrow("Pick after how many days");
     await expect(setLateOrderNotice(f.db, shop.id, { days: 3, message: "x".repeat(501) })).rejects.toThrow("under 500 characters");
@@ -32,15 +32,15 @@ describe("running late emails", () => {
     const old = await f.waitingOrder();
     await f.db.update(schema.orders).set({ paidAt: new Date(Date.now() - 30 * DAY) }).where(eq(schema.orders.id, old.id));
 
-    expect(await sendLateOrderEmails(at(2 * DAY))).toEqual({ sent: 0 });
-    expect(await sendLateOrderEmails(at(3 * DAY + 3_600_000))).toEqual({ sent: 1 });
+    expect(await sendLateOrderEmails(at(2 * DAY))).toMatchObject({ sent: 0 });
+    expect(await sendLateOrderEmails(at(3 * DAY + 3_600_000))).toMatchObject({ sent: 1 });
     const [mail] = late(waiting.email);
     expect(mail!.subject).toBe(`Your order #${waiting.number} from Glow Lamps is taking a little longer`);
     expect(mail!.text).toContain("Hi Ada,\n\nYour order");
     expect(mail!.text).toContain("\n\nOur supplier is busy before the holidays.\n\nThanks!\n\nYour order: https://");
     for (const o of [held, preorder, pickup, shipped, old]) expect(late(o.email)).toHaveLength(0);
     // Only once, and it's on the order's timeline.
-    expect(await sendLateOrderEmails(at(5 * DAY))).toEqual({ sent: 0 });
+    expect(await sendLateOrderEmails(at(5 * DAY))).toMatchObject({ sent: 0 });
     expect(await f.db.query.emails.findMany({ where: eq(schema.emails.orderId, waiting.id) })).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "order_late", status: "sent" })]));
 
     const file = JSON.parse(JSON.stringify(await exportStore(f.db, shop.id)));
@@ -49,6 +49,6 @@ describe("running late emails", () => {
     // Off: nobody hears.
     expect(await setLateOrderNotice(f.db, shop.id, null)).toBeNull();
     await f.waitingOrder();
-    expect(await sendLateOrderEmails(at(5 * DAY))).toEqual({ sent: 0 });
+    expect(await sendLateOrderEmails(at(5 * DAY))).toMatchObject({ sent: 0 });
   });
 });

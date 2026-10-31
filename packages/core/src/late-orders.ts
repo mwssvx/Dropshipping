@@ -7,6 +7,7 @@ import { and, eq, inArray, isNull, ne, notExists, sql } from "drizzle-orm";
 import { schema, type Db, type LateOrderNotice } from "@sf/db";
 import { UserError } from "./errors";
 import { deliverOrderEmail, type FulfillmentContext } from "./fulfillment";
+import { sendHandoverReminders } from "./handover-reminders";
 
 export const LATE_ORDER_DAYS = [3, 5, 7, 10, 14] as const;
 export const LATE_ORDER_MESSAGE_MAX = 500;
@@ -77,5 +78,7 @@ export async function sendLateOrderEmails(ctx: FulfillmentContext, scope: { shop
     });
     if (result.status === "sent") sent++;
   }
-  return { sent };
+  // The day-before pickup and delivery reminders run here too, so they need no job of their own.
+  const handover = (await sendHandoverReminders(ctx, scope)).sent;
+  return { sent, handover };
 }
