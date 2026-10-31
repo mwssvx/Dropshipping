@@ -1,10 +1,11 @@
 import { PixelEvent } from "@/components/PixelEvent";
 import { notFound } from "next/navigation";
-import { buyerAmounts, formatHandoverDay, handoverDayOptions, buyerCancelOptions, buyerThread, formatDeliveryDate, formatDeliveryWindow, orderDelivery, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems, formatShipsBy, storePixels, surveyFor, orderDownloads, formatFileSize, transferDueBy } from "@sf/core";
+import { canMarkArrived, buyerAmounts, formatHandoverDay, handoverDayOptions, buyerCancelOptions, buyerThread, formatDeliveryDate, formatDeliveryWindow, orderDelivery, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems, formatShipsBy, storePixels, surveyFor, orderDownloads, formatFileSize, transferDueBy } from "@sf/core";
 import Link from "next/link";
 import { db, fulfillment, storeAddress } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
-import { cancelOrderByBuyerAction, changeHandoverDayAction, editOrderByBuyerAction } from "../../actions";
+import { cancelOrderByBuyerAction, changeHandoverDayAction, editOrderByBuyerAction, markArrivedAction } from "../../actions";
+import { MarkArrived } from "./MarkArrived";
 import { CancelOrder } from "./CancelOrder";
 import { ChangeDay } from "./ChangeDay";
 import { ReferralCard } from "@/components/ReferralCard";
@@ -63,6 +64,8 @@ export default async function OrderStatusPage({ params, searchParams }: { params
   const partOf = order.subscriptionId ? await (await db()).query.subscriptions.findFirst({ where: (s, { eq }) => eq(s.id, order.subscriptionId!), columns: { token: true, status: true } }) : null;
   const survey = surveyFor(shop, order);
   const arrives = paid ? await orderDelivery(await db(), shop, order) : null;
+  // Shipped and not reported delivered: the buyer can say it arrived.
+  const arrivedText = canMarkArrived(order) ? await storeT(handle) : null;
   // Paying by bank transfer: where to send it, or that it didn't arrive in time.
   const transfer = order.manualPayment === "bank_transfer" && (order.paymentStatus === "pending" || order.paymentStatus === "failed")
     ? { t: await storeT(handle), lang: (await storeLang(handle)) ?? "en", due: transferDueBy(shop, order) }
@@ -217,6 +220,7 @@ export default async function OrderStatusPage({ params, searchParams }: { params
         ))}
       </ol>
       {arrives && <p className="text-sm">Expected delivery: <strong>{formatDeliveryWindow(arrives)}</strong></p>}
+      {arrivedText && <MarkArrived action={markArrivedAction.bind(null, handle, ref)} text={{ arrivedQuestion: arrivedText.arrivedQuestion, markArrived: arrivedText.markArrived, arrivedThanks: arrivedText.arrivedThanks }} />}
       {downloads.length > 0 && (
         <section id="downloads" className="card p-5 flex flex-col gap-2 text-sm" aria-labelledby="downloads-heading">
           <h2 id="downloads-heading" className="font-semibold">Your downloads</h2>
