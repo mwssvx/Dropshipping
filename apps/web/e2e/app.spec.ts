@@ -380,3 +380,40 @@ test("weight and cost of the store's own stock, set from the app", async ({ page
   await expect(page.getByText('No products match "mug".')).toBeVisible();
   await expect(page.getByRole("link", { name: /Beeswax Candle/ })).toHaveCount(0);
 });
+
+test("reviews: one waiting is published and another gets a reply, from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `rv${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/import`);
+  await web.getByRole("link", { name: /sunset projection lamp/i }).click();
+  await web.getByRole("button", { name: "Import and publish" }).click();
+  await expect(web.getByText("Imported and live on your store.")).toBeVisible();
+  const handle = (await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!.split("/products/")[1]!;
+  await web.goto(`${WEB}/admin/products/move`);
+  const csv = [
+    "product_handle,state,rating,title,author,email,location,body,reply,created_at,replied_at",
+    `${handle},published,5,,Ada L.,ada@example.com,,"Warm light, perfect for the bedroom.",,2025-03-04 10:00:00 UTC,`,
+    `${handle},pending,3,,Grace H.,grace@example.com,,Smaller than I thought.,,2025-04-01 12:00:00 UTC,`,
+  ].join("\n");
+  await web.getByLabel("Reviews file (CSV)").setInputFiles({ name: "reviews.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
+  await web.getByRole("button", { name: "Add reviews" }).click();
+  await expect(web.getByRole("status")).toContainText("2 reviews added");
+
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Reviews" }).click();
+  // Grace's is waiting for an OK.
+  await expect(page.getByRole("tab", { name: "To check (1)" })).toBeVisible();
+  await expect(page.getByText("Smaller than I thought.")).toBeVisible();
+  await expect(page.getByText("★★★☆☆  3 out of 5")).toBeVisible();
+  await shot(page, "340-app-reviews");
+  await page.getByRole("button", { name: "Publish Grace H.'s review" }).click();
+  await expect(page.getByText("Nothing to check")).toBeVisible();
+
+  // Both are live now with no reply; answer Ada's.
+  await page.getByRole("tab", { name: "No reply (2)" }).click();
+  await page.getByRole("textbox", { name: "Reply to Ada L." }).fill("Thanks Ada, glad it suits the room!");
+  await page.getByRole("button", { name: "Post reply to Ada L." }).click();
+  await expect(page.getByRole("tab", { name: "No reply (1)" })).toBeVisible();
+  await expect(page.getByText("Warm light, perfect for the bedroom.")).toHaveCount(0);
+  await page.getByRole("tab", { name: "All" }).click();
+  await expect(page.getByRole("textbox", { name: "Reply to Ada L." })).toHaveValue("Thanks Ada, glad it suits the room!");
+});

@@ -42,6 +42,11 @@ import {
   setCustomsInfo,
   stockLevel,
   ordersToPost,
+  reviewPage,
+  reviewCounts,
+  moderateReview,
+  notifyReviewReply,
+  unfilledFields,
   productPhotos,
   sendPriceDrops,
   sendStockAlerts,
@@ -398,6 +403,44 @@ const routes: Record<string, Handler> = {
     return { ok: true, message: "Sent. We'll tell you when it's checked." };
   },
 
+  "GET reviews": async ({ url, db, shop }) => {
+    const show = url.searchParams.get("show");
+    // Waiting for your OK, published with no reply yet, or the latest of all.
+    const filter = show === "no_reply" ? { status: "published" as const, noReply: true } : show === "all" ? {} : { status: "pending" as const };
+    const [{ reviews }, counts, noReply] = await Promise.all([
+      reviewPage(db, shop.id, { ...filter, size: 100 }),
+      reviewCounts(db, shop.id),
+      reviewPage(db, shop.id, { status: "published", noReply: true, size: 1 }),
+    ]);
+    return {
+      counts: { pending: counts.pending, noReply: noReply.total },
+      reviews: reviews.map(({ review: r, productTitle }) => ({
+        id: r.id,
+        name: r.name,
+        rating: r.rating,
+        body: r.body,
+        status: r.status,
+        reply: r.reply,
+        photos: r.photoIds.length,
+        productTitle,
+        createdAt: r.createdAt,
+      })),
+    };
+  },
+  "POST reviews/:id": async ({ req, params, db, shop }) => {
+    const b = await body<{ status?: unknown; reply?: unknown }>(req);
+    const status = b.status === "published" || b.status === "hidden" ? b.status : undefined;
+    const reply = typeof b.reply === "string" ? b.reply : undefined;
+    if (reply !== undefined) {
+      const missing = unfilledFields(reply);
+      if (missing.length) throw new UserError(`Replace ${missing.join(" and ")} first: this review has nothing to fill it with.`);
+    }
+    const r = (await moderateReview(db, shop.id, params.id!, { status, reply }))!;
+    // The buyer hears about the first reply once the review is live, as from the website.
+    if (r.status === "published" && r.reply) await notifyReviewReply(db, mailer(), shop, r.id, await storeAddress(shop)).catch((e) => console.error("review reply email failed", e));
+    const message = status === "hidden" ? "Hidden from your store." : reply !== undefined ? (r.status === "published" ? "Reply posted." : "Reply saved. It shows once you publish the review.") : "Published on your store.";
+    return { ok: true, message };
+  },
   "GET inbox": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "needs_you";
     const rows = await listInbox(db, shop.id, show);
@@ -472,6 +515,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("money")) return "money";
   if (path.startsWith("assistant") || path.startsWith("actions")) return "assistant";
   if (path.startsWith("inbox")) return "inbox";
+  if (path.startsWith("reviews")) return "reviews";
   if (path === "today") return "home";
   return null;
 }
