@@ -892,3 +892,48 @@ test("checkouts left unpaid, and the reminder sent, shown in the app", async ({ 
   await expect(page.getByText("Left unpaid")).toBeVisible();
   await shot(page, "355-app-left-at-checkout");
 });
+
+test("a dispute answered from the app with the evidence and a note", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `dp${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Linen Apron");
+  await web.getByLabel("Price", { exact: true }).fill("28.00");
+  await web.getByLabel("Stock", { exact: true }).fill("5");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  await buy(browser, new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href);
+
+  // The buyer's bank opens a dispute (test mode stands in for the bank).
+  await web.goto(`${WEB}/admin/orders`);
+  await web.getByRole("link", { name: "#1001" }).click();
+  const simulate = web.getByText("Test mode: simulate a dispute");
+  await expect(async () => {
+    await web.reload();
+    await expect(simulate).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 20_000 });
+  await simulate.click();
+  await web.getByRole("button", { name: "Simulate a dispute" }).click();
+  await expect(web.getByText("Needs your answer").first()).toBeVisible();
+
+  await signIn(page, email);
+  await tab(page, "Money");
+  await page.getByRole("link", { name: /Disputes \(1 to answer\)/ }).click();
+  await expect(page.getByRole("heading", { name: "Disputes", level: 1 })).toBeVisible();
+  await page.getByRole("link", { name: "Dispute on order #1001" }).click();
+  const dispute = page.getByRole("region", { name: /^Disputed: \$/ });
+  await expect(dispute.getByText("Needs your answer")).toBeVisible();
+  await expect(dispute.getByText("The money is held until the bank decides.", { exact: false })).toBeVisible();
+  await expect(dispute.getByRole("list", { name: "Evidence" }).getByText("✗ Tracking number")).toBeVisible();
+  await dispute.getByRole("textbox", { name: "Anything to add (optional)" }).fill("The buyer emailed to say thanks.");
+  await shot(page, "357-app-dispute");
+  await dispute.getByRole("button", { name: "Send evidence" }).click();
+  await expect(page.getByText("Evidence sent. The bank will decide, and the result shows here.")).toBeVisible();
+  await expect(dispute.getByText("Bank reviewing")).toBeVisible();
+  await expect(dispute.getByText("Your note: The buyer emailed to say thanks.")).toBeVisible();
+
+  // The website shows the same, and the activity log says it was the app.
+  await web.goto(`${WEB}/admin/disputes`);
+  await expect(web.getByText("Bank reviewing").first()).toBeVisible();
+  await web.goto(`${WEB}/admin/activity`);
+  await expect(web.getByText("ent the evidence for the dispute on order #1001 in the app")).toBeVisible();
+});

@@ -56,6 +56,14 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  acceptDispute,
+  countOpenDisputes,
+  disputeEvidence,
+  disputeReason,
+  disputesForOrder,
+  disputeStats,
+  listDisputes,
+  submitDispute,
   abandonedCheckouts,
   ABANDONED_DAYS,
   isOrderBuyerBlocked,
@@ -204,6 +212,26 @@ const ORDER_FILTERS: Record<string, (o: OrderRow) => boolean> = {
 
 /* Routes */
 
+/** An order's disputes for the app; while one waits for an answer, what the evidence has and lacks. */
+async function orderDisputes(db: Db, shop: Shop, orderId: string) {
+  const rows = await disputesForOrder(db, orderId);
+  return Promise.all(
+    rows.map(async (d) => ({
+      id: d.id,
+      status: d.status,
+      inquiry: d.inquiry,
+      reason: disputeReason(d.reason).label,
+      tip: disputeReason(d.reason).tip,
+      amountMinor: d.amountMinor,
+      currency: d.currency,
+      evidenceDueBy: d.evidenceDueBy,
+      note: d.note,
+      submittedAt: d.submittedAt,
+      checks: d.status === "needs_response" ? (await disputeEvidence(db, shop, d.id)).checks : [],
+    })),
+  );
+}
+
 async function appSession(db: Db, user: { id: string; email: string }) {
   await noteDevice({ db, mailer: mailer(), brand: BRAND, manageUrl: platformUrl("/admin/account") }, user.id, APP_DEVICE);
   const { token, expiresAt } = await createSession(db, user.id, APP_DEVICE);
@@ -330,6 +358,8 @@ const routes: Record<string, Handler> = {
     const postYourself = o.paymentStatus === "paid" && !o.pickup && !o.localDelivery && (ownParcel ? !ownParcel.shipment?.trackingNumber : parcels.length === 0 && o.fulfillments.length === 0);
     return {
       customer: buyer,
+      // A buyer's bank pulling the money back, with what the evidence has and lacks while it waits for an answer.
+      disputes: can(role, "money") ? await orderDisputes(db, shop, o.id) : [],
       // On the store's blocked list (by email or address), so checkout turns them away.
       blocked: await isOrderBuyerBlocked(db, shop.id, o),
       // Collected by the buyer or dropped off by the store: no tracking, the merchant says when it's done.
@@ -379,6 +409,46 @@ const routes: Record<string, Handler> = {
       refundableMinor: ["paid", "partially_refunded"].includes(o.paymentStatus) ? o.totalMinor - o.refundedMinor : 0,
       risk: o.risk ? { level: o.risk.level, reasons: o.risk.reasons } : null,
     };
+  },
+  "GET disputes": async ({ db, shop }) => {
+    const [stats, rows] = await Promise.all([disputeStats(db, shop.id), listDisputes(db, shop.id)]);
+    return {
+      open: stats.open,
+      atStakeMinor: stats.atStakeMinor,
+      won: stats.won,
+      lost: stats.lost,
+      // Banks start to worry at 0.75% of orders over 90 days.
+      rate: stats.rate,
+      tooHigh: stats.orders > 0 && stats.rate >= 0.0075,
+      disputes: rows.slice(0, 50).map((d) => ({
+        id: d.id,
+        orderId: d.orderId,
+        orderNumber: d.orderNumber,
+        email: d.email,
+        status: d.status,
+        inquiry: d.inquiry,
+        reason: disputeReason(d.reason).label,
+        amountMinor: d.amountMinor,
+        currency: d.currency,
+        evidenceDueBy: d.evidenceDueBy,
+        createdAt: d.createdAt,
+      })),
+    };
+  },
+  "POST disputes/:id": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ action?: unknown; note?: unknown }>(req);
+    const ctx = { db, payments: payments() };
+    if (b.action === "submit") {
+      const d = await submitDispute(ctx, shop, params.id!, { note: str(b.note) });
+      await logged({ shop, user, db }, "Sent the evidence for the dispute on order {order} in the app", { orderId: d.orderId ?? undefined, href: "/admin/disputes" });
+      return { ok: true, message: "Evidence sent. The bank will decide, and the result shows here." };
+    }
+    if (b.action === "accept") {
+      const d = await acceptDispute(ctx, shop, params.id!);
+      await logged({ shop, user, db }, "Accepted the dispute on order {order} in the app", { orderId: d.orderId ?? undefined, href: "/admin/disputes" });
+      return { ok: true, message: "Accepted. The buyer keeps the money back." };
+    }
+    throw new HttpError(400, "Pick send or accept.");
   },
   "POST orders/:id/block": async ({ req, params, db, shop, user }) => {
     const b = await body<{ note?: unknown }>(req);
@@ -489,6 +559,8 @@ const routes: Record<string, Handler> = {
       // The products earning (or losing) the most in the last 30 days, after ads.
       topProducts: profit.products.slice(0, 5).map((p) => ({ title: p.title, units: p.units, profitMinor: p.profitMinor, adsMinor: p.adsMinor, roas: p.roas })),
       payoutsEnabled: shop.payoutsEnabled,
+      // Disputes waiting for an answer, for the button to the Disputes screen.
+      disputesOpen: await countOpenDisputes(db, shop.id),
       payouts: payouts.map((p) => ({ id: p.id, amountMinor: p.amountMinor, status: p.status, arrivalDate: p.arrivalDate })),
       holds: requirements.map((r) => ({
         id: r.id,
@@ -862,6 +934,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("reviews")) return "reviews";
   if (path.startsWith("customers")) return "customers";
   if (path.startsWith("codes")) return "marketing";
+  if (path.startsWith("disputes")) return "money";
   if (path.startsWith("checkouts")) return "orders";
   if (path.startsWith("store-status")) return "theme";
   if (path.startsWith("gift-cards")) return "gift_cards";

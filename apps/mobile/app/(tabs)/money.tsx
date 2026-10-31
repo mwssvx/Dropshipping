@@ -8,6 +8,8 @@ import { color, space } from "../../src/theme";
 
 type Money = {
   currency: string;
+  /** Disputes waiting for an answer. */
+  disputesOpen?: number;
   availableMinor: number;
   pendingMinor: number;
   onTheWayMinor: number;
@@ -157,6 +159,15 @@ export default function MoneyScreen() {
               </List>
             </Section>
           ) : null}
+
+          <List>
+            <Row
+              href="/disputes"
+              title={d.disputesOpen ? `Disputes (${d.disputesOpen} to answer)` : "Disputes"}
+              subtitle={d.disputesOpen ? "A buyer's bank is pulling money back. Send the evidence before the deadline." : "When a buyer's bank pulls a payment back"}
+              right={d.disputesOpen ? <Pill label="Answer" tone="critical" /> : undefined}
+            />
+          </List>
 
           <Section title="Payouts">
             {d.payouts.length === 0 ? (

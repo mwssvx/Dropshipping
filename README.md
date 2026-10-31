@@ -1904,3 +1904,7 @@ The All list on the app's Orders tab ends with Left at checkout: buyers from the
 ### Push notifications for returns and reviews (after launch, part 356)
 
 The phone now buzzes when a buyer asks to return something (or someone returns a gift) and when a new review is waiting for your OK, each once, and only for people whose role handles returns or reviews. Tapping one opens Returns or Reviews in the app, and both can be turned off in the app's Settings, under Notifications, like the others.
+
+### Disputes in the app (after launch, part 357)
+
+When a buyer's bank pulls a payment back, the order in the app shows the dispute for people who look after money: why the bank says it happened, what helps answer it, the deadline, and what the evidence we gathered has and lacks (tracking, delivery, a returns policy, emails and messages). Add a note and send the evidence, or accept it, from the phone, as on the website. Money has a Disputes screen listing them, the ones to answer first, with what's held and how many were won or lost, and a warning when disputes pass 0.75% of orders. The dispute push notification opens the order.
