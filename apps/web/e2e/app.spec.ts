@@ -81,7 +81,7 @@ test("sign in, then import a product, let AI write it and put it on sale in unde
   await shot(page, "58-app-product");
 
   // Quick price edit.
-  await page.getByRole("textbox", { name: "Price" }).fill("24.00");
+  await page.getByRole("textbox", { name: "Price", exact: true }).fill("24.00");
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Saved.", { exact: true })).toBeVisible();
   await page.goto("/products");
@@ -499,4 +499,40 @@ test("a discount code made, checked and turned off from the app", async ({ page,
   await expect(web.getByText("FIVE").first()).toBeVisible();
   await web.goto(`${WEB}/admin/activity`);
   await expect(web.getByText("Turned off the discount code WELCOME10 in the app")).toBeVisible();
+});
+
+test("a crossed-out price set from the app shows as a sale on the store", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `cp${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Beeswax Candle");
+  await web.getByLabel("Price", { exact: true }).fill("12.00");
+  await web.getByLabel("Stock", { exact: true }).fill("6");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const candle = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /Beeswax Candle/ }).click();
+  const was = page.getByRole("textbox", { name: "Crossed-out price" });
+  await was.fill("10");
+  await expect(page.getByText("Make it higher than the price, or leave it empty.")).toBeVisible();
+  await was.fill("16.00");
+  await expect(page.getByText("Buyers see 25% off.")).toBeVisible();
+  await shot(page, "344-app-crossed-out-price");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Saved.", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(was).toHaveValue("16.00");
+
+  // The store shows the old price struck through next to the new one.
+  await web.goto(candle);
+  await expect(web.locator("s", { hasText: "$16.00" }).first()).toBeVisible();
+
+  // Emptied, the sale ends.
+  await was.fill("");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Saved.", { exact: true })).toBeVisible();
+  await web.reload();
+  await expect(web.locator("s", { hasText: "$16.00" })).toHaveCount(0);
 });

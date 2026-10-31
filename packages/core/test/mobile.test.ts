@@ -163,6 +163,24 @@ describe("today and quick edits", () => {
     await expect(patchProduct(f.db, shop.id, card.id, { variants: [{ id: gift!.id, costMinor: 10 }] })).rejects.toThrow("Gift cards have no cost");
   });
 
+  it("sets a crossed-out price above the price, and drops it once the price passes it", async () => {
+    const f = await setup();
+    const shop = await f.shop();
+    const own = await createProduct(f.db, shop.id, { title: "Beeswax Candle", variants: [{ priceMinor: 1200, stock: 5 }] });
+    const [candle] = await f.variants(own.id);
+    const sale = await patchProduct(f.db, shop.id, own.id, { variants: [{ id: candle!.id, priceMinor: 900, compareAtMinor: 1200 }] });
+    expect(sale.variants[0]).toMatchObject({ priceMinor: 900, compareAtMinor: 1200 });
+    // Typed at or below the price, it's refused rather than shown as a fake sale.
+    await expect(patchProduct(f.db, shop.id, own.id, { variants: [{ id: candle!.id, compareAtMinor: 900 }] })).rejects.toThrow("higher than the price");
+    // A stock change leaves it be; a price rise past it clears it.
+    expect((await patchProduct(f.db, shop.id, own.id, { variants: [{ id: candle!.id, stock: 4 }] })).variants[0]!.compareAtMinor).toBe(1200);
+    const raised = await patchProduct(f.db, shop.id, own.id, { variants: [{ id: candle!.id, priceMinor: 1300 }] });
+    expect(raised.variants[0]).toMatchObject({ priceMinor: 1300, compareAtMinor: null });
+    // And it can be set and cleared on its own.
+    expect((await patchProduct(f.db, shop.id, own.id, { variants: [{ id: candle!.id, compareAtMinor: 1500 }] })).variants[0]!.compareAtMinor).toBe(1500);
+    expect((await patchProduct(f.db, shop.id, own.id, { variants: [{ id: candle!.id, compareAtMinor: null }] })).variants[0]!.compareAtMinor).toBe(null);
+  });
+
   it("keeps only real photos up to 5 MB", async () => {
     const f = await setup();
     const shop = await f.shop();

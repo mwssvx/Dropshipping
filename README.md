@@ -1852,3 +1852,7 @@ An order in the app now says, under the buyer, whether it's their first order or
 ### Discount codes in the app (after launch, part 343)
 
 Today has a Discount codes button for roles that can open marketing. It lists every code with what it does, how often it was used and what it sold, with a switch to turn each one off or back on. A store can make an everyday code from the phone: a percent off, an amount off or free shipping, optionally for first orders only. Limits, dates, buy X get Y and codes for chosen products stay on the website. Codes made or switched from the app show in the activity log as done in the app.
+
+### A crossed-out price from the app (after launch, part 344)
+
+A product in the app now has a crossed-out price for each variant, the "was" price buyers see struck through next to the price. While typing, the app says how much off buyers will see, or that it has to be higher than the price. Saved too low, it's refused. When a later price change goes past it, it's dropped, the same as a bulk edit does, so the store never shows a fake sale. Emptying it ends the sale.
