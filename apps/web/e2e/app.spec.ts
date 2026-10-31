@@ -286,4 +286,20 @@ test("two orders to the same address say the store's items can share a box", asy
   await expect(page.getByText(/has items you post/)).toBeVisible();
   await expect(page.getByText(/can go in one box/)).toBeVisible();
   await shot(page, "324-app-same-address");
+
+  // Both candles go in one box, posted from the phone with one tracking number.
+  await expect(page.getByText("Post it yourself")).toBeVisible();
+  await page.getByRole("button", { name: "Add tracking" }).click();
+  await page.getByLabel("Carrier").fill("USPS");
+  await page.getByLabel("Tracking number").fill("9400111899");
+  await page.getByRole("switch", { name: "Order #1001 gets this tracking too" }).click();
+  await page.getByRole("button", { name: "Save tracking" }).click();
+  await expect(page.getByText("Tracking added here and to order #1001. The buyers get an email.")).toBeVisible();
+  await expect(page.getByText("Post it yourself")).toHaveCount(0);
+  // Shipped now, so it no longer lists the other order; that one has the tracking too.
+  await page.goto("/");
+  await tab(page, "Orders");
+  await page.getByRole("tab", { name: "All" }).click();
+  await page.getByRole("link", { name: "Order #1001" }).click();
+  await expect(page.getByText("USPS 9400111899")).toBeVisible();
 });
