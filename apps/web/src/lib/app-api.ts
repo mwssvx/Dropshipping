@@ -15,6 +15,7 @@ import {
   getOrder,
   orderDelivery,
   daysPastDelivery,
+  ordersPastDelivery,
   getPushSettings,
   getProduct,
   getSessionUser,
@@ -201,6 +202,12 @@ const routes: Record<string, Handler> = {
 
   "GET orders": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") ?? "all";
+    // Shipped parcels past their delivery date, the latest first, as on the web Orders page.
+    if (show === "late") {
+      const late = new Map((await ordersPastDelivery(db, shop)).map((l) => [l.id, l.daysLate]));
+      const rows = (await listOrders(db, shop.id)).filter((o) => late.has(o.id)).sort((a, b) => late.get(b.id)! - late.get(a.id)! || a.number - b.number);
+      return { orders: rows.slice(0, 200).map((o) => ({ ...orderSummary(o), daysLate: late.get(o.id)! })) };
+    }
     const keep = ORDER_FILTERS[show];
     if (!keep) throw new UserError("Unknown filter.");
     // The app shows the latest 200; for all orders that's one page, not the store's whole history.

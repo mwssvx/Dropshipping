@@ -124,6 +124,9 @@ test("a problem order: the order fixer proposes a refund, approved from Today", 
   await expect(page.getByText("Sent.", { exact: true })).toBeVisible();
 
   await tab(page, "Orders");
+  // Nothing has shipped, so nothing is late.
+  await page.getByRole("tab", { name: "Late" }).click();
+  await expect(page.getByText("Nothing late")).toBeVisible();
   await page.getByRole("tab", { name: "All" }).click();
   await expect(page.getByRole("link", { name: "Order #1001" })).toContainText("Refunded");
 });
