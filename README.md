@@ -1456,3 +1456,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Several collections in one spot** (`apps/web/src/theme/CollectionTabs.tsx`): a new home page section in the theme editor. Tick up to five collections, like "New in", "Best sellers" and "Gifts", and shoppers switch between them as tabs over one product grid, with a "Shop all" button under each that opens the whole collection. Tabs come in the order you tick them; tick none and the first collections are used.
 2. **Never empty, works for everyone**: a collection with nothing on sale gets no tab, one collection left shows just its grid without tabs, and none hides the section. The tabs follow the usual pattern for screen readers: the arrow keys, Home and End move between them, and only the chosen tab sits in the Tab order. Two new store strings in all six languages. No migration: it lives in the theme.
+
+### Visit us (after launch, part 256)
+
+1. **Where to find your shop** (`apps/web/src/theme/Sections.tsx`): a new home page section in the theme editor for stores with a front door or a pickup point. Type the address, up to seven rows of opening hours ("Mon–Fri", "9:00–17:30"), a line on where to park and an optional photo of the shop, and shoppers get a "Get directions" button that opens a map search for the address in a new tab.
+2. **No map until asked**: the page loads nothing from a map service, so it stays fast and nobody is tracked just for looking; the map opens only when a shopper presses the button. The heading defaults to "Visit us" in the shopper's language, rows with no days are skipped, and the section stays hidden until the address is filled in. Four new store strings in all six languages. No migration: it lives in the theme.

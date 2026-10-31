@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Fragment } from "react";
-import { announcementMessages, collectionTabs, featuredViewAll, pickFeatured, type Section, type SectionSettings, type TrustIcon } from "@sf/core/theme";
+import { announcementMessages, collectionTabs, directionsUrl, featuredViewAll, pickFeatured, type Section, type SectionSettings, type TrustIcon } from "@sf/core/theme";
 import type { PostCard, StorefrontCatalog } from "@sf/core";
 import { cardBadges, type Badge, type BadgeFacts } from "@sf/core/badges";
 import type { BadgeSettings } from "@sf/db";
@@ -468,6 +468,43 @@ function CollectionTabsSection({ s, data }: Props<"collection_tabs">) {
   );
 }
 
+function VisitUs({ s, data, first }: Props<"store_location">) {
+  const t = data.t ?? storeText(null);
+  if (!s.address) return null;
+  const heading = s.heading || t.visitUs;
+  const hours = s.hours.filter((h) => h.days);
+  return (
+    <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12" aria-label={heading}>
+      <div className={`grid gap-8 items-center ${s.imageUrl ? "md:grid-cols-2" : "max-w-2xl"}`}>
+        <div className="flex flex-col gap-5">
+          <h2 className="text-3xl font-bold tracking-tight">{heading}</h2>
+          <address className="not-italic text-lg leading-relaxed whitespace-pre-line">{s.address}</address>
+          {hours.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <h3 className="font-semibold">{t.openingHours}</h3>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm">
+                {hours.map((h, i) => (
+                  <Fragment key={i}>
+                    <dt className="font-medium">{h.days}</dt>
+                    <dd className="text-muted">{h.time}</dd>
+                  </Fragment>
+                ))}
+              </dl>
+            </div>
+          )}
+          {s.text && <p className="text-muted leading-relaxed whitespace-pre-line">{s.text}</p>}
+          <a href={directionsUrl(s.address)} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-lg self-start">
+            {t.directions}<span className="sr-only"> {t.opensNewTab}</span>
+          </a>
+        </div>
+        {s.imageUrl && (
+          <img src={s.imageUrl} alt="" className="w-full aspect-[4/3] object-cover rounded-lg" loading={first ? "eager" : "lazy"} decoding="async" />
+        )}
+      </div>
+    </section>
+  );
+}
+
 function RichText({ s }: Props<"rich_text">) {
   if (!s.heading && !s.text) return null;
   return (
@@ -737,6 +774,7 @@ export function SectionView({ section, data, first }: { section: Section; data: 
     case "gallery": return <Gallery s={section.settings} data={data} first={first} />;
     case "before_after": return <BeforeAfterSection s={section.settings} data={data} first={first} />;
     case "collection_tabs": return <CollectionTabsSection s={section.settings} data={data} first={first} />;
+    case "store_location": return <VisitUs s={section.settings} data={data} first={first} />;
   }
 }
 
