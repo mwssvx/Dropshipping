@@ -56,6 +56,12 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  createTagRule,
+  deleteTagRule,
+  describeTagRule,
+  listTagRules,
+  MAX_TAG_RULES,
+  type TagRuleInput,
   bundleProductChoices,
   createBundle,
   deleteBundle,
@@ -1245,6 +1251,38 @@ const routes: Record<string, Handler> = {
     revalidatePath(`/s/${shop.handle}`, "layout");
     return { ok: true, message: "Bundle deleted." };
   },
+  // Tag rules: a tag every customer who matches gets ("spent $200 or more" gets vip), and loses when they stop matching.
+  "GET tag-rules": async ({ db, shop }) => {
+    const [rules, products] = await Promise.all([listTagRules(db, shop.id), listActiveProducts(db, shop.id)]);
+    return {
+      rules: rules.map((r) => ({ id: r.id, tag: r.tag, describe: describeTagRule(r, shop.currency, r.productTitle), customers: r.customers })),
+      max: MAX_TAG_RULES,
+      products: products.filter((p) => !p.giftCard).map((p) => ({ id: p.id, title: p.title })),
+    };
+  },
+  "POST tag-rules": async ({ req, db, shop, user }) => {
+    const b = await body<Record<string, unknown>>(req);
+    const kind = str(b.kind);
+    const tag = str(b.tag);
+    const whole = (v: unknown) => Number.parseInt(str(v).trim() || "0", 10) || 0;
+    const input: TagRuleInput =
+      kind === "bought"
+        ? { kind, tag, productId: str(b.productId) }
+        : kind === "orders"
+          ? { kind, tag, threshold: whole(b.orders) }
+          : kind === "lapsed"
+            ? { kind, tag, threshold: whole(b.days) }
+            : { kind: "spent", tag, threshold: parseMoney(str(b.amount).trim().replace(/^[^\d]+/, "") || "0") };
+    const { rule, applied } = await createTagRule(db, shop.id, input);
+    await logged({ shop, user, db }, `Added the tag rule for "${rule.tag}" in the app`, { href: "/admin/customers#tag-rules" });
+    const n = applied?.tagged ?? 0;
+    return { ok: true, message: n === 0 ? "Added. Nobody matches it yet." : `Added. ${n} ${n === 1 ? "customer now has" : "customers now have"} the tag “${rule.tag}”.` };
+  },
+  "DELETE tag-rules/:id": async ({ params, db, shop, user }) => {
+    const { rule } = await deleteTagRule(db, shop.id, params.id!);
+    await logged({ shop, user, db }, `Removed the tag rule for "${rule.tag}" in the app`, { href: "/admin/customers#tag-rules" });
+    return { ok: true, message: `Removed. Customers it tagged lose “${rule.tag}”, unless you gave it by hand.` };
+  },
   "GET questions": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
     const rows = await listQuestions(db, shop.id);
@@ -1843,6 +1881,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("activity") || path.startsWith("team")) return "team";
   if (path.startsWith("subscriptions")) return "orders";
   if (path.startsWith("blocked")) return "customers";
+  if (path.startsWith("tag-rules")) return "customers";
   if (path.startsWith("restock") || path.startsWith("stock-count")) return "products";
   if (path.startsWith("price-changes")) return "products";
   if (path.startsWith("suppliers")) return "suppliers";
