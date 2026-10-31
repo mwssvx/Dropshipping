@@ -41,6 +41,9 @@ test("a merchant gets feed links for Google and Meta, and fixes what's missing",
   const google = await page.getByLabel("Google Shopping feed link").inputValue();
   expect(google).toMatch(/\/feeds\/google\.xml$/);
   await expect(page.getByLabel("Facebook and Instagram feed link")).toHaveValue(/\/feeds\/meta\.csv$/);
+  // Pinterest and TikTok read the same file as Google.
+  await expect(page.getByLabel("Pinterest feed link")).toHaveValue(google);
+  await expect(page.getByLabel("TikTok feed link")).toHaveValue(google);
   await shot(page, "144-sales-channels");
 
   // The browser opens the feed the way a channel fetches it (store hosts only resolve in the browser).
