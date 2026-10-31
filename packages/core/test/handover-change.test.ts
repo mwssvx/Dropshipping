@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { schema } from "@sf/db";
-import { changeHandoverDay, DemoModel, handoverDates, handoverDayOptions, sendHandoverReminders, setHandoverDays, setLocalPickup } from "../src";
+import { changeHandoverDay, DemoModel, moveHandoverDay, storeHandoverOptions, handoverDates, handoverDayOptions, sendHandoverReminders, setHandoverDays, setLocalPickup } from "../src";
 import { DAY, makeFixture } from "../evals/fixture";
 
 describe("changing the pickup or delivery day", () => {
@@ -41,5 +41,31 @@ describe("changing the pickup or delivery day", () => {
     expect(handoverDayOptions(shop, { ...order, fulfillmentStatus: "delivered" })).toBeNull();
     expect(handoverDayOptions(shop, { ...order, handoverOn: null })).toBeNull();
     expect(handoverDayOptions({ handoverDays: null }, order)).toBeNull();
+  });
+
+  it("lets the store move it to any day in the window, today included, and emails the buyer", async () => {
+    const f = await makeFixture(new DemoModel());
+    const shop0 = await f.shop();
+    await setLocalPickup(f.db, shop0.id, { address: "Glow Lamps Studio\n12 Congress Ave, Austin" });
+    const days = (await setHandoverDays(f.db, shop0.id, { weekdays: [1, 3], leadDays: 2, timeZone: "America/Chicago" }))!;
+    const shop = await f.shop();
+    const placed = await f.waitingOrder();
+    await f.db.update(schema.orders).set({ pickup: true, handoverOn: handoverDates(days)[0] }).where(eq(schema.orders.id, placed.id));
+    const order = (await f.db.query.orders.findFirst({ where: eq(schema.orders.id, placed.id) }))!;
+
+    const options = storeHandoverOptions(shop, order)!;
+    expect(options).toHaveLength(16);
+    const today = options[0]!;
+    await expect(moveHandoverDay(f.ctx, shop.id, order.id, "2020-01-01")).rejects.toThrow("Pick one of the days listed.");
+    const moved = await moveHandoverDay(f.ctx, shop.id, order.id, today);
+    expect(moved.handoverOn).toBe(today);
+    expect(moved.edits.at(-1)).toMatchObject({ by: "merchant", changes: [expect.stringMatching(/^Pickup day moved from /)] });
+    const mail = f.mailer.sent.find((m) => m.to === order.email && m.subject.startsWith(`New pickup day for order #${order.number} from ${shop.name}:`))!;
+    expect(mail.text).toContain(`${shop.name} moved the day you collect order #${order.number} from`);
+    const logged = await f.db.query.emails.findMany({ where: eq(schema.emails.kind, "handover_moved") });
+    expect(logged.map((e) => e.ref)).toEqual([today]);
+
+    await f.db.update(schema.orders).set({ fulfillmentStatus: "delivered" }).where(eq(schema.orders.id, order.id));
+    await expect(moveHandoverDay(f.ctx, shop.id, order.id, options[3]!)).rejects.toThrow("This order has no day to move.");
   });
 });

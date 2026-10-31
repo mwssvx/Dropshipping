@@ -1612,3 +1612,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **From the order page** (`changeHandoverDay` in `packages/core/src/handover-change.ts`): a buyer who picked a pickup or local delivery day can open "Change the day" under it and move it to another day the store hands over orders, in their language. The store's team gets an email ("Order #1042 at …: now collecting on Friday, November 6"), and the order's history says "Pickup day moved from … to …".
 2. **Until the day before**: on the day itself, once it's picked up or delivered, or for an unpaid order, it can't be moved online and the buyer messages the store instead. The day-before reminder follows the new day. No migration.
+
+### The store moves the day (after launch, part 287)
+
+1. **From the order page** (`moveHandoverDay` in `packages/core/src/handover-change.ts`): under "Collecting on …" or "Deliver on …", "Move to another day" lists every day from today to the end of the buyer's window, open days or not, since the store can make an exception. Moving it emails the buyer "New pickup day for order #1042 from …" with the new day, and the order's history says who moved it from when to when.
+2. Handed-over and unpaid orders can't move. The email shows on the order's timeline, and the day-before reminder follows the new day. No migration.
