@@ -122,6 +122,8 @@ export default function CustomerScreen() {
         </Section>
       ) : null}
 
+      <RewardPoints id={id!} />
+
       <Section title="Your note and tags">
         <Card>
           {msg ? <Banner tone={msg.tone}>{msg.text}</Banner> : null}
@@ -131,5 +133,44 @@ export default function CustomerScreen() {
         </Card>
       </Section>
     </Screen>
+  );
+}
+
+/** Reward points, when the store gives them: the balance, and adding or taking some with a note the buyer sees. */
+function RewardPoints({ id }: { id: string }) {
+  const data = useApi<{ enabled: boolean; points: number }>(`customers/${id}/points`);
+  const [points, setPoints] = useState("");
+  const [why, setWhy] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ tone: "success" | "critical"; text: string } | null>(null);
+  const d = data.data;
+  if (!d || (!d.enabled && d.points === 0)) return null;
+
+  async function save() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await api<{ message: string }>(`customers/${id}/points`, { body: { points, note: why } });
+      setMsg({ tone: "success", text: r.message });
+      setPoints("");
+      setWhy("");
+      await data.reload();
+    } catch (e) {
+      setMsg({ tone: "critical", text: (e as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Section title="Reward points">
+      <Card>
+        {msg ? <Banner tone={msg.tone}>{msg.text}</Banner> : null}
+        <Stat label="Points now" value={d.points.toLocaleString("en-US")} />
+        <Field label="Points to add" value={points} onChangeText={setPoints} keyboardType="numbers-and-punctuation" placeholder="200" hint="A minus number takes points away." />
+        <Field label="Note they see" value={why} onChangeText={setWhy} placeholder="Sorry about the late parcel" />
+        <Button label="Save points" kind="secondary" busy={busy} disabled={busy || !points.trim()} onPress={save} />
+      </Card>
+    </Section>
   );
 }

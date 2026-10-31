@@ -56,6 +56,11 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  adjustPoints,
+  customerPoints,
+  describeRewards,
+  rewardsSummary,
+  setRewardsSettings,
   setSurvey,
   surveyReport,
   audienceSizes,
@@ -1088,6 +1093,45 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, on ? "Saved the buyer survey in the app" : "Turned off the buyer survey in the app", { href: "/admin/survey" });
     return { ok: true, message: on ? "Saved. Buyers see the question on their order page right after paying." : "The survey is off. Answers so far stay here." };
   },
+  // Rewards: points on what buyers pay, swapped for store credit.
+  "GET rewards": async ({ db, shop }) => {
+    const summary = await rewardsSummary(db, shop);
+    return {
+      enabled: shop.rewardsEnabled,
+      earnRate: shop.rewardsEarnRate,
+      value: (shop.rewardsValueMinor / 100).toFixed(2),
+      describe: describeRewards(shop),
+      members: summary.members,
+      points: summary.points,
+      owedMinor: summary.owedMinor,
+      redeemedPoints: summary.redeemedPoints,
+      top: summary.top.map((r) => ({ customerId: r.customerId, name: r.name || r.email, points: r.points })),
+    };
+  },
+  "PUT rewards": async ({ req, db, shop, user }) => {
+    const b = await body<{ enabled?: unknown; earnRate?: unknown; value?: unknown }>(req);
+    let valueMinor: number;
+    try {
+      valueMinor = parseMoney(str(b.value).trim().replace(/^[^\d]+/, ""));
+    } catch {
+      throw new UserError("Enter what 100 points are worth, like 1.00.");
+    }
+    await setRewardsSettings(db, shop.id, { enabled: b.enabled === true, earnRate: Number.parseInt(str(b.earnRate), 10) || 0, valueMinor });
+    await logged({ shop, user, db }, "Changed the rewards settings in the app", { href: "/admin/rewards" });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: b.enabled === true ? "Rewards saved. Buyers earn points from their next order." : "Rewards are off. Points buyers have stay theirs." };
+  },
+  "GET customers/:id/points": async ({ params, db, shop }) => {
+    await getCustomerProfile(db, shop.id, params.id!);
+    return { enabled: shop.rewardsEnabled, points: await customerPoints(db, params.id!) };
+  },
+  "POST customers/:id/points": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ points?: unknown; note?: unknown }>(req);
+    const points = Number(str(b.points).replace(/[\s,]/g, ""));
+    const balance = await adjustPoints(db, shop.id, params.id!, { points, note: str(b.note) });
+    await logged({ shop, user, db }, `${points > 0 ? "Added" : "Took away"} ${Math.abs(points).toLocaleString("en-US")} reward points in the app`, { href: `/admin/customers/${params.id}` });
+    return { ok: true, points: balance, message: `Saved. They have ${balance.toLocaleString("en-US")} points now.` };
+  },
   "GET questions": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
     const rows = await listQuestions(db, shop.id);
@@ -1673,6 +1717,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("partners")) return "marketing";
   if (path.startsWith("campaigns")) return "marketing";
   if (path.startsWith("survey")) return "marketing";
+  if (path.startsWith("rewards")) return "marketing";
   if (path.startsWith("checkouts")) return "orders";
   if (path.startsWith("store-status")) return "theme";
   if (path.startsWith("gift-cards")) return "gift_cards";
