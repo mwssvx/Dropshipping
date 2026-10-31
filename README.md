@@ -1716,3 +1716,7 @@ A store moving its catalog to a supplier's warehouse in China, or back home, sho
 ### Preparing time per product (after launch, part 309)
 
 Print-on-demand, engraved and made-to-order products take longer to get ready than the rest of a catalog, so one store-wide processing time either over-promises for them or under-promises for everything else. A product's **Preparing time** card sets its own days (0 to 30; empty uses the store's). The product page ("Ships within 7 days, then 6–10 days in transit"), the cart, checkout rates, the receipt, the order page, the same-day cutoff countdown, the holiday order-by date, Google's handling time in the feed and on the page, and the store export all use it. A cart or order waits for its slowest item. The drafted shipping policy says some items take longer when any product on sale does. `products.processing_days` (migration 0159), `setProductProcessingDays` and `processingFor` in `packages/core/src/delivery.ts`.
+
+### Preparing time in bulk (after launch, part 310)
+
+A print-on-demand line usually has dozens of products with the same production time. The Products list's bulk change gets **Set preparing time**: tick products or the whole filtered list, enter the days (empty for the store's), preview ("2 days (store's)" to "5 days") and apply. Gift cards and downloads are skipped, and it can be undone for a week like every bulk change. `{ kind: "processing", days }` in `packages/core/src/bulk-edit.ts`. No migration.

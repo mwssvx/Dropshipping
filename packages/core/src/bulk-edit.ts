@@ -1,6 +1,6 @@
 // Bulk edit: change many products at once from the Products list. Publish, hide or archive them,
 // move prices up or down by a percent, set or clear the crossed-out "was" price, or add them to a
-// collection, add or remove a tag, or set where they ship from. Every change is saved with what it replaced, so the merchant can undo it for a week.
+// collection, add or remove a tag, or set where they ship from or how long they take to prepare. Every change is saved with what it replaced, so the merchant can undo it for a week.
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { schema, type BulkEditAction, type BulkEditSnapshot, type Db } from "@sf/db";
 import { z } from "zod";
@@ -8,6 +8,7 @@ import { NotFoundError, UserError } from "./errors";
 import { normalizeTags } from "./customers";
 import { countryCode } from "./customs";
 import { countryName } from "./shipping";
+import { PRODUCT_PROCESSING_MAX } from "./delivery";
 import { formatMoney } from "./money";
 import { MAX_PRODUCT_TAGS } from "./products";
 
@@ -17,6 +18,8 @@ const DAY = 86_400_000;
 /** How long an edit can be undone. */
 export const UNDO_DAYS = 7;
 export const MAX_BULK_PRODUCTS = 500;
+
+const DAYS_ERROR = `Enter 0 to ${PRODUCT_PROCESSING_MAX} days, or leave it empty for your store's.`;
 
 const actionSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("status"), status: z.enum(["active", "draft", "archived"]) }),
@@ -29,6 +32,10 @@ const actionSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("collection"), collectionId: z.string().uuid(), remove: z.boolean().default(false) }),
   z.object({ kind: z.literal("tag"), tag: z.string(), remove: z.boolean().default(false) }),
   z.object({ kind: z.literal("ships_from"), country: z.string().max(10).nullable() }),
+  z.object({
+    kind: z.literal("processing"),
+    days: z.number({ error: DAYS_ERROR }).int(DAYS_ERROR).min(0, DAYS_ERROR).max(PRODUCT_PROCESSING_MAX, DAYS_ERROR).nullable(),
+  }),
 ]);
 
 export type BulkEditInput = z.input<typeof actionSchema>;
@@ -53,7 +60,7 @@ async function plan(db: Db, shop: Shop, productIds: string[], input: BulkEditInp
   const variants = await db.query.variants.findMany({ where: inArray(schema.variants.productId, ids) });
   const money = (n: number | null) => (n == null ? "none" : formatMoney(n, shop.currency));
   const changes: BulkChange[] = [];
-  const snapshot: BulkEditSnapshot = { products: [], variants: [], collection: [], tags: [], shipsFrom: [] };
+  const snapshot: BulkEditSnapshot = { products: [], variants: [], collection: [], tags: [], shipsFrom: [], processing: [] };
   let skipped = 0;
   // Products that already have as many tags as they can.
   let full = 0;
@@ -107,6 +114,20 @@ async function plan(db: Db, shop: Shop, productIds: string[], input: BulkEditInp
       if (p.shipsFrom === action.country) continue;
       changes.push({ productId: p.id, product: p.title, variant: null, before: `ships from ${name(p.shipsFrom)}`, after: `ships from ${name(action.country)}`, belowCost: false });
       snapshot.shipsFrom!.push({ productId: p.id, before: p.shipsFrom, after: action.country });
+    }
+  } else if (action.kind === "processing") {
+    const days = (d: number | null) => {
+      const n = d ?? shop.processingDays;
+      return `${n} ${n === 1 ? "day" : "days"}${d === null ? " (store's)" : ""}`;
+    };
+    for (const p of products) {
+      if (p.giftCard || p.digital) {
+        skipped++;
+        continue;
+      }
+      if (p.processingDays === action.days) continue;
+      changes.push({ productId: p.id, product: p.title, variant: null, before: days(p.processingDays), after: days(action.days), belowCost: false });
+      snapshot.processing!.push({ productId: p.id, before: p.processingDays, after: action.days });
     }
   } else {
     for (const p of products) {
@@ -162,6 +183,8 @@ export function describeBulkAction(action: BulkEditAction, collectionTitle?: str
       return `${action.remove ? "Removed" : "Added"} the tag “${action.tag}”`;
     case "ships_from":
       return action.country ? `Set Ships from to ${countryName(action.country)}` : "Set Ships from to your store's country";
+    case "processing":
+      return action.days === null ? "Set preparing time to your store's" : `Set preparing time to ${action.days} ${action.days === 1 ? "day" : "days"}`;
   }
 }
 
@@ -192,6 +215,7 @@ export async function applyBulkEdit(db: Db, shop: Shop, productIds: string[], in
     }
     for (const t of snapshot.tags ?? []) await setTag(tx, t.productId, t.tag, !t.had, now);
     for (const c of snapshot.shipsFrom ?? []) await tx.update(schema.products).set({ shipsFrom: c.after }).where(eq(schema.products.id, c.productId));
+    for (const c of snapshot.processing ?? []) await tx.update(schema.products).set({ processingDays: c.after }).where(eq(schema.products.id, c.productId));
     const touched = [...new Set(changes.map((c) => c.productId))];
     if (action.kind !== "status") await tx.update(schema.products).set({ updatedAt: now }).where(inArray(schema.products.id, touched));
     const [edit] = await tx.insert(schema.bulkEdits).values({ shopId: shop.id, summary, action, snapshot, products: touched.length, createdBy: opts.userId ?? null, createdAt: now }).returning();
@@ -262,6 +286,18 @@ export async function undoBulkEdit(db: Db, shopId: string, editId: string, now =
           continue;
         }
         await tx.update(schema.products).set({ shipsFrom: c.before, updatedAt: now }).where(eq(schema.products.id, c.productId));
+        restored++;
+      }
+    }
+    if (snapshot.processing?.length) {
+      const rows = await tx.query.products.findMany({ where: inArray(schema.products.id, snapshot.processing.map((c) => c.productId)), columns: { id: true, processingDays: true } });
+      for (const c of snapshot.processing) {
+        const row = rows.find((r) => r.id === c.productId);
+        if (!row || row.processingDays !== c.after) {
+          kept++;
+          continue;
+        }
+        await tx.update(schema.products).set({ processingDays: c.before, updatedAt: now }).where(eq(schema.products.id, c.productId));
         restored++;
       }
     }

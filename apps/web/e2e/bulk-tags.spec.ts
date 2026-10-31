@@ -52,4 +52,13 @@ test("a merchant tags many products at once, then undoes it", async ({ page }, i
   await expect(page.getByRole("table", { name: "What will change" }).getByRole("row", { name: /Magnetic Phone Stand/ })).toContainText("ships from China");
   await page.getByRole("button", { name: "Apply to 2 products" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Set Ships from to China on 2 products." })).toBeVisible();
+
+  // Both are printed to order and take five days to get ready.
+  await page.getByRole("checkbox", { name: "Select all products" }).check();
+  await page.getByLabel("Change", { exact: true }).selectOption({ label: "Set preparing time" });
+  await page.getByLabel("Days to get them ready").fill("5");
+  await page.getByRole("button", { name: "Preview" }).click();
+  await expect(page.getByRole("table", { name: "What will change" }).getByRole("row", { name: /Magnetic Phone Stand/ })).toContainText("5 days");
+  await page.getByRole("button", { name: "Apply to 2 products" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Set preparing time to 5 days on 2 products." })).toBeVisible();
 });

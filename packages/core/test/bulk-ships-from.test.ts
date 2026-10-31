@@ -33,3 +33,26 @@ describe("ships from in bulk", () => {
     expect([await from(stand.id), await from(projector.id)]).toEqual([null, null]);
   });
 });
+
+describe("preparing time in bulk", () => {
+  it("sets the days many products take to get ready, and undoes it", async () => {
+    const f = await makeFixture(new DemoModel());
+    const shop = await f.shop();
+    const { lamp, stand, projector } = f.products;
+    const days = async (id: string) => (await f.db.query.products.findFirst({ where: eq(schema.products.id, id) }))!.processingDays;
+    await f.db.update(schema.products).set({ processingDays: 5 }).where(eq(schema.products.id, stand.id));
+    const ids = [lamp.id, stand.id, projector.id];
+    await expect(previewBulkEdit(f.db, shop, ids, { kind: "processing", days: 31 })).rejects.toThrow("Enter 0 to 30 days");
+    await expect(previewBulkEdit(f.db, shop, ids, { kind: "processing", days: Number.NaN })).rejects.toThrow("Enter 0 to 30 days");
+    const preview = await previewBulkEdit(f.db, shop, ids, { kind: "processing", days: 5 });
+    expect(preview.products).toBe(2);
+    expect(preview.changes.find((c) => c.productId === lamp.id)).toMatchObject({ before: `${shop.processingDays} days (store's)`, after: "5 days" });
+    const edit = await applyBulkEdit(f.db, shop, ids, { kind: "processing", days: 5 });
+    expect(edit.summary).toBe("Set preparing time to 5 days on 2 products");
+    expect([await days(lamp.id), await days(stand.id), await days(projector.id)]).toEqual([5, 5, 5]);
+    expect(await undoBulkEdit(f.db, shop.id, edit.id)).toEqual({ restored: 2, kept: 0 });
+    expect([await days(lamp.id), await days(stand.id), await days(projector.id)]).toEqual([null, 5, null]);
+    const back = await applyBulkEdit(f.db, shop, ids, { kind: "processing", days: null });
+    expect(back.summary).toBe("Set preparing time to your store's on 1 product");
+  });
+});

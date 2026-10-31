@@ -92,7 +92,8 @@ export type BulkEditAction =
   | { kind: "compare_at"; percent: number | null }
   | { kind: "collection"; collectionId: string; remove: boolean }
   | { kind: "tag"; tag: string; remove: boolean }
-  | { kind: "ships_from"; country: string | null };
+  | { kind: "ships_from"; country: string | null }
+  | { kind: "processing"; days: number | null };
 /** What a bulk edit replaced, and what it set, so it can be undone without losing later edits. */
 export type BulkEditSnapshot = {
   products: { id: string; status: "draft" | "active" | "archived" }[];
@@ -102,6 +103,8 @@ export type BulkEditSnapshot = {
   tags?: { productId: string; tag: string; had: boolean }[];
   /** Where products shipped from before and after (null = the store's country). */
   shipsFrom?: { productId: string; before: string | null; after: string | null }[];
+  /** Preparing days before and after (null = the store's processing days). */
+  processing?: { productId: string; before: number | null; after: number | null }[];
 };
 
 export type PricingRule = { kind: "multiplier" | "fixed"; value: number; ending: "99" | "95" | "00" | "none"; compareAtPercent: number | null; minPriceMinor: number };
