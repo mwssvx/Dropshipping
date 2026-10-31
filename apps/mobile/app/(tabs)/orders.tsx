@@ -4,20 +4,23 @@ import { useApi } from "../../src/api";
 import { FULFILMENT, money, PAYMENT, when } from "../../src/format";
 import { EmptyState, Field, List, LoadError, Loading, Pill, Row, Screen, Segmented } from "../../src/ui";
 
-type Order = { id: string; number: number; name: string; email: string; totalMinor: number; currency: string; paymentStatus: string; fulfillmentStatus: string; held?: boolean; paidAt: string | null; createdAt: string; daysLate?: number };
-type Show = "open" | "to_post" | "problems" | "late" | "all";
+type Order = { id: string; number: number; name: string; email: string; totalMinor: number; currency: string; paymentStatus: string; fulfillmentStatus: string; held?: boolean; paidAt: string | null; createdAt: string; daysLate?: number; handover?: { kind: "pickup" | "delivery"; day: string | null; ready: boolean } };
+type Show = "open" | "to_post" | "handover" | "problems" | "late" | "all";
 
 const EMPTY: Record<Show, [string, string]> = {
   open: ["No open orders", "Paid orders that haven't shipped yet show up here."],
   to_post: ["Nothing to post", "Orders with your own stock in them show up here until you add their tracking, oldest first."],
+  handover: ["Nothing to hand over", "Paid orders buyers pick up, or that you deliver yourself, show up here by day until they're handed over."],
   problems: ["No problems", "Orders the supplier couldn't take, and orders held for a risk check, show up here."],
   late: ["Nothing late", "Shipped parcels that are past their delivery date show up here, so you can check on them before the buyer asks."],
   all: ["No orders yet", "Share your store link to get your first sale."],
 };
 
+const day = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+
 export default function OrdersScreen() {
   const params = useLocalSearchParams<{ show?: string }>();
-  const [show, setShow] = useState<Show>(params.show === "problems" || params.show === "held" ? "problems" : params.show === "all" ? "all" : params.show === "late" ? "late" : params.show === "to_post" ? "to_post" : "open");
+  const [show, setShow] = useState<Show>(params.show === "problems" || params.show === "held" ? "problems" : params.show === "all" ? "all" : params.show === "late" ? "late" : params.show === "to_post" ? "to_post" : params.show === "handover" ? "handover" : "open");
   const [query, setQuery] = useState("");
   const [q, setQ] = useState("");
   // Waits for a pause in typing before asking the server.
@@ -39,6 +42,7 @@ export default function OrdersScreen() {
           options={[
             ["open", "Open"],
             ["to_post", "To post"],
+            ["handover", "Hand over"],
             ["problems", "Needs you"],
             ["late", "Late"],
             ["all", "All"],
@@ -65,7 +69,11 @@ export default function OrdersScreen() {
                 href={`/orders/${o.id}`}
                 a11y={`Order #${o.number}`}
                 title={`#${o.number} · ${o.name}`}
-                subtitle={`${money(o.totalMinor, o.currency)} · ${when(o.paidAt ?? o.createdAt)}${refunded ? ` · ${PAYMENT[o.paymentStatus]}` : ""}`}
+                subtitle={
+                  o.handover
+                    ? `${o.handover.kind === "pickup" ? "Pickup" : "Local delivery"}${o.handover.day ? ` · ${day.format(new Date(`${o.handover.day}T12:00:00Z`))}` : " · no day picked"}${o.handover.kind === "pickup" && o.handover.ready ? " · buyer told it's ready" : ""}`
+                    : `${money(o.totalMinor, o.currency)} · ${when(o.paidAt ?? o.createdAt)}${refunded ? ` · ${PAYMENT[o.paymentStatus]}` : ""}`
+                }
                 right={o.daysLate ? <Pill label={`${o.daysLate} ${o.daysLate === 1 ? "day" : "days"} late`} tone="warning" /> : o.held ? <Pill label="On hold" tone="warning" /> : <Pill label={o.paymentStatus === "pending" ? "Not paid" : f.label} tone={o.paymentStatus === "pending" ? "neutral" : f.tone} />}
               />
             );

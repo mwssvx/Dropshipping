@@ -274,6 +274,13 @@ const routes: Record<string, Handler> = {
     }
     // Orders with the store's own items to pack and post, oldest first, as on the packing slips.
     if (show === "to_post") return { orders: (await ordersToPost(db, shop.id)).slice(0, 200).map(orderSummary) };
+    // Paid pickups and local deliveries not handed over yet, the soonest day first (no day picked: last).
+    if (show === "handover") {
+      const rows = (await listOrders(db, shop.id))
+        .filter((o) => (o.pickup || o.localDelivery) && ["paid", "partially_refunded"].includes(o.paymentStatus) && o.fulfillmentStatus !== "delivered")
+        .sort((a, b) => (a.handoverOn ?? "9999").localeCompare(b.handoverOn ?? "9999") || a.number - b.number);
+      return { orders: rows.slice(0, 200).map((o) => ({ ...orderSummary(o), handover: { kind: o.pickup ? "pickup" : "delivery", day: o.handoverOn, ready: !!o.pickupReadyAt } })) };
+    }
     const keep = ORDER_FILTERS[show];
     if (!keep) throw new UserError("Unknown filter.");
     // The app shows the latest 200; for all orders that's one page, not the store's whole history.

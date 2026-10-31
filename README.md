@@ -1880,3 +1880,7 @@ Today has a Sales button for roles that can open marketing. Start a sale on ever
 ### Pickups and local deliveries in the app (after launch, part 350)
 
 An order the buyer picks up, or that the store delivers itself, now shows a card in the app with its day, if one was picked. For a pickup, Ready for pickup emails the buyer where to collect it, and Picked up closes it when they have it. For a local delivery, Delivered closes it once it's dropped off. The buyer gets the same emails as from the website, and each step goes in the activity log.
+
+### A Hand over list in the app (after launch, part 351)
+
+The app's Orders tab has a Hand over list: paid orders buyers pick up, or that you deliver yourself, that aren't handed over yet. The soonest day comes first and each row says pickup or local delivery, the day, and whether the buyer was told it's ready.
