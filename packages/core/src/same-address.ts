@@ -6,6 +6,7 @@ import { and, eq, gte, inArray, isNull, lte, ne, sql } from "drizzle-orm";
 import { schema, type Address, type Db } from "@sf/db";
 import { addressKey } from "./blocklist";
 import { addManualTracking, type FulfillmentContext } from "./fulfillment";
+import { ordersWaitingForTracking } from "./tracking-import";
 
 const DAYS = 30;
 const DAY = 86_400_000;
@@ -37,6 +38,13 @@ export async function ownItemsWaiting(db: Db, orderIds: string[]) {
     .where(and(inArray(schema.fulfillments.orderId, orderIds), isNull(schema.fulfillments.supplierId), sql`${schema.fulfillments.trackingNumber} is not null`));
   const gone = new Set(shipped.map((r) => r.orderId));
   return new Set(rows.map((r) => r.orderId).filter((id) => !gone.has(id)));
+}
+
+/** Paid orders with the store's own items still to post (no tracking on its own parcel yet), oldest first. */
+export async function ordersToPost(db: Db, shopId: string) {
+  const waiting = await ordersWaitingForTracking(db, shopId);
+  const own = await ownItemsWaiting(db, waiting.map((o) => o.id));
+  return waiting.filter((o) => own.has(o.id));
 }
 
 const OPEN = ["unfulfilled", "sent_to_supplier", "partially_shipped"] as const;
