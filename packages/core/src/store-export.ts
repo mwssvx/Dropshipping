@@ -324,7 +324,7 @@ const importSchema = z.object({
       min_order_minor: z.number().int().min(0).max(100_000).optional(),
       ship_cutoff: z.object({ hour: z.number().int().min(1).max(23), timeZone: z.string().max(60), weekends: z.boolean() }).nullable().optional(),
       holiday_deadline: z.object({ name: z.string().trim().min(1).max(40), arriveBy: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).nullable().optional(),
-      late_order_notice: z.object({ days: z.number().int().min(1).max(30), message: z.string().max(500).nullable() }).nullable().optional(),
+      late_order_notice: z.object({ days: z.number().int().min(1).max(30), message: z.string().max(500).nullable(), transit: z.boolean().optional() }).nullable().optional(),
       tipping: z.object({ percents: z.array(z.number().int().min(1).max(30)).min(1).max(3), note: z.string().max(120).nullable() }).nullable().optional(),
       survey: z.object({ question: z.string().max(120), options: z.array(z.string().max(40)).min(2).max(8), other: z.boolean() }).nullable().optional(),
       local_delivery_area: z

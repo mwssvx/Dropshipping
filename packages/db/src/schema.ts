@@ -849,7 +849,7 @@ export const emails = pgTable(
     id: id(),
     shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
     orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
-    kind: text("kind", { enum: ["order_confirmation", "shipping_update", "delivered", "refund", "support_reply", "abandoned_cart", "payment_link", "gift_shipped", "order_link", "order_updated", "abandoned_cart_offer", "pickup_ready", "bank_transfer", "bank_transfer_lapsed", "order_news", "order_late", "handover_reminder", "handover_moved"] }).notNull(),
+    kind: text("kind", { enum: ["order_confirmation", "shipping_update", "delivered", "refund", "support_reply", "abandoned_cart", "payment_link", "gift_shipped", "order_link", "order_updated", "abandoned_cart_offer", "pickup_ready", "bank_transfer", "bank_transfer_lapsed", "order_news", "order_late", "handover_reminder", "handover_moved", "order_transit_late"] }).notNull(),
     // Tells apart emails of a kind that can repeat (one per refund). Empty for once-only kinds.
     ref: text("ref").notNull().default(""),
     to: text("to").notNull(),
@@ -1797,7 +1797,12 @@ export type HolidayReturns = { from: string; to: string; until: string };
 export type ProductQuiz = { title: string; intro: string | null; on: boolean; questions: { text: string; answers: { label: string; tag: string }[] }[] };
 export type GiftCardBonus = { everyMinor: number; bonusMinor: number; from: string; to: string; usableFrom: string | null; usableUntil: string | null };
 /** "Running late" emails: after `days` without shipping, with the merchant's own words added when set. */
-export type LateOrderNotice = { days: number; message: string | null };
+export type LateOrderNotice = {
+  days: number;
+  message: string | null;
+  /** Also email buyers once when a shipped parcel is past its delivery date. */
+  transit?: boolean;
+};
 
 export type ReturnItem = {
   lineId: string;

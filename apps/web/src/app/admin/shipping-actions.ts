@@ -282,19 +282,19 @@ export async function setHolidayDeadlineAction(_: HolidayDeadlineState, form: Fo
   return { saved };
 }
 
-export type LateOrderState = { error?: string; saved?: { days: number; message: string | null } | null };
+export type LateOrderState = { error?: string; saved?: { days: number; message: string | null; transit?: boolean } | null };
 
 /** Turns the "running late" email to buyers on or off. */
 export async function setLateOrderAction(_: LateOrderState, form: FormData): Promise<LateOrderState> {
   const { shop, db, user } = await requireShop("shipping");
   let saved: LateOrderState["saved"] = null;
   try {
-    saved = await setLateOrderNotice(db, shop.id, form.get("enabled") === "on" ? { days: Number(form.get("days") ?? ""), message: String(form.get("message") ?? "") } : null);
+    saved = await setLateOrderNotice(db, shop.id, form.get("enabled") === "on" ? { days: Number(form.get("days") ?? ""), message: String(form.get("message") ?? ""), transit: form.get("transit") === "on" } : null);
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
     throw e;
   }
-  await logged({ shop, user, db }, saved ? `Turned on "running late" emails after ${saved.days} days` : `Turned off "running late" emails`, { href: "/admin/shipping#late-heading" });
+  await logged({ shop, user, db }, saved ? `Turned on "running late" emails after ${saved.days} days${saved.transit ? " and for parcels past their delivery date" : ""}` : `Turned off "running late" emails`, { href: "/admin/shipping#late-heading" });
   revalidatePath("/admin/shipping");
   return { saved };
 }
