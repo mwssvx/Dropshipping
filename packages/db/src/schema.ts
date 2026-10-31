@@ -94,7 +94,8 @@ export type BulkEditAction =
   | { kind: "tag"; tag: string; remove: boolean }
   | { kind: "ships_from"; country: string | null }
   | { kind: "processing"; days: number | null }
-  | { kind: "surcharge"; amountMinor: number };
+  | { kind: "surcharge"; amountMinor: number }
+  | { kind: "weight"; grams: number; onlyMissing: boolean };
 /** What a bulk edit replaced, and what it set, so it can be undone without losing later edits. */
 export type BulkEditSnapshot = {
   products: { id: string; status: "draft" | "active" | "archived" }[];
@@ -108,6 +109,8 @@ export type BulkEditSnapshot = {
   processing?: { productId: string; before: number | null; after: number | null }[];
   /** Extra shipping per item before and after. */
   surcharge?: { productId: string; before: number; after: number }[];
+  /** Each option's packed weight before and after, in grams. */
+  weight?: { variantId: string; before: number | null; after: number }[];
 };
 
 export type PricingRule = { kind: "multiplier" | "fixed"; value: number; ending: "99" | "95" | "00" | "none"; compareAtPercent: number | null; minPriceMinor: number };

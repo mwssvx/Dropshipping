@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { applyBulkEdit, MAX_BULK_PRODUCTS, parseMoney, parseProductQuery, previewBulkEdit, productIds, sendPriceDrops, undoBulkEdit, UserError, type BulkEditInput } from "@sf/core";
+import { applyBulkEdit, MAX_BULK_PRODUCTS, parseKg, parseMoney, parseProductQuery, previewBulkEdit, productIds, sendPriceDrops, undoBulkEdit, UserError, type BulkEditInput } from "@sf/core";
 import { logged, requireShop, stock } from "@/lib/server";
 
 export type BulkState = {
@@ -50,6 +50,11 @@ function actionFrom(form: FormData): BulkEditInput {
       } catch {
         throw new UserError("Enter an amount like 15 or 15.50.");
       }
+    }
+    case "weight": {
+      const grams = parseKg(String(form.get("kg") ?? ""));
+      if (grams == null || Number.isNaN(grams)) throw new UserError("Enter the weight in kg, like 0.5.");
+      return { kind: "weight", grams, onlyMissing: form.get("onlyMissing") === "on" };
     }
     default:
       throw new UserError("Pick what to change.");

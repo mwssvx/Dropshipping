@@ -1780,3 +1780,7 @@ The app's order screen shows the same "Also going to this address" list as the w
 ### Same address on the order list (after launch, part 325)
 
 On the Orders page, an order going to the same door as another unshipped order shows a "Same address as #1001" tag that links to the other order. You can spot the boxes to combine before you start packing.
+
+### Weight in bulk (after launch, part 326)
+
+On the Products list, "Set the weight" gives every option of the picked products the same packed weight, for shipping rates that go by weight. "Only options with no weight yet" is ticked by default, so weights you already typed stay as they are. Pair it with the "Missing a weight" filter to fill in a whole catalog at once. Gift cards and downloads are skipped, and you can undo it for a week like any other bulk change.

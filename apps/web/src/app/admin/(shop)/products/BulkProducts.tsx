@@ -22,6 +22,7 @@ const KINDS = [
   ["ships_from", "Set where they ship from"],
   ["processing", "Set preparing time"],
   ["surcharge", "Set extra shipping"],
+  ["weight", "Set the weight"],
 ] as const;
 type Kind = (typeof KINDS)[number][0];
 
@@ -52,6 +53,8 @@ export function BulkProducts({ rows, collections, tags = [], recent, total = row
   const [country, setCountry] = useState("");
   const [days, setDays] = useState("");
   const [amount, setAmount] = useState("");
+  const [kg, setKg] = useState("");
+  const [onlyMissing, setOnlyMissing] = useState(true);
   const [belowCost, setBelowCost] = useState(false);
   // Every product in the list, on every page, rather than the ones ticked here.
   const [everything, setEverything] = useState(false);
@@ -62,7 +65,7 @@ export function BulkProducts({ rows, collections, tags = [], recent, total = row
   const all = picked.size === rows.length && rows.length > 0;
   const count = everything ? total : picked.size;
   // A preview is for the products and change it was made from; touching either asks again.
-  const key = JSON.stringify([everything ? "all" : [...picked].sort(), kind, percent, ending, collectionId, tag, country, days, amount]);
+  const key = JSON.stringify([everything ? "all" : [...picked].sort(), kind, percent, ending, collectionId, tag, country, days, amount, kg, onlyMissing]);
   const preview = state.preview && state.key === key ? state.preview : null;
   const needsCollection = kind === "add" || kind === "remove";
 
@@ -85,6 +88,8 @@ export function BulkProducts({ rows, collections, tags = [], recent, total = row
         <input type="hidden" name="country" value={country} />
         <input type="hidden" name="days" value={days} />
         <input type="hidden" name="amount" value={amount} />
+        <input type="hidden" name="kg" value={kg} />
+        {onlyMissing && <input type="hidden" name="onlyMissing" value="on" />}
         <input type="hidden" name="key" value={key} />
         {belowCost && <input type="hidden" name="belowCost" value="on" />}
         {state.done && (
@@ -156,6 +161,19 @@ export function BulkProducts({ rows, collections, tags = [], recent, total = row
                   <input className="input w-40 num" id="bulk-amount" value={amount} inputMode="decimal" maxLength={9} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" aria-describedby="bulk-amount-hint" />
                   <span className="hint text-sm" id="bulk-amount-hint">Empty for none.</span>
                 </div>
+              )}
+              {kind === "weight" && (
+                <>
+                  <div className="field">
+                    <label className="label" htmlFor="bulk-kg">Packed weight of each (kg)</label>
+                    <input className="input w-40 num" id="bulk-kg" value={kg} inputMode="decimal" maxLength={8} onChange={(e) => setKg(e.target.value)} placeholder="0.5" aria-describedby="bulk-kg-hint" />
+                    <span className="hint text-sm" id="bulk-kg-hint">For shipping rates that go by weight.</span>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm self-center">
+                    <input type="checkbox" checked={onlyMissing} onChange={(e) => setOnlyMissing(e.target.checked)} />
+                    Only options with no weight yet
+                  </label>
+                </>
               )}
               <button type="submit" className="btn btn-secondary" name="intent" value="preview">Preview</button>
             </div>
