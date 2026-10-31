@@ -285,10 +285,14 @@ const routes: Record<string, Handler> = {
   },
 
   "POST imports/preview": async ({ req, db, shop }) => {
-    const p = await previewImport(db, suppliers(), shop.id, str((await body(req)).url));
+    const b = await body<{ url?: unknown; warehouse?: unknown }>(req);
+    const p = await previewImport(db, suppliers(), shop.id, str(b.url), typeof b.warehouse === "string" ? b.warehouse : null);
     return {
       supplier: p.supplier,
       alreadyImported: p.alreadyImported,
+      // Listings sold from several warehouses: the one these options come from, and the others.
+      warehouse: p.warehouse,
+      warehouses: p.warehouses.map((w) => w.name),
       product: {
         title: p.product.title,
         imageUrl: p.product.images[0] ?? null,
@@ -297,8 +301,8 @@ const routes: Record<string, Handler> = {
     };
   },
   "POST imports": async ({ req, db, shop }) => {
-    const b = await body<{ url?: unknown; title?: unknown; prices?: Record<string, number>; publish?: unknown }>(req);
-    const product = await importProduct(db, suppliers(), shop.id, { url: str(b.url), title: str(b.title), prices: b.prices ?? {}, publish: b.publish === true });
+    const b = await body<{ url?: unknown; title?: unknown; prices?: Record<string, number>; publish?: unknown; warehouse?: unknown }>(req);
+    const product = await importProduct(db, suppliers(), shop.id, { url: str(b.url), title: str(b.title), prices: b.prices ?? {}, publish: b.publish === true, warehouse: typeof b.warehouse === "string" ? b.warehouse : null });
     return { ok: true, id: product.id };
   },
 

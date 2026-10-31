@@ -23,6 +23,7 @@ export function ImportForm({ url, preview, currency }: { url: string; preview: I
   return (
     <form action={action} className="flex flex-col gap-6">
       <input type="hidden" name="url" value={url} />
+      {preview.warehouse && <input type="hidden" name="warehouse" value={preview.warehouse} />}
       <FormError message={state.error} />
       <section className="card p-5 flex flex-col gap-4">
         <div className="flex gap-4 items-start">

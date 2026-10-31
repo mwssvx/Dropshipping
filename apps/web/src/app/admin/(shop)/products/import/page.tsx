@@ -1,20 +1,20 @@
 import Link from "next/link";
-import { DEMO_SUPPLIER_LINKS, previewImport, UserError, type ImportPreview } from "@sf/core";
+import { countryName, DEMO_SUPPLIER_LINKS, formatMoney, previewImport, UserError, type ImportPreview } from "@sf/core";
 import { requireShop, suppliers } from "@/lib/server";
 import { PageHeader } from "../../PageHeader";
 import { ImportForm } from "./ImportForm";
 
 export const metadata = { title: "Import from supplier" };
 
-export default async function ImportPage({ searchParams }: { searchParams: Promise<{ url?: string }> }) {
-  const { url } = await searchParams;
+export default async function ImportPage({ searchParams }: { searchParams: Promise<{ url?: string; warehouse?: string }> }) {
+  const { url, warehouse } = await searchParams;
   const { shop, db } = await requireShop("products");
   const available = suppliers().available;
   let preview: ImportPreview | null = null;
   let error: string | null = null;
   if (url) {
     try {
-      preview = await previewImport(db, suppliers(), shop.id, url);
+      preview = await previewImport(db, suppliers(), shop.id, url, warehouse);
     } catch (e) {
       if (!(e instanceof UserError)) throw e;
       error = e.message;
@@ -59,7 +59,39 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
                 You already imported this as <Link className="underline" href={`/admin/products/${preview.alreadyImported.id}`}>{preview.alreadyImported.title}</Link>.
               </p>
             )}
-            <ImportForm key={preview.product.ref} url={url!} preview={preview} currency={shop.currency} />
+            {preview.warehouses.length > 1 && (
+              <section className="card p-5 flex flex-col gap-3" aria-labelledby="warehouse-heading">
+                <div>
+                  <h2 id="warehouse-heading" className="font-semibold">Pick a warehouse</h2>
+                  <p className="hint">
+                    The supplier sends this from {preview.warehouses.length} warehouses, each with its own cost and delivery time. Your store sells from one, so buyers
+                    don&apos;t see a &quot;Ships from&quot; choice. A warehouse in {countryName(shop.country)} is faster and has no customs.
+                  </p>
+                </div>
+                <ul className="flex flex-wrap gap-2" aria-label="Warehouses">
+                  {preview.warehouses.map((w) => {
+                    const on = w.name === preview!.warehouse;
+                    return (
+                      <li key={w.name}>
+                        <Link
+                          aria-current={on ? "true" : undefined}
+                          href={`?url=${encodeURIComponent(url!)}&warehouse=${encodeURIComponent(w.name)}`}
+                          className={`chip text-sm ${on ? "border-[var(--color-accent)] shadow-[inset_0_0_0_1px_var(--color-accent)] font-medium" : ""}`}
+                        >
+                          {w.name} · from {formatMoney(w.lowestCostMinor, shop.currency)}{w.fastestDays !== null ? ` · up to ${w.fastestDays} days` : ""}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {preview.shipsFrom && (
+                  <p className="text-sm" role="note">
+                    It&apos;ll show &quot;Ships from {countryName(preview.shipsFrom)}&quot; on the product page, and buyers in {countryName(shop.country)} get the import duties note if you&apos;ve turned it on.
+                  </p>
+                )}
+              </section>
+            )}
+            <ImportForm key={`${preview.product.ref}-${preview.warehouse ?? ""}`} url={url!} preview={preview} currency={shop.currency} />
           </>
         )}
       </div>
