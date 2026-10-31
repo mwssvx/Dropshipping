@@ -1654,3 +1654,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Dates, not just days** (`rateDeliveryWindows` in `packages/core/src/delivery.ts`): each shipping rate at checkout now says when the order would arrive with it ("Arrives Nov 4 – Nov 7", in the buyer's language), counted like the cart's dates: the store's processing days and same-day cutoff, the slowest item's supplier days, and a pre-order's ship-by date. Buyers compare Standard and Express by the day it lands, which is what they care about.
 2. Rates fall back to "Arrives in 3–5 days" when the store has dates off, and to nothing when no days are known. No migration.
+
+### Past their delivery date (after launch, part 296)
+
+1. **Parcels that should have arrived** (`ordersPastDelivery` in `packages/core/src/past-delivery.ts`): the Orders page lists shipped orders whose delivery window ended at least a day ago and that aren't marked delivered, most late first, with the day each was due, how late it is, where it's going and its tracking link. "Email these buyers" opens the bulk update for all of them, so a merchant can say what's happening before the "where is my order?" emails and disputes start.
+2. It counts the window buyers see on their order page (from the latest shipment, with the supplier's and the rate's days), even when the store doesn't show dates to buyers. Pickups, local deliveries, refunded orders and orders paid over 120 days ago are left out, and the check reads every candidate order in four queries. No migration.

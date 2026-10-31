@@ -99,4 +99,9 @@ test("a supplier refusal becomes a problem order the merchant fixes by shipping 
 
   await buyer.goto(statusUrl);
   await expect(buyer.getByText("USPS: 9400111899223")).toBeVisible();
+
+  // Shipped today, so it isn't past its delivery date.
+  await page.goto("/admin/orders");
+  await expect(page.getByRole("link", { name: "#1001" })).toBeVisible();
+  await expect(page.getByRole("region", { name: /Past their delivery date/ })).toHaveCount(0);
 });
