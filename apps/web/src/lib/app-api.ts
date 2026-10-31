@@ -56,6 +56,13 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  createPartner,
+  formatRate,
+  listPartners,
+  PARTNER_HOLD_DAYS,
+  recordPartnerPayout,
+  resetPartnerLink,
+  setPartnerActive,
   addWholesaleBuyer,
   parseMoney,
   decideWholesale,
@@ -182,7 +189,7 @@ import {
 import type { Db } from "@sf/db";
 import { revalidatePath } from "next/cache";
 import { BRAND } from "./brand";
-import { agents, campaigns, db, fulfillment, logged, mailer, platformUrl, notifyLater, payments, refunds, stock, storeAddress, subscriptions, supplierPortalUrl, suppliers, tax, testPayments } from "./server";
+import { agents, campaigns, db, fulfillment, logged, mailer, platformUrl, notifyLater, payments, refunds, stock, storeAddress, partnerPortalUrl, subscriptions, supplierPortalUrl, suppliers, tax, testPayments } from "./server";
 
 type User = { id: string; email: string };
 type ShopLink = { id: string; name: string; handle: string; role: string };
@@ -947,6 +954,67 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, `${said} in the app`, { href: "/admin/wholesale" });
     return { ok: true, message: { approve: `${name} is approved. We emailed them.`, decline: `${name} is declined. We emailed them.`, remove: `${name} pays the normal prices again.` }[decision] };
   },
+  // Partners: creators with their own code, the orders it brought, and what they're owed.
+  "GET partners": async ({ db, shop, role }) => {
+    const [partners, store] = await Promise.all([listPartners(db, shop.id), storeAddress(shop)]);
+    const seesMoney = can(role, "money");
+    return {
+      seesMoney,
+      holdDays: PARTNER_HOLD_DAYS,
+      partners: partners.map((p) => ({
+        id: p.id,
+        name: p.name,
+        email: p.email,
+        code: p.code,
+        percentOff: p.percentOff,
+        commission: formatRate(p.commissionBps),
+        active: p.active,
+        orders: p.orders,
+        money: seesMoney ? { salesMinor: p.salesMinor, pendingMinor: p.pendingMinor, earnedMinor: p.earnedMinor, paidMinor: p.paidMinor, owedMinor: p.owedMinor } : null,
+        shareUrl: `${store}/discount/${p.code}`,
+        portalUrl: partnerPortalUrl(p.portalToken),
+      })),
+    };
+  },
+  "POST partners": async ({ req, db, shop, user }) => {
+    const b = await body<Record<string, unknown>>(req);
+    const store = await storeAddress(shop);
+    const partner = await createPartner({ db, mailer: mailer(), partnerUrl: partnerPortalUrl, storeUrl: () => store }, shop, {
+      name: str(b.name),
+      email: str(b.email),
+      code: str(b.code),
+      percentOff: Number.parseInt(str(b.percentOff), 10) || 0,
+      commissionPercent: Number.parseFloat(str(b.commission)) || 0,
+    });
+    await logged({ shop, user, db }, `Added partner ${partner.name} with the code ${partner.code} in the app`, { href: "/admin/partners" });
+    return { ok: true, message: `${partner.name} is a partner with the code ${partner.code}.${partner.email ? " We emailed them their code and private page." : ""}` };
+  },
+  "POST partners/:id/payout": async ({ req, params, db, shop, user, role }) => {
+    if (!can(role, "money")) throw new HttpError(403, "Your role on this store doesn't include money. The owner can change it.");
+    const b = await body<{ amount?: unknown; note?: unknown }>(req);
+    let amountMinor: number;
+    try {
+      amountMinor = parseMoney(str(b.amount).trim().replace(/^[^\d]+/, ""));
+    } catch {
+      throw new UserError("Enter the amount, like 25.00.");
+    }
+    const { partner, payout } = await recordPartnerPayout(db, shop, params.id!, { amountMinor, note: str(b.note) });
+    const amount = formatMoney(payout.amountMinor, shop.currency);
+    await logged({ shop, user, db }, `Recorded ${amount} paid to partner ${partner.name} in the app`, { href: "/admin/partners" });
+    return { ok: true, message: `Recorded ${amount} paid to ${partner.name}.` };
+  },
+  "POST partners/:id": async ({ req, params, db, shop, user }) => {
+    const action = (await body<{ action?: unknown }>(req)).action;
+    if (action === "new_link") {
+      const partner = await resetPartnerLink(db, shop.id, params.id!);
+      await logged({ shop, user, db }, `Made a new private link for partner ${partner.name} in the app`, { href: "/admin/partners" });
+      return { ok: true, message: `${partner.name} has a new private link. The old one stops working, so send them this one.` };
+    }
+    if (action !== "pause" && action !== "resume") throw new UserError("Pause, bring back, or make a new link.");
+    const partner = await setPartnerActive(db, shop.id, params.id!, action === "resume");
+    await logged({ shop, user, db }, `${action === "resume" ? "Brought back" : "Paused"} partner ${partner.name} in the app`, { href: "/admin/partners" });
+    return { ok: true, message: action === "resume" ? `${partner.name}'s code works again.` : `${partner.name} is paused, so their code stops working. What they earned stays.` };
+  },
   "GET questions": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
     const rows = await listQuestions(db, shop.id);
@@ -1529,6 +1597,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("suppliers")) return "suppliers";
   if (path.startsWith("cart-links")) return "marketing";
   if (path.startsWith("wholesale")) return "wholesale";
+  if (path.startsWith("partners")) return "marketing";
   if (path.startsWith("checkouts")) return "orders";
   if (path.startsWith("store-status")) return "theme";
   if (path.startsWith("gift-cards")) return "gift_cards";

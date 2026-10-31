@@ -1960,3 +1960,7 @@ Today has a Cart links button for people who look after marketing. Name a link, 
 ### Wholesale in the app (after launch, part 370)
 
 Customers in the app has Wholesale for people who look after it, and a push notification says when a business applies for wholesale prices. Each application shows the business, its email, tax or resale number and what it wrote, with Approve and Decline (both email the buyer). Approved buyers can lose wholesale prices again, buyers you already know can be added by email, and the screen turns wholesale on or off and sets the discount and the smallest wholesale order.
+
+### Partners in the app (after launch, part 371)
+
+Today has a Partners button for people who look after marketing. Add a creator with their code, the discount buyers get and their share (we email them their code and private page), see each partner's orders and, for people who see the money, what they sold, what they're owed and what's waiting to count. Record a payment to them, pause them (their code stops working) or bring them back, make them a new private link, and share their code link or private page from the phone.
