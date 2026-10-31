@@ -56,6 +56,10 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  applySupplierCost,
+  listCostChanges,
+  resolveCostChange,
+  setPriceWatch,
   recordStockCount,
   cancelRestockOrder,
   createRestockOrder,
@@ -738,6 +742,63 @@ const routes: Record<string, Handler> = {
     if (r.found) parts.push(`${r.found} more than expected.`);
     return { ok: true, message: parts.join(" ") };
   },
+  // Supplier price rises: raise the price with the pricing rule, or keep it.
+  "GET price-changes": async ({ db, shop }) => {
+    const changes = await listCostChanges(db, shop);
+    const products = testPayments()
+      ? (await db.query.products.findMany({ where: (p, { and, eq, ne }) => and(eq(p.shopId, shop.id), ne(p.status, "archived"), eq(p.giftCard, false)), orderBy: (p, { asc }) => asc(p.title), limit: 50 })).map((p) => ({ id: p.id, title: p.title }))
+      : [];
+    return {
+      minMarginPercent: shop.minMarginPercent,
+      autoReprice: shop.autoReprice,
+      changes: changes.map((c) => ({
+        id: c.id,
+        title: c.title,
+        status: c.status,
+        costBeforeMinor: c.costBeforeMinor,
+        costAfterMinor: c.costAfterMinor,
+        priceMinor: c.status === "open" ? c.currentPriceMinor : c.priceMinor,
+        newPriceMinor: c.newPriceMinor,
+        suggestedPriceMinor: c.status === "open" && c.suggestedPriceMinor > c.currentPriceMinor ? c.suggestedPriceMinor : null,
+        marginBefore: c.marginBefore,
+        marginNow: c.marginNow,
+        belowTarget: c.status === "open" && c.belowTarget,
+        createdAt: c.createdAt,
+      })),
+      testProducts: products,
+    };
+  },
+  "PUT price-changes/watch": async ({ req, db, shop, user }) => {
+    const b = await body<{ minMarginPercent?: unknown; autoReprice?: unknown }>(req);
+    const raw = str(b.minMarginPercent).trim();
+    await setPriceWatch(db, shop.id, { minMarginPercent: raw ? Number(raw) : Number.NaN, autoReprice: b.autoReprice === true });
+    await logged({ shop, user, db }, "Changed the price watch in the app", { href: "/admin/price-changes" });
+    revalidatePath("/admin", "layout");
+    return { ok: true, message: "Saved." };
+  },
+  "POST price-changes/simulate": async ({ req, db, shop }) => {
+    if (!testPayments()) throw new HttpError(403, "Only in test mode.");
+    const productId = str((await body<{ productId?: unknown }>(req)).productId);
+    const variant = await db.query.variants.findFirst({
+      where: (v, { and, eq, isNotNull }) => and(eq(v.productId, productId), isNotNull(v.costMinor)),
+      orderBy: (v, { asc }) => asc(v.position),
+    });
+    const product = variant && (await db.query.products.findFirst({ where: (p, { and, eq }) => and(eq(p.id, productId), eq(p.shopId, shop.id)) }));
+    if (!variant || !product) throw new UserError("Pick a product with a supplier cost.");
+    await applySupplierCost(db, shop, variant.id, Math.max(variant.costMinor! + 1, Math.round(variant.priceMinor * 0.9)));
+    return { ok: true };
+  },
+  "POST price-changes/:id": async ({ req, params, db, shop, user }) => {
+    const action = (await body<{ action?: unknown }>(req)).action;
+    if (action !== "raise" && action !== "keep") throw new UserError("Raise the price or keep it.");
+    const row = await resolveCostChange(db, shop, params.id!, action);
+    if (action === "raise") {
+      await logged({ shop, user, db }, `Raised a price to ${formatMoney(row.newPriceMinor!, shop.currency)} after a supplier price rise, in the app`, { href: "/admin/price-changes" });
+      revalidatePath(`/s/${shop.handle}`, "layout");
+    }
+    revalidatePath("/admin", "layout");
+    return { ok: true, message: action === "raise" ? `Price raised to ${formatMoney(row.newPriceMinor!, shop.currency)}.` : "Price kept as it is." };
+  },
   "GET questions": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
     const rows = await listQuestions(db, shop.id);
@@ -871,9 +932,13 @@ const routes: Record<string, Handler> = {
     return { ok: true, message: run.text };
   },
 
-  "GET products": async ({ db, shop }) => ({
-    products: (await listProducts(db, shop.id)).map((p) => ({ ...productView(p), stockLevel: stockLevel(p, shop.restockAlertAt) })),
-  }),
+  "GET products": async ({ db, shop }) => {
+    const [products, changes] = await Promise.all([listProducts(db, shop.id), listCostChanges(db, shop)]);
+    return {
+      products: products.map((p) => ({ ...productView(p), stockLevel: stockLevel(p, shop.restockAlertAt) })),
+      priceRises: changes.filter((c) => c.status === "open").length,
+    };
+  },
   "GET products/:id": async ({ params, db, shop }) => productView(await getProduct(db, shop.id, params.id!)),
   "PATCH products/:id": async ({ req, params, db, shop }) => {
     const product = await patchProduct(db, shop.id, params.id!, await body(req));
@@ -1312,6 +1377,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("subscriptions")) return "orders";
   if (path.startsWith("blocked")) return "customers";
   if (path.startsWith("restock") || path.startsWith("stock-count")) return "products";
+  if (path.startsWith("price-changes")) return "products";
   if (path.startsWith("checkouts")) return "orders";
   if (path.startsWith("store-status")) return "theme";
   if (path.startsWith("gift-cards")) return "gift_cards";
