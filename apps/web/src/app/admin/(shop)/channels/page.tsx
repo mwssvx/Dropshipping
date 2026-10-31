@@ -33,13 +33,25 @@ export default async function ChannelsPage() {
       file: "meta.csv",
       steps: "In Meta Commerce Manager, open your catalog, then Data sources, Data feed, “Scheduled feed”. Paste the link and pick a daily update.",
     },
+    {
+      id: "pinterest",
+      name: "Pinterest",
+      file: "google.xml",
+      steps: "Pinterest reads the same file as Google. In your Pinterest business account, open Ads, then Catalogs, “Create data source”. Paste the link, pick XML, your currency and a daily update. Your products become shoppable Pins.",
+    },
+    {
+      id: "tiktok",
+      name: "TikTok",
+      file: "google.xml",
+      steps: "TikTok also reads the Google file. In TikTok Ads Manager, open Assets, then Catalogs, add products with “Data feed”, paste the link and pick a daily update. Use the catalog in video shopping ads.",
+    },
   ];
   return (
     <main className="pb-12">
       <PageHeader title="Sales channels" />
       <div className="px-4 sm:px-8 flex flex-col gap-6 max-w-4xl">
         <p className="hint max-w-2xl">
-          List your products in Google Shopping and in Facebook and Instagram shops and ads. Each channel reads a feed from your store once a day, so
+          List your products in Google Shopping, in Facebook and Instagram shops and ads, on Pinterest and in TikTok ads. Each channel reads a feed from your store once a day, so
           new products, prices, sales and stock follow by themselves. Gift cards aren&apos;t listed.
         </p>
         <p className="text-sm" role="status">
