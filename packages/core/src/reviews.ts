@@ -248,9 +248,10 @@ export type ReviewSort = "newest" | "helpful";
 export const reviewSort = (value: string | undefined): ReviewSort => (value === "helpful" ? "helpful" : "newest");
 
 /** The query string for a product page's review list: which stars, which order, and whether all are shown. */
-export function reviewsQuery(view: { stars?: number | null; sort?: ReviewSort; all?: boolean }) {
+export function reviewsQuery(view: { stars?: number | null; photos?: boolean; sort?: ReviewSort; all?: boolean }) {
   const q = new URLSearchParams();
   if (view.stars) q.set("stars", String(view.stars));
+  if (view.photos) q.set("photos", "1");
   if (view.sort === "helpful") q.set("sort", "helpful");
   if (view.all) q.set("reviews", "all");
   const s = q.toString();
@@ -260,18 +261,21 @@ export function reviewsQuery(view: { stars?: number | null; sort?: ReviewSort; a
 /**
  * Published reviews for a product page, with the average for the stars and search results and how
  * many there are of each star rating. `stars` lists only reviews with that rating; the count,
- * average and breakdown always cover them all. `sort: "helpful"` puts the reviews most shoppers
- * found helpful first, newest first among equals.
+ * average and breakdown always cover them all. `photos` lists only reviews with buyer photos, and
+ * `sort: "helpful"` puts the reviews most shoppers found helpful first, newest first among equals.
  */
-export async function productReviews(db: Db, productId: string, limit = REVIEWS_SHOWN, opts: { stars?: number | null; sort?: ReviewSort } = {}) {
+export async function productReviews(db: Db, productId: string, limit = REVIEWS_SHOWN, opts: { stars?: number | null; photos?: boolean; sort?: ReviewSort } = {}) {
   const where = and(eq(schema.reviews.productId, productId), eq(schema.reviews.status, "published"));
-  const listed = opts.stars ? and(where, eq(schema.reviews.rating, opts.stars)) : where;
+  const hasPhotos = sql`jsonb_array_length(${schema.reviews.photoIds}) > 0`;
+  const listed = and(where, opts.stars ? eq(schema.reviews.rating, opts.stars) : undefined, opts.photos ? hasPhotos : undefined);
   const order = opts.sort === "helpful"
     ? [desc(schema.reviews.helpfulCount), desc(schema.reviews.createdAt), desc(schema.reviews.id)]
     : [desc(schema.reviews.createdAt), desc(schema.reviews.id)];
-  const [byRating, reviews] = await Promise.all([
+  const [byRating, reviews, [listedRow], [photoRow]] = await Promise.all([
     db.select({ rating: schema.reviews.rating, n: count() }).from(schema.reviews).where(where).groupBy(schema.reviews.rating),
     db.query.reviews.findMany({ where: listed, orderBy: order, limit }),
+    db.select({ n: count() }).from(schema.reviews).where(listed),
+    db.select({ n: count() }).from(schema.reviews).where(and(where, hasPhotos)),
   ]);
   // breakdown[0] is one star, breakdown[4] five.
   const breakdown = [1, 2, 3, 4, 5].map((r) => Number(byRating.find((b) => b.rating === r)?.n ?? 0));
@@ -279,14 +283,16 @@ export async function productReviews(db: Db, productId: string, limit = REVIEWS_
   const total = breakdown.reduce((a, b, i) => a + b * (i + 1), 0);
   // The newest buyer photos for the strip above the reviews, from any published review.
   const withPhotos = await db.query.reviews.findMany({
-    where: and(where, sql`jsonb_array_length(${schema.reviews.photoIds}) > 0`),
+    where: and(where, hasPhotos),
     orderBy: desc(schema.reviews.createdAt),
     columns: { id: true, name: true, rating: true, photoIds: true },
     limit: 12,
   });
   const photos = withPhotos.flatMap((r) => r.photoIds.map((id) => ({ url: reviewPhotoUrl(id), reviewId: r.id, name: r.name, rating: r.rating }))).slice(0, 12);
-  const listedCount = opts.stars ? breakdown[opts.stars - 1]! : n;
-  return { count: n, average: n ? Math.round((total / n) * 10) / 10 : null, reviews, photos, breakdown, listedCount };
+  const listedCount = Number(listedRow?.n ?? 0);
+  // How many reviews have photos, for the "With photos" filter.
+  const withPhotosCount = Number(photoRow?.n ?? 0);
+  return { count: n, average: n ? Math.round((total / n) * 10) / 10 : null, reviews, photos, breakdown, listedCount, withPhotosCount };
 }
 
 /** A device's "helpful" id: the random value the store keeps in a cookie. */

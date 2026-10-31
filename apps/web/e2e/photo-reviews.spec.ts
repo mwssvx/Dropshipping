@@ -92,4 +92,15 @@ test("a buyer adds photos to a review and they show on the product page", async 
   await expect(review.getByRole("list", { name: "Buyer's photos" }).getByRole("img")).toHaveCount(1);
   await buyer.reload();
   await expect(buyer.getByRole("list", { name: "Photos from buyers" }).getByRole("img")).toHaveCount(1);
+
+  // Shoppers can list only the reviews with photos, and tap again to see them all.
+  const reviews = buyer.locator("#reviews");
+  const withPhotos = reviews.getByRole("link", { name: "With photos (1)" });
+  await withPhotos.click();
+  await expect(buyer).toHaveURL(/\?photos=1#reviews$/);
+  await expect(withPhotos).toHaveAttribute("aria-current", "true");
+  await expect(reviews.locator('li[id^="review-"]')).toHaveCount(1);
+  await withPhotos.click();
+  await expect(buyer).toHaveURL(/\/products\/[^?]+#reviews$/);
+  await expect(withPhotos).not.toHaveAttribute("aria-current", "true");
 });
