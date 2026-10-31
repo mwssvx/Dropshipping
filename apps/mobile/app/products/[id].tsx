@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Image, View } from "react-native";
 import { api, send, useApi } from "../../src/api";
 import { kg, money, parseKg, parseMoney } from "../../src/format";
-import { useSession } from "../../src/session";
+import { useCan, useSession } from "../../src/session";
 import { BackLink, Banner, Body, Button, Card, Field, Heading, LoadError, Loading, Pill, Screen, Section, Toggle } from "../../src/ui";
 import { color, radius, space } from "../../src/theme";
 import { STATUS, type Product } from "../../src/product";
@@ -229,6 +229,7 @@ export default function ProductScreen() {
       ) : null}
 
       <TagsSection product={p} busy={busy} act={act} />
+      <CollectionsSection product={p} busy={busy} act={act} />
       <PreorderSection product={p} busy={busy} act={act} />
       <LimitsSection product={p} busy={busy} act={act} />
 
@@ -327,6 +328,48 @@ function TagsSection({ product: p, busy, act }: { product: Product; busy: string
           disabled={!!busy || text === null || text === saved}
           onPress={() => act("tags", async () => (await api(`products/${p.id}`, { method: "PATCH", body: { tags: value } }), "Tags saved."))}
         />
+      </Card>
+    </Section>
+  );
+}
+
+/** Which collections the product is in. Hand-picked ones switch here; automatic ones fill by their rules. */
+function CollectionsSection({ product: p, busy, act }: { product: Product; busy: string | null; act: Act }) {
+  const can = useCan();
+  const all = p.collections ?? [];
+  const manual = all.filter((c) => !c.auto);
+  if (!can("collections")) return null;
+  const auto = all.filter((c) => c.auto);
+  return (
+    <Section title="Collections">
+      <Card>
+        {!all.length ? <Body muted>No collections yet. Make them on the website, then put products in them here.</Body> : null}
+        {manual.length ? (
+          <View role="group" aria-label="Hand-picked collections">
+            {manual.map((c) => (
+              <Toggle
+                key={c.id}
+                label={c.title}
+                value={c.in}
+                onChange={(v) => {
+                  if (busy) return;
+                  void act(`collection-${c.id}`, async () => (await api<{ message: string }>(`products/${p.id}/collections/${c.id}`, { method: "PUT", body: { in: v } })).message);
+                }}
+              />
+            ))}
+          </View>
+        ) : null}
+        {auto.length ? (
+          <View role="group" aria-label="Automatic collections" style={{ gap: space(2) }}>
+            <Body muted>These fill by themselves from their rules.</Body>
+            {auto.map((c) => (
+              <View key={c.id} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space(2) }}>
+                <Body>{c.title}</Body>
+                <Pill label={c.in ? "In it" : "Not in it"} tone={c.in ? "success" : "neutral"} />
+              </View>
+            ))}
+          </View>
+        ) : null}
       </Card>
     </Section>
   );

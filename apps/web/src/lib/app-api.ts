@@ -56,6 +56,9 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  listCollections,
+  collectionsOfProduct,
+  setProductInCollection,
   MAX_PRODUCT_TAGS,
   productTags,
   HOLIDAY_NAME_MAX,
@@ -1528,9 +1531,31 @@ const routes: Record<string, Handler> = {
   },
   "GET products/:id": async ({ params, db, shop }) => {
     const p = await getProduct(db, shop.id, params.id!);
-    const [sold, storeTags] = await Promise.all([p.preorder ? preordersSold(db, p.id) : 0, productTags(db, shop.id)]);
-    // The store's other tags, most used first, to tap instead of typing.
-    return { ...productView(p), preordersSold: sold, storeTags: storeTags.map((t) => t.tag).slice(0, 30), maxTags: MAX_PRODUCT_TAGS };
+    const [sold, storeTags, collections, inIds] = await Promise.all([
+      p.preorder ? preordersSold(db, p.id) : 0,
+      productTags(db, shop.id),
+      listCollections(db, shop.id),
+      collectionsOfProduct(db, shop.id, p.id),
+    ]);
+    const isIn = new Set(inIds);
+    return {
+      ...productView(p),
+      preordersSold: sold,
+      // The store's other tags, most used first, to tap instead of typing.
+      storeTags: storeTags.map((t) => t.tag).slice(0, 30),
+      maxTags: MAX_PRODUCT_TAGS,
+      // Hand-picked collections can be switched here; automatic ones fill by their rules.
+      collections: collections.map((c) => ({ id: c.id, title: c.title, auto: !!c.rules, in: isIn.has(c.id) })),
+    };
+  },
+  "PUT products/:id/collections/:collectionId": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ in?: unknown }>(req);
+    const p = await getProduct(db, shop.id, params.id!);
+    const nowIn = await setProductInCollection(db, shop.id, params.collectionId!, p.id, b.in === true);
+    const title = (await listCollections(db, shop.id)).find((c) => c.id === params.collectionId)?.title ?? "a collection";
+    await logged({ shop, user, db }, nowIn ? `Added ${p.title} to ${title} in the app` : `Took ${p.title} out of ${title} in the app`, { href: `/admin/products/${p.id}` });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, in: nowIn, message: nowIn ? `Added to ${title}.` : `Taken out of ${title}.` };
   },
   "PUT products/:id/preorder": async ({ req, params, db, shop, user }) => {
     const b = await body<{ on?: unknown; shipsBy?: unknown; limit?: unknown }>(req);
@@ -1969,6 +1994,7 @@ function routeArea(key: string): Area | null {
   if (key === "POST orders/:id/refund") return "refunds";
   if (key === "POST customers/:id/credit") return "gift_cards";
   if (key === "POST orders/:id/transfer-paid" || key === "PUT bank-transfers") return "money";
+  if (key === "PUT products/:id/collections/:collectionId") return "collections";
   const path = key.split(" ")[1]!;
   if (path.startsWith("orders")) return "orders";
   if (path.startsWith("products") || path.startsWith("imports")) return "products";
