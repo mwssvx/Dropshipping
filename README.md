@@ -1471,3 +1471,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **For adults-only stores** (`apps/web/src/theme/AgeGate.tsx`): in the theme editor's Style tab, "Ask visitors their age first" can ask for 18 or 21 and over. Visitors see the store's name, "You must be old enough to buy from …" and "Are you 21 or older?" before anything else, with Yes and No.
 2. **Once per device**: a yes is remembered in the browser, so returning shoppers aren't asked on every page; a no keeps the store hidden with a short "Sorry" and isn't remembered, so a slip is fixed by reloading. Escape doesn't skip it, and the editor preview never asks. It's a confirmation, not an ID check: checkout still asks for products with a minimum age (part 133). Five new store strings in all six languages. No migration: it lives in the theme.
+
+### Star breakdown on product pages (after launch, part 259)
+
+1. **How buyers rated it** (`apps/web/src/app/s/[shop]/products/[handle]/page.tsx`): above a product's reviews, five rows show how many reviews gave it 5, 4, 3, 2 and 1 stars, with a bar for each. Tapping a row lists only those reviews ("Only 2-star reviews", with a link back to all of them), so a shopper worried about a product can read the low ones first.
+2. **Long lists**: the page still starts with the newest 20 reviews and now has "Show all 23 reviews" (up to 100) underneath, for the chosen rating too. Ratings nobody gave aren't links, and the stars at the top and in search results always count every review. `productReviews` in core returns the breakdown in the same query that counts them. Five new store strings in all six languages. No migration.

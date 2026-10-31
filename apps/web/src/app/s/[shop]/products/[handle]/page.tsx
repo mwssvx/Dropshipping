@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, formatDeliveryWindow, giftCardBonusNow, holidayReturnsNow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, breadcrumbCollection, collectionFromReferer, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, comingSoonProduct, COMPARE_MAX, defaultCutoffZone, countdownTo, shipsToCountry, recentSalesCount, RECENT_SALES_DAYS } from "@sf/core";
+import { bundlesForProduct, formatDeliveryWindow, giftCardBonusNow, holidayReturnsNow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, breadcrumbCollection, collectionFromReferer, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, comingSoonProduct, COMPARE_MAX, defaultCutoffZone, countdownTo, shipsToCountry, recentSalesCount, RECENT_SALES_DAYS, starsFilter, REVIEWS_SHOWN, REVIEWS_SHOWN_ALL } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { ShareButtons } from "@/components/ShareButtons";
 import { SaleCountdown } from "@/components/SaleCountdown";
@@ -102,7 +102,7 @@ const ASKED_MESSAGES = {
   invalid: { key: "askInvalid", ok: false },
 } as const;
 
-export default async function ProductPage({ params, searchParams }: { params: Promise<{ shop: string; handle: string }>; searchParams: Promise<{ alert?: string; saved?: string; asked?: string; launch?: string; compare?: string }> }) {
+export default async function ProductPage({ params, searchParams }: { params: Promise<{ shop: string; handle: string }>; searchParams: Promise<{ alert?: string; saved?: string; asked?: string; launch?: string; compare?: string; stars?: string; reviews?: string }> }) {
   const { shop: shopHandle, handle } = await params;
   const query = await searchParams;
   const t = await storeT(shopHandle);
@@ -129,7 +129,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
     product.variants.every((x) => Object.keys(x.options ?? {}).sort().join("|") === names) &&
     new Set(product.variants.map((x) => JSON.stringify(defs.map((d) => x.options?.[d.name])))).size === product.variants.length;
   const [reviews, questions, rawUpsells, base, fx, chart, rawRecent, soldLately] = await Promise.all([
-    productReviews(await db(), product.id),
+    productReviews(await db(), product.id, query.reviews === "all" ? REVIEWS_SHOWN_ALL : REVIEWS_SHOWN, { stars: starsFilter(query.stars) }),
     productQuestions(await db(), product.id),
     upsellsFor(await db(), shop.id, [product.id]),
     storeBase(shopHandle),
@@ -143,6 +143,8 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const crumbFound = await breadcrumbCollection(await db(), shop.id, raw, collectionFromReferer(asked.get("referer"), base));
   const crumb = crumbFound ? (await localCollections(shopHandle, [crumbFound]))[0]! : null;
   const origin = `${asked.get("x-forwarded-proto") ?? "https"}://${asked.get("host")}${base}`;
+  const stars = starsFilter(query.stars);
+  const reviewsHref = `${base}/products/${product.handle}`;
   const askedKind = ASKED_MESSAGES[(query.asked ?? "") as keyof typeof ASKED_MESSAGES];
   const upsells = await localProducts(shopHandle, rawUpsells);
   const together = (await localProducts(shopHandle, await boughtTogether(await db(), shop.id, [product.id]))).filter((p) => !upsells.some((u) => u.id === p.id));
@@ -527,6 +529,40 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
             </ul>
           </div>
         )}
+        {reviews.count > 0 && (
+          // Each row lists only the reviews with that many stars; rows with none aren't links.
+          <ul className="flex flex-col gap-1.5 max-w-sm text-sm" aria-label={t.ratingBreakdown}>
+            {[5, 4, 3, 2, 1].map((n) => {
+              const c = reviews.breakdown[n - 1]!;
+              const on = stars === n;
+              const row = (
+                <>
+                  <span className="w-16 shrink-0">{t.starRow(n)}</span>
+                  <span className="h-2 flex-1 rounded-full bg-sunken overflow-hidden" aria-hidden>
+                    <span className="block h-full rounded-full bg-accent" style={{ width: `${Math.round((100 * c) / reviews.count)}%` }} />
+                  </span>
+                  <span className="w-8 text-right num">{c}<span className="sr-only"> {t.reviewCount(c)}</span></span>
+                </>
+              );
+              return (
+                <li key={n}>
+                  {c > 0 ? (
+                    <a href={on ? `${reviewsHref}#reviews` : `${reviewsHref}?stars=${n}#reviews`} aria-current={on ? "true" : undefined}
+                      className={`flex items-center gap-3 rounded px-1 -mx-1 hover:bg-sunken ${on ? "font-semibold" : ""}`}>{row}</a>
+                  ) : (
+                    <span className="flex items-center gap-3 px-1 -mx-1 hint">{row}</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {stars && (
+          <p className="text-sm flex flex-wrap gap-x-3">
+            <span>{t.onlyStars(stars)}</span>
+            <a href={`${reviewsHref}#reviews`} className="underline hover:text-accent">{t.allReviews}</a>
+          </p>
+        )}
         {reviews.count === 0 ? (
           <p className="hint">{t.noReviews}</p>
         ) : (
@@ -546,6 +582,9 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
               </li>
             ))}
           </ul>
+        )}
+        {reviews.listedCount > reviews.reviews.length && query.reviews !== "all" && (
+          <a href={`${reviewsHref}?${stars ? `stars=${stars}&` : ""}reviews=all#reviews`} className="btn btn-secondary self-start">{t.allReviewsCount(reviews.listedCount)}</a>
         )}
       </section>
       <section id="questions" className="md:col-span-2 flex flex-col gap-4 border-t border-border pt-8" aria-labelledby="questions-heading">
