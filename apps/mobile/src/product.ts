@@ -15,6 +15,8 @@ export type Product = {
   missing: ("photo" | "description" | "weight" | "customs" | "cost")[];
   hsCode: string | null;
   originCountry: string | null;
+  /** On the list only: sold out, or an option at or under the store's running-low number. */
+  stockLevel?: "sold_out" | "low" | null;
 };
 
 export const MISSING: Record<Product["missing"][number], string> = {

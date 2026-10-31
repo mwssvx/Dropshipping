@@ -40,6 +40,7 @@ import {
   isOwnStock,
   missingDetails,
   setCustomsInfo,
+  stockLevel,
   productPhotos,
   sendPriceDrops,
   sendStockAlerts,
@@ -312,7 +313,9 @@ const routes: Record<string, Handler> = {
     return { ok: true, message: run.text };
   },
 
-  "GET products": async ({ db, shop }) => ({ products: (await listProducts(db, shop.id)).map(productView) }),
+  "GET products": async ({ db, shop }) => ({
+    products: (await listProducts(db, shop.id)).map((p) => ({ ...productView(p), stockLevel: stockLevel(p, shop.restockAlertAt) })),
+  }),
   "GET products/:id": async ({ params, db, shop }) => productView(await getProduct(db, shop.id, params.id!)),
   "PATCH products/:id": async ({ req, params, db, shop }) => {
     const product = await patchProduct(db, shop.id, params.id!, await body(req));

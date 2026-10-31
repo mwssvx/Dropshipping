@@ -351,4 +351,18 @@ test("weight and cost of the store's own stock, set from the app", async ({ page
   await tab(page, "Products");
   await page.getByRole("tab", { name: "Needs details (1)" }).click();
   await expect(page.getByText("No photo · No description", { exact: true })).toBeVisible();
+
+  // Two left is at the store's running-low number (3), so it shows under Low; none left, under Sold out.
+  for (const [left, list] of [["2", "Low (1)"], ["0", "Sold out (1)"]] as const) {
+    await page.getByRole("tab", { name: "All" }).click();
+    await page.getByRole("link", { name: /Beeswax Candle/ }).click();
+    await page.getByRole("textbox", { name: "Stock", exact: true }).fill(left);
+    await page.getByRole("button", { name: "Save changes" }).click();
+    await expect(page.getByText("Saved.", { exact: true })).toBeVisible();
+    await page.goto("/");
+    await tab(page, "Products");
+    await page.getByRole("tab", { name: list }).click();
+    await expect(page.getByRole("link", { name: /Beeswax Candle/ })).toBeVisible();
+  }
+  await shot(page, "337-app-sold-out");
 });

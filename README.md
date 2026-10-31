@@ -1824,3 +1824,7 @@ The app's Products tab now has "Needs details" next to "All" when a product on y
 ### Customs details from the app (after launch, part 336)
 
 The app's product screen now has a Customs section for anything that ships: the HS code and the country it was made in, as printed on customs forms for orders abroad. Where it ships from is still set on the website.
+
+### Running low and sold out, in the app (after launch, part 337)
+
+The app's Products tab now has "Low" and "Sold out" lists next to "All" when something on sale is at or under your running-low number (3 unless you changed it), or has none left. Each list only shows up when it has something in it, so you can see what to restock from your phone.

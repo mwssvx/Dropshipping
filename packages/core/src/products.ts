@@ -295,6 +295,14 @@ function stockWhere(shopId: string, filter: ProductStockFilter) {
   }
 }
 
+/** The same as the filter, for one product already loaded: sold out, running low, or neither (null). */
+export function stockLevel(p: { variants: { stock: number | null }[] }, restockAlertAt: number): "sold_out" | "low" | null {
+  if (!p.variants.length) return null;
+  const available = p.variants.some((v) => v.stock === null || v.stock > 0);
+  if (!available) return "sold_out";
+  return p.variants.some((v) => v.stock !== null && v.stock <= restockAlertAt) ? "low" : null;
+}
+
 export const PRODUCT_SOURCES = ["supplier", "own", "digital", "gift_card"] as const;
 export type ProductSource = (typeof PRODUCT_SOURCES)[number];
 
