@@ -217,6 +217,7 @@ export async function checkoutAction(handle: string, _: CheckoutState, form: For
       protection: values.protection === "on",
       giftWrap: values.giftWrap === "on",
       tipPercent: values.tipPercent ? Number(values.tipPercent) : null,
+      handoverOn: values.handoverOn || null,
       ageConfirmed: values.ageConfirmed === "on",
       campaignId: (await cookies()).get(campaignCookie(shop.id))?.value ?? null,
       visitSource: await visitSource(await db(), shop.id, (await cookies()).get("sf_vid")?.value).catch(() => null),
