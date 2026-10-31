@@ -1808,3 +1808,7 @@ When you add tracking for your own items and other orders to the same address al
 ### Box weight for buying postage (after launch, part 332)
 
 When you post your own items, the order page says what the box weighs packed ("Weighs about 300 g packed"), from each option's weight, so you can buy the right postage label. The packing slip shows it too, on screen only. When an item has no weight, nothing is shown rather than a wrong number.
+
+### Post your own parcel from the app (after launch, part 333)
+
+The app's order screen now has "Post it yourself" (or "Your own parcel" when a supplier sends the rest) on orders with your own stock still to send. Tap "Add tracking", type the carrier and number, and the buyer gets their email. When other orders to the same address share the box, switch on "Order #1001 gets this tracking too" and they get the same tracking.

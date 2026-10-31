@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Linking, View } from "react-native";
 import { api, useApi } from "../../src/api";
 import { FULFILMENT, money, PAYMENT, parseMoney, when } from "../../src/format";
-import { BackLink, Banner, Body, Button, Card, Field, Heading, List, LoadError, Loading, Pill, Row, Screen, Section } from "../../src/ui";
+import { BackLink, Banner, Body, Button, Card, Field, Heading, List, LoadError, Loading, Pill, Row, Screen, Section, Toggle } from "../../src/ui";
 import { space } from "../../src/theme";
 import { useCan } from "../../src/session";
 
@@ -39,6 +39,8 @@ type Detail = {
   parcels?: { own: boolean; items: { title: string; quantity: number }[]; status: string | null; carrier: string | null; trackingNumber: string | null; trackingUrl: string | null }[];
   /** The buyer's other orders to the same address that haven't shipped. */
   sameAddress?: { orders: { id: string; number: number; createdAt: string; ownItems: boolean }[]; oneBox: boolean } | null;
+  /** The store's own items wait to be posted. `own`: only part of the order, the rest comes from a supplier. */
+  postYourself?: { own: boolean } | null;
 };
 
 /** Where one parcel of several is: shipped with tracking, with the supplier, or still to post yourself. */
@@ -71,6 +73,7 @@ export default function OrderScreen() {
   const [reason, setReason] = useState("");
   const [carrier, setCarrier] = useState("");
   const [tracking, setTracking] = useState("");
+  const [also, setAlso] = useState<string[]>([]);
 
   async function run(key: string, path: string, body: unknown) {
     setBusy(key);
@@ -129,12 +132,25 @@ export default function OrderScreen() {
         </Card>
       ) : null}
 
+      {o.postYourself && panel !== "tracking" ? (
+        <Card>
+          <Heading>{o.postYourself.own ? "Your own parcel" : "Post it yourself"}</Heading>
+          <Body muted>{`${o.postYourself.own ? "Part of this order is your own stock, so you post it. The supplier sends the rest." : "This order is your own stock, so you post it."} Add the tracking once it's sent and the buyer gets an email.`}</Body>
+          <Button label="Add tracking" onPress={() => setPanel("tracking")} disabled={!!busy} />
+        </Card>
+      ) : null}
+
       {panel === "tracking" ? (
         <Card>
           <Heading>Add tracking</Heading>
           <Field label="Carrier" value={carrier} onChangeText={setCarrier} placeholder="USPS, Royal Mail…" />
           <Field label="Tracking number" value={tracking} onChangeText={setTracking} autoCapitalize="none" />
-          <Button label="Save tracking" onPress={() => run("tracking", `orders/${o.id}/tracking`, { carrier, trackingNumber: tracking })} busy={busy === "tracking"} />
+          {o.postYourself && o.sameAddress?.oneBox
+            ? o.sameAddress.orders.filter((x) => x.ownItems).map((x) => (
+                <Toggle key={x.id} label={`Order #${x.number} gets this tracking too`} value={also.includes(x.id)} onChange={(on) => setAlso(on ? [...also, x.id] : also.filter((a) => a !== x.id))} />
+              ))
+            : null}
+          <Button label="Save tracking" onPress={() => run("tracking", `orders/${o.id}/tracking`, { carrier, trackingNumber: tracking, own: !!o.postYourself?.own, also })} busy={busy === "tracking"} />
         </Card>
       ) : null}
 

@@ -14,7 +14,7 @@ import {
   fixProblemOrder,
   getOrder,
   orderDelivery,
-  daysPastDelivery, orderParcels, ordersToSameAddress,
+  daysPastDelivery, orderParcels, ordersToSameAddress, addTrackingToSameBox,
   ordersPastDelivery,
   getPushSettings,
   getProduct,
@@ -222,7 +222,11 @@ const routes: Record<string, Handler> = {
     const parcels = o.pickup || o.localDelivery ? [] : await orderParcels(db, o);
     // The buyer's other orders to this door still to ship, as on the web order page.
     const sameDoor = o.paymentStatus === "paid" && o.fulfillmentStatus !== "shipped" && o.fulfillmentStatus !== "delivered" ? await ordersToSameAddress(db, shop.id, o) : null;
+    // The store's own items still to post: its parcel in a mixed order, or the whole order when it's all its own.
+    const ownParcel = parcels.find((p) => p.key === "own");
+    const postYourself = o.paymentStatus === "paid" && !o.pickup && !o.localDelivery && (ownParcel ? !ownParcel.shipment?.trackingNumber : parcels.length === 0 && o.fulfillments.length === 0);
     return {
+      postYourself: postYourself ? { own: !!ownParcel } : null,
       sameAddress: sameDoor?.orders.length
         ? { orders: sameDoor.orders.map((x) => ({ id: x.id, number: x.number, createdAt: x.createdAt, ownItems: x.ownItems })), oneBox: sameDoor.ownItems && sameDoor.orders.some((x) => x.ownItems) }
         : null,
@@ -282,8 +286,13 @@ const routes: Record<string, Handler> = {
   },
   "POST orders/:id/tracking": async ({ req, params, shop }) => {
     const b = await body(req);
-    await addManualTracking(await fulfillment(), shop.id, params.id!, { carrier: str(b.carrier), trackingNumber: str(b.trackingNumber), url: str(b.url) });
-    return { ok: true, message: "Tracking added. The buyer gets an email." };
+    const ctx = await fulfillment();
+    const input = { carrier: str(b.carrier), trackingNumber: str(b.trackingNumber), url: str(b.url) };
+    // own: the store's own parcel in an order a supplier sends part of. also: orders packed in the same box.
+    await addManualTracking(ctx, shop.id, params.id!, { ...input, own: b.own === true });
+    const also = Array.isArray(b.also) ? b.also.filter((x): x is string => typeof x === "string").slice(0, 20) : [];
+    const shared = await addTrackingToSameBox(ctx, shop.id, params.id!, also, input);
+    return { ok: true, message: shared.length ? `Tracking added here and to ${shared.map((n) => `order #${n}`).join(", ")}. The buyers get an email.` : "Tracking added. The buyer gets an email." };
   },
   "POST orders/:id/fix": async ({ params, shop }) => {
     const run = await fixProblemOrder(await agents(), shop, params.id!);
