@@ -26,14 +26,15 @@ test("product pages count down to the shipping cutoff", async ({ page, browser }
   // The time zone starts at the store's own country.
   await expect(settings.getByLabel("Your time zone")).toHaveValue("America/New_York");
   await settings.getByLabel("Order by").selectOption("17");
-  // Shipping every day keeps the next cutoff within a day, whenever this runs.
+  // Shipping every day keeps the next cutoff within a day, whenever this runs (a day and an hour the
+  // evening the clocks go back).
   await settings.getByLabel("We ship at weekends").check();
   await settings.getByRole("button", { name: "Save cutoff" }).click();
   await expect(settings.getByText("Saved. Orders in by 5 PM ship that day.")).toBeVisible();
 
   const buyer = await (await browser.newContext({ ...info.project.use })).newPage();
   await buyer.goto(store);
-  await expect(buyer.locator("#delivery-estimate").getByRole("timer")).toHaveText(/^Order within \d\d:\d\d:\d\d and it ships (today|[A-Z][a-z]+day)$/);
+  await expect(buyer.locator("#delivery-estimate").getByRole("timer")).toHaveText(/^Order within (1 day )?\d\d:\d\d:\d\d and it ships (today|[A-Z][a-z]+day)$/);
 
   await page.reload();
   await settings.getByLabel("Orders in by a set time ship that day").uncheck();

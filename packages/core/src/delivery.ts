@@ -124,11 +124,11 @@ export async function productDelivery(db: Db, shop: Shop, productId: string, opt
   const transit = transitDays(variants, cheapest(rates));
   if (!transit) return null;
   const now = opts.now ?? new Date();
-  // The countdown shows once the cutoff is less than a day away.
-  // No "order in the next hour" while shipping is paused.
+  // The countdown shows once the cutoff is less than a day away; the night the clocks go back,
+  // that day is 25 hours long. No "order in the next hour" while shipping is paused.
   const days = processingFor(shop, [product]);
   const next = shop.shipCutoff && !activeShipPause(shop, now) ? nextCutoff(now, days, shop.shipCutoff) : null;
-  const cutoff = next && next.msLeft <= DAY ? next : null;
+  const cutoff = next && next.msLeft <= DAY + 3_600_000 ? next : null;
   const window = deliveryWindow(shippingStart(shop, now), days, transit.min, transit.max, shop.shipCutoff);
   return { ...window, country, cutoff, holiday: holidayOrderBy(shop.holidayDeadline, window, shop.shipCutoff, now) };
 }

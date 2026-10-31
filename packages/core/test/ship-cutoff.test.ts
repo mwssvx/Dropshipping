@@ -54,6 +54,11 @@ describe("same-day cutoff", () => {
     const thu = (await productDelivery(f.db, await f.shop(), mug.id, { now: new Date("2026-10-29T19:00:00Z") }))!;
     expect(thu.cutoff).toMatchObject({ today: false, deadline: new Date("2026-10-30T18:00:00Z") });
     expect(day(thu.cutoff!.shipsOn)).toBe("2026-10-30");
+    // The evening before the clocks go back, Sunday's cutoff is 25 hours away, and still counted down to.
+    await setShipCutoff(f.db, shopId, { ...ny, weekends: true });
+    const sat = (await productDelivery(f.db, await f.shop(), mug.id, { now: new Date("2026-10-31T18:30:00Z") }))!;
+    expect(sat.cutoff).toMatchObject({ today: false, deadline: new Date("2026-11-01T19:00:00Z") });
+    expect(sat.cutoff!.msLeft).toBeGreaterThan(24 * 3_600_000);
 
     await expect(setShipCutoff(f.db, shopId, { ...ny, hour: 0 })).rejects.toThrow("Pick a cutoff time");
     await expect(setShipCutoff(f.db, shopId, { ...ny, timeZone: "Mars/Olympus" })).rejects.toThrow("Pick your time zone");
