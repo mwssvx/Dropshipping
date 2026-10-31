@@ -228,6 +228,7 @@ export default function ProductScreen() {
         </Section>
       ) : null}
 
+      <TagsSection product={p} busy={busy} act={act} />
       <PreorderSection product={p} busy={busy} act={act} />
       <LimitsSection product={p} busy={busy} act={act} />
 
@@ -295,6 +296,36 @@ function LimitsSection({ product: p, busy, act }: { product: Product; busy: stri
           busy={busy === "limits"}
           disabled={!!busy || !edit}
           onPress={() => act("limits", async () => (await api<{ message: string }>(`products/${p.id}/limits`, { method: "PUT", body: s })).message)}
+        />
+      </Card>
+    </Section>
+  );
+}
+
+/** The product's tags: what list filters, collections that fill by tag and tagged codes go by. */
+function TagsSection({ product: p, busy, act }: { product: Product; busy: string | null; act: Act }) {
+  const saved = (p.tags ?? []).join(", ");
+  const [text, setText] = useState<string | null>(null);
+  const value = text ?? saved;
+  useEffect(() => setText(null), [p]);
+  const have = new Set(value.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean));
+  const others = (p.storeTags ?? []).filter((t) => !have.has(t)).slice(0, 12);
+  return (
+    <Section title="Tags">
+      <Card>
+        <Field label="Tags" value={value} onChangeText={setText} autoCapitalize="none" placeholder="summer, gift idea" hint={`Separate them with commas. Up to ${p.maxTags ?? 20}.`} />
+        {others.length ? (
+          <View role="group" aria-label="Your other tags" style={{ flexDirection: "row", flexWrap: "wrap", gap: space(2) }}>
+            {others.map((t) => (
+              <Button key={t} label={`+ ${t}`} kind="ghost" a11y={`Add the tag ${t}`} onPress={() => setText(value.trim() ? `${value.replace(/,\s*$/, "")}, ${t}` : t)} />
+            ))}
+          </View>
+        ) : null}
+        <Button
+          label="Save tags"
+          busy={busy === "tags"}
+          disabled={!!busy || text === null || text === saved}
+          onPress={() => act("tags", async () => (await api(`products/${p.id}`, { method: "PATCH", body: { tags: value } }), "Tags saved."))}
         />
       </Card>
     </Section>

@@ -21,6 +21,11 @@ export type Product = {
   preordersSold?: number;
   /** The least and most a buyer can order. */
   purchaseLimit?: { min: number | null; max: number | null; perCustomer: number | null } | null;
+  /** Lowercase, for filters, collections that fill by tag, and codes for tagged products. */
+  tags?: string[];
+  /** On the product screen only: the tags the store's products use, most used first. */
+  storeTags?: string[];
+  maxTags?: number;
   /** On the list only: sold out, or an option at or under the store's running-low number. */
   stockLevel?: "sold_out" | "low" | null;
 };
