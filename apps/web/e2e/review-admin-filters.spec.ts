@@ -40,6 +40,13 @@ test("the merchant lists reviews with no reply yet", async ({ page }, info) => {
   await expect(filters.getByRole("link", { name: "No reply yet" })).toHaveAttribute("aria-current", "true");
   await expect(cards).toHaveCount(2);
   await expect(page.getByText("2 reviews match, no reply yet.")).toBeVisible();
+  // The download takes the same list.
+  const [file] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: "Download these (CSV)" }).click()]);
+  expect(file.suggestedFilename()).toMatch(/-reviews-published\.csv$/);
+  const downloaded = await (await import("node:fs/promises")).readFile((await file.path())!, "utf8");
+  const lines = downloaded.trim().split("\n");
+  expect(lines[0]).toMatch(/^product_handle,state,rating,title,author,email,location,body,reply,created_at,replied_at,/);
+  expect(lines.slice(1).map((l) => l.split(",")[4])).toEqual(["Quiet review", "Unhappy review"]);
   const result = await new AxeBuilder({ page }).include("main").withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   expect(result.violations.map((v) => v.id)).toEqual([]);
 

@@ -1532,3 +1532,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Start from a saved reply** (`apps/web/src/app/admin/(shop)/reviews/ReplyForm.tsx`): the review reply box has the same "Start from" menu as the Inbox, using the store's saved replies. `{first_name}` becomes the reviewer's first name ("there" for an erased buyer), `{store_name}` the store and `{order_number}` the order when the review came from one. With no saved replies yet, the box links to Inbox → Saved replies.
 2. **Nothing half-filled goes public**: a field the review can't fill (like `{tracking_link}`) is flagged in the box, and saving is refused until it's replaced (`replyToReviewAction`), since a reply shows to every shopper. No migration.
+
+### Download your reviews (after launch, part 271)
+
+1. **Your reviews are yours** (`reviewsCsv` in `packages/core/src/review-import.ts`, `/admin/reviews/export.csv`): "Download these (CSV)" on the Reviews page gives the list on screen (tab, stars, search and filters), and "download every review" gives them all. The file uses the columns of Shopify's Product Reviews export, so it goes back into this store, another store here, or most review apps. Extra columns at the end carry the product title, order number, photo links and helpful votes. Buyer emails are filled in only for staff who can see customers.
+2. **Safe both ways**: text a spreadsheet would run as a formula starts with `'`, which the import drops again, and bringing a downloaded file back into the same store adds nothing twice, even for reviews that came from orders. No migration.

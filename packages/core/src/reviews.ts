@@ -140,17 +140,14 @@ export type ReviewStatus = "pending" | "published" | "hidden";
  * matching a search over the reviewer's name, what they wrote and the product's title. Returns the
  * total so the page can say how many match.
  */
-export async function reviewPage(
-  db: Db,
-  shopId: string,
-  opts: { status?: ReviewStatus; rating?: number; query?: string; page?: number; size?: number; noReply?: boolean; photos?: boolean; reported?: boolean } = {},
-) {
-  const size = opts.size ?? REVIEW_PAGE_SIZE;
-  const page = Math.max(1, Math.floor(opts.page ?? 1));
+export type ReviewListFilters = { status?: ReviewStatus; rating?: number; query?: string; noReply?: boolean; photos?: boolean; reported?: boolean };
+
+/** The admin review list's filters as one condition, shared by the list and its download. */
+export function reviewListWhere(db: Db, shopId: string, opts: ReviewListFilters) {
   const r = schema.reviews;
   const q = opts.query?.trim().toLowerCase().slice(0, 100);
   const like = q ? `%${q.replace(/[\\%_]/g, "\\$&")}%` : null;
-  const where = and(
+  return and(
     eq(r.shopId, shopId),
     opts.status ? eq(r.status, opts.status) : undefined,
     opts.rating ? eq(r.rating, opts.rating) : undefined,
@@ -165,6 +162,13 @@ export async function reviewPage(
         )
       : undefined,
   );
+}
+
+export async function reviewPage(db: Db, shopId: string, opts: ReviewListFilters & { page?: number; size?: number } = {}) {
+  const size = opts.size ?? REVIEW_PAGE_SIZE;
+  const page = Math.max(1, Math.floor(opts.page ?? 1));
+  const r = schema.reviews;
+  const where = reviewListWhere(db, shopId, opts);
   const [rows, [total]] = await Promise.all([
     db
       .select({ review: r, productTitle: schema.products.title, orderNumber: schema.orders.number })

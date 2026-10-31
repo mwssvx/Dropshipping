@@ -53,14 +53,17 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
     if (change.page && change.page > 1) next.set("page", String(change.page));
     return `/admin/reviews?${next}`;
   };
+  // The download takes what's on screen: this tab with its stars, search and filters.
+  const download = `/admin/reviews/export.csv?${href({}).split("?")[1]}`;
 
   return (
     <main className="pb-12">
-      <PageHeader title="Reviews" />
+      <PageHeader title="Reviews" actions={<a href={download} className="btn btn-secondary" download>Download these (CSV)</a>} />
       <div className="px-4 sm:px-8 flex flex-col gap-4 max-w-3xl">
         <p className="hint">
           Only buyers whose order has shipped can review, so every review is from a real customer. The shipping email asks them for one, and a review request follows once it has arrived.
           {" "}Moving from Shopify? <Link href="/admin/products/move#reviews-heading" className="underline">Bring your reviews over</Link>.
+          {" "}Your reviews are yours too: <a href="/admin/reviews/export.csv" className="underline" download>download every review</a> in the same format.
         </p>
         <form action={setReviewsAutoPublishAction} className="card p-4 flex flex-wrap items-center gap-3 text-sm">
           <label className="flex items-center gap-2 flex-1 min-w-60">

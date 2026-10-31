@@ -3,9 +3,11 @@
 // keep their date, name, stars, text and the merchant's reply. They aren't tied to an order here,
 // so the store doesn't call them "Verified buyer". Photos and email addresses aren't brought over.
 import { createHash } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { UserError } from "./errors";
+import { csvCell } from "./payouts";
+import { reviewListWhere, type ReviewListFilters } from "./reviews";
 import { parseCsv } from "./shopify-import";
 
 export const MAX_IMPORTED_REVIEWS = 5000;
@@ -22,7 +24,8 @@ export type ImportedReview = {
   status: "published" | "hidden" | "pending";
 };
 
-const pick = (row: string[], at: number | undefined) => (at === undefined || at < 0 ? "" : (row[at] ?? "").trim());
+// A leading ' is how a download keeps a spreadsheet from running "=..." as a formula; drop it again.
+const pick = (row: string[], at: number | undefined) => (at === undefined || at < 0 ? "" : (row[at] ?? "").trim().replace(/^'(?=[=+\-@])/, ""));
 
 /** Reads a reviews export. Says which format it was, and how many rows couldn't be used. */
 export function readReviewsCsv(text: string) {
@@ -87,9 +90,20 @@ export async function importReviews(db: Db, shopId: string, text: string) {
     ? await db.query.products.findMany({ where: and(eq(schema.products.shopId, shopId), inArray(schema.products.handle, handles)), columns: { id: true, handle: true } })
     : [];
   const byHandle = new Map(products.map((p) => [p.handle, p.id]));
+  // A file downloaded from this store and brought back in: reviews already here stay single.
+  const here = products.length
+    ? await db.query.reviews.findMany({ where: and(eq(schema.reviews.shopId, shopId), inArray(schema.reviews.productId, products.map((p) => p.id))), columns: { productId: true, name: true, rating: true, body: true, createdAt: true } })
+    : [];
+  const sameAs = (productId: string, r: { name: string; rating: number; body: string; createdAt: Date | null }) => [productId, r.name, r.rating, r.body, r.createdAt?.getTime() ?? ""].join("\u0000");
+  const existing = new Set(here.map((h) => sameAs(h.productId, h)));
+  let skipped = 0;
   const rows = reviews.flatMap((r) => {
     const productId = byHandle.get(r.handle);
     if (!productId) return [];
+    if (existing.has(sameAs(productId, r))) {
+      skipped++;
+      return [];
+    }
     return [{
       shopId,
       productId,
@@ -112,10 +126,56 @@ export async function importReviews(db: Db, shopId: string, text: string) {
   return {
     format,
     added,
-    alreadyHere: rows.length - added,
+    alreadyHere: rows.length - added + skipped,
     // Products the file reviews that this store doesn't have (yet): move the products first.
     missingProducts: missing.slice(0, 20),
     missingCount: reviews.filter((r) => !byHandle.has(r.handle)).length,
     unusable,
   };
+}
+
+// Taking reviews out ------------------------------------------------------------------------------
+
+/** The most reviews one download holds. */
+export const MAX_EXPORTED_REVIEWS = 20_000;
+
+const STATE: Record<"published" | "hidden" | "pending", string> = { published: "published", hidden: "unpublished", pending: "pending" };
+
+/**
+ * The store's reviews as a spreadsheet, in the columns of Shopify's Product Reviews export, so the
+ * file can be brought back here or into most review apps. Extra columns at the end (product title,
+ * order, photos, helpful votes) are skipped by importers. Buyer emails only for staff who can see
+ * customers.
+ */
+export async function reviewsCsv(db: Db, shopId: string, opts: ReviewListFilters & { emails: boolean; photoUrl: (id: string) => string }) {
+  const r = schema.reviews;
+  const rows = await db
+    .select({ review: r, handle: schema.products.handle, productTitle: schema.products.title, orderNumber: schema.orders.number, email: schema.orders.email })
+    .from(r)
+    .innerJoin(schema.products, eq(schema.products.id, r.productId))
+    .leftJoin(schema.orders, eq(schema.orders.id, r.orderId))
+    .where(reviewListWhere(db, shopId, opts))
+    .orderBy(desc(r.createdAt), desc(r.id))
+    .limit(MAX_EXPORTED_REVIEWS);
+  const header = ["product_handle", "state", "rating", "title", "author", "email", "location", "body", "reply", "created_at", "replied_at", "product_title", "order_number", "photos", "helpful_votes"];
+  const lines = rows.map(({ review: x, handle, productTitle, orderNumber, email }) =>
+    [
+      handle,
+      STATE[x.status],
+      x.rating,
+      "",
+      x.name,
+      opts.emails ? (email ?? "") : "",
+      "",
+      x.body,
+      x.reply ?? "",
+      x.createdAt.toISOString(),
+      "",
+      productTitle,
+      orderNumber ?? "",
+      x.photoIds.map(opts.photoUrl).join(" "),
+      x.helpfulCount,
+    ].map(csvCell).join(","),
+  );
+  return [header.join(","), ...lines].join("\n") + "\n";
 }
