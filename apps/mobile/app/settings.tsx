@@ -106,6 +106,13 @@ export default function Settings() {
         </Section>
       ) : null}
       {can("theme") ? <StoreStatusCard /> : null}
+      {can("team") ? (
+        <Section title="Team">
+          <List>
+            <Row href="/activity" title="Activity" subtitle="Who on your team did what: refunds, price changes, orders sent" />
+          </List>
+        </Section>
+      ) : null}
       <Section title="Account">
         <List>
           {me ? <Row title={me.user.email} subtitle={me.shop.name} /> : null}

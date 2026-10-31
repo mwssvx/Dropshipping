@@ -1057,3 +1057,20 @@ test("analytics in the app: sales, visitors and best sellers over the last days"
   await page.getByRole("tab", { name: "Last year" }).click();
   await expect(page.getByText("Changes are vs the same days last year.", { exact: false })).toBeVisible();
 });
+
+test("the team's activity, with what was done in the app, from Settings", async ({ page, browser }) => {
+  const { email } = await merchant(browser, `ac${Date.now()}`);
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Discount codes" }).click();
+  await page.getByRole("textbox", { name: "Code" }).fill("SPRING5");
+  await page.getByRole("textbox", { name: "Percent off" }).fill("5");
+  await page.getByRole("button", { name: "Create code" }).click();
+  await expect(page.getByText("SPRING5 is ready: 5% off.")).toBeVisible();
+
+  await page.goto("/settings");
+  await page.getByRole("link", { name: /^Activity/ }).click();
+  await expect(page.getByRole("heading", { name: "Activity", level: 1 })).toBeVisible();
+  await expect(page.getByText(`${email} created the discount code SPRING5 in the app`)).toBeVisible();
+  await expect(page.getByRole("heading", { name: new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date()) })).toBeVisible();
+  await shot(page, "361-app-activity");
+});

@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  listActivity,
+  listTeam,
   analyticsReport,
   comparisonRange,
   CUTOFF_TIME_ZONES,
@@ -500,6 +502,18 @@ const routes: Record<string, Handler> = {
       salesBySource: r.salesBySource.slice(0, 5),
       sources: r.sources.slice(0, 5),
       busiest: when.busiest,
+    };
+  },
+  // Who on the team did what, newest first, as on the web's Activity page. Order entries open the order in the app.
+  "GET activity": async ({ url, db, shop }) => {
+    const person = url.searchParams.get("person") || undefined;
+    const beforeParam = url.searchParams.get("before");
+    const before = beforeParam && !Number.isNaN(Date.parse(beforeParam)) ? new Date(beforeParam) : undefined;
+    const [{ entries, next }, { members }] = await Promise.all([listActivity(db, shop.id, { userId: person, before }), listTeam(db, shop.id)]);
+    return {
+      members: members.map((m) => ({ userId: m.userId, email: m.email, name: m.name, role: m.role })),
+      entries: entries.map((e) => ({ id: e.id, email: e.email, summary: e.summary, createdAt: e.createdAt, orderId: e.href?.match(/^\/admin\/orders\/([0-9a-f-]{36})$/)?.[1] ?? null })),
+      next,
     };
   },
   "GET questions": async ({ url, db, shop }) => {
@@ -1072,6 +1086,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("questions")) return "reviews";
   if (path.startsWith("payment-links")) return "orders";
   if (path.startsWith("analytics")) return "analytics";
+  if (path.startsWith("activity")) return "team";
   if (path.startsWith("checkouts")) return "orders";
   if (path.startsWith("store-status")) return "theme";
   if (path.startsWith("gift-cards")) return "gift_cards";

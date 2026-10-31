@@ -1920,3 +1920,7 @@ The Orders tab has Create a payment link, for a buyer who asked by message, phon
 ### Analytics in the app (after launch, part 360)
 
 Today has an Analytics button for people who can see the store's numbers. It shows sales after refunds, orders, visitors and how many of them bought, over the last 7, 30 or 90 days, each with how it moved against the days before or the same days last year. Below that: sales by day, the busiest time of the week, the steps from visit to order, the best sellers, what each source sold and where visitors came from, all counted the same way as the website's Analytics page.
+
+### Team activity in the app (after launch, part 361)
+
+The app's Settings has Activity for people who manage the team: what everyone did, newest first and by day, on the website and in the app (refunds, price changes, orders sent, codes and settings), with each person's name to see only theirs and Older to look further back. An entry about an order opens that order.
