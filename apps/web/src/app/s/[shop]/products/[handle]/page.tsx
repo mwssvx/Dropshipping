@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { searchOfferExtras, bundlesForProduct, formatDeliveryWindow, giftCardBonusNow, holidayReturnsNow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, breadcrumbCollection, collectionFromReferer, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, comingSoonProduct, COMPARE_MAX, defaultCutoffZone, countdownTo, shipsToCountry, recentSalesCount, RECENT_SALES_DAYS, starsFilter, postsFeaturing, recordProductView, REVIEWS_SHOWN, REVIEWS_SHOWN_ALL, reviewSort, reviewsQuery, helpfulVotes, reportedReviews } from "@sf/core";
+import { dutiesFor, searchOfferExtras, bundlesForProduct, formatDeliveryWindow, giftCardBonusNow, holidayReturnsNow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, breadcrumbCollection, collectionFromReferer, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, comingSoonProduct, COMPARE_MAX, defaultCutoffZone, countdownTo, shipsToCountry, recentSalesCount, RECENT_SALES_DAYS, starsFilter, postsFeaturing, recordProductView, REVIEWS_SHOWN, REVIEWS_SHOWN_ALL, reviewSort, reviewsQuery, helpfulVotes, reportedReviews } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { ShareButtons } from "@/components/ShareButtons";
 import { SaleCountdown } from "@/components/SaleCountdown";
@@ -359,6 +359,11 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                 : t.shippingTo(shownMoney(shipping.priceMinor), new Intl.DisplayNames([lang], { type: "region" }).of(shipping.country) ?? shipping.country)}
             </span>
             {shipping.freeOverMinor !== null && <span className="hint"> · {t.freeShippingOver(shownMoney(shipping.freeOverMinor))}</span>}
+          </p>
+        )}
+        {shipping && dutiesFor(shop, shipping.country) && (
+          <p id="duties-line" className="text-sm hint">
+            {(shop.duties === "included" ? t.dutiesIncludedShort : t.dutiesOnDelivery)(new Intl.DisplayNames([lang], { type: "region" }).of(shipping.country) ?? shipping.country)}
           </p>
         )}
         {delivery && (

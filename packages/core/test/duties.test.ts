@@ -28,4 +28,22 @@ describe("import duties", () => {
     const file = JSON.parse(JSON.stringify(await exportStore(f.db, shop.id)));
     expect(file.store.duties).toBe("included");
   });
+
+  it("puts the same note on the receipt for orders abroad", async () => {
+    const f = await makeFixture(new DemoModel());
+    const shop = await f.shop();
+    const receipt = (o: { number: number; email: string }) => f.mailer.sent.find((m) => m.to === o.email && m.subject === `Order #${o.number} confirmed`)!.text;
+    const before = await f.order(f.products.lamp.id, { country: "GB" });
+    expect(receipt(before)).not.toContain("import duties");
+
+    await setDuties(f.db, shop.id, "buyer_pays");
+    const abroad = await f.order(f.products.lamp.id, { country: "GB" });
+    expect(receipt(abroad)).toContain("Customs may charge import duties or taxes when it arrives. They're paid to the courier and weren't part of this total.");
+    const home = await f.order(f.products.lamp.id);
+    expect(receipt(home)).not.toContain("import duties");
+
+    await setDuties(f.db, shop.id, "included");
+    const included = await f.order(f.products.lamp.id, { country: "FR" });
+    expect(receipt(included)).toContain("Import duties and taxes are included, so there's nothing more to pay when it arrives.");
+  });
 });

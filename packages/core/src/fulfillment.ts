@@ -3,6 +3,7 @@ import { schema, type Db, type PersonalizationValue } from "@sf/db";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { cartDelivery, formatDeliveryWindow, orderDelivery } from "./delivery";
+import { dutiesFor } from "./duties";
 import { NotFoundError, UserError } from "./errors";
 import type { Mailer } from "./email";
 import { formatMoney } from "./money";
@@ -737,6 +738,7 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
           : []),
         ...(order.preorderShipsBy ? [``, `Pre-order: it ships by ${formatShipsBy(order.preorderShipsBy)}. We'll email tracking as soon as it's on its way.`] : []),
         ...(arrives ? [``, `Expected delivery: ${formatDeliveryWindow(arrives)}.`] : []),
+        ...dutiesLine(shop, order),
         ...(order.gift
           ? [
               ``,
@@ -837,6 +839,14 @@ export async function deliverOrderEmail(ctx: FulfillmentContext, shop: Shop, ord
       .where(eq(schema.emails.id, row.id));
     return { status: "failed" as const };
   }
+}
+
+/** The import duties note on a receipt for an order crossing customs, as said at checkout. */
+function dutiesLine(shop: Shop, order: Order) {
+  if (order.pickup || order.localDelivery) return [];
+  const policy = dutiesFor(shop, order.shippingAddress.country);
+  if (!policy) return [];
+  return [``, policy === "included" ? "Import duties and taxes are included, so there's nothing more to pay when it arrives." : "Customs may charge import duties or taxes when it arrives. They're paid to the courier and weren't part of this total."];
 }
 
 /** The longest update a merchant can email to buyers. */

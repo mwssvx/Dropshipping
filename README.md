@@ -1679,3 +1679,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Who pays at the border** (`dutiesFor` in `packages/core/src/duties.ts`): the Taxes page has "Import duties": buyers pay them on delivery, they're included in my prices, or don't mention them (the default). Buyers choosing a country the parcel would cross customs to read it under the shipping rates at checkout, in their language ("Customs in United Kingdom may charge import duties or taxes when it arrives…"), so fewer parcels are refused at the door and fewer disputes say "nobody told me".
 2. Nothing shows for the store's own country, for two EU countries (one customs union), for pickups or local delivery. The generated shipping policy says the same, and the setting comes along in the store file. Migration `0156_import_duties` (`shops.duties`).
+
+### Import duties on product pages and receipts (after launch, part 301)
+
+1. **Said before the cart and kept after paying** (`dutiesFor` in `packages/core/src/duties.ts`): with import duties set on the Taxes page, product pages add a line under the shipping cost for shoppers abroad ("Import duties and taxes for United Kingdom may be charged on delivery.", or "…included."), in their language, and the order confirmation email repeats what checkout said. Buyers decide knowing the full cost, and have it in writing when the courier asks. No migration.
