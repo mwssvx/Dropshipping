@@ -1419,3 +1419,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **One product up close** (`apps/web/src/theme/Sections.tsx`): a new home page section in the theme editor. Pick a product, add a few words of your own if you like, and choose which side the photo sits. It shows the big photo, the title, its stars from real reviews, the price (with the sale price and price per unit when there is one) and a link to the full details.
 2. **The right button**: a product with nothing to pick goes straight into the cart with Add to cart. One with sizes, colours or personal touches gets "Choose options", which opens its page, and a sold-out product shows a greyed-out Sold out button. The section stays hidden until a product is picked, and disappears by itself if that product is archived or deleted.
 3. **Fast when it leads the page**: placed first, its photo loads before anything else. Two new store strings in all six languages. No migration: it lives in the theme.
+
+### Countdown (after launch, part 249)
+
+1. **A clock for the big day** (`apps/web/src/theme/Countdown.tsx`): a new home page section in the theme editor. Give it a heading like "Black Friday starts in", a few words, the date and time to count down to and an optional button, and shoppers see days, hours, minutes and seconds ticking down.
+2. **Never stuck at zero**: the section stays hidden until a time is set and hides itself the moment that time passes, on the page and on every later visit, so a finished countdown never lingers. The time is picked in the merchant's own time zone and saved with it, so it ends at the same moment for every shopper.
+3. Four new store strings in all six languages. No migration: it lives in the theme.

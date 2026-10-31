@@ -12,6 +12,7 @@ import { parseVideo } from "@sf/core/video-link";
 import { SectionVideo } from "./SectionVideo";
 import { AnnouncementBar } from "./AnnouncementBar";
 import { Slideshow } from "./Slideshow";
+import { Countdown } from "./Countdown";
 import { storeHref } from "./style";
 
 /*
@@ -338,6 +339,16 @@ function FeaturedProduct({ s, data, first }: Props<"featured_product">) {
   );
 }
 
+function CountdownSection({ s, data }: Props<"countdown">) {
+  const t = data.t ?? storeText(null);
+  if (!s.endsAt || new Date(s.endsAt).getTime() <= Date.now()) return null;
+  return (
+    <Countdown endsAt={s.endsAt} heading={s.heading} text={s.text}
+      button={s.buttonLabel ? { label: s.buttonLabel, href: storeHref(data.base, s.buttonLink) } : null}
+      labels={{ days: t.countdownDays, hours: t.countdownHours, minutes: t.countdownMinutes, seconds: t.countdownSeconds }} />
+  );
+}
+
 function RichText({ s }: Props<"rich_text">) {
   if (!s.heading && !s.text) return null;
   return (
@@ -601,6 +612,7 @@ export function SectionView({ section, data, first }: { section: Section; data: 
     case "slideshow": return <SlideshowSection s={section.settings} data={data} first={first} />;
     case "columns": return <Columns s={section.settings} data={data} first={first} />;
     case "featured_product": return <FeaturedProduct s={section.settings} data={data} first={first} />;
+    case "countdown": return <CountdownSection s={section.settings} data={data} first={first} />;
   }
 }
 

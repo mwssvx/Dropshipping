@@ -236,6 +236,15 @@ const sectionSchemas = {
     text: text(600),
     imagePosition: z.enum(["left", "right"]).default("left"),
   }),
+  // A clock counting down to a moment, like a launch or the start of a sale. It isn't shown before
+  // a time is set, and hides itself once that time has passed.
+  countdown: z.object({
+    heading: text(120),
+    text: text(400),
+    endsAt: z.union([z.literal(""), z.iso.datetime({ offset: true, error: "Pick a date and time." })]).default(""),
+    buttonLabel: text(40),
+    buttonLink: link,
+  }),
 } as const;
 
 export type SectionType = keyof typeof sectionSchemas;
@@ -260,6 +269,7 @@ export const SECTION_LABELS: Record<SectionType, { name: string; about: string }
   slideshow: { name: "Slideshow", about: "Up to five big pictures, each with a heading and a button, taking turns every few seconds. Shoppers can pause it, and it starts paused for those who ask for less motion." },
   columns: { name: "Columns", about: "Two to six blocks side by side, each with a picture, a title, a few words and a link. Good for how it works, what makes you different or your main collections." },
   featured_product: { name: "Featured product", about: "One product up close: a big photo, its stars and price, a few words of your own and an Add to cart button." },
+  countdown: { name: "Countdown", about: "A clock counting down to a date, like a launch or the start of your Black Friday sale, with a button. It hides itself once the time has passed." },
 };
 
 const sectionId = z.string().regex(/^[a-z0-9]{4,24}$/, "Section ids are short lowercase codes.");
