@@ -1864,3 +1864,7 @@ Today has a Returns button for roles that handle returns. It lists the returns w
 ### Store credit from the app (after launch, part 346)
 
 A customer's screen in the app has Give store credit for roles that handle gift cards. Type an amount and, if you like, why (only your team sees it), and the customer gets a gift card code by email that works at checkout. It adds to the Store credit they already have and shows under Gift cards on the website. Good for saying sorry for a late parcel without a refund.
+
+### Counts on Today's buttons (after launch, part 347)
+
+Today's Returns and Reviews buttons in the app now say what waits behind them, like "Returns (2 open)" and "Reviews (3 to check)", so you don't have to open them to find out. Each count only shows for roles that can open that screen.

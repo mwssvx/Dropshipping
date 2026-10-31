@@ -399,7 +399,7 @@ test("reviews: one waiting is published and another gets a reply, from the app",
   await expect(web.getByRole("status")).toContainText("2 reviews added");
 
   await signIn(page, email);
-  await page.getByRole("button", { name: "Reviews" }).click();
+  await page.getByRole("button", { name: "Reviews (1 to check)" }).click();
   // Grace's is waiting for an OK.
   await expect(page.getByRole("tab", { name: "To check (1)" })).toBeVisible();
   await expect(page.getByText("Smaller than I thought.")).toBeVisible();
@@ -557,7 +557,8 @@ test("returns answered from the app: one declined with a reason, one refunded", 
   }
 
   await signIn(page, email);
-  await page.getByRole("button", { name: "Returns" }).click();
+  // Today says how many wait.
+  await page.getByRole("button", { name: "Returns (2 open)" }).click();
   await expect(page.getByRole("tab", { name: "Open (2)" })).toBeVisible();
   await expect(page.getByText('It arrived damaged: "The wax is cracked."')).toBeVisible();
   await shot(page, "345-app-returns");
@@ -580,6 +581,8 @@ test("returns answered from the app: one declined with a reason, one refunded", 
   await expect(page.getByText("Declined", { exact: true })).toBeVisible();
   await expect(page.getByText("Refunded", { exact: true })).toBeVisible();
   await expect(page.getByText("You said: Candles can't come back once lit.")).toBeVisible();
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Returns", exact: true })).toBeVisible();
 
   // The website shows the same answers, and the activity log says they came from the app.
   await web.goto(`${WEB}/admin/activity`);
