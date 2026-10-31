@@ -196,6 +196,7 @@ export async function importProductAction(_: FormState, form: FormData): Promise
       description: String(form.get("description") ?? ""),
       prices,
       publish: form.get("publish") === "1",
+      warehouse: form.get("warehouse") ? String(form.get("warehouse")) : null,
     });
     id = product.id;
     await logged({ shop, user, db }, `Imported the product “${product.title}” from a supplier`, { href: `/admin/products/${id}` });

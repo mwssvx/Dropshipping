@@ -3,8 +3,9 @@ import { SupplierError, type PlaceOrderInput, type SupplierAdapter, type Supplie
 /**
  * A stand-in supplier so the whole dropshipping flow runs without a supplier account.
  * Links look like https://demo-supplier.test/p/<slug>. Products are made up from the slug:
- * a slug containing "low-stock" sells out by the time an order is placed, and orders to countries
- * outside the launch list fail.
+ * a slug containing "low-stock" sells out by the time an order is placed, one containing
+ * "warehouses" comes from a warehouse in China or in the US (a "Ships From" option, the way
+ * AliExpress lists them), and orders to countries outside the launch list fail.
  */
 export const DEMO_SUPPLIER_HOST = "demo-supplier.test";
 export const DEMO_SUPPLIER_LINKS = [
@@ -57,6 +58,27 @@ export class FakeSupplier implements SupplierAdapter {
     const lowStock = slug.includes("low-stock");
     const baseCost = 300 + (h % 1500);
     const sizes = h % 3 === 0 ? ["Default"] : ["Small", "Large"];
+    if (slug.includes("warehouses")) {
+      const from = [["China", "cn", 0, 8, 15], ["United States", "us", 400, 3, 5]] as const;
+      return {
+        ref: `demo-${slug}`,
+        sourceUrl: url.toString(),
+        title,
+        description: `${title}.\n\nShips from the supplier's warehouse in China or the US.`,
+        images: [],
+        variants: sizes.flatMap((size, i) =>
+          from.map(([country, code, extra, min, max]) => ({
+            ref: `demo-${slug}-${size.toLowerCase()}-${code}`,
+            title: size === "Default" ? country : `${size} / ${country}`,
+            options: (size === "Default" ? { "Ships From": country } : { Size: size, "Ships From": country }) as Record<string, string>,
+            costMinor: baseCost + i * 250 + extra,
+            stock: 50 + (h % 400),
+            shipDaysMin: min,
+            shipDaysMax: max,
+          })),
+        ),
+      };
+    }
     return {
       ref: `demo-${slug}`,
       sourceUrl: url.toString(),

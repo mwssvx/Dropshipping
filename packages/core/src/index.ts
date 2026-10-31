@@ -10,6 +10,7 @@ export * from "./payments";
 export * from "./suppliers";
 export * from "./email";
 export * from "./imports";
+export * from "./warehouses";
 export * from "./fulfillment";
 export * from "./themes";
 export * from "./collections";
