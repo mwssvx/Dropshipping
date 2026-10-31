@@ -195,17 +195,37 @@ export function starsFilter(value: string | undefined): number | null {
   return Number.isInteger(n) && n >= 1 && n <= 5 ? n : null;
 }
 
+/** How a product page orders its reviews. */
+export type ReviewSort = "newest" | "helpful";
+
+/** The review order from a link: "helpful", or newest first for anything else. */
+export const reviewSort = (value: string | undefined): ReviewSort => (value === "helpful" ? "helpful" : "newest");
+
+/** The query string for a product page's review list: which stars, which order, and whether all are shown. */
+export function reviewsQuery(view: { stars?: number | null; sort?: ReviewSort; all?: boolean }) {
+  const q = new URLSearchParams();
+  if (view.stars) q.set("stars", String(view.stars));
+  if (view.sort === "helpful") q.set("sort", "helpful");
+  if (view.all) q.set("reviews", "all");
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
 /**
  * Published reviews for a product page, with the average for the stars and search results and how
  * many there are of each star rating. `stars` lists only reviews with that rating; the count,
- * average and breakdown always cover them all.
+ * average and breakdown always cover them all. `sort: "helpful"` puts the reviews most shoppers
+ * found helpful first, newest first among equals.
  */
-export async function productReviews(db: Db, productId: string, limit = REVIEWS_SHOWN, opts: { stars?: number | null } = {}) {
+export async function productReviews(db: Db, productId: string, limit = REVIEWS_SHOWN, opts: { stars?: number | null; sort?: ReviewSort } = {}) {
   const where = and(eq(schema.reviews.productId, productId), eq(schema.reviews.status, "published"));
   const listed = opts.stars ? and(where, eq(schema.reviews.rating, opts.stars)) : where;
+  const order = opts.sort === "helpful"
+    ? [desc(schema.reviews.helpfulCount), desc(schema.reviews.createdAt), desc(schema.reviews.id)]
+    : [desc(schema.reviews.createdAt), desc(schema.reviews.id)];
   const [byRating, reviews] = await Promise.all([
     db.select({ rating: schema.reviews.rating, n: count() }).from(schema.reviews).where(where).groupBy(schema.reviews.rating),
-    db.query.reviews.findMany({ where: listed, orderBy: desc(schema.reviews.createdAt), limit }),
+    db.query.reviews.findMany({ where: listed, orderBy: order, limit }),
   ]);
   // breakdown[0] is one star, breakdown[4] five.
   const breakdown = [1, 2, 3, 4, 5].map((r) => Number(byRating.find((b) => b.rating === r)?.n ?? 0));
@@ -221,6 +241,42 @@ export async function productReviews(db: Db, productId: string, limit = REVIEWS_
   const photos = withPhotos.flatMap((r) => r.photoIds.map((id) => ({ url: reviewPhotoUrl(id), reviewId: r.id, name: r.name, rating: r.rating }))).slice(0, 12);
   const listedCount = opts.stars ? breakdown[opts.stars - 1]! : n;
   return { count: n, average: n ? Math.round((total / n) * 10) / 10 : null, reviews, photos, breakdown, listedCount };
+}
+
+/** A device's "helpful" id: the random value the store keeps in a cookie. */
+export const VOTER_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
+
+/**
+ * Marks a published review on this store helpful for this device, or takes the mark back when it
+ * is already there. Returns whether it is marked now and the new count.
+ */
+export async function toggleHelpful(db: Db, shopId: string, reviewId: string, voter: string) {
+  if (!VOTER_PATTERN.test(voter) || !z.string().uuid().safeParse(reviewId).success) throw new NotFoundError("Review");
+  const review = await db.query.reviews.findFirst({
+    where: and(eq(schema.reviews.id, reviewId), eq(schema.reviews.shopId, shopId), eq(schema.reviews.status, "published")),
+    columns: { id: true },
+  });
+  if (!review) throw new NotFoundError("Review");
+  return db.transaction(async (tx) => {
+    const [added] = await tx.insert(schema.reviewVotes).values({ reviewId, voter }).onConflictDoNothing().returning();
+    if (!added) await tx.delete(schema.reviewVotes).where(and(eq(schema.reviewVotes.reviewId, reviewId), eq(schema.reviewVotes.voter, voter)));
+    const [row] = await tx
+      .update(schema.reviews)
+      .set({ helpfulCount: sql`greatest(0, ${schema.reviews.helpfulCount} + ${added ? 1 : -1})` })
+      .where(eq(schema.reviews.id, reviewId))
+      .returning({ helpfulCount: schema.reviews.helpfulCount });
+    return { voted: !!added, count: row!.helpfulCount };
+  });
+}
+
+/** Which of these reviews this device has marked helpful. */
+export async function helpfulVotes(db: Db, voter: string | undefined, reviewIds: string[]): Promise<Set<string>> {
+  if (!voter || !VOTER_PATTERN.test(voter) || !reviewIds.length) return new Set();
+  const rows = await db
+    .select({ reviewId: schema.reviewVotes.reviewId })
+    .from(schema.reviewVotes)
+    .where(and(eq(schema.reviewVotes.voter, voter), inArray(schema.reviewVotes.reviewId, reviewIds)));
+  return new Set(rows.map((r) => r.reviewId));
 }
 
 /** A product card's stars: the average of its published reviews and how many there are. */

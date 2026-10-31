@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, formatDeliveryWindow, giftCardBonusNow, holidayReturnsNow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, breadcrumbCollection, collectionFromReferer, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, comingSoonProduct, COMPARE_MAX, defaultCutoffZone, countdownTo, shipsToCountry, recentSalesCount, RECENT_SALES_DAYS, starsFilter, REVIEWS_SHOWN, REVIEWS_SHOWN_ALL } from "@sf/core";
+import { bundlesForProduct, formatDeliveryWindow, giftCardBonusNow, holidayReturnsNow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, breadcrumbCollection, collectionFromReferer, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, comingSoonProduct, COMPARE_MAX, defaultCutoffZone, countdownTo, shipsToCountry, recentSalesCount, RECENT_SALES_DAYS, starsFilter, REVIEWS_SHOWN, REVIEWS_SHOWN_ALL, reviewSort, reviewsQuery, helpfulVotes } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { ShareButtons } from "@/components/ShareButtons";
 import { SaleCountdown } from "@/components/SaleCountdown";
@@ -15,11 +15,11 @@ import { currentBuyer } from "@/lib/buyer";
 import { db } from "@/lib/server";
 import { buyerCountry, buyerFx } from "@/lib/currency";
 import { SubmitButton } from "@/components/SubmitButton";
-import { addBundleAction, addToCartAction, askQuestionAction, launchListAction, stockAlertAction, toggleCompareAction, toggleSavedAction } from "../../actions";
+import { addBundleAction, addToCartAction, askQuestionAction, helpfulAction, launchListAction, stockAlertAction, toggleCompareAction, toggleSavedAction } from "../../actions";
 import { readCompare } from "@/lib/compare";
 import { savedIds } from "@/lib/saved";
 import { loadShop, localCollections, localProducts, storeBase, storeLang, storeT, missing } from "../../data";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { Price } from "@/components/Price";
 import { UnitPrice } from "@/components/UnitPrice";
 import type { Contents } from "@sf/db";
@@ -102,7 +102,7 @@ const ASKED_MESSAGES = {
   invalid: { key: "askInvalid", ok: false },
 } as const;
 
-export default async function ProductPage({ params, searchParams }: { params: Promise<{ shop: string; handle: string }>; searchParams: Promise<{ alert?: string; saved?: string; asked?: string; launch?: string; compare?: string; stars?: string; reviews?: string }> }) {
+export default async function ProductPage({ params, searchParams }: { params: Promise<{ shop: string; handle: string }>; searchParams: Promise<{ alert?: string; saved?: string; asked?: string; launch?: string; compare?: string; stars?: string; reviews?: string; sort?: string }> }) {
   const { shop: shopHandle, handle } = await params;
   const query = await searchParams;
   const t = await storeT(shopHandle);
@@ -129,7 +129,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
     product.variants.every((x) => Object.keys(x.options ?? {}).sort().join("|") === names) &&
     new Set(product.variants.map((x) => JSON.stringify(defs.map((d) => x.options?.[d.name])))).size === product.variants.length;
   const [reviews, questions, rawUpsells, base, fx, chart, rawRecent, soldLately] = await Promise.all([
-    productReviews(await db(), product.id, query.reviews === "all" ? REVIEWS_SHOWN_ALL : REVIEWS_SHOWN, { stars: starsFilter(query.stars) }),
+    productReviews(await db(), product.id, query.reviews === "all" ? REVIEWS_SHOWN_ALL : REVIEWS_SHOWN, { stars: starsFilter(query.stars), sort: reviewSort(query.sort) }),
     productQuestions(await db(), product.id),
     upsellsFor(await db(), shop.id, [product.id]),
     storeBase(shopHandle),
@@ -145,6 +145,10 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const origin = `${asked.get("x-forwarded-proto") ?? "https"}://${asked.get("host")}${base}`;
   const stars = starsFilter(query.stars);
   const reviewsHref = `${base}/products/${product.handle}`;
+  const sort = reviewSort(query.sort);
+  const allShown = query.reviews === "all";
+  // The reviews this device marked helpful, so their button shows as pressed.
+  const voted = await helpfulVotes(await db(), (await cookies()).get("sf_voter")?.value, reviews.reviews.map((r) => r.id));
   const askedKind = ASKED_MESSAGES[(query.asked ?? "") as keyof typeof ASKED_MESSAGES];
   const upsells = await localProducts(shopHandle, rawUpsells);
   const together = (await localProducts(shopHandle, await boughtTogether(await db(), shop.id, [product.id]))).filter((p) => !upsells.some((u) => u.id === p.id));
@@ -547,7 +551,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
               return (
                 <li key={n}>
                   {c > 0 ? (
-                    <a href={on ? `${reviewsHref}#reviews` : `${reviewsHref}?stars=${n}#reviews`} aria-current={on ? "true" : undefined}
+                    <a href={`${reviewsHref}${reviewsQuery({ stars: on ? null : n, sort })}#reviews`} aria-current={on ? "true" : undefined}
                       className={`flex items-center gap-3 rounded px-1 -mx-1 hover:bg-sunken ${on ? "font-semibold" : ""}`}>{row}</a>
                   ) : (
                     <span className="flex items-center gap-3 px-1 -mx-1 hint">{row}</span>
@@ -560,8 +564,18 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
         {stars && (
           <p className="text-sm flex flex-wrap gap-x-3">
             <span>{t.onlyStars(stars)}</span>
-            <a href={`${reviewsHref}#reviews`} className="underline hover:text-accent">{t.allReviews}</a>
+            <a href={`${reviewsHref}${reviewsQuery({ sort })}#reviews`} className="underline hover:text-accent">{t.allReviews}</a>
           </p>
+        )}
+        {reviews.listedCount > 1 && (
+          <nav aria-label={t.sortReviews} className="flex gap-1 text-sm">
+            {(["newest", "helpful"] as const).map((o) => (
+              <a key={o} href={`${reviewsHref}${reviewsQuery({ stars, sort: o, all: allShown })}#reviews`} aria-current={sort === o ? "true" : undefined}
+                className={`rounded-full border px-3 py-1 ${sort === o ? "border-ink bg-ink text-surface" : "border-border hover:bg-sunken"}`}>
+                {o === "newest" ? t.sortNewest : t.sortHelpful}
+              </a>
+            ))}
+          </nav>
         )}
         {reviews.count === 0 ? (
           <p className="hint">{t.noReviews}</p>
@@ -579,12 +593,19 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                   </div>
                 )}
                 {r.reply && <p className="text-sm hint border-l-2 border-border pl-3"><span className="font-medium">{shop.name}: </span>{r.reply}</p>}
+                <form action={helpfulAction.bind(null, shopHandle, product.handle, r.id, { stars, sort, all: allShown })} className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                  <button type="submit" aria-pressed={voted.has(r.id)} aria-describedby={r.helpfulCount > 0 ? `helpful-${r.id}` : undefined}
+                    className={`rounded-full border px-3 py-1 ${voted.has(r.id) ? "border-ink bg-ink text-surface" : "border-border hover:bg-sunken"}`}>
+                    <span aria-hidden>👍 </span>{t.helpful}
+                  </button>
+                  {r.helpfulCount > 0 && <span id={`helpful-${r.id}`} className="hint">{t.helpfulCount(r.helpfulCount)}</span>}
+                </form>
               </li>
             ))}
           </ul>
         )}
         {reviews.listedCount > reviews.reviews.length && query.reviews !== "all" && (
-          <a href={`${reviewsHref}?${stars ? `stars=${stars}&` : ""}reviews=all#reviews`} className="btn btn-secondary self-start">{t.allReviewsCount(reviews.listedCount)}</a>
+          <a href={`${reviewsHref}${reviewsQuery({ stars, sort, all: true })}#reviews`} className="btn btn-secondary self-start">{t.allReviewsCount(reviews.listedCount)}</a>
         )}
       </section>
       <section id="questions" className="md:col-span-2 flex flex-col gap-4 border-t border-border pt-8" aria-labelledby="questions-heading">
