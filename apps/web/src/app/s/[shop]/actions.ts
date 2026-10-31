@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, cancelOrderByBuyer, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, visitSource, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, MAX_SAVED, saveItem, setPriceAlerts, shareSaved, stopSharingSaved, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer, answerSurvey, chooseBankTransfer, joinLaunchList, toggleCompareId, lookVariants, stayPathAfterAdd, toggleHelpful, VOTER_PATTERN, reviewsQuery, reviewSort, starsFilter } from "@sf/core";
+import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, cancelOrderByBuyer, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, visitSource, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, MAX_SAVED, saveItem, setPriceAlerts, shareSaved, stopSharingSaved, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer, answerSurvey, chooseBankTransfer, joinLaunchList, toggleCompareId, lookVariants, stayPathAfterAdd, toggleHelpful, reportReview, VOTER_PATTERN, reviewsQuery, reviewSort, starsFilter } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
 import { agents, campaigns, db, fulfillment, payments, platformUrl, refunds, subscriptions, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
@@ -656,22 +656,42 @@ const VOTER_COOKIE = "sf_voter";
  * Marks a review helpful, or takes the mark back, then returns to the same review in the same list.
  * The list (stars, order, all) comes from the page, so it's checked again here.
  */
-export async function helpfulAction(handle: string, productHandle: string, reviewId: string, view: { stars?: unknown; photos?: unknown; sort?: unknown; all?: unknown }) {
-  const shop = await loadShop(handle);
+/** This device's random id for helpful votes and reports, set on its first one. */
+async function voterId() {
   const jar = await cookies();
   let voter = jar.get(VOTER_COOKIE)?.value;
   if (!voter || !VOTER_PATTERN.test(voter)) {
     voter = randomBytes(16).toString("base64url");
     jar.set(VOTER_COOKIE, voter, { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365 });
   }
-  const found = await toggleHelpful(await db(), shop.id, reviewId, voter).then(
-    () => true,
-    (e) => {
-      if (e instanceof NotFoundError) return false;
-      throw e;
-    },
-  );
+  return voter;
+}
+
+type ReviewView = { stars?: unknown; photos?: unknown; sort?: unknown; all?: unknown };
+
+/** Back to the review on the product page, with the shopper's filters kept. */
+async function backToReview(handle: string, productHandle: string, reviewId: string, view: ReviewView, found: boolean): Promise<never> {
+  // The redirect can differ from the page only after the #, which the router treats as a scroll,
+  // so ask for the page's fresh data too.
+  revalidatePath(`/s/${handle}/products/${productHandle}`);
   const list = reviewsQuery({ stars: starsFilter(String(view?.stars ?? "")), photos: view?.photos === true, sort: reviewSort(String(view?.sort ?? "")), all: view?.all === true });
   redirect(`${await storeBase(handle)}/products/${encodeURIComponent(productHandle)}${list}#${found ? `review-${reviewId}` : "reviews"}`);
+}
+
+const unlessGone = (e: unknown) => {
+  if (e instanceof NotFoundError) return false;
+  throw e;
+};
+
+export async function helpfulAction(handle: string, productHandle: string, reviewId: string, view: ReviewView) {
+  const shop = await loadShop(handle);
+  const found = await toggleHelpful(await db(), shop.id, reviewId, await voterId()).then(() => true, unlessGone);
+  await backToReview(handle, productHandle, reviewId, view, found);
+}
+
+export async function reportReviewAction(handle: string, productHandle: string, reviewId: string, view: ReviewView) {
+  const shop = await loadShop(handle);
+  const found = await reportReview(await db(), shop.id, reviewId, await voterId()).then(() => true, unlessGone);
+  await backToReview(handle, productHandle, reviewId, view, found);
 }
 

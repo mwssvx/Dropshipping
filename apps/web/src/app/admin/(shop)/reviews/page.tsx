@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { REVIEW_PAGE_SIZE, reviewCounts, reviewPage, reviewPhotoUrl, reviewRequestStats } from "@sf/core";
+import { REVIEW_PAGE_SIZE, reportedReviewCount, reviewCounts, reviewPage, reviewPhotoUrl, reviewRequestStats } from "@sf/core";
 import { requireShop } from "@/lib/server";
-import { moderateReviewAction, removeReviewPhotoAction, setReviewsAutoPublishAction } from "../../growth-actions";
+import { keepReportedReviewAction, moderateReviewAction, removeReviewPhotoAction, setReviewsAutoPublishAction } from "../../growth-actions";
 import { PageHeader } from "../PageHeader";
 import { ReplyForm } from "./ReplyForm";
 import { ReviewRequestForm } from "./ReviewRequestForm";
@@ -14,7 +14,7 @@ const TABS = [
   { key: "hidden", label: "Hidden" },
 ] as const;
 
-export default async function ReviewsPage({ searchParams }: { searchParams: Promise<{ show?: string; stars?: string; q?: string; page?: string; reply?: string; photos?: string }> }) {
+export default async function ReviewsPage({ searchParams }: { searchParams: Promise<{ show?: string; stars?: string; q?: string; page?: string; reply?: string; photos?: string; reported?: string }> }) {
   const { shop, db } = await requireShop("reviews");
   const params = await searchParams;
   const status = TABS.find((t) => t.key === params.show)?.key ?? "pending";
@@ -23,14 +23,17 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
   const page = /^\d{1,5}$/.test(params.page ?? "") ? Math.max(1, Number(params.page)) : 1;
   const noReply = params.reply === "none";
   const photos = params.photos === "1";
-  const filtered = Boolean(q || stars || noReply || photos);
-  const [{ reviews: rows, total }, counts, requests] = await Promise.all([
-    reviewPage(db, shop.id, { status, rating: stars, query: q, page, noReply, photos }),
+  // Reported reviews are always published (hiding one clears its reports), so this filter opens that tab.
+  const reported = params.reported === "1" && status === "published";
+  const filtered = Boolean(q || stars || noReply || photos || reported);
+  const [{ reviews: rows, total }, counts, requests, reportedCount] = await Promise.all([
+    reviewPage(db, shop.id, { status, rating: stars, query: q, page, noReply, photos, reported }),
     reviewCounts(db, shop.id),
     reviewRequestStats(db, shop.id),
+    reportedReviewCount(db, shop.id),
   ]);
   const pages = Math.max(1, Math.ceil(total / REVIEW_PAGE_SIZE));
-  const href = (change: { show?: string; stars?: number | null; q?: string | null; page?: number; noReply?: boolean; photos?: boolean }) => {
+  const href = (change: { show?: string; stars?: number | null; q?: string | null; page?: number; noReply?: boolean; photos?: boolean; reported?: boolean }) => {
     const next = new URLSearchParams({ show: change.show ?? status });
     const s = change.stars === undefined ? stars : change.stars;
     if (s) next.set("stars", String(s));
@@ -38,6 +41,7 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
     if (query) next.set("q", query);
     if (change.noReply ?? noReply) next.set("reply", "none");
     if (change.photos ?? photos) next.set("photos", "1");
+    if (change.reported ?? reported) next.set("reported", "1");
     if (change.page && change.page > 1) next.set("page", String(change.page));
     return `/admin/reviews?${next}`;
   };
@@ -69,7 +73,7 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
         </section>
         <nav className="flex gap-1 border-b border-border overflow-x-auto" aria-label="Review status">
           {TABS.map((t) => (
-            <Link key={t.key} href={href({ show: t.key, stars: null, q: null, noReply: false, photos: false })} aria-current={t.key === status ? "page" : undefined}
+            <Link key={t.key} href={href({ show: t.key, stars: null, q: null, noReply: false, photos: false, reported: false })} aria-current={t.key === status ? "page" : undefined}
               className={`px-3 py-2 text-sm -mb-px border-b-2 whitespace-nowrap ${t.key === status ? "border-accent font-semibold" : "border-transparent hint"}`}>
               {t.label} <span className="num hint">({counts[t.key]})</span>
             </Link>
@@ -81,6 +85,7 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
             {stars && <input type="hidden" name="stars" value={stars} />}
             {noReply && <input type="hidden" name="reply" value="none" />}
             {photos && <input type="hidden" name="photos" value="1" />}
+            {reported && <input type="hidden" name="reported" value="1" />}
             <label htmlFor="review-q" className="sr-only">Search reviews</label>
             <input id="review-q" name="q" type="search" defaultValue={q} placeholder="Name, words or product" className="input flex-1" />
             <button className="btn btn-secondary">Search</button>
@@ -95,11 +100,16 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
           <nav className="flex flex-wrap gap-1 text-sm" aria-label="More filters">
             <Link href={href({ noReply: !noReply, page: 1 })} aria-current={noReply ? "true" : undefined} className={`px-2 py-1 rounded-md ${noReply ? "bg-sunken font-semibold" : "hint"}`}>No reply yet</Link>
             <Link href={href({ photos: !photos, page: 1 })} aria-current={photos ? "true" : undefined} className={`px-2 py-1 rounded-md ${photos ? "bg-sunken font-semibold" : "hint"}`}>With photos</Link>
+            {(reportedCount > 0 || reported) && (
+              <Link href={href({ show: "published", reported: !reported, page: 1 })} aria-current={reported ? "true" : undefined} className={`px-2 py-1 rounded-md ${reported ? "bg-sunken font-semibold" : "text-critical"}`}>
+                Reported <span className="num">({reportedCount})</span>
+              </Link>
+            )}
           </nav>
         </div>
         {filtered && (
           <p className="hint text-sm">
-            {total} {total === 1 ? "review matches" : "reviews match"}{q && <> &ldquo;{q}&rdquo;</>}{stars && <> with {stars} star{stars > 1 ? "s" : ""}</>}{noReply && <>, no reply yet</>}{photos && <>, with photos</>}. <Link href={href({ stars: null, q: null, noReply: false, photos: false })} className="underline">Clear</Link>
+            {total} {total === 1 ? "review matches" : "reviews match"}{q && <> &ldquo;{q}&rdquo;</>}{stars && <> with {stars} star{stars > 1 ? "s" : ""}</>}{noReply && <>, no reply yet</>}{photos && <>, with photos</>}{reported && <>, reported by shoppers</>}. <Link href={href({ stars: null, q: null, noReply: false, photos: false, reported: false })} className="underline">Clear</Link>
           </p>
         )}
         {rows.length === 0 ? (
@@ -113,6 +123,12 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
                   <span className="font-medium">{r.name}</span>
                   <span className="hint">on {productTitle} · {orderNumber != null ? `order #${orderNumber}` : `from ${r.importedFrom ?? "another platform"}`} · {r.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
                 </div>
+                {r.reportCount > 0 && (
+                  <div className="banner banner-critical text-sm flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span className="flex-1 min-w-48">Reported by {r.reportCount === 1 ? "a shopper" : `${r.reportCount} shoppers`}. It stays up until you hide it.</span>
+                    <form action={keepReportedReviewAction.bind(null, r.id)}><button className="underline">Keep it</button></form>
+                  </div>
+                )}
                 <p className="text-sm whitespace-pre-line">{r.body}</p>
                 {r.photoIds.length > 0 && (
                   <ul className="flex flex-wrap gap-3" aria-label="Buyer's photos">

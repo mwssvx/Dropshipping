@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, formatDeliveryWindow, giftCardBonusNow, holidayReturnsNow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, breadcrumbCollection, collectionFromReferer, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, comingSoonProduct, COMPARE_MAX, defaultCutoffZone, countdownTo, shipsToCountry, recentSalesCount, RECENT_SALES_DAYS, starsFilter, REVIEWS_SHOWN, REVIEWS_SHOWN_ALL, reviewSort, reviewsQuery, helpfulVotes } from "@sf/core";
+import { bundlesForProduct, formatDeliveryWindow, giftCardBonusNow, holidayReturnsNow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, breadcrumbCollection, collectionFromReferer, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, comingSoonProduct, COMPARE_MAX, defaultCutoffZone, countdownTo, shipsToCountry, recentSalesCount, RECENT_SALES_DAYS, starsFilter, REVIEWS_SHOWN, REVIEWS_SHOWN_ALL, reviewSort, reviewsQuery, helpfulVotes, reportedReviews } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { ShareButtons } from "@/components/ShareButtons";
 import { SaleCountdown } from "@/components/SaleCountdown";
@@ -15,7 +15,7 @@ import { currentBuyer } from "@/lib/buyer";
 import { db } from "@/lib/server";
 import { buyerCountry, buyerFx } from "@/lib/currency";
 import { SubmitButton } from "@/components/SubmitButton";
-import { addBundleAction, addToCartAction, askQuestionAction, helpfulAction, launchListAction, stockAlertAction, toggleCompareAction, toggleSavedAction } from "../../actions";
+import { addBundleAction, addToCartAction, askQuestionAction, helpfulAction, launchListAction, reportReviewAction, stockAlertAction, toggleCompareAction, toggleSavedAction } from "../../actions";
 import { readCompare } from "@/lib/compare";
 import { savedIds } from "@/lib/saved";
 import { loadShop, localCollections, localProducts, storeBase, storeLang, storeT, missing } from "../../data";
@@ -148,8 +148,10 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const sort = reviewSort(query.sort);
   const photosOnly = query.photos === "1";
   const allShown = query.reviews === "all";
-  // The reviews this device marked helpful, so their button shows as pressed.
-  const voted = await helpfulVotes(await db(), (await cookies()).get("sf_voter")?.value, reviews.reviews.map((r) => r.id));
+  // The reviews this device marked helpful (their button shows as pressed) or reported.
+  const voter = (await cookies()).get("sf_voter")?.value;
+  const reviewIds = reviews.reviews.map((r) => r.id);
+  const [voted, reported] = await Promise.all([helpfulVotes(await db(), voter, reviewIds), reportedReviews(await db(), voter, reviewIds)]);
   const askedKind = ASKED_MESSAGES[(query.asked ?? "") as keyof typeof ASKED_MESSAGES];
   const upsells = await localProducts(shopHandle, rawUpsells);
   const together = (await localProducts(shopHandle, await boughtTogether(await db(), shop.id, [product.id]))).filter((p) => !upsells.some((u) => u.id === p.id));
@@ -618,13 +620,22 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
                   </div>
                 )}
                 {r.reply && <p className="text-sm hint border-l-2 border-border pl-3"><span className="font-medium">{shop.name}: </span>{r.reply}</p>}
-                <form action={helpfulAction.bind(null, shopHandle, product.handle, r.id, { stars, photos: photosOnly, sort, all: allShown })} className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                  <button type="submit" aria-pressed={voted.has(r.id)} aria-describedby={r.helpfulCount > 0 ? `helpful-${r.id}` : undefined}
-                    className={`rounded-full border px-3 py-1 ${voted.has(r.id) ? "border-ink bg-ink text-surface" : "border-border hover:bg-sunken"}`}>
-                    <span aria-hidden>👍 </span>{t.helpful}
-                  </button>
-                  {r.helpfulCount > 0 && <span id={`helpful-${r.id}`} className="hint">{t.helpfulCount(r.helpfulCount)}</span>}
-                </form>
+                <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                  <form action={helpfulAction.bind(null, shopHandle, product.handle, r.id, { stars, photos: photosOnly, sort, all: allShown })} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <button type="submit" aria-pressed={voted.has(r.id)} aria-describedby={r.helpfulCount > 0 ? `helpful-${r.id}` : undefined}
+                      className={`rounded-full border px-3 py-1 ${voted.has(r.id) ? "border-ink bg-ink text-surface" : "border-border hover:bg-sunken"}`}>
+                      <span aria-hidden>👍 </span>{t.helpful}
+                    </button>
+                    {r.helpfulCount > 0 && <span id={`helpful-${r.id}`} className="hint">{t.helpfulCount(r.helpfulCount)}</span>}
+                  </form>
+                  {reported.has(r.id) ? (
+                    <span className="hint ml-auto">{t.reported}</span>
+                  ) : (
+                    <form action={reportReviewAction.bind(null, shopHandle, product.handle, r.id, { stars, photos: photosOnly, sort, all: allShown })} className="ml-auto">
+                      <button type="submit" aria-label={t.reportReview(r.name)} className="hint underline-offset-2 hover:underline py-1">{t.report}</button>
+                    </form>
+                  )}
+                </div>
               </li>
             ))}
           </ul>

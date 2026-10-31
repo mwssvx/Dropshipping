@@ -223,6 +223,13 @@ export async function moderateReviewAction(id: string, status: "published" | "hi
   revalidatePath("/admin", "layout");
 }
 
+/** Keeps a review shoppers reported: it stays up and leaves the Reported list. */
+export async function keepReportedReviewAction(id: string) {
+  const { shop, db } = await requireShop("reviews");
+  await moderateReview(db, shop.id, id, { clearReports: true });
+  revalidatePath("/admin/reviews");
+}
+
 /** Takes down one photo a buyer added to their review. */
 export async function removeReviewPhotoAction(id: string, photoId: string) {
   const { shop, db } = await requireShop("reviews");
