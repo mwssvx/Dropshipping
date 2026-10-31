@@ -97,6 +97,9 @@ export const LOGOS_MAX = 12;
 /** The most messages one announcement bar takes turns showing. */
 export const ANNOUNCE_MAX = 5;
 
+/** The most slides one slideshow holds. */
+export const SLIDES_MAX = 5;
+
 /** The most columns one "Columns" section holds. */
 export const COLUMNS_MAX = 6;
 
@@ -205,6 +208,17 @@ const sectionSchemas = {
     videoUrl: videoLink,
     coverUrl: imageUrl,
   }),
+  // Big pictures with a heading and a button that take turns, like a hero with several messages.
+  // A slide with no picture and no heading yet isn't shown.
+  slideshow: z.object({
+    slides: z
+      .array(z.object({ imageUrl, heading: text(120), text: text(400), buttonLabel: text(40), buttonLink: link }))
+      .max(SLIDES_MAX, `A slideshow holds up to ${SLIDES_MAX} slides.`)
+      .default([]),
+    seconds: z.number().int().min(3).max(15).default(6),
+    height: z.enum(["small", "medium", "large"]).default("medium"),
+    align: z.enum(["left", "center"]).default("center"),
+  }),
   // Side-by-side blocks, each with an optional picture, a title, a few words and a link.
   // A column with nothing in it yet isn't shown.
   columns: z.object({
@@ -236,6 +250,7 @@ export const SECTION_LABELS: Record<SectionType, { name: string; about: string }
   shop_the_look: { name: "Shop the look", about: "One photo beside the products in it, like a styled room or an outfit, with a button that adds them all to the cart." },
   logo_list: { name: "Logo row", about: "A row of logos, like magazines that wrote about you or brands you carry. Use only logos you may show." },
   video: { name: "Video", about: "A YouTube or Vimeo video, or a video file, with a heading. Nothing loads from YouTube or Vimeo until a shopper presses play." },
+  slideshow: { name: "Slideshow", about: "Up to five big pictures, each with a heading and a button, taking turns every few seconds. Shoppers can pause it, and it starts paused for those who ask for less motion." },
   columns: { name: "Columns", about: "Two to six blocks side by side, each with a picture, a title, a few words and a link. Good for how it works, what makes you different or your main collections." },
 };
 

@@ -11,6 +11,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { parseVideo } from "@sf/core/video-link";
 import { SectionVideo } from "./SectionVideo";
 import { AnnouncementBar } from "./AnnouncementBar";
+import { Slideshow } from "./Slideshow";
 import { storeHref } from "./style";
 
 /*
@@ -91,6 +92,17 @@ function Hero({ s, data, first }: Props<"hero">) {
         <div className="mt-2"><Button label={s.buttonLabel} href={s.buttonLink} base={data.base} /></div>
       </div>
     </section>
+  );
+}
+
+function SlideshowSection({ s, data, first }: Props<"slideshow">) {
+  const t = data.t ?? storeText(null);
+  const slides = s.slides.filter((x) => x.imageUrl || x.heading);
+  if (!slides.length) return null;
+  return (
+    <Slideshow slides={slides.map((x) => ({ imageUrl: x.imageUrl, heading: x.heading, text: x.text, buttonLabel: x.buttonLabel, href: storeHref(data.base, x.buttonLink) }))}
+      seconds={s.seconds} height={HERO_HEIGHT[s.height]} center={s.align === "center"} first={first}
+      labels={{ slideshow: t.slideshow, previous: t.slidePrevious, next: t.slideNext, pause: t.slidePause, play: t.slidePlay, of: t.slideOf, goTo: t.slideGoTo }} />
   );
 }
 
@@ -529,6 +541,7 @@ export function SectionView({ section, data, first }: { section: Section; data: 
     case "shop_the_look": return <ShopTheLook s={section.settings} data={data} first={first} />;
     case "logo_list": return <LogoList s={section.settings} data={data} first={first} />;
     case "video": return <VideoBlock s={section.settings} data={data} first={first} />;
+    case "slideshow": return <SlideshowSection s={section.settings} data={data} first={first} />;
     case "columns": return <Columns s={section.settings} data={data} first={first} />;
   }
 }
