@@ -2,11 +2,14 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
+  addSkillFromUrl,
+  addSkillText,
   askAssistant,
   decideAction,
   fixProblemOrder,
   merchantReply,
   normalizeBrandRules,
+  removeSkill,
   reviewStoreWithAi,
   findTrendsWithAi,
   runMarginWatch,
@@ -178,6 +181,31 @@ export async function saveAiSettingsAction(_: AgentState, form: FormData): Promi
       }),
       skillsOff: SKILL_NAMES.filter((n) => !form.getAll("skills").includes(n)),
     });
+  } catch (e) {
+    return fail(e);
+  }
+  revalidatePath("/admin", "layout");
+  return { saved: true };
+}
+
+export async function addSkillAction(_: AgentState, form: FormData): Promise<AgentState> {
+  const { shop, db } = await requireShop("ai");
+  const link = String(form.get("link") ?? "").trim();
+  const pasted = String(form.get("text") ?? "").trim();
+  try {
+    if (!link && !pasted) return { error: "Paste a GitHub link to a skill, or the skill's text." };
+    const { skill, replaced } = link ? await addSkillFromUrl(db, shop.id, link) : await addSkillText(db, shop.id, pasted);
+    revalidatePath("/admin", "layout");
+    return { saved: true, message: `${replaced ? "Updated" : "Added"} “${skill.title}”. The Assistant uses it for ${skill.when.charAt(0).toLowerCase()}${skill.when.slice(1).replace(/\.$/, "")}.` };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function removeSkillAction(name: string): Promise<AgentState> {
+  const { shop, db } = await requireShop("ai");
+  try {
+    await removeSkill(db, shop.id, name);
   } catch (e) {
     return fail(e);
   }

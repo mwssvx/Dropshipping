@@ -1,8 +1,8 @@
-import { aiBudget, aiImpact, aiMonth, BUYER_TOPICS, impactLines, timeSaved, type AiImpact, formatMoney, listAgentActivity, listShopperChats, LANGUAGES, MEMORY_MAX_NOTES, MODEL_LABEL, SKILL_NAMES, SKILLS, type BrandRules } from "@sf/core";
+import { aiBudget, aiImpact, aiMonth, BUYER_TOPICS, impactLines, timeSaved, type AiImpact, formatMoney, listAgentActivity, listShopperChats, LANGUAGES, MEMORY_MAX_NOTES, MODEL_LABEL, SKILL_NAMES, SKILLS, SKILL_SOURCES, CUSTOM_SKILLS_MAX, type BrandRules } from "@sf/core";
 import { aiModel, requireShop } from "@/lib/server";
 import { AGENT_LABEL } from "@/lib/agent-labels";
 import { PageHeader } from "../PageHeader";
-import { AiSettingsForm, MarginCheckButton } from "./AiForms";
+import { AiSettingsForm, MarginCheckButton, SkillLibrary } from "./AiForms";
 
 export const metadata = { title: "AI settings" };
 
@@ -88,6 +88,11 @@ export default async function AiSettingsPage() {
               languages={Object.entries(LANGUAGES).map(([code, l]) => ({ code, name: l.english }))}
               skills={SKILL_NAMES.map((key) => ({ key, title: SKILLS[key].title, when: SKILLS[key].when, on: !shop.aiSkillsOff.includes(key) }))}
             />
+          </section>
+          <section className="card p-5 flex flex-col gap-3" aria-labelledby="skills-title">
+            <h2 id="skills-title" className="font-semibold">Your skills</h2>
+            <p className="hint text-sm">Playbooks you add from GitHub or paste in. Like the built-in skills above, the Assistant lists them and reads one only when a question is about it, so they cost nothing until used.</p>
+            <SkillLibrary skills={shop.aiCustomSkills.map((s) => ({ name: s.name, title: s.title, when: s.when, sourceUrl: s.sourceUrl }))} max={CUSTOM_SKILLS_MAX} sources={SKILL_SOURCES} />
           </section>
           {chats.length > 0 && (
             <section className="card p-5 flex flex-col gap-3" aria-labelledby="shopper-chats-title">

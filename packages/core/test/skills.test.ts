@@ -14,7 +14,7 @@ describe("assistant skills", () => {
     const after = await f.shop();
     expect(after.aiSkillsOff).toEqual(["marketing"]);
     expect(AGENT_SPECS.assistant.system(after)).not.toContain("- marketing:");
-    expect(skillMenu(SKILL_NAMES)).toBe("");
+    expect(skillMenu({ aiSkillsOff: SKILL_NAMES, aiCustomSkills: [] })).toBe("");
   });
 
   it("reads a playbook, and won't read one the owner switched off", async () => {
@@ -25,7 +25,7 @@ describe("assistant skills", () => {
     const results = model.requests[2]!.messages.at(-1)!.content as { content: string; is_error?: boolean }[];
     const msgs = model.requests[1]!.messages.at(-1)!.content as { content: string }[];
     expect(msgs[0]!.content).toContain("Charm prices");
-    expect(results[0]).toMatchObject({ is_error: true, content: expect.stringContaining("switched this skill off") });
+    expect(results[0]).toMatchObject({ is_error: true, content: expect.stringContaining("no skill called marketing") });
   });
 
   it("in demo mode, a 'what should I sell' question loads trend research and starts the trend scout", async () => {

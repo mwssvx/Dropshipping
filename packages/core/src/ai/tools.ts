@@ -26,7 +26,8 @@ import { profitReport } from "../profit";
 import { customerReport, productFunnel, returnsReport } from "../insights";
 import { WATCH_KINDS, type WatchSignal } from "../watch";
 import { AUTO, blocked, needsOk, untrusted, type Decision, type RunScope } from "./context";
-import { enabledSkills, SKILL_NAMES, SKILLS } from "./skills";
+import { allSkills, SKILL_NAMES, SKILLS, type SkillName } from "./skills";
+import { customSkillResult } from "./skill-library";
 import { brandProblems, type BrandRules } from "./brand";
 import { createDiscount } from "../discounts";
 import { createCollection } from "../collections";
@@ -1515,11 +1516,16 @@ const skillTools = [
     name: "use_skill",
     kind: "read",
     description: "Read the playbook for one of your skills (they're listed in your instructions). Do this before answering a question in that skill's area, then follow the playbook.",
-    input: z.object({ skill: z.enum(SKILL_NAMES) }),
-    summary: (i) => `Read the ${SKILLS[i.skill].title.toLowerCase()} playbook`,
+    input: z.object({ skill: z.string().min(1).max(60).describe("The skill's name as listed in your instructions") }),
+    summary: (i, run) => {
+      const s = allSkills(run.shop).find((x) => x.name === i.skill);
+      return `Read the ${s ? s.title.toLowerCase() : i.skill} playbook`;
+    },
     async run(i, run) {
-      if (!enabledSkills(run.shop.aiSkillsOff).includes(i.skill)) throw new UserError("The owner switched this skill off. Answer without it.");
-      return { skill: i.skill, playbook: SKILLS[i.skill].playbook };
+      const s = allSkills(run.shop).find((x) => x.name === i.skill);
+      if (!s) throw new UserError(`There is no skill called ${i.skill}. Use one of the names in your instructions, or answer without a skill.`);
+      if (s.custom) return customSkillResult(s.custom);
+      return { skill: s.name, playbook: SKILLS[s.name as SkillName].playbook };
     },
   }),
   analystTool("read_profit"),
@@ -1602,7 +1608,8 @@ const chatShopTools = [
     input: z.object({ month: z.enum(["this", "last"]) }),
     summary: (i) => `Looked at what the AI did ${i.month === "this" ? "this month" : "last month"}`,
     async run(i, run) {
-      const month = aiMonth(run.ctx.now?.() ?? new Date(), i.month === "this" ? 0 : 1);
+      // Rows are stamped with the database clock, so the month comes from the real clock too.
+      const month = aiMonth(new Date(), i.month === "this" ? 0 : 1);
       const r = await aiImpact(run.ctx.db, run.shop.id, month);
       return {
         month: month.label,

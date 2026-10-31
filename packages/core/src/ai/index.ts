@@ -20,3 +20,4 @@ export function modelFromEnv(env: Record<string, string | undefined>): ModelClie
 export * from "./memory";
 export * from "./examples";
 export * from "./impact";
+export * from "./skill-library";

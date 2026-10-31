@@ -2,7 +2,7 @@
 import { useActionState } from "react";
 import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
-import { marginCheckAction, saveAiSettingsAction } from "../../ai-actions";
+import { addSkillAction, marginCheckAction, removeSkillAction, saveAiSettingsAction } from "../../ai-actions";
 
 export function AiSettingsForm(props: { budget: string; planMax: string; topics: { key: string; label: string; on: boolean }[]; autoPause: boolean; shopper: boolean; weeklyReview: boolean; dailyWatch: boolean; watchEmail: boolean; monthlyEmail: boolean; skills: { key: string; title: string; when: string; on: boolean }[]; brand: { voice: string; banned: string; language: string; titleMax: string }; languages: { code: string; name: string }[]; memory: string; memoryMax: number; examples: string[] }) {
   const [state, action] = useActionState(saveAiSettingsAction, {});
@@ -150,6 +150,72 @@ export function MarginCheckButton() {
       <FormError message={state.error} />
       {state.message && <p className="banner banner-info whitespace-pre-line" role="status">{state.message}</p>}
       <div><SubmitButton className="btn btn-secondary" pendingText="Checking…">Check margins now</SubmitButton></div>
+    </form>
+  );
+}
+
+export function SkillLibrary(props: { skills: { name: string; title: string; when: string; sourceUrl: string | null }[]; max: number; sources: { title: string; url: string; note: string }[] }) {
+  const [state, action] = useActionState(addSkillAction, {});
+  return (
+    <div className="flex flex-col gap-4">
+      {props.skills.length === 0 ? (
+        <p className="hint text-sm">None yet. Add one below, and the Assistant will read it whenever a question is about that area.</p>
+      ) : (
+        <ul className="flex flex-col divide-y divide-border text-sm">
+          {props.skills.map((s) => (
+            <li key={s.name} className="py-2 flex gap-3 justify-between items-start">
+              <span className="min-w-0">
+                <span className="font-medium">{s.title}</span>
+                <span className="hint block">For {s.when.charAt(0).toLowerCase()}{s.when.slice(1).replace(/\.$/, "")}.</span>
+                {s.sourceUrl && <a className="link text-xs" href={s.sourceUrl} target="_blank" rel="noreferrer">Source ↗</a>}
+              </span>
+              <RemoveSkill name={s.name} title={s.title} />
+            </li>
+          ))}
+        </ul>
+      )}
+      <form action={action} className="flex flex-col gap-3" aria-label="Add a skill">
+        <FormError message={state.error} />
+        {state.message && <p className="banner banner-info" role="status">{state.message}</p>}
+        <div className="field">
+          <label className="label" htmlFor="skill-link">GitHub link to a skill</label>
+          <input className="input" id="skill-link" name="link" inputMode="url" placeholder="https://github.com/anthropics/skills/tree/main/skills/…" aria-describedby="skill-link-hint" />
+          <span className="hint" id="skill-link-hint">
+            Link to the skill&apos;s folder (the one with a SKILL.md) or to the file itself. Check the repository&apos;s licence before using its skills for your business.
+          </span>
+        </div>
+        <details className="text-sm">
+          <summary className="cursor-pointer">Or paste a skill</summary>
+          <div className="field mt-2">
+            <label className="label" htmlFor="skill-text">Skill text</label>
+            <textarea className="input min-h-32 font-mono text-xs" id="skill-text" name="text" placeholder={"---\nname: email-sequence\ndescription: Writing a welcome email series\n---\n# Email sequences\n\nThe playbook…"} />
+          </div>
+        </details>
+        <div className="flex flex-wrap gap-3 items-center">
+          <SubmitButton pendingText="Adding…">Add skill</SubmitButton>
+          <span className="hint">{props.skills.length} of {props.max}.</span>
+        </div>
+      </form>
+      <div className="text-sm">
+        <span className="hint block mb-1">Places to find skills:</span>
+        <ul className="flex flex-col gap-1">
+          {props.sources.map((s) => (
+            <li key={s.url}>
+              <a className="link" href={s.url} target="_blank" rel="noreferrer">{s.title} ↗</a> <span className="hint">{s.note}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function RemoveSkill({ name, title }: { name: string; title: string }) {
+  const [state, action] = useActionState(removeSkillAction.bind(null, name), {});
+  return (
+    <form action={action} className="shrink-0">
+      <FormError message={state.error} />
+      <button type="submit" className="btn btn-secondary btn-sm" aria-label={`Remove ${title}`}>Remove</button>
     </form>
   );
 }
