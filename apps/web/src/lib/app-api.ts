@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  createGiftGuides,
+  giftGuideTitles,
   holidayChecklist,
   holidaySeason,
   createCollection,
@@ -1398,6 +1400,9 @@ const routes: Record<string, Handler> = {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
       collections: collections.map((c) => ({ id: c.id, title: c.title, auto: !!c.rules, productCount: c.productCount, url: `${store.replace(/\/$/, "")}/collections/${c.handle}` })),
+      // Gift guides the store doesn't have yet, so one tap can make them.
+      missingGuides: giftGuideTitles(shop.currency).filter((t) => !collections.some((c) => c.title === t)),
+      guideCount: giftGuideTitles(shop.currency).length,
     };
   },
   "POST collections": async ({ req, db, shop, user }) => {
@@ -1406,6 +1411,15 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, `Made the collection ${c.title} in the app`, { href: `/admin/collections/${c.id}` });
     revalidatePath(`/s/${shop.handle}`, "layout");
     return { ok: true, id: c.id, message: `Made ${c.title}. To fill it, open a product and switch it on under Collections.` };
+  },
+  "POST collections/gift-guides": async ({ db, shop, user }) => {
+    const made = await createGiftGuides(db, shop);
+    if (made.length) await logged({ shop, user, db }, `Made gift guides in the app: ${made.map((c) => c.title).join(", ")}`, { href: "/admin/collections" });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return {
+      ok: true,
+      message: made.length === 0 ? "You already have every gift guide." : `Made ${made.length === 1 ? "1 gift guide" : `${made.length} gift guides`}. They fill themselves with what's in stock at that price, best sellers first.`,
+    };
   },
   "DELETE collections/:id": async ({ params, db, shop, user }) => {
     const c = await getCollection(db, shop.id, params.id!);
@@ -1421,6 +1435,7 @@ const routes: Record<string, Handler> = {
       "order-by": { path: "/holiday-date", area: "shipping" },
       late: { path: "/late-emails", area: "shipping" },
       sale: { path: "/sales", area: "marketing" },
+      "gift-guides": { path: "/collections", area: "collections" },
     };
     return {
       season: holidaySeason(),

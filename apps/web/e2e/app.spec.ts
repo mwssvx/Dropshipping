@@ -2180,3 +2180,20 @@ test("the holiday checklist in the app, with a line set up from the app", async 
   await page.goto("/holiday-checklist");
   await expect(page.getByRole("region", { name: "Done" }).getByRole("button", { name: "Email buyers when an order runs late, done" })).toBeVisible();
 });
+
+test("gift guides made from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `gg${Date.now()}`);
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Collections/ }).click();
+  const guides = page.getByRole("region", { name: "Gift guides" });
+  await expect(guides).toContainText("Gifts under $25, Gifts under $50, Gifts under $100");
+  await guides.getByRole("button", { name: "Make gift guides" }).click();
+  await expect(page.getByText("Made 3 gift guides. They fill themselves with what's in stock at that price, best sellers first.")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Gift guides" })).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "Gifts under $50" })).toContainText("Fills by itself");
+  await shot(page, "388-app-gift-guides");
+
+  await web.goto(`${WEB}/admin/collections`);
+  await expect(web.getByRole("row", { name: /Gifts under \$100/ })).toContainText("By rules");
+});

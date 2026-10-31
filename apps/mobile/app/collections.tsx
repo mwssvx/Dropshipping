@@ -11,7 +11,7 @@ type Collection = { id: string; title: string; auto: boolean; productCount: numb
  * it from each product's screen; automatic ones are set up on the website, where their rules live.
  */
 export default function CollectionsScreen() {
-  const data = useApi<{ collections: Collection[] }>("collections");
+  const data = useApi<{ collections: Collection[]; missingGuides: string[]; guideCount: number }>("collections");
   const [title, setTitle] = useState("");
   const [confirm, setConfirm] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -42,6 +42,19 @@ export default function CollectionsScreen() {
       ) : (
         <>
           <Body muted>Group products so buyers can browse, like "Best sellers" or "Gifts under $30".</Body>
+          {d.missingGuides.length ? (
+            <Section title="Gift guides">
+              <Card>
+                <Body>{`${d.missingGuides.join(", ")}: collections that fill themselves with what's in stock at that price or less, best sellers first.`}</Body>
+                <Button
+                  label={d.missingGuides.length === d.guideCount ? "Make gift guides" : d.missingGuides.length === 1 ? "Make the last one" : "Make the rest"}
+                  busy={busy === "guides"}
+                  disabled={!!busy}
+                  onPress={() => run("guides", "collections/gift-guides", { method: "POST" })}
+                />
+              </Card>
+            </Section>
+          ) : null}
           <Section title="Your collections">
             {d.collections.length === 0 ? <EmptyState heading="No collections yet" body="Make one below, then put products in it from their screens." /> : null}
             {d.collections.map((c) => (

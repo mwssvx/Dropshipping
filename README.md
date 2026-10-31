@@ -2028,3 +2028,7 @@ The Products tab in the app has a Collections row. It lists the store's collecti
 ### Holiday checklist in the app (after launch, part 387)
 
 From October 1 to December 24, the app's Today screen has a Holiday checklist button. It shows the same checklist as the website, split into To do and Done. Lines the app can set up (the last day to order, running late emails, a sale) open that screen; the rest open the website.
+
+### Gift guides in the app (after launch, part 388)
+
+The app's Collections screen offers to make the gift guides ("Gifts under $25", "under $50" and "under $100") the store doesn't have yet, in one tap. They fill themselves with what's in stock at that price or less, best sellers first. The holiday checklist's gift guides line now opens this screen in the app.
