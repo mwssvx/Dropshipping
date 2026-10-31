@@ -173,6 +173,9 @@ export const shops = pgTable(
     localDeliveryArea: jsonb("local_delivery_area").$type<LocalDeliveryArea | null>(),
     // Buyers picking up or getting a local delivery choose one of these days at checkout, or null when they don't choose.
     handoverDays: jsonb("handover_days").$type<HandoverDays | null>(),
+    // Import duties on orders to other countries: not mentioned, paid by the buyer to customs on
+    // delivery (said at checkout), or included in the store's prices (said at checkout too).
+    duties: text("duties", { enum: ["off", "buyer_pays", "included"] }).notNull().default("off"),
     // Gift wrapping buyers can add to a gift at checkout, or null when the store doesn't wrap.
     giftWrap: jsonb("gift_wrap").$type<GiftWrap | null>(),
     // The smallest order the store takes, in goods after discounts; 0 means any amount.

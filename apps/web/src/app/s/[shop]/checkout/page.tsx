@@ -1,6 +1,6 @@
 import { PixelEvent } from "@/components/PixelEvent";
 import { redirect } from "next/navigation";
-import { addonOffer, formatDeliveryWindow, rateDeliveryWindows, formatHandoverDay, handoverDates, convertAmount, convertPrice, protectionFee, countryName, fitsWeight, formatMoney, GIFT_CARD_SEND_DAYS, lastCheckoutDetails, savedAddresses, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, onHoliday, LOCAL_DELIVERY_RATE_ID, localDeliveryPrice, PICKUP_RATE_ID, storePixels, taxExemptionFor, tipAmount, UserError } from "@sf/core";
+import { addonOffer, formatDeliveryWindow, rateDeliveryWindows, formatHandoverDay, handoverDates, convertAmount, convertPrice, protectionFee, countryName, fitsWeight, formatMoney, GIFT_CARD_SEND_DAYS, lastCheckoutDetails, savedAddresses, dutiesFor, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, onHoliday, LOCAL_DELIVERY_RATE_ID, localDeliveryPrice, PICKUP_RATE_ID, storePixels, taxExemptionFor, tipAmount, UserError } from "@sf/core";
 import { buyerFx } from "@/lib/currency";
 import { currentBuyer } from "@/lib/buyer";
 import { readCart, readDiscountCode, readGiftCardCode } from "@/lib/cart";
@@ -109,6 +109,9 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
   const shipped = hasGoods ? shipsTo(zones) : [...SHIPPING_COUNTRIES];
   if ((quote.canPickUp || (quote.ownStock && shop.localDeliveryArea)) && !shipped.includes(shop.country)) shipped.push(shop.country);
   const countries = shipped.map((c) => [c, nameOf(c, countryName(c))] as [string, string]).sort((a, b) => a[1].localeCompare(b[1], lang ?? "en"));
+  // Who pays import duties, said for the countries an order would cross customs to.
+  const dutyCountries = hasGoods ? shipped.filter((c) => dutiesFor(shop, c)) : [];
+  const duties = dutyCountries.length ? { countries: dutyCountries, note: shop.duties === "included" ? t.dutiesIncluded("{country}") : t.dutiesBuyerPays("{country}") } : null;
   const withoutShipping = presentQuote({ ...quote, shippingMinor: 0, taxMinor: 0 }, fx);
   // One more product for a little less, unless this is a wholesale or gift-card-only order.
   const offer = !quote.wholesale && hasGoods ? await addonOffer(await db(), shop, [...new Set(variants.map((v) => v.productId))]) : null;
@@ -121,6 +124,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
         defaultCountry={shop.country}
         initial={initial}
         addresses={addresses}
+        duties={duties}
         askPhone={shop.checkoutPhone}
         paidByGiftCard={!!quote.giftCard && quote.dueMinor === 0}
         countries={countries}

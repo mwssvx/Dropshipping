@@ -1674,3 +1674,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Send it to another place you've used** (`savedAddresses` in `packages/core/src/buyers.ts`): a signed-in buyer who has had orders sent to more than one address gets a "Your addresses" menu at the top of checkout's delivery details, newest first, with up to five of them and "A new address". Picking one fills in the name, address, postal code, country and phone (and the shipping rates follow), so a buyer who sends gifts to their mum or orders to work doesn't type it all again.
 2. The addresses come from the buyer's paid orders, so there's nothing extra to store or keep up: the same place typed a little differently counts once, pickups and unpaid tries are left out, and the fields stay editable. In six languages. No migration.
+
+### Import duties (after launch, part 300)
+
+1. **Who pays at the border** (`dutiesFor` in `packages/core/src/duties.ts`): the Taxes page has "Import duties": buyers pay them on delivery, they're included in my prices, or don't mention them (the default). Buyers choosing a country the parcel would cross customs to read it under the shipping rates at checkout, in their language ("Customs in United Kingdom may charge import duties or taxes when it arrives…"), so fewer parcels are refused at the door and fewer disputes say "nobody told me".
+2. Nothing shows for the store's own country, for two EU countries (one customs union), for pickups or local delivery. The generated shipping policy says the same, and the setting comes along in the store file. Migration `0156_import_duties` (`shops.duties`).

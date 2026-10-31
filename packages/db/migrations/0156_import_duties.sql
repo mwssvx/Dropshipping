@@ -1,0 +1,1 @@
+ALTER TABLE "shops" ADD COLUMN "duties" text DEFAULT 'off' NOT NULL;

@@ -2,7 +2,7 @@ import { formatMoney, listTaxRegistrations, TAX_JURISDICTIONS, taxReport } from 
 import { requireShop, tax } from "@/lib/server";
 import { removeTaxRegistrationAction, setPricesIncludeTaxAction } from "../../money-actions";
 import { PageHeader } from "../PageHeader";
-import { AddRegistrationForm } from "./TaxForms";
+import { AddRegistrationForm, DutiesForm } from "./TaxForms";
 
 export const metadata = { title: "Taxes" };
 
@@ -55,6 +55,15 @@ export default async function TaxesPage({ searchParams }: { searchParams: Promis
             </label>
             <div><button className="btn btn-secondary">Save</button></div>
           </form>
+        </section>
+
+        <section className="card p-5 flex flex-col gap-3" aria-labelledby="duties-heading">
+          <h2 id="duties-heading" className="font-semibold">Import duties</h2>
+          <p className="hint text-sm">
+            A parcel going to another country can owe customs duty or import tax when it arrives. Buyers who didn&apos;t expect it refuse the
+            parcel or open a dispute, so say up front who pays. Nothing is said for orders in your own country, or between two EU countries.
+          </p>
+          <DutiesForm value={shop.duties} />
         </section>
 
         <section className="card p-5 flex flex-col gap-4">
