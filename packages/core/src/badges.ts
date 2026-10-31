@@ -31,6 +31,26 @@ export function quickAddVariant(p: {
   return only.stock === null || only.stock > 0 ? only.id : null;
 }
 
+/** Most options a product card lists in its picker; with more, the product page is the better place to choose. */
+export const QUICK_PICK_MAX = 12;
+
+/**
+ * The options a product card can list in a small picker next to "Add to cart": two to 12, all at
+ * one price (so the card's price holds for each), nothing to type and no minimum above one. Sold
+ * out options are listed but can't be picked. Null otherwise, or when none are left.
+ */
+export function quickPickOptions(p: {
+  variants: { id: string; title: string; priceMinor: number; stock: number | null }[];
+  personalization?: unknown[] | null;
+  purchaseLimit?: { min: number | null } | null;
+}) {
+  const v = p.variants;
+  if (v.length < 2 || v.length > QUICK_PICK_MAX || p.personalization?.length || (p.purchaseLimit?.min ?? 1) > 1) return null;
+  if (v.some((x) => x.priceMinor !== v[0]!.priceMinor)) return null;
+  const options = v.map((x) => ({ id: x.id, title: x.title, soldOut: x.stock !== null && x.stock <= 0 }));
+  return options.some((o) => !o.soldOut) ? options : null;
+}
+
 /** Whether product cards carry an "Add to cart" button for products with nothing to choose. */
 export async function setCardQuickAdd(db: Db, shopId: string, on: boolean) {
   await db.update(schema.shops).set({ cardQuickAdd: on, updatedAt: new Date() }).where(eq(schema.shops.id, shopId));

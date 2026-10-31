@@ -5,7 +5,7 @@ import { applyRules, collectionRulesSchema, type CollectionRules } from "./colle
 import { NotFoundError, UserError } from "./errors";
 import { uniqueHandle } from "./handles";
 import { listActiveProducts } from "./products";
-import { placeSoldOut, productSoldOut, quickAddVariant, soldOutDisplay } from "./badges";
+import { placeSoldOut, productSoldOut, quickAddVariant, quickPickOptions, soldOutDisplay } from "./badges";
 import { cardSwatches } from "./swatches";
 import { productRatings, storeReviews } from "./reviews";
 import { secondPhoto } from "./gallery";
@@ -185,6 +185,7 @@ export async function storefrontCatalog(db: Db, shopId: string) {
     soldOut: soldOut.has(p.id),
     swatches: cardSwatches(p),
     quickAdd: quickAddVariant(p),
+    quickPick: quickPickOptions(p),
     sold: units.get(p.id) ?? 0,
     rating: ratings.get(p.id) ?? null,
   }));
