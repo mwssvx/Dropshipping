@@ -288,6 +288,56 @@ function ShopTheLook({ s, data }: Props<"shop_the_look">) {
   );
 }
 
+/**
+ * One product up close. Add to cart works when there's nothing to pick; a product with options or
+ * personal touches sends the shopper to its own page to choose.
+ */
+function FeaturedProduct({ s, data, first }: Props<"featured_product">) {
+  const t = data.t ?? storeText(null);
+  const p = s.productId ? data.catalog.products.find((x) => x.id === s.productId) : undefined;
+  if (!p) return null;
+  const href = `${data.base}/products/${p.handle}`;
+  return (
+    <section className="sf-featured-product max-w-6xl mx-auto px-4 sm:px-6 py-12 grid gap-8 md:grid-cols-2 items-center" aria-label={p.title}>
+      <Link href={href} className={`aspect-square rounded-lg bg-sunken overflow-hidden ${s.imagePosition === "right" ? "md:order-2" : ""}`} tabIndex={-1} aria-hidden="true">
+        {p.imageUrl && (
+          <img src={p.imageUrl} alt="" width={900} height={900} loading={first ? "eager" : "lazy"} fetchPriority={first ? "high" : "auto"} decoding="async"
+            className="size-full object-cover" />
+        )}
+      </Link>
+      <div className="flex flex-col gap-4 items-start">
+        <h2 className="text-3xl font-bold tracking-tight"><Link href={href} className="hover:underline">{p.title}</Link></h2>
+        {p.rating && (
+          <span className="flex items-center gap-1">
+            <Stars value={p.rating.average} label={t.stars(p.rating.average)} />
+            <span className="text-muted text-sm">{t.reviewCount(p.rating.count)}</span>
+          </span>
+        )}
+        <span className="text-xl">
+          <Price minor={p.priceMinor} compareAt={p.compareAtMinor} currency={data.currency} fx={data.fx} />
+        </span>
+        <UnitPrice minor={p.priceMinor} contents={p.contents} currency={data.currency} fx={data.fx} itemWord={t.unitItem} />
+        {s.text && <Paragraphs text={s.text} className="text-muted leading-relaxed" />}
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          {p.soldOut ? (
+            <button type="button" className="btn btn-primary btn-lg" disabled>{t.soldOut}</button>
+          ) : p.quickAdd ? (
+            <form action={data.addLook}>
+              <input type="hidden" name="variantId" value={p.quickAdd} />
+              {data.addLook
+                ? <SubmitButton className="btn btn-primary btn-lg" pendingText={t.adding}>{t.addToCart}</SubmitButton>
+                : <button type="button" className="btn btn-primary btn-lg" disabled>{t.addToCart}</button>}
+            </form>
+          ) : (
+            <Link href={href} className="btn btn-primary btn-lg">{t.featuredChoose}</Link>
+          )}
+          <Link href={href} className="text-sm font-semibold text-accent hover:underline">{t.featuredDetails}</Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function RichText({ s }: Props<"rich_text">) {
   if (!s.heading && !s.text) return null;
   return (
@@ -550,6 +600,7 @@ export function SectionView({ section, data, first }: { section: Section; data: 
     case "video": return <VideoBlock s={section.settings} data={data} first={first} />;
     case "slideshow": return <SlideshowSection s={section.settings} data={data} first={first} />;
     case "columns": return <Columns s={section.settings} data={data} first={first} />;
+    case "featured_product": return <FeaturedProduct s={section.settings} data={data} first={first} />;
   }
 }
 

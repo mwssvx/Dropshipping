@@ -1413,3 +1413,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **A way back up from long pages** (`apps/web/src/theme/BackToTop.tsx`): tick "Show a “Back to top” button on long pages" in the theme editor's Style tab and a small button appears in the bottom corner once a shopper has scrolled two screens down a store page, like a long collection or blog post.
 2. **Calm and reachable**: it slides back up smoothly, or jumps at once for shoppers who ask their device for less motion, and puts keyboard focus back in the header so keyboard users carry on from the top. It sits opposite the chat buttons and above the phone Add to cart bar. Off by default; one new store string in all six languages. No migration: it lives in the theme.
+
+### Featured product (after launch, part 248)
+
+1. **One product up close** (`apps/web/src/theme/Sections.tsx`): a new home page section in the theme editor. Pick a product, add a few words of your own if you like, and choose which side the photo sits. It shows the big photo, the title, its stars from real reviews, the price (with the sale price and price per unit when there is one) and a link to the full details.
+2. **The right button**: a product with nothing to pick goes straight into the cart with Add to cart. One with sizes, colours or personal touches gets "Choose options", which opens its page, and a sold-out product shows a greyed-out Sold out button. The section stays hidden until a product is picked, and disappears by itself if that product is archived or deleted.
+3. **Fast when it leads the page**: placed first, its photo loads before anything else. Two new store strings in all six languages. No migration: it lives in the theme.

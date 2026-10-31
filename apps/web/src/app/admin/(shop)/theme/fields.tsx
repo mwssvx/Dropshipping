@@ -15,7 +15,7 @@ type Field =
   | { key: string; label: string; kind: "text" | "textarea" | "image" | "link"; hint?: string; max?: number }
   | { key: string; label: string; kind: "select"; options: { value: string; label: string }[] }
   | { key: string; label: string; kind: "number"; min: number; max: number }
-  | { key: string; label: string; kind: "collection" | "collections" | "faq" | "quotes" | "badges" | "products" | "logos" | "messages" | "columns" | "slides" };
+  | { key: string; label: string; kind: "collection" | "collections" | "faq" | "quotes" | "badges" | "product" | "products" | "logos" | "messages" | "columns" | "slides" };
 
 export const TRUST_ICON_LABELS: Record<TrustIcon, string> = {
   shipping: "Delivery truck",
@@ -128,6 +128,11 @@ export const SECTION_FIELDS: Record<SectionType, Field[]> = {
     { key: "align", label: "Text position", kind: "select", options: [{ value: "center", label: "Centered" }, { value: "left", label: "Left" }] },
     { key: "items", label: "Columns", kind: "columns" },
   ],
+  featured_product: [
+    { key: "productId", label: "Product", kind: "product" },
+    { key: "text", label: "A few words about it (optional)", kind: "textarea", max: 600 },
+    { key: "imagePosition", label: "Photo side", kind: "select", options: [{ value: "left", label: "Left" }, { value: "right", label: "Right" }] },
+  ],
 };
 
 /** One select per piece of a look, plus an empty one to add the next until the look is full. */
@@ -228,6 +233,15 @@ export function SectionForm<T extends SectionType>({
                   );
                 })}
               </fieldset>
+            )}
+            {f.kind === "product" && (
+              <>
+                <select id={id} className="input" value={String(v ?? "")} onChange={(e) => set(f.key, e.target.value || null)}>
+                  <option value="">Pick a product</option>
+                  {products.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+                </select>
+                {products.length === 0 && <span className="hint">You have no products on sale yet.</span>}
+              </>
             )}
             {f.kind === "products" && <PieceSelects id={id} label={f.label} value={v as string[]} products={products} onChange={(x) => set(f.key, x)} />}
             {f.kind === "faq" && <FaqItems label={f.label} items={v as { question: string; answer: string }[]} onChange={(x) => set(f.key, x)} />}
