@@ -110,6 +110,9 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
   const pastDue = daysPastDelivery(arrives, order);
   // The buyer's other orders to this door still to ship: the store's own items can share a box.
   const sameDoor = paid && order.fulfillmentStatus !== "shipped" && order.fulfillmentStatus !== "delivered" ? await ordersToSameAddress(db, shop.id, order) : null;
+  // Orders this page already links to (added after checkout, replacements) aren't listed twice.
+  const linked = new Set([parent?.id, child?.id, original?.id, ...replacements.map((r) => r.id)].filter(Boolean));
+  const otherDoors = sameDoor?.orders.filter((o) => !linked.has(o.id)) ?? [];
   const boxMates = sameDoor?.ownItems ? sameDoor.orders.filter((o) => o.ownItems).map((o) => ({ id: o.id, number: o.number })) : [];
 
   return (
@@ -441,18 +444,18 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
               </p>
             )}
           </div>
-          {sameDoor && sameDoor.orders.length > 0 && (
+          {sameDoor && otherDoors.length > 0 && (
             <section aria-labelledby="same-door-heading">
               <h2 id="same-door-heading" className="font-semibold mb-1">Also going to this address</h2>
               <ul className="flex flex-col gap-1">
-                {sameDoor.orders.map((o) => (
+                {otherDoors.map((o) => (
                   <li key={o.id}>
                     <Link href={`/admin/orders/${o.id}`} className="underline">Order #{o.number}</Link> <span className="hint">· {when.format(o.createdAt)}{o.ownItems ? " · has items you post" : ""}</span>
                   </li>
                 ))}
               </ul>
               <p className="hint mt-1">
-                {sameDoor.ownItems && sameDoor.orders.some((o) => o.ownItems)
+                {sameDoor.ownItems && otherDoors.some((o) => o.ownItems)
                   ? "The items you post yourself can go in one box, so you pay postage once. When you add tracking, tick the other orders and they get it too."
                   : "Suppliers send their parcels on their own, so these may still arrive on different days."}
               </p>
