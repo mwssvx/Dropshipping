@@ -1023,6 +1023,26 @@ export type AiReportItem = {
   search?: string;
 };
 
+// The store's to-do list: things the owner wrote down, or asked the Assistant to remind them of.
+export const tasks = pgTable(
+  "tasks",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    note: text("note"),
+    dueAt: timestamp("due_at", { withTimezone: true }),
+    // An admin path the task is about, e.g. /admin/products/<id>.
+    href: text("href"),
+    status: text("status", { enum: ["open", "done"] }).notNull().default("open"),
+    source: text("source", { enum: ["owner", "assistant", "watch"] }).notNull().default("owner"),
+    createdBy: text("created_by"),
+    doneAt: timestamp("done_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("tasks_shop_status_idx").on(t.shopId, t.status, t.dueAt)],
+);
+
 // What an AI helper found for the merchant: the store review's suggestions, or the trend scout's
 // product ideas. Kept so the merchant can look back.
 export const aiReports = pgTable(

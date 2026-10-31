@@ -4,11 +4,12 @@ import { countNeedsYou } from "../ai/conversations";
 import { listPendingActions } from "../ai/runtime";
 import { listRequirements } from "../payouts";
 import { soldOutAtSupplier } from "../supplier-sold-out";
+import { taskCounts } from "../tasks";
 import { openNotices } from "../trust";
 import type { Shop } from "../ai/context";
 import { can, type Role } from "../team";
 
-export type AttentionItem = { kind: "hold" | "notice" | "problems" | "risk" | "to_send" | "inbox" | "sold_out" | "watch"; title: string; body: string; url: string; tone: "critical" | "warning" | "info" };
+export type AttentionItem = { kind: "hold" | "notice" | "problems" | "risk" | "to_send" | "inbox" | "sold_out" | "watch" | "tasks"; title: string; body: string; url: string; tone: "critical" | "warning" | "info" };
 
 const DAY = 86_400_000;
 
@@ -17,7 +18,7 @@ export async function todaySummary(db: Db, shop: Shop, now = new Date(), role: R
   const startOfDay = new Date(now);
   startOfDay.setHours(0, 0, 0, 0);
   const weekAgo = new Date(now.getTime() - 7 * DAY);
-  const [recent, open, requirements, notices, pending, inbox, soldOut, watch] = await Promise.all([
+  const [recent, open, requirements, notices, pending, inbox, soldOut, watch, todo] = await Promise.all([
     db.query.orders.findMany({
       where: and(eq(schema.orders.shopId, shop.id), inArray(schema.orders.paymentStatus, ["paid", "partially_refunded", "refunded"]), gte(schema.orders.paidAt, weekAgo)),
     }),
@@ -35,6 +36,7 @@ export async function todaySummary(db: Db, shop: Shop, now = new Date(), role: R
       where: and(eq(schema.aiReports.shopId, shop.id), eq(schema.aiReports.kind, "watch"), gte(schema.aiReports.createdAt, new Date(now.getTime() - 1.5 * DAY)), lte(schema.aiReports.createdAt, now)),
       orderBy: desc(schema.aiReports.createdAt),
     }),
+    taskCounts(db, shop.id, now),
   ]);
   const net = (o: (typeof recent)[number]) => o.totalMinor - o.refundedMinor;
   const today = recent.filter((o) => o.paidAt! >= startOfDay);
@@ -69,9 +71,14 @@ export async function todaySummary(db: Db, shop: Shop, now = new Date(), role: R
     attention.push({ kind: "watch", tone, title: watch.items[0]!.title, body: `${watch.items[0]!.action}${more ? ` (and ${more} more on Insights)` : ""}`, url: "/insights" });
   }
 
+  if (todo.overdue || todo.today) {
+    const due = [todo.overdue ? `${todo.overdue} overdue` : "", todo.today ? `${todo.today} due today` : ""].filter(Boolean).join(", ");
+    attention.push({ kind: "tasks", tone: todo.overdue ? "warning" : "info", title: `${todo.open} on your to-do list`, body: `${due.charAt(0).toUpperCase()}${due.slice(1)}.`, url: "/tasks" });
+  }
+
   // Staff see order counts and order problems, not sales totals, payouts or AI proposals.
   const seesMoney = can(role, "money");
-  const ATTENTION_AREA = { hold: "money", notice: "trust", problems: "orders", risk: "orders", to_send: "orders", inbox: "inbox", sold_out: "products", watch: "analytics" } as const;
+  const ATTENTION_AREA = { hold: "money", notice: "trust", problems: "orders", risk: "orders", to_send: "orders", inbox: "inbox", sold_out: "products", watch: "analytics", tasks: "home" } as const;
   return {
     currency: shop.currency,
     salesTodayMinor: seesMoney ? today.reduce((s, o) => s + net(o), 0) : null,
