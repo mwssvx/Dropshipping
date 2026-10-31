@@ -36,6 +36,8 @@ function actionFrom(form: FormData): BulkEditInput {
       if (!tag) throw new UserError("Enter the tag, like summer.");
       return { kind: "tag", tag, remove: kind === "remove_tag" };
     }
+    case "ships_from":
+      return { kind: "ships_from", country: String(form.get("country") ?? "").trim() || null };
     default:
       throw new UserError("Pick what to change.");
   }

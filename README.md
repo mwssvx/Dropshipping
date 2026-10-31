@@ -1708,3 +1708,7 @@ AliExpress and other suppliers often list one item from several warehouses as a 
 ### Ships from in the Google feed (after launch, part 307)
 
 Google Merchant Center checks delivery times against where a parcel leaves from, and flags listings that promise US delivery times for a parcel coming from China. The product feed now sends `ships_from_country` for every physical option: the product's Ships from (part 305) or the store's own country. Pinterest and TikTok read the same file. Sales channels says how many options ship from abroad and from where. `FeedItem.shipsFrom` in `packages/core/src/feeds.ts`. No migration.
+
+### Ships from in bulk (after launch, part 308)
+
+A store moving its catalog to a supplier's warehouse in China, or back home, shouldn't open every product. The Products list's bulk change gets **Set where they ship from**: tick the products (or the whole filtered list), enter a two-letter code (empty for the store's own country), preview and apply. Gift cards and downloads are skipped. Like every bulk change it can be undone for a week, and products set by hand since are left alone. `{ kind: "ships_from", country }` in `packages/core/src/bulk-edit.ts`, with `snapshot.shipsFrom`. No migration (both live in the bulk edit's JSON).

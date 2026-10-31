@@ -1,11 +1,13 @@
 // Bulk edit: change many products at once from the Products list. Publish, hide or archive them,
 // move prices up or down by a percent, set or clear the crossed-out "was" price, or add them to a
-// collection, or add or remove a tag. Every change is saved with what it replaced, so the merchant can undo it for a week.
+// collection, add or remove a tag, or set where they ship from. Every change is saved with what it replaced, so the merchant can undo it for a week.
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { schema, type BulkEditAction, type BulkEditSnapshot, type Db } from "@sf/db";
 import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
 import { normalizeTags } from "./customers";
+import { countryCode } from "./customs";
+import { countryName } from "./shipping";
 import { formatMoney } from "./money";
 import { MAX_PRODUCT_TAGS } from "./products";
 
@@ -26,6 +28,7 @@ const actionSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("compare_at"), percent: z.number().int().min(5, "Show a \"was\" price 5% to 300% above the price.").max(300, "Show a \"was\" price 5% to 300% above the price.").nullable() }),
   z.object({ kind: z.literal("collection"), collectionId: z.string().uuid(), remove: z.boolean().default(false) }),
   z.object({ kind: z.literal("tag"), tag: z.string(), remove: z.boolean().default(false) }),
+  z.object({ kind: z.literal("ships_from"), country: z.string().max(10).nullable() }),
 ]);
 
 export type BulkEditInput = z.input<typeof actionSchema>;
@@ -50,7 +53,7 @@ async function plan(db: Db, shop: Shop, productIds: string[], input: BulkEditInp
   const variants = await db.query.variants.findMany({ where: inArray(schema.variants.productId, ids) });
   const money = (n: number | null) => (n == null ? "none" : formatMoney(n, shop.currency));
   const changes: BulkChange[] = [];
-  const snapshot: BulkEditSnapshot = { products: [], variants: [], collection: [], tags: [] };
+  const snapshot: BulkEditSnapshot = { products: [], variants: [], collection: [], tags: [], shipsFrom: [] };
   let skipped = 0;
   // Products that already have as many tags as they can.
   let full = 0;
@@ -87,6 +90,23 @@ async function plan(db: Db, shop: Shop, productIds: string[], input: BulkEditInp
       }
       changes.push({ productId: p.id, product: p.title, variant: null, before: p.tags.join(", "), after: (had ? p.tags.filter((t) => t !== tag) : [...p.tags, tag]).join(", "), belowCost: false });
       snapshot.tags!.push({ productId: p.id, tag, had });
+    }
+  } else if (action.kind === "ships_from") {
+    const raw = (action.country ?? "").trim();
+    const code = raw ? countryCode(raw) : null;
+    if (raw && !code) throw new UserError("Enter the country as a two-letter code, like CN or US.");
+    // The store's own country is what an empty one means.
+    action.country = code === shop.country ? null : code;
+    const name = (c: string | null) => countryName(c ?? shop.country);
+    for (const p of products) {
+      // Gift cards and downloads don't ship.
+      if (p.giftCard || p.digital) {
+        skipped++;
+        continue;
+      }
+      if (p.shipsFrom === action.country) continue;
+      changes.push({ productId: p.id, product: p.title, variant: null, before: `ships from ${name(p.shipsFrom)}`, after: `ships from ${name(action.country)}`, belowCost: false });
+      snapshot.shipsFrom!.push({ productId: p.id, before: p.shipsFrom, after: action.country });
     }
   } else {
     for (const p of products) {
@@ -140,6 +160,8 @@ export function describeBulkAction(action: BulkEditAction, collectionTitle?: str
       return `${action.remove ? "Took out of" : "Added to"} ${collectionTitle ?? "a collection"}`;
     case "tag":
       return `${action.remove ? "Removed" : "Added"} the tag “${action.tag}”`;
+    case "ships_from":
+      return action.country ? `Set Ships from to ${countryName(action.country)}` : "Set Ships from to your store's country";
   }
 }
 
@@ -169,6 +191,7 @@ export async function applyBulkEdit(db: Db, shop: Shop, productIds: string[], in
       else await tx.insert(schema.collectionProducts).values({ collectionId: c.collectionId, productId: c.productId, position: 1_000_000 }).onConflictDoNothing();
     }
     for (const t of snapshot.tags ?? []) await setTag(tx, t.productId, t.tag, !t.had, now);
+    for (const c of snapshot.shipsFrom ?? []) await tx.update(schema.products).set({ shipsFrom: c.after }).where(eq(schema.products.id, c.productId));
     const touched = [...new Set(changes.map((c) => c.productId))];
     if (action.kind !== "status") await tx.update(schema.products).set({ updatedAt: now }).where(inArray(schema.products.id, touched));
     const [edit] = await tx.insert(schema.bulkEdits).values({ shopId: shop.id, summary, action, snapshot, products: touched.length, createdBy: opts.userId ?? null, createdAt: now }).returning();
@@ -228,6 +251,19 @@ export async function undoBulkEdit(db: Db, shopId: string, editId: string, now =
     for (const t of snapshot.tags ?? []) {
       if (await setTag(tx, t.productId, t.tag, t.had, now)) restored++;
       else kept++;
+    }
+    // Ships from goes back only where nobody has set it since.
+    if (snapshot.shipsFrom?.length) {
+      const rows = await tx.query.products.findMany({ where: inArray(schema.products.id, snapshot.shipsFrom.map((c) => c.productId)), columns: { id: true, shipsFrom: true } });
+      for (const c of snapshot.shipsFrom) {
+        const row = rows.find((r) => r.id === c.productId);
+        if (!row || row.shipsFrom !== c.after) {
+          kept++;
+          continue;
+        }
+        await tx.update(schema.products).set({ shipsFrom: c.before, updatedAt: now }).where(eq(schema.products.id, c.productId));
+        restored++;
+      }
     }
   });
   return { restored, kept };
