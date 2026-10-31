@@ -1980,3 +1980,7 @@ Today has a Rewards button for people who look after marketing. Turn reward poin
 ### Bank transfers in the app (after launch, part 375)
 
 The Orders tab has a Bank transfers row. It lists orders waiting for the buyer's transfer, oldest first, with the day each should arrive by and which are past due. People who look after money can turn bank transfers on or off, write the account buyers pay into, and set the days to pay. An order waiting on a transfer says so in the app, and Mark as paid sends it to the supplier as soon as the money is in.
+
+### Pre-orders and purchase limits in the app (after launch, part 376)
+
+A product's screen in the app now has Pre-orders and Purchase limits. Let buyers keep ordering sold-out options with a ship-by date and an optional cap, and see how many were pre-ordered so far. Set the least and most per order, and the most per customer, for limited runs or things sold in sets. Both follow the same rules as on the website.

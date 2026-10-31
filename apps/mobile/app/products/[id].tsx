@@ -5,7 +5,7 @@ import { Image, View } from "react-native";
 import { api, send, useApi } from "../../src/api";
 import { kg, money, parseKg, parseMoney } from "../../src/format";
 import { useSession } from "../../src/session";
-import { BackLink, Banner, Body, Button, Card, Field, Heading, LoadError, Loading, Pill, Screen, Section } from "../../src/ui";
+import { BackLink, Banner, Body, Button, Card, Field, Heading, LoadError, Loading, Pill, Screen, Section, Toggle } from "../../src/ui";
 import { color, radius, space } from "../../src/theme";
 import { STATUS, type Product } from "../../src/product";
 
@@ -228,6 +228,9 @@ export default function ProductScreen() {
         </Section>
       ) : null}
 
+      <PreorderSection product={p} busy={busy} act={act} />
+      <LimitsSection product={p} busy={busy} act={act} />
+
       <Section title="On your store">
         {p.status === "active" ? (
           <Button label="Take off sale" kind="secondary" busy={busy === "status"} onPress={() => act("status", async () => (await api(`products/${id}`, { method: "PATCH", body: { status: "draft" } }), "Taken off sale. It's a draft now."))} />
@@ -236,5 +239,64 @@ export default function ProductScreen() {
         )}
       </Section>
     </Screen>
+  );
+}
+
+type Act = (key: string, fn: () => Promise<string>) => Promise<void>;
+const longDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+
+/** Sold-out options can still be ordered, promised to ship by a date; those orders wait for stock. */
+function PreorderSection({ product: p, busy, act }: { product: Product; busy: string | null; act: Act }) {
+  const saved = { on: !!p.preorder, shipsBy: p.preorder?.shipsBy ?? "", limit: p.preorder?.limit == null ? "" : String(p.preorder.limit) };
+  const [edit, setEdit] = useState<typeof saved | null>(null);
+  const s = edit ?? saved;
+  useEffect(() => setEdit(null), [p]);
+  return (
+    <Section title="Pre-orders">
+      <Card>
+        <Body muted>When an option sells out, buyers can still order it, promised to ship by a date. Those orders wait until it's back in stock, then go out like any other.</Body>
+        <Toggle label="Take pre-orders when sold out" value={s.on} onChange={(v) => setEdit({ ...s, on: v })} />
+        {s.on ? (
+          <>
+            <Field label="Ships by" value={s.shipsBy} onChangeText={(v) => setEdit({ ...s, shipsBy: v })} placeholder="2026-12-01" keyboardType="numbers-and-punctuation" autoCapitalize="none" hint="As YYYY-MM-DD, tomorrow to 120 days out." />
+            <Field label="Most pre-orders (optional)" value={s.limit} onChangeText={(v) => setEdit({ ...s, limit: v })} keyboardType="number-pad" hint="Leave empty for no limit." />
+          </>
+        ) : null}
+        {p.preorder ? (
+          <Body>{`${p.preordersSold ?? 0} pre-ordered so far${p.preorder.limit ? ` of ${p.preorder.limit}` : ""}, shipping by ${longDay.format(new Date(`${p.preorder.shipsBy}T12:00:00Z`))}.`}</Body>
+        ) : null}
+        <Button
+          label="Save pre-orders"
+          busy={busy === "preorder"}
+          disabled={!!busy || !edit}
+          onPress={() => act("preorder", async () => (await api<{ message: string }>(`products/${p.id}/preorder`, { method: "PUT", body: s })).message)}
+        />
+      </Card>
+    </Section>
+  );
+}
+
+/** The least and most a buyer can order of this product, per order and over all their orders. */
+function LimitsSection({ product: p, busy, act }: { product: Product; busy: string | null; act: Act }) {
+  const l = p.purchaseLimit;
+  const saved = { min: l?.min == null ? "" : String(l.min), max: l?.max == null ? "" : String(l.max), perCustomer: l?.perCustomer == null ? "" : String(l.perCustomer) };
+  const [edit, setEdit] = useState<typeof saved | null>(null);
+  const s = edit ?? saved;
+  useEffect(() => setEdit(null), [p]);
+  return (
+    <Section title="Purchase limits">
+      <Card>
+        <Body muted>For limited runs, or things sold in sets. Leave a box empty for no limit.</Body>
+        <Field label="Least per order" value={s.min} onChangeText={(v) => setEdit({ ...s, min: v })} keyboardType="number-pad" />
+        <Field label="Most per order" value={s.max} onChangeText={(v) => setEdit({ ...s, max: v })} keyboardType="number-pad" />
+        <Field label="Most per customer" value={s.perCustomer} onChangeText={(v) => setEdit({ ...s, perCustomer: v })} keyboardType="number-pad" hint="Counts what they bought before, by email." />
+        <Button
+          label="Save limits"
+          busy={busy === "limits"}
+          disabled={!!busy || !edit}
+          onPress={() => act("limits", async () => (await api<{ message: string }>(`products/${p.id}/limits`, { method: "PUT", body: s })).message)}
+        />
+      </Card>
+    </Section>
   );
 }

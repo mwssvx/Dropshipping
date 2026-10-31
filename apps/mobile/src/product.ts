@@ -15,6 +15,12 @@ export type Product = {
   missing: ("photo" | "description" | "weight" | "customs" | "cost")[];
   hsCode: string | null;
   originCountry: string | null;
+  /** Sold-out options can still be ordered, promised to ship by a date. */
+  preorder?: { shipsBy: string; limit: number | null } | null;
+  /** On the product screen only: how many were pre-ordered on paid orders. */
+  preordersSold?: number;
+  /** The least and most a buyer can order. */
+  purchaseLimit?: { min: number | null; max: number | null; perCustomer: number | null } | null;
   /** On the list only: sold out, or an option at or under the store's running-low number. */
   stockLevel?: "sold_out" | "low" | null;
 };

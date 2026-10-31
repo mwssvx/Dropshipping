@@ -1714,3 +1714,44 @@ test("bank transfers turned on in the app, and a transfer marked paid", async ({
   await expect(page.getByText("Marked as paid. It goes to the supplier now, and the buyer gets their confirmation.")).toBeVisible();
   await expect(page.getByRole("region", { name: "Bank transfer" })).toHaveCount(0);
 });
+
+test("pre-orders and purchase limits set on a product in the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `po${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Linen Throw");
+  await web.getByLabel("Price", { exact: true }).fill("60.00");
+  await web.getByLabel("Stock", { exact: true }).fill("0");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const throwUrl = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Linen Throw/ }).click();
+  const pre = page.getByRole("region", { name: "Pre-orders" });
+  await pre.getByRole("switch", { name: "Take pre-orders when sold out" }).click();
+  // Too far ahead is refused, as on the website.
+  const day = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+  await pre.getByRole("textbox", { name: "Ships by" }).fill(day(200));
+  await pre.getByRole("button", { name: "Save pre-orders" }).click();
+  await expect(page.getByText("Pre-orders can promise up to 120 days ahead.")).toBeVisible();
+  const shipsBy = day(30);
+  await pre.getByRole("textbox", { name: "Ships by" }).fill(shipsBy);
+  await pre.getByRole("textbox", { name: "Most pre-orders (optional)" }).fill("20");
+  await pre.getByRole("button", { name: "Save pre-orders" }).click();
+  await expect(page.getByText("Saved. Sold-out options can now be pre-ordered.")).toBeVisible();
+  const short = new Date(`${shipsBy}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+  await expect(pre.getByText(`0 pre-ordered so far of 20, shipping by ${short}.`)).toBeVisible();
+
+  const limits = page.getByRole("region", { name: "Purchase limits" });
+  await limits.getByRole("textbox", { name: "Most per order" }).fill("2");
+  await limits.getByRole("button", { name: "Save limits" }).click();
+  await expect(page.getByText("Saved. The cart and checkout now follow these limits.")).toBeVisible();
+  await shot(page, "376-app-preorders-limits");
+
+  const buyer = await (await browser.newContext()).newPage();
+  await buyer.goto(throwUrl);
+  const long = new Date(`${shipsBy}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+  await expect(buyer.getByText(`Pre-order: ships by ${long}`)).toBeVisible();
+  await expect(buyer.getByText("Up to 2 per order")).toBeVisible();
+});
