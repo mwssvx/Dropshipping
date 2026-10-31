@@ -3,6 +3,7 @@ import { getPublishedPostByHandle, NotFoundError, postBlocks, postSummary, readi
 import { db } from "@/lib/server";
 import { buyerFx } from "@/lib/currency";
 import { ProductGrid } from "@/theme/Sections";
+import { Track } from "@/components/Track";
 import { loadShop, storeBase, missing } from "../../data";
 
 const date = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric" });
@@ -42,6 +43,7 @@ export default async function PostPage({ params }: { params: Promise<{ shop: str
   return (
     <main className="max-w-3xl mx-auto px-4 sm:px-6 py-12 flex flex-col gap-8">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
+      <Track shopId={shop.id} kind="post_view" postId={post.id} />
       <article className="flex flex-col gap-6">
         <header className="flex flex-col gap-3">
           <Link href={`${base}/blog`} className="hint hover:text-accent">← Blog</Link>

@@ -428,6 +428,8 @@ export async function startCheckout(
     campaignId?: string | null;
     /** Where the buyer's visit came from (`visitSource`): a site or utm_source, null when direct. */
     visitSource?: string | null;
+    /** The last blog post read in the visit (`visitPost`), for the blog's sales. */
+    visitPostId?: string | null;
     /** The signed-in buyer, from their session. Wholesale prices follow the account. */
     buyerEmail?: string | null;
     /** A gift card code the buyer entered in the cart. */
@@ -638,6 +640,7 @@ export async function startCheckout(
         presentment,
         campaignId,
         visitSource: input.visitSource?.slice(0, 100) || null,
+        visitPostId: input.visitPostId ?? null,
         wholesale: !!cart.wholesale,
         giftCardId: cart.giftCard?.id ?? null,
         giftCardMinor,

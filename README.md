@@ -1570,3 +1570,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### From our blog on product pages (after launch, part 278)
 
 1. **Back from the product to the post** (`postsFeaturing` in `packages/core/src/blog.ts`): a product's page lists up to three of the newest blog posts that feature it, under "From our blog", with their picture, title and a line from each. Buyers reading about a lamp find the guide that recommends it, and search engines see the two pages link both ways. Drafts and scheduled posts stay out, and the heading comes in the store's language. No migration.
+
+### Which posts sell (after launch, part 279)
+
+1. **Reads and sales on the Blog page** (`postStats` in `packages/core/src/analytics.ts`): each published post shows how many visits read it in the last 30 days, and what was bought in visits whose last post read was this one ("$64.00 (2 orders)", after refunds). So a merchant sees which posts bring buyers, not just visitors, and what to write more of.
+2. **How it's counted**: a post's page records a read (`post_view`, with the post) next to the usual page view, with the same random visit id and no personal data. At checkout the order keeps the last post read in that visit (`orders.visit_post_id`, `visitPost`). Unpaid checkouts and replacements aren't sales. Migration `0151_blog_reads`.

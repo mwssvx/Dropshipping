@@ -178,3 +178,42 @@ test("posts carry topics, buyers list the posts on one topic, and read the next 
   await expect(buyer.getByRole("heading", { level: 1, name: "Blog", exact: true })).toBeVisible();
   await buyer.close();
 });
+
+test("the blog list shows how many visits read each post and what they bought", async ({ page }, info) => {
+  const id = `${info.project.name}-reads-${Date.now()}`;
+  const store = await newMerchantWithLamp(page, id);
+  await page.goto("/admin/blog/new");
+  await page.getByLabel("Title").fill("Why a lamp helps kids sleep");
+  await page.getByLabel("Post").fill("A soft light at bedtime makes the dark less scary, and little ones settle sooner.");
+  await page.getByLabel("Sunset Projection Lamp").check();
+  await page.getByLabel("Published").check();
+  await page.getByRole("button", { name: "Save post" }).click();
+  await expect(page.getByText("Saved.")).toBeVisible();
+
+  // A buyer reads the post, follows it to the lamp and buys it.
+  const buyer = await (await page.context().browser()!.newContext({ ...info.project.use })).newPage();
+  // The page view and the post read are both counted before the buyer moves on.
+  let events = 0;
+  buyer.on("response", (r) => { if (r.url().endsWith("/api/events")) events++; });
+  await buyer.goto(`${store}/blog/why-a-lamp-helps-kids-sleep`);
+  await expect.poll(() => events, { timeout: 10_000 }).toBeGreaterThanOrEqual(2);
+  await buyer.getByRole("region", { name: "In this post" }).getByRole("link", { name: /Sunset Projection Lamp/ }).click();
+  await buyer.getByRole("button", { name: "Add to cart" }).click();
+  await buyer.getByRole("link", { name: "Check out" }).click();
+  await buyer.getByLabel("Email").fill("ada@example.com");
+  await buyer.getByLabel("Full name").fill("Ada Buyer");
+  await buyer.getByLabel("Address", { exact: true }).fill("1 Main St");
+  await buyer.getByLabel("City").fill("Austin");
+  await buyer.getByLabel("State or region").fill("TX");
+  await buyer.getByLabel("Postal code").fill("78701");
+  await buyer.getByRole("button", { name: "Continue to payment" }).click();
+  await buyer.getByRole("button", { name: /^Pay/ }).click();
+  await expect(buyer.getByRole("heading", { name: "Thank you, Ada!" })).toBeVisible();
+  await buyer.close();
+
+  await page.goto("/admin/blog");
+  const row = page.getByRole("row", { name: /Why a lamp helps kids sleep/ });
+  await expect(row.getByRole("cell").nth(2)).toHaveText("1");
+  await expect(row.getByRole("cell").nth(3)).toHaveText(/^\$[\d.,]+ \(1 order\)$/);
+  await shot(page, "290-blog-reads");
+});

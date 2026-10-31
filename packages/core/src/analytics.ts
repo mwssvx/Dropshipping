@@ -10,7 +10,7 @@ const DAY = 86_400_000;
 export async function recordEvent(
   db: Db,
   shopId: string,
-  input: { sessionId: string; kind: string; productId?: string | null; referrer?: string | null; host?: string | null; utmSource?: string | null },
+  input: { sessionId: string; kind: string; productId?: string | null; postId?: string | null; referrer?: string | null; host?: string | null; utmSource?: string | null },
 ) {
   if (!/^[A-Za-z0-9_-]{8,64}$/.test(input.sessionId)) return false;
   if (!(STOREFRONT_EVENTS as readonly string[]).includes(input.kind)) return false;
@@ -19,8 +19,55 @@ export async function recordEvent(
     const p = await db.query.products.findFirst({ where: and(eq(schema.products.id, productId), eq(schema.products.shopId, shopId)), columns: { id: true } });
     if (!p) return false;
   }
-  await db.insert(schema.storefrontEvents).values({ shopId, sessionId: input.sessionId, kind: input.kind as StorefrontEventKind, productId, source: utmSourceOf(input.utmSource) ?? sourceOf(input.referrer, input.host) });
+  // A post read names its post, and only a post of this store.
+  const postId = input.kind === "post_view" && input.postId && /^[0-9a-f-]{36}$/i.test(input.postId) ? input.postId : null;
+  if (input.kind === "post_view") {
+    if (!postId) return false;
+    const p = await db.query.blogPosts.findFirst({ where: and(eq(schema.blogPosts.id, postId), eq(schema.blogPosts.shopId, shopId)), columns: { id: true } });
+    if (!p) return false;
+  }
+  await db.insert(schema.storefrontEvents).values({ shopId, sessionId: input.sessionId, kind: input.kind as StorefrontEventKind, productId, postId, source: utmSourceOf(input.utmSource) ?? sourceOf(input.referrer, input.host) });
   return true;
+}
+
+/** The last blog post read in a visit, so an order placed in it counts toward that post. */
+export async function visitPost(db: Db, shopId: string, sessionId: string | null | undefined) {
+  if (!sessionId || !/^[A-Za-z0-9_-]{8,64}$/.test(sessionId)) return null;
+  const e = schema.storefrontEvents;
+  const [row] = await db
+    .select({ postId: e.postId })
+    .from(e)
+    .where(and(eq(e.shopId, shopId), eq(e.sessionId, sessionId), eq(e.kind, "post_view"), isNotNull(e.postId)))
+    .orderBy(desc(e.createdAt))
+    .limit(1);
+  return row?.postId ?? null;
+}
+
+/**
+ * How each post did over the last `days`: visits that read it, and the paid orders (with their
+ * sales after refunds) placed in a visit whose last post read was it.
+ */
+export async function postStats(db: Db, shopId: string, postIds: string[], days = 30, now = new Date()) {
+  const stats = new Map<string, { reads: number; orders: number; salesMinor: number }>(postIds.map((id) => [id, { reads: 0, orders: 0, salesMinor: 0 }]));
+  if (!postIds.length) return stats;
+  const since = new Date(now.getTime() - days * DAY);
+  const e = schema.storefrontEvents;
+  const o = schema.orders;
+  const [reads, sales] = await Promise.all([
+    db
+      .select({ postId: e.postId, reads: countDistinct(e.sessionId) })
+      .from(e)
+      .where(and(eq(e.shopId, shopId), eq(e.kind, "post_view"), inArray(e.postId, postIds), gte(e.createdAt, since)))
+      .groupBy(e.postId),
+    db
+      .select({ postId: o.visitPostId, orders: count(), salesMinor: sql<number>`sum(${o.totalMinor} - ${o.refundedMinor})::bigint` })
+      .from(o)
+      .where(and(eq(o.shopId, shopId), inArray(o.visitPostId, postIds), inArray(o.paymentStatus, [...PAID]), ne(o.source, "replacement"), gte(o.createdAt, since)))
+      .groupBy(o.visitPostId),
+  ]);
+  for (const r of reads) if (r.postId) stats.get(r.postId)!.reads = Number(r.reads);
+  for (const r of sales) if (r.postId) Object.assign(stats.get(r.postId)!, { orders: Number(r.orders), salesMinor: Number(r.salesMinor) });
+  return stats;
 }
 
 /** A link's utm_source ("instagram", "spring-newsletter"), cleaned up, or null when there's none worth keeping. */
