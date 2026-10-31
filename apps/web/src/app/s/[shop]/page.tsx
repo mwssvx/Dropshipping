@@ -1,10 +1,10 @@
 import { headers } from "next/headers";
-import { storefrontCatalog } from "@sf/core";
+import { latestPosts, storefrontCatalog } from "@sf/core";
 import { socialLinks } from "@sf/core/theme";
 import { db } from "@/lib/server";
 import { buyerFx } from "@/lib/currency";
 import { HomeSections } from "@/theme/Sections";
-import { loadShop, loadTheme, localCollections, localProducts, storeBase, storeT } from "./data";
+import { loadShop, loadTheme, localCollections, localProducts, storeBase, storeLang, storeT } from "./data";
 import { addLookAction, addToCartAction, newsletterAction } from "./actions";
 import { readRecent } from "@/lib/recent";
 
@@ -15,6 +15,7 @@ export default async function StoreHome({ params, searchParams }: { params: Prom
   const raw = await storefrontCatalog(await db(), shop.id);
   // The cookie is only read when a section shows it.
   const recentIds = theme.home.some((s) => s.type === "recently_viewed" && !s.hidden) ? await readRecent(shop.id) : undefined;
+  const posts = theme.home.some((s) => s.type === "blog_posts" && !s.hidden) ? await latestPosts(await db(), shop.id) : undefined;
   // Tells search engines which social pages are the store's own.
   const asked = await headers();
   const sameAs = socialLinks(theme.settings.social).map((l) => l.href);
@@ -41,6 +42,8 @@ export default async function StoreHome({ params, searchParams }: { params: Prom
         t: await storeT(param),
         badges: shop.productBadges,
         recentIds,
+        posts,
+        lang: (await storeLang(param)) ?? undefined,
         quickAdd: shop.cardQuickAdd ? addToCartAction.bind(null, param) : undefined,
         addLook: addLookAction.bind(null, param),
         signup: { action: newsletterAction.bind(null, param), status: signup === "sent" || signup === "invalid" ? signup : null, offerPercent: shop.welcomeOffer?.percentOff ?? null },

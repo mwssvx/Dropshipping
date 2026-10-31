@@ -1425,3 +1425,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **A clock for the big day** (`apps/web/src/theme/Countdown.tsx`): a new home page section in the theme editor. Give it a heading like "Black Friday starts in", a few words, the date and time to count down to and an optional button, and shoppers see days, hours, minutes and seconds ticking down.
 2. **Never stuck at zero**: the section stays hidden until a time is set and hides itself the moment that time passes, on the page and on every later visit, so a finished countdown never lingers. The time is picked in the merchant's own time zone and saved with it, so it ends at the same moment for every shopper.
 3. Four new store strings in all six languages. No migration: it lives in the theme.
+
+### Blog posts on the home page (after launch, part 250)
+
+1. **Your newest posts, by themselves** (`apps/web/src/theme/Sections.tsx`): a new home page section in the theme editor. It shows the two to six newest published blog posts, each with its picture, title, date, reading time and a line from it, plus "View all" to the blog. New posts appear as soon as they're published, so nothing needs updating by hand.
+2. **Never empty**: while the blog has no published posts the section stays hidden, on the store and in the editor preview. Posts load only on stores whose home page shows them (`latestPosts` in `packages/core/src/blog.ts`). Dates follow the shopper's language. Two new store strings in all six languages. No migration: it lives in the theme.

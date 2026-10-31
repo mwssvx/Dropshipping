@@ -1,17 +1,18 @@
 "use client";
 import type { BadgeSettings } from "@sf/db";
 import { useEffect, useState } from "react";
-import type { StorefrontCatalog } from "@sf/core";
+import type { PostCard, StorefrontCatalog } from "@sf/core";
 import type { ThemeDoc } from "@sf/core/theme";
 import { HomeSections } from "@/theme/Sections";
 import { StoreShell } from "@/theme/StoreShell";
 import type { PreviewMessage } from "../(shop)/theme/ThemeEditor";
 
-export function PreviewClient({ initial, shopName, currency, catalog, badges, base }: {
+export function PreviewClient({ initial, shopName, currency, catalog, posts, badges, base }: {
   initial: ThemeDoc;
   shopName: string;
   currency: string;
   catalog: StorefrontCatalog;
+  posts: PostCard[];
   badges?: BadgeSettings;
   base: string;
 }) {
@@ -46,7 +47,7 @@ export function PreviewClient({ initial, shopName, currency, catalog, badges, ba
   return (
     <StoreShell doc={doc} shopName={shopName} currency={currency} base={base} cartCount={0}>
       <main>
-        <HomeSections sections={doc.home} data={{ base, currency, catalog, badges, recentIds: sample }} highlight={highlight} />
+        <HomeSections sections={doc.home} data={{ base, currency, catalog, badges, recentIds: sample, posts }} highlight={highlight} />
       </main>
     </StoreShell>
   );

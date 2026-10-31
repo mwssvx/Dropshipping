@@ -245,6 +245,11 @@ const sectionSchemas = {
     buttonLabel: text(40),
     buttonLink: link,
   }),
+  // The newest published blog posts. It fills itself and isn't shown while the blog is empty.
+  blog_posts: z.object({
+    heading: text(120),
+    limit: z.number().int().min(2).max(6).default(3),
+  }),
 } as const;
 
 export type SectionType = keyof typeof sectionSchemas;
@@ -270,6 +275,7 @@ export const SECTION_LABELS: Record<SectionType, { name: string; about: string }
   columns: { name: "Columns", about: "Two to six blocks side by side, each with a picture, a title, a few words and a link. Good for how it works, what makes you different or your main collections." },
   featured_product: { name: "Featured product", about: "One product up close: a big photo, its stars and price, a few words of your own and an Add to cart button." },
   countdown: { name: "Countdown", about: "A clock counting down to a date, like a launch or the start of your Black Friday sale, with a button. It hides itself once the time has passed." },
+  blog_posts: { name: "Blog posts", about: "Your newest blog posts with their pictures and a line from each. It fills itself as you publish." },
 };
 
 const sectionId = z.string().regex(/^[a-z0-9]{4,24}$/, "Section ids are short lowercase codes.");

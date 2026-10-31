@@ -140,6 +140,10 @@ export const SECTION_FIELDS: Record<SectionType, Field[]> = {
     { key: "buttonLabel", label: "Button label", kind: "text", max: 40 },
     { key: "buttonLink", label: "Button link", kind: "link" },
   ],
+  blog_posts: [
+    { key: "heading", label: "Heading", kind: "text", max: 120, hint: "Leave empty for “From the blog” in the shopper's language." },
+    { key: "limit", label: "How many to show", kind: "number", min: 2, max: 6 },
+  ],
 };
 
 /** A saved moment as the editor's computer shows it, for a datetime-local input. */

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { announcementMessages, featuredViewAll, pickFeatured, type Section, type SectionSettings, type TrustIcon } from "@sf/core/theme";
-import type { StorefrontCatalog } from "@sf/core";
+import type { PostCard, StorefrontCatalog } from "@sf/core";
 import { cardBadges, type Badge, type BadgeFacts } from "@sf/core/badges";
 import type { BadgeSettings } from "@sf/db";
 import { storeText, type StoreText } from "@/lib/store-text";
@@ -41,6 +41,10 @@ export type SectionData = {
   t?: StoreText;
   /** Which automatic badges product cards show; the defaults when left out. */
   badges?: BadgeSettings;
+  /** The newest blog posts, loaded only where a section shows them. */
+  posts?: PostCard[];
+  /** The shopper's language, for dates; American English when left out. */
+  lang?: string;
 };
 
 type Props<T extends keyof SectionSettings> = { s: SectionSettings[T]; data: SectionData; first: boolean };
@@ -349,6 +353,35 @@ function CountdownSection({ s, data }: Props<"countdown">) {
   );
 }
 
+function BlogPosts({ s, data }: Props<"blog_posts">) {
+  const t = data.t ?? storeText(null);
+  const posts = (data.posts ?? []).slice(0, s.limit);
+  if (!posts.length) return null;
+  const heading = s.heading || t.blogHeading;
+  const date = new Intl.DateTimeFormat(data.lang ?? "en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+  return (
+    <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12 flex flex-col gap-6" aria-label={heading}>
+      <SectionHeading text={heading} base={data.base} link="/blog" viewAll={t.viewAll} />
+      <ul className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+        {posts.map((p) => (
+          <li key={p.id}>
+            <article className="flex flex-col gap-2">
+              {p.imageUrl && (
+                <Link href={`${data.base}/blog/${p.handle}`} className="sf-media block aspect-[3/2] rounded-lg bg-sunken overflow-hidden" tabIndex={-1} aria-hidden="true">
+                  <img src={p.imageUrl} alt="" loading="lazy" decoding="async" className="size-full object-cover" />
+                </Link>
+              )}
+              <h3 className="text-lg font-semibold"><Link href={`${data.base}/blog/${p.handle}`} className="hover:underline">{p.title}</Link></h3>
+              <p className="hint">{p.publishedAt ? `${date.format(new Date(p.publishedAt))} · ` : ""}{t.readMinutes(p.minutes)}</p>
+              {p.summary && <p className="text-muted line-clamp-3">{p.summary}</p>}
+            </article>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function RichText({ s }: Props<"rich_text">) {
   if (!s.heading && !s.text) return null;
   return (
@@ -613,6 +646,7 @@ export function SectionView({ section, data, first }: { section: Section; data: 
     case "columns": return <Columns s={section.settings} data={data} first={first} />;
     case "featured_product": return <FeaturedProduct s={section.settings} data={data} first={first} />;
     case "countdown": return <CountdownSection s={section.settings} data={data} first={first} />;
+    case "blog_posts": return <BlogPosts s={section.settings} data={data} first={first} />;
   }
 }
 
