@@ -1030,3 +1030,30 @@ test("a payment link made in the app is emailed, shared and paid", async ({ page
   await expect(page.getByRole("heading", { name: /^Order #/ })).toBeVisible();
   await expect(page.getByRole("region", { name: "Payment link" })).toHaveCount(0);
 });
+
+test("analytics in the app: sales, visitors and best sellers over the last days", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `an${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Pine Candle");
+  await web.getByLabel("Price", { exact: true }).fill("18.00");
+  await web.getByLabel("Stock", { exact: true }).fill("9");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  await buy(browser, new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href);
+
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Analytics", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Analytics", level: 1 })).toBeVisible();
+  await expect(page.getByText("Orders · New", { exact: true })).toBeVisible();
+  await expect(page.getByText("Changes are vs the 7 days before.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("img", { name: /^Sales by day, highest \$/ })).toBeVisible();
+  await expect(page.getByText("Pine Candle", { exact: true })).toBeVisible();
+  await expect(page.getByText(/^1 sold · \d+ views?$/)).toBeVisible();
+  await expect(page.getByText("Started checkout", { exact: true })).toBeVisible();
+  await shot(page, "360-app-analytics");
+
+  await page.getByRole("tab", { name: "30 days" }).click();
+  await expect(page.getByText("Changes are vs the 30 days before.", { exact: false })).toBeVisible();
+  await page.getByRole("tab", { name: "Last year" }).click();
+  await expect(page.getByText("Changes are vs the same days last year.", { exact: false })).toBeVisible();
+});
