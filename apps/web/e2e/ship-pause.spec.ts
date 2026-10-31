@@ -54,4 +54,16 @@ test("pause shipping while still taking orders", async ({ page, browser }, info)
   await buyer.reload();
   await expect(buyer.locator("#ship-pause")).toHaveCount(0);
   await expect(estimate).toHaveText(before!);
+
+  // Set ahead: the week before, shoppers learn the last day to order.
+  const starts = new Date(Date.now() + 3 * DAY);
+  await page.getByLabel("Pause shipping for a while").check();
+  await page.getByLabel("Starting (optional)").fill(iso(starts));
+  await page.getByLabel("Orders ship again on").fill(iso(resumes));
+  await page.getByRole("button", { name: "Save shipping pause" }).click();
+  await expect(page.getByRole("status")).toContainText(`From ${longDay(starts)}, every store page`);
+  await buyer.reload();
+  await expect(buyer.locator("#ship-pause")).toHaveCount(0);
+  await expect(buyer.locator("#ship-pause-soon")).toHaveText(`Order by ${longDay(new Date(starts.getTime() - DAY))} to get it on its way before our shipping break. Orders after that ship from ${longDay(resumes)}.`);
+  await expect(estimate).toHaveText(before!);
 });

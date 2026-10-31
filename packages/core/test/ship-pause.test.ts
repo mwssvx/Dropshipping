@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { schema } from "@sf/db";
-import { activeShipPause, DemoModel, exportStore, orderDelivery, productDelivery, sendLateOrderEmails, setLateOrderNotice, setShipPause, shippingStart } from "../src";
+import { activeShipPause, upcomingShipPause, DemoModel, exportStore, orderDelivery, productDelivery, sendLateOrderEmails, setLateOrderNotice, setShipPause, shippingStart } from "../src";
 import { DAY, makeFixture } from "../evals/fixture";
 
 const day = (d: Date) => d.toISOString().slice(0, 10);
@@ -51,6 +51,11 @@ describe("shipping pause", () => {
     expect(ahead).toMatchObject({ from: in10, resumesOn: in20 });
     expect(activeShipPause(await f.shop(), now)).toBeNull();
     expect(activeShipPause(await f.shop(), new Date(resumes.getTime() + 3_600_000))).not.toBeNull();
+    // Warned about from a week before: the last day to order is the day before it starts.
+    expect(upcomingShipPause(await f.shop(), now)).toBeNull();
+    expect(upcomingShipPause(await f.shop(), new Date(now.getTime() + 4 * DAY))).toMatchObject({ lastDay: day(new Date(now.getTime() + 9 * DAY)), resumesOn: in20 });
+    expect(upcomingShipPause(await f.shop(), new Date(resumes.getTime() + 3_600_000))).toBeNull();
+    expect(upcomingShipPause(paused, now)).toBeNull();
     expect(await setShipPause(f.db, shop.id, null, now)).toBeNull();
   });
 });

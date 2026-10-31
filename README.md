@@ -1688,3 +1688,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Keep selling while nothing ships** (`setShipPause` and `shippingStart` in `packages/core/src/ship-pause.ts`): the Shipping page has "Pause shipping for a while", with the day orders ship again, an optional start day (to set Chinese New Year up ahead) and a few words for buyers. While it's on, every store page says "Shipping is paused for a few days. Orders placed now ship from February 18…", and delivery dates on product pages, the cart, checkout, order pages and receipts count from that day, so nobody is promised a parcel that can't leave yet. Unlike a break under Store status, buyers can still order.
 2. Running late emails wait while it's on and count from the day shipping resumes, the "order in the next hour" cutoff hides, a sale's banner steps aside for it, and it ends by itself. A pause lasts up to 45 days and comes along in the store file. Migration `0157_ship_pause` (`shops.ship_pause`).
+
+### Last day before a shipping pause (after launch, part 303)
+
+1. **Order before the break** (`upcomingShipPause` in `packages/core/src/ship-pause.ts`): a shipping pause set ahead warns shoppers for the week before it starts. Every store page says "Order by February 9 to get it on its way before our shipping break. Orders after that ship from February 18.", in their language, with the merchant's note. That turns the break into a reason to order now, the way an order-by date does before Christmas. Delivery dates don't move until the pause starts. No migration.

@@ -53,3 +53,18 @@ export function activeShipPause(shop: Pick<Shop, "shipPause">, now = new Date())
 export function shippingStart(shop: Pick<Shop, "shipPause">, at: Date) {
   return activeShipPause(shop, at)?.resumes ?? at;
 }
+
+/** How many days before a pause set ahead the store starts warning. */
+export const SHIP_PAUSE_WARN_DAYS = 7;
+
+/**
+ * A pause set ahead that starts within the next week, so the store can say "order by Feb 9 to get
+ * it out before our break": `lastDay` is the last day orders still go out as usual.
+ */
+export function upcomingShipPause(shop: Pick<Shop, "shipPause">, now = new Date()) {
+  const p = shop.shipPause;
+  if (!p?.from) return null;
+  const starts = dayStart(p.from).getTime();
+  if (now.getTime() >= starts || starts - now.getTime() > SHIP_PAUSE_WARN_DAYS * DAY) return null;
+  return { ...p, lastDay: new Date(starts - DAY).toISOString().slice(0, 10) };
+}
