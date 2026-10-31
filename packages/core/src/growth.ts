@@ -6,6 +6,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { schema, type Db } from "@sf/db";
 import { NotFoundError, UserError } from "./errors";
 import { sendOrderEmail, type FulfillmentContext } from "./fulfillment";
+import { sendBrowseReminders } from "./browse-reminders";
 
 const HOUR = 3_600_000;
 
@@ -57,7 +58,8 @@ export async function sendAbandonedCartEmails(ctx: FulfillmentContext, now = new
     if (recent) continue;
     if ((await sendOrderEmail(ctx, order.id, "abandoned_cart")).status === "sent") sent++;
   }
-  return { sent, offers: await sendAbandonedCartOffers(ctx, now) };
+  // Browse reminders run alongside: same hourly job, same kind of nudge.
+  return { sent, offers: await sendAbandonedCartOffers(ctx, now), browse: (await sendBrowseReminders(ctx, now)).sent };
 }
 
 // The second reminder: a day after the first, for checkouts up to four days old.

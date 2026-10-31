@@ -141,6 +141,8 @@ export const shops = pgTable(
     aiAutoPause: boolean("ai_auto_pause").notNull().default(false),
     // Remind buyers who started checkout but didn't pay (one email, an hour later).
     abandonedCartEmails: boolean("abandoned_cart_emails").notNull().default(true),
+    // Email subscribers who looked at a product while signed in and didn't buy it ("Still thinking it over?").
+    browseReminders: boolean("browse_reminders").notNull().default(false),
     // A phone number at checkout, for the courier: not asked, optional, or required.
     checkoutPhone: text("checkout_phone", { enum: ["off", "optional", "required"] }).notNull().default("optional"),
     // A second checkout reminder, a day after the first, with a one-time code. Null means off.
@@ -445,6 +447,11 @@ export const customers = pgTable(
     welcomeCodeAt: timestamp("welcome_code_at", { withTimezone: true }),
     // When we last sent a win-back code. Another goes only after they order again and then lapse again.
     winbackSentAt: timestamp("winback_sent_at", { withTimezone: true }),
+    // The product a subscriber last looked at while signed in, for one browse reminder, and when.
+    lastViewedProductId: uuid("last_viewed_product_id").references((): AnyPgColumn => products.id, { onDelete: "set null" }),
+    lastViewedAt: timestamp("last_viewed_at", { withTimezone: true }),
+    // When we last sent them a browse reminder: at most one a week.
+    browseRemindedAt: timestamp("browse_reminded_at", { withTimezone: true }),
     // Month and day only ("07-14"), given by the buyer on their store account. No year is asked for.
     birthday: text("birthday"),
     // The year we last sent their birthday code, so it goes once a year.

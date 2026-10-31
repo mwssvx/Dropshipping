@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { abandonedCartStats, birthdaysKnown, birthdayStats, customerTags, describeDiscount, listCodeBatches, MAX_BATCH, formatMoney, listDiscounts, productChoices, POST_PURCHASE_MINUTES, postPurchaseStats, referralStats, SIGNUP_POPUP_SECONDS, THANK_YOU_NOTE_MAX, SUBSCRIBE_WITHIN_DAYS, subscriptionStats, welcomeOfferStats, winbackDueCount, winbackStats } from "@sf/core";
+import { abandonedCartStats, BROWSE_AFTER_HOURS, browseReminderStats, birthdaysKnown, birthdayStats, customerTags, describeDiscount, listCodeBatches, MAX_BATCH, formatMoney, listDiscounts, productChoices, POST_PURCHASE_MINUTES, postPurchaseStats, referralStats, SIGNUP_POPUP_SECONDS, THANK_YOU_NOTE_MAX, SUBSCRIBE_WITHIN_DAYS, subscriptionStats, welcomeOfferStats, winbackDueCount, winbackStats } from "@sf/core";
 import { requireShop, testPayments } from "@/lib/server";
-import { sendOffersNowAction, sendRemindersNowAction, setDiscountActiveAction, setRemindersAction } from "../../growth-actions";
+import { sendBrowseRemindersNowAction, sendOffersNowAction, sendRemindersNowAction, setBrowseRemindersAction, setDiscountActiveAction, setRemindersAction } from "../../growth-actions";
 import { ReminderOfferForm } from "./ReminderOfferForm";
 import { PageHeader } from "../PageHeader";
 import { DiscountForm } from "./DiscountForm";
@@ -39,6 +39,7 @@ export default async function MarketingPage() {
     birthdayStats(db, shop.id),
     birthdaysKnown(db, shop.id),
   ]);
+  const browse = await browseReminderStats(db, shop.id);
   const collectionTitle = new Map(collections.map((c) => [c.id, c.title]));
   const money = (m: number) => formatMoney(m, shop.currency);
   const now = new Date();
@@ -299,6 +300,34 @@ export default async function MarketingPage() {
             <form action={sendOffersNowAction} className="flex items-center gap-3">
               <button className="btn btn-secondary">Send second reminders now</button>
               <span className="hint">Test mode: sends as if a day had passed.</span>
+            </form>
+          )}
+        </section>
+
+        <section className="card p-5 flex flex-col gap-3" aria-labelledby="browse-heading">
+          <h2 id="browse-heading" className="font-semibold">Browse reminders</h2>
+          <p className="text-sm">
+            When a subscriber looks at a product while signed in to their account and doesn&apos;t buy it, we email them about{" "}
+            {BROWSE_AFTER_HOURS} hours later: &ldquo;Still thinking about the &hellip;?&rdquo;, with a link back to it. Nobody gets more than
+            one a week, and it&apos;s skipped when they ordered or started checkout since, or the product sold out. Only buyers who said yes to
+            your emails get one.
+          </p>
+          <form action={setBrowseRemindersAction} className="flex flex-wrap items-center gap-3 text-sm">
+            <label className="flex items-center gap-2">
+              <input type="checkbox" name="browseReminders" defaultChecked={shop.browseReminders} />
+              Send browse reminders
+            </label>
+            <button className="btn btn-secondary">Save</button>
+          </form>
+          <dl className="grid grid-cols-3 gap-3 border-t border-border pt-3 text-sm">
+            <div><dt className="hint">Buyers reminded, last 30 days</dt><dd className="text-lg font-semibold num">{browse.sent}</dd></div>
+            <div><dt className="hint">Orders from them</dt><dd className="text-lg font-semibold num">{browse.orders}</dd></div>
+            <div><dt className="hint">Sales</dt><dd className="text-lg font-semibold num">{money(browse.salesMinor)}</dd></div>
+          </dl>
+          {testPayments() && shop.browseReminders && (
+            <form action={sendBrowseRemindersNowAction} className="flex items-center gap-3 border-t border-border pt-3">
+              <button className="btn btn-secondary">Send browse reminders now</button>
+              <span className="hint">Test mode: sends as if {BROWSE_AFTER_HOURS} hours had passed.</span>
             </form>
           )}
         </section>
