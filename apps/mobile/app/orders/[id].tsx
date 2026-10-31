@@ -41,6 +41,8 @@ type Detail = {
   sameAddress?: { orders: { id: string; number: number; createdAt: string; ownItems: boolean }[]; oneBox: boolean } | null;
   /** The store's own items wait to be posted. `own`: only part of the order, the rest comes from a supplier. */
   postYourself?: { own: boolean } | null;
+  /** The buyer, when this person can open customers. */
+  customer?: { id: string; orders: number; tags: string[] } | null;
 };
 
 /** Where one parcel of several is: shipped with tracking, with the supplier, or still to post yourself. */
@@ -192,6 +194,14 @@ export default function OrderScreen() {
             <Button kind="secondary" label={`Call ${o.shippingAddress.phone}`} onPress={() => void Linking.openURL(`tel:${o.shippingAddress.phone!.replace(/[^\d+]/g, "")}`)} />
           ) : null}
           {o.buyerNote ? <Body>Their note: {o.buyerNote}</Body> : null}
+          {o.customer ? (
+            <Row
+              href={`/customers/${o.customer.id}` as never}
+              title={o.customer.orders > 1 ? `${o.customer.orders} orders from them` : "Their first order"}
+              subtitle={o.customer.tags.length ? o.customer.tags.join(", ") : "See their orders, note and tags"}
+              a11y={`Customer ${o.shippingAddress.name}`}
+            />
+          ) : null}
         </Card>
       </Section>
 

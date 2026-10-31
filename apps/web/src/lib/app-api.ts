@@ -50,6 +50,7 @@ import {
   listCustomers,
   getCustomerProfile,
   updateCustomerNotes,
+  customerOfOrder,
   productPhotos,
   sendPriceDrops,
   sendStockAlerts,
@@ -250,7 +251,7 @@ const routes: Record<string, Handler> = {
     const orders = show === "all" ? (await orderPage(db, shop.id, {}, { size: 200 })).orders : (await listOrders(db, shop.id)).filter(keep).slice(0, 200);
     return { orders: orders.map(orderSummary) };
   },
-  "GET orders/:id": async ({ params, db, shop }) => {
+  "GET orders/:id": async ({ params, db, shop, role }) => {
     const o = await getOrder(db, shop.id, params.id!);
     // When it should arrive, as on the web order page, and how late a shipped parcel is.
     const arrives = ["paid", "partially_refunded"].includes(o.paymentStatus) ? await orderDelivery(db, shop, o, { evenIfHidden: true }) : null;
@@ -260,8 +261,11 @@ const routes: Record<string, Handler> = {
     const sameDoor = o.paymentStatus === "paid" && o.fulfillmentStatus !== "shipped" && o.fulfillmentStatus !== "delivered" ? await ordersToSameAddress(db, shop.id, o) : null;
     // The store's own items still to post: its parcel in a mixed order, or the whole order when it's all its own.
     const ownParcel = parcels.find((p) => p.key === "own");
+    // Who bought it, for a link to their customer screen (only for roles that can open customers).
+    const buyer = can(role, "customers") ? await customerOfOrder(db, shop.id, o.email) : null;
     const postYourself = o.paymentStatus === "paid" && !o.pickup && !o.localDelivery && (ownParcel ? !ownParcel.shipment?.trackingNumber : parcels.length === 0 && o.fulfillments.length === 0);
     return {
+      customer: buyer,
       postYourself: postYourself ? { own: !!ownParcel } : null,
       sameAddress: sameDoor?.orders.length
         ? { orders: sameDoor.orders.map((x) => ({ id: x.id, number: x.number, createdAt: x.createdAt, ownItems: x.ownItems })), oneBox: sameDoor.ownItems && sameDoor.orders.some((x) => x.ownItems) }
