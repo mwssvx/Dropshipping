@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, cancelOrderByBuyer, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, visitPost, visitSource, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, MAX_SAVED, saveItem, setPriceAlerts, shareSaved, stopSharingSaved, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer, answerSurvey, chooseBankTransfer, joinLaunchList, toggleCompareId, lookVariants, stayPathAfterAdd, toggleHelpful, reportReview, rewardReview, VOTER_PATTERN, reviewsQuery, reviewSort, starsFilter } from "@sf/core";
+import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, cancelOrderByBuyer, changeHandoverDay, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, visitPost, visitSource, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, MAX_SAVED, saveItem, setPriceAlerts, shareSaved, stopSharingSaved, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer, answerSurvey, chooseBankTransfer, joinLaunchList, toggleCompareId, lookVariants, stayPathAfterAdd, toggleHelpful, reportReview, rewardReview, VOTER_PATTERN, reviewsQuery, reviewSort, starsFilter } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
 import { agents, campaigns, db, fulfillment, mailer, payments, platformUrl, refunds, storeAddress, subscriptions, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
@@ -572,6 +572,22 @@ export async function cancelOrderByBuyerAction(handle: string, ref: string, _: C
   try {
     const order = await getOrderByPaymentIntent(await db(), shop.id, ref);
     await cancelOrderByBuyer({ ...(await refunds()), adminUrl: platformUrl }, shop.id, order.id, { reason: String(form.get("reason") ?? "") });
+  } catch (e) {
+    if (e instanceof UserError || e instanceof NotFoundError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath(`${await storeBase(handle)}/orders/${ref}`);
+  return { done: true };
+}
+
+export type ChangeDayState = { done?: boolean; error?: string };
+
+/** The buyer moves their pickup or local delivery to another day the store hands over orders. */
+export async function changeHandoverDayAction(handle: string, ref: string, _: ChangeDayState, form: FormData): Promise<ChangeDayState> {
+  const shop = await loadShop(handle);
+  try {
+    const order = await getOrderByPaymentIntent(await db(), shop.id, ref);
+    await changeHandoverDay({ db: await db(), mailer: mailer(), adminUrl: platformUrl }, shop.id, order.id, String(form.get("day") ?? ""));
   } catch (e) {
     if (e instanceof UserError || e instanceof NotFoundError) return { error: e.message };
     throw e;
