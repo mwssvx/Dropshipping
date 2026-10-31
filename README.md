@@ -1868,3 +1868,7 @@ A customer's screen in the app has Give store credit for roles that handle gift 
 ### Counts on Today's buttons (after launch, part 347)
 
 Today's Returns and Reviews buttons in the app now say what waits behind them, like "Returns (2 open)" and "Reviews (3 to check)", so you don't have to open them to find out. Each count only shows for roles that can open that screen.
+
+### Order search in the app (after launch, part 348)
+
+The app's Orders tab has a search box. Type an order number (with or without #), the buyer's name or their email and it looks through all orders, not just the list that's open, like the web Orders page. Clear it to get the lists back.

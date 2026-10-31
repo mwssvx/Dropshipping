@@ -1,8 +1,8 @@
 import { useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useApi } from "../../src/api";
 import { FULFILMENT, money, PAYMENT, when } from "../../src/format";
-import { EmptyState, List, LoadError, Loading, Pill, Row, Screen, Segmented } from "../../src/ui";
+import { EmptyState, Field, List, LoadError, Loading, Pill, Row, Screen, Segmented } from "../../src/ui";
 
 type Order = { id: string; number: number; name: string; email: string; totalMinor: number; currency: string; paymentStatus: string; fulfillmentStatus: string; held?: boolean; paidAt: string | null; createdAt: string; daysLate?: number };
 type Show = "open" | "to_post" | "problems" | "late" | "all";
@@ -18,28 +18,42 @@ const EMPTY: Record<Show, [string, string]> = {
 export default function OrdersScreen() {
   const params = useLocalSearchParams<{ show?: string }>();
   const [show, setShow] = useState<Show>(params.show === "problems" || params.show === "held" ? "problems" : params.show === "all" ? "all" : params.show === "late" ? "late" : params.show === "to_post" ? "to_post" : "open");
-  const list = useApi<{ orders: Order[] }>(`orders?show=${show}`);
+  const [query, setQuery] = useState("");
+  const [q, setQ] = useState("");
+  // Waits for a pause in typing before asking the server.
+  useEffect(() => {
+    const t = setTimeout(() => setQ(query.trim()), 300);
+    return () => clearTimeout(t);
+  }, [query]);
+  const list = useApi<{ orders: Order[] }>(q ? `orders?q=${encodeURIComponent(q)}` : `orders?show=${show}`);
   const orders = list.data?.orders ?? [];
 
   return (
     <Screen title="Orders" onRefresh={list.reload} refreshing={list.loading && !!list.data}>
-      <Segmented
-        label="Which orders"
-        value={show}
-        onChange={setShow}
-        options={[
-          ["open", "Open"],
-          ["to_post", "To post"],
-          ["problems", "Needs you"],
-          ["late", "Late"],
-          ["all", "All"],
-        ]}
-      />
+      <Field label="Search orders" value={query} onChangeText={setQuery} placeholder="Order number, name or email" autoCapitalize="none" />
+      {q ? null : (
+        <Segmented
+          label="Which orders"
+          value={show}
+          onChange={setShow}
+          options={[
+            ["open", "Open"],
+            ["to_post", "To post"],
+            ["problems", "Needs you"],
+            ["late", "Late"],
+            ["all", "All"],
+          ]}
+        />
+      )}
       <LoadError error={list.error} stale={list.stale} retry={list.reload} />
       {!list.data ? (
         list.loading ? <Loading /> : null
       ) : orders.length === 0 ? (
-        <EmptyState heading={EMPTY[show][0]} body={EMPTY[show][1]} />
+        q ? (
+          <EmptyState heading="No order matches" body={`No order's number, name or email has "${q}" in it.`} />
+        ) : (
+          <EmptyState heading={EMPTY[show][0]} body={EMPTY[show][1]} />
+        )
       ) : (
         <List>
           {orders.map((o) => {

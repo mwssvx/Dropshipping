@@ -253,6 +253,9 @@ const routes: Record<string, Handler> = {
   },
 
   "GET orders": async ({ url, db, shop }) => {
+    // A search looks through every order, by number, name or email, as on the web Orders page.
+    const q = url.searchParams.get("q")?.trim().slice(0, 100);
+    if (q) return { orders: (await orderPage(db, shop.id, { query: q }, { size: 50 })).orders.map(orderSummary) };
     const show = url.searchParams.get("show") ?? "all";
     // Shipped parcels past their delivery date, the latest first, as on the web Orders page.
     if (show === "late") {
