@@ -1,9 +1,10 @@
 "use server";
+import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, cancelOrderByBuyer, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, visitSource, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, MAX_SAVED, saveItem, setPriceAlerts, shareSaved, stopSharingSaved, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer, answerSurvey, chooseBankTransfer, joinLaunchList, toggleCompareId, lookVariants, stayPathAfterAdd } from "@sf/core";
+import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, cancelOrderByBuyer, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, visitSource, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, MAX_SAVED, saveItem, setPriceAlerts, shareSaved, stopSharingSaved, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer, answerSurvey, chooseBankTransfer, joinLaunchList, toggleCompareId, lookVariants, stayPathAfterAdd, toggleHelpful, VOTER_PATTERN, reviewsQuery, reviewSort, starsFilter } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
 import { agents, campaigns, db, fulfillment, payments, platformUrl, refunds, subscriptions, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
@@ -647,3 +648,30 @@ export async function changeSubscriptionAction(handle: string, token: string, _:
   const done = { interval: "Saved. Your next delivery date has moved to match.", skip: "Skipped. Your next delivery date is below.", pause: "Paused. Nothing will be sent or charged until you resume.", resume: "Resumed. Your next delivery date is below.", cancel: "Cancelled. You won't be charged again." }[change.type];
   return { done };
 }
+
+/** Keeps a device's "helpful" marks apart from other devices': a random id, only set once a shopper taps one. */
+const VOTER_COOKIE = "sf_voter";
+
+/**
+ * Marks a review helpful, or takes the mark back, then returns to the same review in the same list.
+ * The list (stars, order, all) comes from the page, so it's checked again here.
+ */
+export async function helpfulAction(handle: string, productHandle: string, reviewId: string, view: { stars?: unknown; sort?: unknown; all?: unknown }) {
+  const shop = await loadShop(handle);
+  const jar = await cookies();
+  let voter = jar.get(VOTER_COOKIE)?.value;
+  if (!voter || !VOTER_PATTERN.test(voter)) {
+    voter = randomBytes(16).toString("base64url");
+    jar.set(VOTER_COOKIE, voter, { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365 });
+  }
+  const found = await toggleHelpful(await db(), shop.id, reviewId, voter).then(
+    () => true,
+    (e) => {
+      if (e instanceof NotFoundError) return false;
+      throw e;
+    },
+  );
+  const list = reviewsQuery({ stars: starsFilter(String(view?.stars ?? "")), sort: reviewSort(String(view?.sort ?? "")), all: view?.all === true });
+  redirect(`${await storeBase(handle)}/products/${encodeURIComponent(productHandle)}${list}#${found ? `review-${reviewId}` : "reviews"}`);
+}
+

@@ -1476,3 +1476,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **How buyers rated it** (`apps/web/src/app/s/[shop]/products/[handle]/page.tsx`): above a product's reviews, five rows show how many reviews gave it 5, 4, 3, 2 and 1 stars, with a bar for each. Tapping a row lists only those reviews ("Only 2-star reviews", with a link back to all of them), so a shopper worried about a product can read the low ones first.
 2. **Long lists**: the page still starts with the newest 20 reviews and now has "Show all 23 reviews" (up to 100) underneath, for the chosen rating too. Ratings nobody gave aren't links, and the stars at the top and in search results always count every review. `productReviews` in core returns the breakdown in the same query that counts them. Five new store strings in all six languages. No migration.
+
+### Helpful reviews (after launch, part 260)
+
+1. **"Helpful" on every review** (`apps/web/src/app/s/[shop]/products/[handle]/page.tsx`): shoppers tap "Helpful" under a review they found useful, and the review says how many people did ("2 people found this helpful"). It counts once per device: a random id in a `sf_voter` cookie, set only when a shopper taps the button. Tapping again takes the mark back. It works without JavaScript and comes back to the same review.
+2. **Most helpful first**: "Newest" and "Most helpful" sit above the list and keep the chosen star rating and "Show all". Hidden or pending reviews can't be marked. Core: `toggleHelpful`, `helpfulVotes`, `reviewSort` and `reviewsQuery` in `reviews.ts`. Migration `0146_helpful_reviews` adds the `review_votes` table and a `helpful_count` on reviews, so sorting needs no extra query. Five new store strings in all six languages.

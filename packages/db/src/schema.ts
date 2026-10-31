@@ -1333,6 +1333,8 @@ export const reviews = pgTable(
     // Brought over from a review app's export: where from, and a key so the same file adds nothing twice.
     importedFrom: text("imported_from"),
     importKey: text("import_key"),
+    // How many shoppers marked it helpful, kept with the review so a page can sort by it.
+    helpfulCount: integer("helpful_count").notNull().default(0),
     createdAt: createdAt(),
   },
   (t) => [
@@ -1341,6 +1343,17 @@ export const reviews = pgTable(
     index("reviews_product_idx").on(t.productId, t.status),
     check("reviews_rating_range", sql`${t.rating} between 1 and 5`),
   ],
+);
+
+// "Helpful" votes on reviews: one per review and device, the device being a random id in a cookie.
+export const reviewVotes = pgTable(
+  "review_votes",
+  {
+    reviewId: uuid("review_id").notNull().references(() => reviews.id, { onDelete: "cascade" }),
+    voter: text("voter").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.reviewId, t.voter] })],
 );
 
 // What buyers do on the store, for the funnel. No personal data: a random session id from a cookie.
