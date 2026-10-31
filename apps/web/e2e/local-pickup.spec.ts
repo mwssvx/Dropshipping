@@ -68,3 +68,66 @@ test("a buyer picks up their order instead of paying for shipping", async ({ pag
   await buyer.goto(orderPage);
   await expect(buyer.getByText("You picked up this order.")).toBeVisible();
 });
+
+test("a buyer picks the day they'll collect their order", async ({ page, browser }, info) => {
+  const id = `${info.project.name}-${Date.now()}`;
+  await page.goto("/signup");
+  await page.getByLabel("Email").fill(`lpd-${id}@example.com`);
+  await page.getByLabel("Password").fill("correct horse battery");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByLabel("Store name").fill(`Kiln ${id}`);
+  await page.getByRole("button", { name: "Create store" }).click();
+  await expect(page.getByRole("heading", { name: /Welcome to Kiln/ })).toBeVisible();
+
+  await page.goto("/admin/products/new");
+  await page.getByLabel("Title").fill("Stoneware Bowl");
+  await page.getByLabel("Price", { exact: true }).fill("18.00");
+  await page.getByLabel("Stock", { exact: true }).fill("4");
+  await page.getByRole("button", { name: "Save product" }).click();
+  await expect(page.getByText("Product added.")).toBeVisible();
+  const store = (await page.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!;
+
+  await page.goto("/admin/shipping");
+  await page.getByLabel("Let buyers pick up their order").check();
+  await page.getByLabel("Pickup address").fill("Kiln Studio\n4 Rainey St, Austin");
+  await page.getByRole("button", { name: "Save pickup" }).click();
+  await expect(page.getByText("Saved. Buyers can pick up orders of your own stock.")).toBeVisible();
+  await page.reload();
+  const days = page.getByRole("region", { name: "Pickup and delivery days" });
+  await days.getByLabel("Buyers pick the day they collect or get their order").check();
+  await days.getByLabel("Saturday").check();
+  await days.getByLabel("Sunday").check();
+  await days.getByLabel("Notice you need").selectOption("2");
+  await days.getByRole("button", { name: "Save days" }).click();
+  await expect(days.getByText("Saved. Buyers pick from Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday at checkout.")).toBeVisible();
+
+  const buyer = await (await browser.newContext({ ...info.project.use })).newPage();
+  await buyer.goto(store);
+  await buyer.getByRole("button", { name: "Add to cart" }).click();
+  await expect(buyer.getByRole("link", { name: /^Cart, 1 item/ })).toBeVisible();
+  await buyer.goto(store.replace(/\/products\/.*$/, "/cart"));
+  await buyer.getByRole("link", { name: "Check out" }).click();
+  await buyer.getByRole("textbox", { name: "Email" }).first().fill(`linus-${id}@example.com`);
+  await buyer.getByLabel("Full name").fill("Linus Pauling");
+  await buyer.getByLabel("Address", { exact: true }).fill("1 Main St");
+  await buyer.getByLabel("City").fill("Austin");
+  await buyer.getByLabel("State or region").fill("TX");
+  await buyer.getByLabel("Postal code").fill("78701");
+  // Shipping needs no day; picking up does.
+  await expect(buyer.getByLabel("Pickup day")).toHaveCount(0);
+  await buyer.getByRole("radio", { name: /Pick it up yourself/ }).check();
+  const pick = buyer.getByLabel("Pickup day");
+  await expect(pick).toBeVisible();
+  const options = pick.locator("option:not([value=''])");
+  await expect(options).toHaveCount(14);
+  const label = (await options.nth(1).textContent())!.trim();
+  await pick.selectOption({ label });
+  await buyer.getByRole("button", { name: "Continue to payment" }).click();
+  await buyer.getByRole("button", { name: /^Pay / }).click();
+  await expect(buyer.getByRole("heading", { name: "Thank you, Linus!" })).toBeVisible();
+  await expect(buyer.getByText(`Pickup day: ${label}`)).toBeVisible();
+
+  await page.goto("/admin/orders");
+  await page.getByRole("link", { name: "#1001" }).first().click();
+  await expect(page.getByText(`Collecting on ${label}`)).toBeVisible();
+});

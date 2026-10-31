@@ -171,6 +171,8 @@ export const shops = pgTable(
     localPickup: jsonb("local_pickup").$type<LocalPickup | null>(),
     // The store delivers its own stock itself to these postal codes, for a fee, or null when it doesn't.
     localDeliveryArea: jsonb("local_delivery_area").$type<LocalDeliveryArea | null>(),
+    // Buyers picking up or getting a local delivery choose one of these days at checkout, or null when they don't choose.
+    handoverDays: jsonb("handover_days").$type<HandoverDays | null>(),
     // Gift wrapping buyers can add to a gift at checkout, or null when the store doesn't wrap.
     giftWrap: jsonb("gift_wrap").$type<GiftWrap | null>(),
     // The smallest order the store takes, in goods after discounts; 0 means any amount.
@@ -588,6 +590,8 @@ export type DeliveryProtection = { percent: number; minMinor: number };
 
 /** Where and how buyers pick up their orders. */
 export type LocalPickup = { address: string; instructions: string | null };
+/** The weekdays (0 Sunday to 6 Saturday) the store hands over pickups and local deliveries, how many days' notice it needs, and its time zone. */
+export type HandoverDays = { weekdays: number[]; leadDays: number; timeZone: string };
 
 /** Where the store delivers itself and what it charges. Postal codes match by how they start. */
 /** The store's gift wrapping: its price and what buyers get ("Kraft paper and a ribbon"). */
@@ -714,6 +718,8 @@ export const orders = pgTable(
     pickupReadyAt: timestamp("pickup_ready_at", { withTimezone: true }),
     // The store delivers it itself (local delivery); it's delivered when the merchant says so.
     localDelivery: boolean("local_delivery").notNull().default(false),
+    // The day the buyer picked to collect it or have it delivered (store time, YYYY-MM-DD).
+    handoverOn: date("handover_on", { mode: "string" }),
     riskReviewedAt: timestamp("risk_reviewed_at", { withTimezone: true }),
     // Has pre-ordered items: waits for stock before going to the supplier, promised by this date.
     preorderShipsBy: timestamp("preorder_ships_by", { withTimezone: true }),

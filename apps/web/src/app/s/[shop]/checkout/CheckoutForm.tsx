@@ -5,7 +5,11 @@ import { FormError } from "@/components/FormError";
 import { checkoutAction } from "../actions";
 
 /** A shipping rate priced for this cart, in the buyer's currency. */
-export type RateChoice = { id: string; name: string; days: string | null; priceLabel: string; priceMinor: number; totalMinor: number; pickup?: boolean; postalPrefixes?: string[] };
+export type RateChoice = {
+  id: string; name: string; days: string | null; priceLabel: string; priceMinor: number; totalMinor: number; pickup?: boolean; postalPrefixes?: string[];
+  /** The days the buyer can pick for a pickup or local delivery ([YYYY-MM-DD, label]), where the store lets them choose. */
+  dates?: [string, string][];
+};
 /** Delivery protection or gift wrapping the buyer can add, priced for this cart in their currency. */
 export type ExtraChoice = { checkbox: string; note: string | null; summary: string; priceLabel: string; priceMinor: number };
 /** Tips the buyer can add: each percentage with what it comes to in their currency. */
@@ -36,7 +40,7 @@ export type CheckoutText = Record<
   | "checkout" | "orderSummary" | "contact" | "newsAndOffers" | "delivery" | "email" | "fullName" | "address" | "address2" | "city" | "region" | "phone"
   | "postalCode" | "country" | "shipping" | "noShipping" | "placeOrder" | "continueToPayment" | "continuing" | "notAvailable" | "tax"
   | "giftCheckbox" | "giftFrom" | "giftMessage" | "giftRecipientEmail" | "giftNote" | "orderNote"
-  | "giftCardTo" | "giftCardEmail" | "giftCardName" | "giftCardFrom" | "giftCardMessage" | "giftCardSendOn" | "giftCardNote",
+  | "giftCardTo" | "giftCardEmail" | "giftCardName" | "giftCardFrom" | "giftCardMessage" | "giftCardSendOn" | "giftCardNote" | "pickupDay" | "deliveryDay",
   string
 >;
 
@@ -211,6 +215,14 @@ function CheckoutForm({
                 <span className="num">{r.priceLabel}</span>
               </label>
             ))
+          )}
+          {rate?.dates && (
+            <div className="field">
+              <label className="label" htmlFor="handoverOn">{rate.pickup ? t.pickupDay : t.deliveryDay}</label>
+              <select className="input" id="handoverOn" name="handoverOn" required defaultValue={v?.handoverOn && rate.dates.some(([d]) => d === v.handoverOn) ? v.handoverOn : rate.dates[0]?.[0]}>
+                {rate.dates.map(([d, label]) => <option key={d} value={d}>{label}</option>)}
+              </select>
+            </div>
           )}
         </fieldset>
       )}

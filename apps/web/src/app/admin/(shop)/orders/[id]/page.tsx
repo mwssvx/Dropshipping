@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { can, countryName, crossesBorder, disputeEvidence, disputeReason, disputesForOrder, formatMoney, getOrder, ORDER_EMAIL_LABELS, orderEditOptions, listRefunds, replaceableLines, replacementBlocked, replacementsOf, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode, formatShipsBy, preorderWaitingOn, isOrderBuyerBlocked, orderDownloads, DOWNLOADS_PER_ITEM, transferDueBy } from "@sf/core";
+import { can, countryName, formatHandoverDay, crossesBorder, disputeEvidence, disputeReason, disputesForOrder, formatMoney, getOrder, ORDER_EMAIL_LABELS, orderEditOptions, listRefunds, replaceableLines, replacementBlocked, replacementsOf, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode, formatShipsBy, preorderWaitingOn, isOrderBuyerBlocked, orderDownloads, DOWNLOADS_PER_ITEM, transferDueBy } from "@sf/core";
 import { BlockBuyerForm } from "./BlockBuyerForm";
 import { fulfillment, requireShop, storeAddress, suppliers, testPayments } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
@@ -298,6 +298,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
           {order.pickup ? (
             <section className="card p-5 flex flex-col gap-3" aria-labelledby="pickup-heading">
               <h2 id="pickup-heading" className="font-semibold">Picking up</h2>
+              {order.handoverOn && <p className="text-sm font-medium">Collecting on {formatHandoverDay(order.handoverOn)}</p>}
               <p className="text-sm">
                 {order.fulfillmentStatus === "delivered"
                   ? `Picked up on ${longDay.format(order.fulfillments.find((f) => f.deliveredAt)?.deliveredAt ?? order.updatedAt)}.`
@@ -312,6 +313,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
           ) : order.localDelivery ? (
             <section className="card p-5 flex flex-col gap-3" aria-labelledby="local-delivery-heading">
               <h2 id="local-delivery-heading" className="font-semibold">You&apos;re delivering this</h2>
+              {order.handoverOn && <p className="text-sm font-medium">Deliver on {formatHandoverDay(order.handoverOn)}</p>}
               <p className="text-sm">
                 {order.fulfillmentStatus === "delivered"
                   ? `Delivered on ${longDay.format(order.fulfillments.find((f) => f.deliveredAt)?.deliveredAt ?? order.updatedAt)}.`

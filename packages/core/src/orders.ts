@@ -35,6 +35,7 @@ import { boughtBefore, describeLimitProblem, limitProblem } from "./purchase-lim
 import { onHoliday } from "./store-closure";
 import { canPickUp, ownStockOnly, PICKUP_METHOD, PICKUP_RATE_ID } from "./local-pickup";
 import { inDeliveryArea, LOCAL_DELIVERY_METHOD, LOCAL_DELIVERY_RATE_ID, localDeliveryPrice } from "./local-delivery";
+import { handoverDates } from "./handover-days";
 
 type Shop = typeof schema.shops.$inferSelect;
 type Order = typeof schema.orders.$inferSelect;
@@ -467,6 +468,8 @@ export async function startCheckout(
     ageConfirmed?: boolean;
     /** The tip percentage the buyer picked at checkout, from the store's choices. */
     tipPercent?: number | null;
+    /** The day picked for a pickup or local delivery, where the store lets buyers choose (`handoverDates`). */
+    handoverOn?: string | null;
   },
   taxCalculator: TaxCalculator = new BuiltInTaxCalculator(),
 ) {
@@ -525,6 +528,12 @@ export async function startCheckout(
       `${shop.name} takes orders of ${formatMoney(cart.minimumOrder.minMinor, shop.currency)} or more. Add ${formatMoney(cart.minimumOrder.shortByMinor, shop.currency)} more to check out.`,
       "below_minimum",
     );
+  }
+  // Picking up or a local delivery: the day must be one the store offers, when it lets buyers choose.
+  const handing = !!shop.handoverDays && (cart.pickingUp || cart.deliveringLocally) && !followUp && !repeat;
+  const handoverOn = handing && input.handoverOn && handoverDates(shop.handoverDays!).includes(input.handoverOn) ? input.handoverOn : null;
+  if (handing && input.storefront && !handoverOn) {
+    throw new UserError(cart.pickingUp ? "Pick the day you'll collect your order." : "Pick the day for your delivery.", "handover_day");
   }
   // A buyer shopping in another currency is charged exactly what they saw, in that currency.
   const fx = input.fx && input.fx.currency !== shop.currency && input.fx.rate > 0 ? input.fx : null;
@@ -647,6 +656,7 @@ export async function startCheckout(
         shippingMethod: cart.shipping?.name ?? null,
         pickup: cart.pickingUp,
         localDelivery: cart.deliveringLocally,
+        handoverOn,
         // Only something that ships can be a gift; gift cards are emailed to the buyer.
         // With a code the recipient can return it with, without asking the buyer.
         gift: gift && cart.needsShipping ? withReturnCode(gift) : null,

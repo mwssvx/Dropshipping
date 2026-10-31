@@ -1,4 +1,4 @@
-import { countryName, describeRate, EVERYWHERE_ELSE, formatDeliveryWindow, formatMoney, listShippingZones, sampleProduct, productDelivery, rateDays, rateWeight, SHIPPING_COUNTRIES, CUTOFF_TIME_ZONES, defaultCutoffZone, HOLIDAY_DAYS_AHEAD, LATE_ORDER_DAYS, LATE_ORDER_MESSAGE_MAX } from "@sf/core";
+import { countryName, describeRate, EVERYWHERE_ELSE, formatDeliveryWindow, formatMoney, listShippingZones, sampleProduct, productDelivery, rateDays, rateWeight, SHIPPING_COUNTRIES, CUTOFF_TIME_ZONES, defaultCutoffZone, HOLIDAY_DAYS_AHEAD, LATE_ORDER_DAYS, LATE_ORDER_MESSAGE_MAX, HANDOVER_DAYS_AHEAD, HANDOVER_LEAD_MAX } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { setCheckoutPhoneAction } from "../../shipping-actions";
@@ -10,6 +10,7 @@ import { LateOrderForm } from "./LateOrderForm";
 import { GiftWrapForm } from "./GiftWrapForm";
 import { LocalDeliveryForm } from "./LocalDeliveryForm";
 import { LocalPickupForm } from "./LocalPickupForm";
+import { HandoverDaysForm } from "./HandoverDaysForm";
 import { MinOrderForm } from "./MinOrderForm";
 import { DeleteButton, RateForm, StarterButton, ZoneForm, type Country } from "./ShippingForms";
 
@@ -220,6 +221,16 @@ export default async function ShippingPage() {
             symbol={new Intl.NumberFormat("en-US", { style: "currency", currency: shop.currency }).formatToParts(0).find((p) => p.type === "currency")?.value ?? ""}
           />
         </section>
+        {(shop.localPickup || shop.localDeliveryArea || shop.handoverDays) && (
+          <section className="card p-5 flex flex-col gap-3" aria-labelledby="handover-heading" id="handover">
+            <h2 id="handover-heading" className="font-semibold">Pickup and delivery days</h2>
+            <p className="text-sm">
+              Let buyers who collect their order or get it from you pick the day at checkout, from the next {HANDOVER_DAYS_AHEAD} days you&apos;re open.
+              The day shows on the order, for you and for them, so nobody waits on a closed shop.
+            </p>
+            <HandoverDaysForm days={shop.handoverDays} zones={CUTOFF_TIME_ZONES} defaultZone={shop.shipCutoff?.timeZone ?? defaultCutoffZone(shop.country)} maxLead={HANDOVER_LEAD_MAX} />
+          </section>
+        )}
         <section className="card p-5 flex flex-col gap-3" aria-labelledby="new-zone">
           <h2 id="new-zone" className="font-semibold">Add a zone</h2>
           {isDefault && <p className="text-sm hint">Your first zone replaces the standard rate: after that, only countries in a zone can check out.</p>}

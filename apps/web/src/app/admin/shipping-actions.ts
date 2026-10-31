@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseKg, parseMoney, setCheckoutPhone, setDeliveryEstimates, setDeliveryProtection, setGiftWrap, setHolidayDeadline, setLateOrderNotice, setLocalDelivery, setLocalPickup, setMinOrder, setShipCutoff, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
+import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseKg, parseMoney, setCheckoutPhone, setDeliveryEstimates, setDeliveryProtection, setGiftWrap, setHolidayDeadline, setLateOrderNotice, setLocalDelivery, setLocalPickup, setHandoverDays, setMinOrder, setShipCutoff, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
 import { logged, requireShop } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -298,3 +298,23 @@ export async function setLateOrderAction(_: LateOrderState, form: FormData): Pro
   revalidatePath("/admin/shipping");
   return { saved };
 }
+
+export type HandoverDaysState = { error?: string; saved?: { weekdays: number[] } | null };
+
+/** The days buyers can pick for a pickup or local delivery, or off (they don't pick). */
+export async function setHandoverDaysAction(_: HandoverDaysState, form: FormData): Promise<HandoverDaysState> {
+  const { shop, db, user } = await requireShop("shipping");
+  let saved: HandoverDaysState["saved"] = null;
+  try {
+    saved = form.get("enabled") === "on"
+      ? await setHandoverDays(db, shop.id, { weekdays: form.getAll("weekday").map(Number), leadDays: Number(form.get("leadDays") ?? ""), timeZone: String(form.get("timeZone") ?? "") })
+      : await setHandoverDays(db, shop.id, null);
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  await logged({ shop, user, db }, saved ? "Let buyers pick a pickup or delivery day" : "Stopped asking buyers for a pickup or delivery day", { href: "/admin/shipping#handover-heading" });
+  revalidatePath("/admin/shipping");
+  return { saved };
+}
+

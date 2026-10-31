@@ -110,6 +110,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       browse_reminders: shop.browseReminders,
       review_reward_percent: shop.reviewRewardPercent,
       review_reminder: shop.reviewReminder,
+      handover_days: shop.handoverDays ? { weekdays: shop.handoverDays.weekdays, lead_days: shop.handoverDays.leadDays, time_zone: shop.handoverDays.timeZone } : null,
       checkout_phone: shop.checkoutPhone,
       abandoned_cart_offer: shop.abandonedCartOffer ? { percent_off: shop.abandonedCartOffer.percentOff } : null,
       delivery_protection: shop.deliveryProtection ? { percent: shop.deliveryProtection.percent, min_minor: shop.deliveryProtection.minMinor } : null,
@@ -313,6 +314,7 @@ const importSchema = z.object({
       browse_reminders: z.boolean().optional(),
       review_reward_percent: z.number().int().min(5).max(30).nullable().optional(),
       review_reminder: z.boolean().optional(),
+      handover_days: z.object({ weekdays: z.array(z.number().int().min(0).max(6)).min(1).max(7), lead_days: z.number().int().min(0).max(7), time_zone: z.string().max(60) }).nullable().optional(),
       checkout_phone: z.enum(["off", "optional", "required"]).optional(),
       abandoned_cart_offer: z.object({ percent_off: z.number().int().min(5).max(50) }).nullable().optional(),
       delivery_protection: z.object({ percent: z.number().min(0.5).max(10), min_minor: z.number().int().min(0).max(10_000) }).nullable().optional(),
@@ -810,6 +812,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
     if (data.store.browse_reminders !== undefined) settings.browseReminders = data.store.browse_reminders;
     if (data.store.review_reward_percent !== undefined) settings.reviewRewardPercent = data.store.review_reward_percent;
     if (data.store.review_reminder !== undefined) settings.reviewReminder = data.store.review_reminder;
+    if (data.store.handover_days !== undefined) settings.handoverDays = data.store.handover_days ? { weekdays: data.store.handover_days.weekdays, leadDays: data.store.handover_days.lead_days, timeZone: data.store.handover_days.time_zone } : null;
     if (data.store.checkout_phone) settings.checkoutPhone = data.store.checkout_phone;
     if (data.store.abandoned_cart_offer !== undefined) settings.abandonedCartOffer = data.store.abandoned_cart_offer && { percentOff: data.store.abandoned_cart_offer.percent_off };
     if (data.store.delivery_protection !== undefined) settings.deliveryProtection = data.store.delivery_protection && { percent: data.store.delivery_protection.percent, minMinor: data.store.delivery_protection.min_minor };

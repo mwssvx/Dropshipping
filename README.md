@@ -1592,3 +1592,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **One more ask** (`sendReviewReminders` in `packages/core/src/review-requests.ts`): under Review requests, "Send one reminder a week later to buyers who haven't reviewed yet". A week after the request, a buyer who hasn't reviewed anything from that order gets "Still time to review the …", with the same star links, saying it's the last time they'll be asked. Most review apps send this second email; it roughly doubles how many buyers answer.
 2. **Never pushy**: once per order, not after a review from the order, not to buyers who unsubscribed, and only for requests from the last two weeks, so turning it on doesn't email old buyers. It runs with the review requests, so no new scheduled job. The setting goes along in the store file. Migration `0154_review_reminders`.
+
+### Pickup and delivery days (after launch, part 283)
+
+1. **Pick a day** (`handoverDates` in `packages/core/src/handover-days.ts`): under Shipping, "Pickup and delivery days" lets a store that hands over orders itself tick the weekdays it's open, the notice it needs (same day to a week) and its time zone. Buyers who choose local pickup or local delivery then pick a day from the next 14 open days at checkout, and the day shows on the order for the store ("Collecting on Thursday, November 5") and the buyer ("Pickup day: …"), in the buyer's language.
+2. **Checked on the server**: checkout refuses a missing day or one outside the list, shipped orders never carry a day, and follow-up or repeat orders skip it. The setting goes along in the store file. Migration `0155_pickup_days`.

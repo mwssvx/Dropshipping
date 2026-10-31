@@ -1,6 +1,6 @@
 import { PixelEvent } from "@/components/PixelEvent";
 import { notFound } from "next/navigation";
-import { buyerAmounts, buyerCancelOptions, buyerThread, formatDeliveryDate, formatDeliveryWindow, orderDelivery, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems, formatShipsBy, storePixels, surveyFor, orderDownloads, formatFileSize, transferDueBy } from "@sf/core";
+import { buyerAmounts, formatHandoverDay, buyerCancelOptions, buyerThread, formatDeliveryDate, formatDeliveryWindow, orderDelivery, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems, formatShipsBy, storePixels, surveyFor, orderDownloads, formatFileSize, transferDueBy } from "@sf/core";
 import Link from "next/link";
 import { db, fulfillment, storeAddress } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
@@ -72,6 +72,7 @@ export default async function OrderStatusPage({ params, searchParams }: { params
     : download === "refunded" ? "This item was refunded, so its download is closed."
     : download === "unpaid" ? "Downloads open once the order is paid." : null;
   const pickupText = paid && (order.pickup || order.localDelivery) ? await storeT(handle) : null;
+  const dayLang = (await storeLang(handle)) ?? "en-US";
   const steps = order.pickup ? [
     { label: "Order confirmed", done: paid },
     { label: "Being prepared", done: paid },
@@ -245,6 +246,7 @@ export default async function OrderStatusPage({ params, searchParams }: { params
         <p className="banner banner-info text-sm" role="status">
           {order.fulfillmentStatus === "delivered" ? pickupText.localDelivered(shop.name) : pickupText.localDeliveryWaiting(shop.name)}
           {order.fulfillmentStatus !== "delivered" && shop.localDeliveryArea?.note && <> {shop.localDeliveryArea.note.replace(/\.$/, "")}.</>}
+          {order.fulfillmentStatus !== "delivered" && order.handoverOn && <> {pickupText.deliveryDay}: {formatHandoverDay(order.handoverOn, dayLang)}.</>}
         </p>
       )}
       {pickupText && order.pickup && order.paymentStatus !== "refunded" && (
@@ -260,6 +262,7 @@ export default async function OrderStatusPage({ params, searchParams }: { params
           ) : (
             <p>{pickupText.pickupWaiting}</p>
           )}
+          {order.fulfillmentStatus !== "delivered" && order.handoverOn && <p>{pickupText.pickupDay}: {formatHandoverDay(order.handoverOn, dayLang)}</p>}
         </section>
       )}
       {paid && shipped.length === 0 && !order.preorderShipsBy && !order.pickup && !order.localDelivery && (
