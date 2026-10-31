@@ -1,7 +1,7 @@
 // The store's blog: posts that bring buyers in from search engines and point them at products.
 // Bodies are plain text: blank lines split paragraphs, "## " starts a subheading and "• " a
 // bullet, so nothing pasted can run in a buyer's browser. The AI writer can draft a post.
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, lte } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
@@ -48,10 +48,27 @@ async function parse(db: Db, shopId: string, input: PostInput, exceptId?: string
 
 const NEARLY_EMPTY = "Write a bit more before publishing: the post is nearly empty.";
 
-export async function createPost(db: Db, shopId: string, input: PostInput, opts: { aiGenerated?: boolean; published?: boolean; now?: Date } = {}) {
+/** How far ahead a post can be scheduled. */
+export const POST_SCHEDULE_MAX_DAYS = 365;
+
+/** On the store: published, and its publish time has come. A post published for later waits. */
+export const livePost = (now = new Date()) => and(eq(schema.blogPosts.status, "published"), lte(schema.blogPosts.publishedAt, now));
+
+/** Whether a post is published but waiting for its time. */
+export const isScheduled = (post: Pick<Post, "status" | "publishedAt">, now = new Date()) => post.status === "published" && !!post.publishedAt && post.publishedAt > now;
+
+function checkSchedule(at: Date | null | undefined, now: Date) {
+  if (!at || at <= now) return null;
+  if (Number.isNaN(at.getTime())) throw new UserError("Pick a date and time to publish.");
+  if (at.getTime() - now.getTime() > POST_SCHEDULE_MAX_DAYS * 86_400_000) throw new UserError("Schedule the post for within the next year.");
+  return at;
+}
+
+export async function createPost(db: Db, shopId: string, input: PostInput, opts: { aiGenerated?: boolean; published?: boolean; publishAt?: Date | null; now?: Date } = {}) {
   const data = await parse(db, shopId, input);
   if (opts.published && data.body.trim().length < 50) throw new UserError(NEARLY_EMPTY);
-  const publish = opts.published ? { status: "published" as const, publishedAt: opts.now ?? new Date() } : {};
+  const now = opts.now ?? new Date();
+  const publish = opts.published ? { status: "published" as const, publishedAt: checkSchedule(opts.publishAt, now) ?? now } : {};
   const [row] = await db.insert(schema.blogPosts).values({ ...data, ...publish, shopId, aiGenerated: !!opts.aiGenerated }).returning();
   return row!;
 }
@@ -67,13 +84,19 @@ export async function updatePost(db: Db, shopId: string, postId: string, input: 
   return row;
 }
 
-/** Publishing keeps the first publish date, so editing a live post doesn't move it to the top. */
-export async function setPostPublished(db: Db, shopId: string, postId: string, published: boolean, now = new Date()) {
+/**
+ * Publishing keeps the first publish date, so editing a live post doesn't move it to the top. With
+ * `at` in the future the post is scheduled: published, but only on the store from then. Publishing
+ * a scheduled post without `at` puts it up now.
+ */
+export async function setPostPublished(db: Db, shopId: string, postId: string, published: boolean, now = new Date(), at?: Date | null) {
   const post = await getPost(db, shopId, postId);
   if (published && post.body.trim().length < 50) throw new UserError(NEARLY_EMPTY);
+  const later = published ? checkSchedule(at, now) : null;
+  const publishedAt = !published ? (isScheduled(post, now) ? null : post.publishedAt) : later ?? (post.publishedAt && post.publishedAt <= now ? post.publishedAt : now);
   const [row] = await db
     .update(schema.blogPosts)
-    .set({ status: published ? "published" : "draft", publishedAt: published ? (post.publishedAt ?? now) : post.publishedAt, updatedAt: new Date() })
+    .set({ status: published ? "published" : "draft", publishedAt, updatedAt: new Date() })
     .where(eq(schema.blogPosts.id, post.id))
     .returning();
   return row!;
@@ -100,7 +123,7 @@ export async function getPost(db: Db, shopId: string, postId: string) {
 /** The store's blog page, newest first. */
 export async function listPublishedPosts(db: Db, shopId: string, limit = 50) {
   return db.query.blogPosts.findMany({
-    where: and(eq(schema.blogPosts.shopId, shopId), eq(schema.blogPosts.status, "published")),
+    where: and(eq(schema.blogPosts.shopId, shopId), livePost()),
     orderBy: desc(schema.blogPosts.publishedAt),
     limit,
   });
@@ -124,7 +147,7 @@ export type PostCard = Awaited<ReturnType<typeof latestPosts>>[number];
 /** One published post with the featured products that are still on sale, in the merchant's order. */
 export async function getPublishedPostByHandle(db: Db, shopId: string, handle: string) {
   const post = await db.query.blogPosts.findFirst({
-    where: and(eq(schema.blogPosts.shopId, shopId), eq(schema.blogPosts.handle, handle), eq(schema.blogPosts.status, "published")),
+    where: and(eq(schema.blogPosts.shopId, shopId), eq(schema.blogPosts.handle, handle), livePost()),
   });
   if (!post) throw new NotFoundError("Post");
   return { post, products: await featuredProducts(db, shopId, post) };

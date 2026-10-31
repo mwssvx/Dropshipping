@@ -91,3 +91,42 @@ test("a merchant writes a post by hand, and an empty post can't be published", a
   await page.getByRole("button", { name: "Delete this post" }).click();
   await expect(page.getByText("No posts yet.")).toBeVisible();
 });
+
+test("a post scheduled for later waits, then goes up when the time is cleared", async ({ page }, info) => {
+  const id = `${info.project.name}-later-${Date.now()}`;
+  const store = await newMerchantWithLamp(page, id);
+  await page.goto("/admin/blog/new");
+  await page.getByLabel("Title").fill("Winter is coming");
+  await page.getByLabel("Post").fill("Long nights are lamp season. Here is what we are bringing in for the cold months ahead.");
+  await page.getByLabel("Published").check();
+  // Tomorrow at 9:00 in the merchant's own time zone.
+  const tomorrow = await page.evaluate(() => {
+    const d = new Date(Date.now() + 86_400_000);
+    d.setHours(9, 0, 0, 0);
+    return { local: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T09:00`, label: d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) };
+  });
+  await page.getByLabel("Publish on (optional)").fill(tomorrow.local);
+  await page.getByRole("button", { name: "Save post" }).click();
+  await expect(page.getByText("Saved.")).toBeVisible();
+  // The time comes back in the same zone, and there's nothing to view yet.
+  await expect(page.getByLabel("Publish on (optional)")).toHaveValue(tomorrow.local);
+  await expect(page.getByRole("link", { name: "View ↗" })).toHaveCount(0);
+  await page.goto("/admin/blog");
+  await expect(page.getByRole("row", { name: /Winter is coming/ })).toContainText("Scheduled for");
+
+  const buyer = await page.context().browser()!.newPage();
+  await buyer.goto(`${store}/blog`);
+  await expect(buyer.getByText("Nothing here yet.")).toBeVisible();
+  expect((await buyer.goto(`${store}/blog/winter-is-coming`))!.status()).toBe(404);
+
+  // Clearing the time publishes it on save.
+  await page.getByRole("link", { name: "Winter is coming" }).click();
+  await expect(page.getByLabel("Publish on (optional)")).toHaveValue(tomorrow.local);
+  await page.getByLabel("Publish on (optional)").fill("");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("Saved.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "View ↗" })).toBeVisible();
+  await buyer.goto(`${store}/blog`);
+  await expect(buyer.getByRole("link", { name: "Winter is coming" })).toBeVisible();
+  await buyer.close();
+});

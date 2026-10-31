@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { listActiveProducts, listPosts } from "@sf/core";
+import { isScheduled, listActiveProducts, listPosts } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { draftPostAction } from "../../blog-actions";
 import { PageHeader } from "../PageHeader";
@@ -40,7 +40,15 @@ export default async function BlogPage() {
                       <Link href={`/admin/blog/${p.id}`} className="font-medium">{p.title}</Link>
                       {p.aiGenerated && <span className="ml-2 pill pill-info">AI draft</span>}
                     </td>
-                    <td>{p.status === "published" ? <span className="pill pill-success">Published {p.publishedAt ? date.format(p.publishedAt) : ""}</span> : <span className="pill pill-neutral">Draft</span>}</td>
+                    <td>
+                      {isScheduled(p) ? (
+                        <span className="pill pill-info">Scheduled for {date.format(p.publishedAt!)}</span>
+                      ) : p.status === "published" ? (
+                        <span className="pill pill-success">Published {p.publishedAt ? date.format(p.publishedAt) : ""}</span>
+                      ) : (
+                        <span className="pill pill-neutral">Draft</span>
+                      )}
+                    </td>
                     <td className="hint">{date.format(p.updatedAt)}</td>
                   </tr>
                 ))}

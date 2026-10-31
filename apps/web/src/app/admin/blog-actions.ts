@@ -1,14 +1,20 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createPost, deletePost, draftPostWithAi, getPost, setPostPublished, updatePost, UserError, type PostInput } from "@sf/core";
+import { createPost, deletePost, draftPostWithAi, getPost, isScheduled, setPostPublished, updatePost, UserError, type PostInput } from "@sf/core";
 import { agents, requireShop } from "@/lib/server";
 import type { FormState } from "./actions";
 
 /** On an error the form shows what was typed again, instead of the saved version. */
-export type PostState = FormState & { values?: { title: string; handle: string; excerpt: string; body: string; imageUrl: string; productIds: string[]; published: boolean } };
+export type PostState = FormState & { values?: { title: string; handle: string; excerpt: string; body: string; imageUrl: string; productIds: string[]; published: boolean; publishAt: string } };
 
-const typed = (form: FormData) => ({ ...(readPost(form) as Required<Omit<PostInput, "productIds">>), productIds: form.getAll("productIds").map(String), published: form.get("published") === "on" });
+const typed = (form: FormData) => ({ ...(readPost(form) as Required<Omit<PostInput, "productIds">>), productIds: form.getAll("productIds").map(String), published: form.get("published") === "on", publishAt: String(form.get("publishAt") ?? "") });
+
+/** "Publish on": an exact time from the browser, which read it in the merchant's own time zone. */
+const publishAt = (form: FormData) => {
+  const v = String(form.get("publishAt") ?? "");
+  return v ? new Date(v) : null;
+};
 
 const readPost = (form: FormData): PostInput => ({
   title: String(form.get("title") ?? ""),
@@ -35,7 +41,7 @@ async function attempt<T>(fn: () => Promise<T>): Promise<{ error: string } | { o
 
 export async function createPostAction(_: PostState, form: FormData): Promise<PostState> {
   const { shop, db } = await requireShop("pages");
-  const r = await attempt(() => createPost(db, shop.id, readPost(form), { published: form.get("published") === "on" }));
+  const r = await attempt(() => createPost(db, shop.id, readPost(form), { published: form.get("published") === "on", publishAt: publishAt(form) }));
   if ("error" in r) return { ...r, values: typed(form) };
   refresh(shop.handle);
   redirect(`/admin/blog/${r.ok.id}?saved=1`);
@@ -46,7 +52,11 @@ export async function updatePostAction(id: string, _: PostState, form: FormData)
   const r = await attempt(async () => {
     await updatePost(db, shop.id, id, readPost(form));
     const wanted = form.get("published") === "on";
-    if (wanted !== ((await getPost(db, shop.id, id)).status === "published")) await setPostPublished(db, shop.id, id, wanted);
+    const post = await getPost(db, shop.id, id);
+    const at = publishAt(form);
+    // Publishing, unpublishing, or moving (or clearing) the time of a post that's waiting.
+    if (wanted !== (post.status === "published") || (wanted && (at !== null || isScheduled(post)) && at?.getTime() !== post.publishedAt?.getTime()))
+      await setPostPublished(db, shop.id, id, wanted, new Date(), at);
   });
   if ("error" in r) return { ...r, values: typed(form) };
   refresh(shop.handle);
