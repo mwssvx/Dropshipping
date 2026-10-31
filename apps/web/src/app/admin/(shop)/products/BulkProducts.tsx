@@ -23,8 +23,17 @@ const KINDS = [
   ["processing", "Set preparing time"],
   ["surcharge", "Set extra shipping"],
   ["weight", "Set the weight"],
+  ["cost", "Set what your own stock costs"],
 ] as const;
 type Kind = (typeof KINDS)[number][0];
+/** Why some picked products were left out of a change. */
+const SKIPPED: Partial<Record<Kind, string>> = {
+  ships_from: "Gift cards and downloads don't ship",
+  processing: "Gift cards and downloads don't ship",
+  surcharge: "Gift cards and downloads don't ship",
+  weight: "Gift cards and downloads don't ship",
+  cost: "Supplier products keep the supplier's cost, and gift cards have none",
+};
 
 export function BulkProducts({ rows, collections, tags = [], recent, total = rows.length, list = {}, maxAll = 500, home = "US", storeDays = 2, currency = "USD" }: {
   rows: BulkRow[];
@@ -55,6 +64,7 @@ export function BulkProducts({ rows, collections, tags = [], recent, total = row
   const [amount, setAmount] = useState("");
   const [kg, setKg] = useState("");
   const [onlyMissing, setOnlyMissing] = useState(true);
+  const [costPercent, setCostPercent] = useState("40");
   const [belowCost, setBelowCost] = useState(false);
   // Every product in the list, on every page, rather than the ones ticked here.
   const [everything, setEverything] = useState(false);
@@ -65,7 +75,7 @@ export function BulkProducts({ rows, collections, tags = [], recent, total = row
   const all = picked.size === rows.length && rows.length > 0;
   const count = everything ? total : picked.size;
   // A preview is for the products and change it was made from; touching either asks again.
-  const key = JSON.stringify([everything ? "all" : [...picked].sort(), kind, percent, ending, collectionId, tag, country, days, amount, kg, onlyMissing]);
+  const key = JSON.stringify([everything ? "all" : [...picked].sort(), kind, percent, ending, collectionId, tag, country, days, amount, kg, onlyMissing, costPercent]);
   const preview = state.preview && state.key === key ? state.preview : null;
   const needsCollection = kind === "add" || kind === "remove";
 
@@ -89,6 +99,7 @@ export function BulkProducts({ rows, collections, tags = [], recent, total = row
         <input type="hidden" name="days" value={days} />
         <input type="hidden" name="amount" value={amount} />
         <input type="hidden" name="kg" value={kg} />
+        <input type="hidden" name="costPercent" value={costPercent} />
         {onlyMissing && <input type="hidden" name="onlyMissing" value="on" />}
         <input type="hidden" name="key" value={key} />
         {belowCost && <input type="hidden" name="belowCost" value="on" />}
@@ -175,6 +186,19 @@ export function BulkProducts({ rows, collections, tags = [], recent, total = row
                   </label>
                 </>
               )}
+              {kind === "cost" && (
+                <>
+                  <div className="field">
+                    <label className="label" htmlFor="bulk-cost">What each costs you (% of its price)</label>
+                    <input className="input w-40 num" id="bulk-cost" value={costPercent} inputMode="numeric" maxLength={3} onChange={(e) => setCostPercent(e.target.value)} placeholder="40" aria-describedby="bulk-cost-hint" />
+                    <span className="hint text-sm" id="bulk-cost-hint">For your profit report. Supplier products keep the supplier&apos;s cost.</span>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm self-center">
+                    <input type="checkbox" checked={onlyMissing} onChange={(e) => setOnlyMissing(e.target.checked)} />
+                    Only options with no cost yet
+                  </label>
+                </>
+              )}
               <button type="submit" className="btn btn-secondary" name="intent" value="preview">Preview</button>
             </div>
             {all && total > rows.length && (
@@ -212,7 +236,7 @@ export function BulkProducts({ rows, collections, tags = [], recent, total = row
                       </table>
                     </div>
                     {preview.changes.length > 50 && <p className="hint">And {preview.changes.length - 50} more.</p>}
-                    {preview.skipped > 0 && <p className="hint">Gift cards keep their prices ({preview.skipped} skipped).</p>}
+                    {preview.skipped > 0 && <p className="hint">{SKIPPED[kind] ?? "Gift cards keep their prices"} ({preview.skipped} skipped).</p>}
                     {preview.full > 0 && <p className="hint">{preview.full === 1 ? "1 product already has" : `${preview.full} products already have`} 20 tags, so {preview.full === 1 ? "it was" : "they were"} left out.</p>}
                     {preview.belowCost > 0 && (
                       <label className="flex items-center gap-2 text-sm">

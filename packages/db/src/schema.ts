@@ -95,7 +95,8 @@ export type BulkEditAction =
   | { kind: "ships_from"; country: string | null }
   | { kind: "processing"; days: number | null }
   | { kind: "surcharge"; amountMinor: number }
-  | { kind: "weight"; grams: number; onlyMissing: boolean };
+  | { kind: "weight"; grams: number; onlyMissing: boolean }
+  | { kind: "cost"; percent: number; onlyMissing: boolean };
 /** What a bulk edit replaced, and what it set, so it can be undone without losing later edits. */
 export type BulkEditSnapshot = {
   products: { id: string; status: "draft" | "active" | "archived" }[];
@@ -111,6 +112,8 @@ export type BulkEditSnapshot = {
   surcharge?: { productId: string; before: number; after: number }[];
   /** Each option's packed weight before and after, in grams. */
   weight?: { variantId: string; before: number | null; after: number }[];
+  /** What each option of the store's own stock costs it, before and after. */
+  cost?: { variantId: string; before: number | null; after: number }[];
 };
 
 export type PricingRule = { kind: "multiplier" | "fixed"; value: number; ending: "99" | "95" | "00" | "none"; compareAtPercent: number | null; minPriceMinor: number };

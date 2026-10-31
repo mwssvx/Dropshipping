@@ -56,6 +56,11 @@ function actionFrom(form: FormData): BulkEditInput {
       if (grams == null || Number.isNaN(grams)) throw new UserError("Enter the weight in kg, like 0.5.");
       return { kind: "weight", grams, onlyMissing: form.get("onlyMissing") === "on" };
     }
+    case "cost": {
+      const raw = String(form.get("costPercent") ?? "").replace(/[%\s]/g, "");
+      if (!raw) throw new UserError("Enter the cost as a percent of the price, like 40.");
+      return { kind: "cost", percent: Number(raw), onlyMissing: form.get("onlyMissing") === "on" };
+    }
     default:
       throw new UserError("Pick what to change.");
   }
