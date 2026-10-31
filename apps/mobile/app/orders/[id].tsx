@@ -62,6 +62,8 @@ type Detail = {
   }[];
   /** A payment link still waiting to be paid. */
   payLink?: { url: string; note: string | null } | null;
+  /** The buyer chose to pay by bank transfer and it hasn't been marked paid yet. */
+  transfer?: { dueBy: string | null; canMark: boolean } | null;
   /** The buyer, when this person can open customers. */
   customer?: { id: string; orders: number; tags: string[] } | null;
 };
@@ -89,7 +91,7 @@ export default function OrderScreen() {
   const { id, made } = useLocalSearchParams<{ id: string; made?: string }>();
   const order = useApi<Detail>(`orders/${id}`);
   const can = useCan();
-  const [panel, setPanel] = useState<null | "refund" | "tracking" | "block" | "accept">(null);
+  const [panel, setPanel] = useState<null | "refund" | "tracking" | "block" | "accept" | "transfer">(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{ tone: "success" | "critical"; text: string } | null>(null);
   const [amount, setAmount] = useState("");
@@ -131,7 +133,31 @@ export default function OrderScreen() {
       </View>
       {note ? <Banner tone={note.tone}>{note.text}</Banner> : made ? <Banner tone="success">{made}</Banner> : null}
 
-      {o.payLink ? (
+      {o.transfer ? (
+        <Card>
+          <View role="region" aria-label="Bank transfer" style={{ gap: space(2) }}>
+            <Heading>Waiting for a bank transfer</Heading>
+            <Body muted>
+              {`${o.shippingAddress.name.split(" ")[0]} was emailed your account details, with #${o.number} as the reference.${o.transfer.dueBy ? ` It should arrive by ${longDay.format(new Date(o.transfer.dueBy))}.` : ""} Nothing goes to the supplier until it's marked paid.`}
+            </Body>
+            {o.transfer.canMark ? (
+              panel === "transfer" ? (
+                <>
+                  <Body>Only mark it paid once the money is in your account. It goes to the supplier straight away.</Body>
+                  <View style={{ flexDirection: "row", gap: space(2), flexWrap: "wrap" }}>
+                    <Button label="Mark as paid" onPress={() => run("transfer", `orders/${o.id}/transfer-paid`, {})} busy={busy === "transfer"} disabled={!!busy} />
+                    <Button label="Cancel" kind="ghost" onPress={() => setPanel(null)} disabled={!!busy} />
+                  </View>
+                </>
+              ) : (
+                <Button label="Mark as paid…" onPress={() => setPanel("transfer")} disabled={!!busy} />
+              )
+            ) : (
+              <Body muted>The store owner marks it paid when the money arrives.</Body>
+            )}
+          </View>
+        </Card>
+      ) : o.payLink ? (
         <Card>
           <View role="region" aria-label="Payment link" style={{ gap: space(2) }}>
             <Heading>{`Waiting for ${o.shippingAddress.name.split(" ")[0]} to pay`}</Heading>

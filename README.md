@@ -1976,3 +1976,7 @@ Analytics in the app has How buyers found you, for people who look after marketi
 ### Rewards in the app (after launch, part 374)
 
 Today has a Rewards button for people who look after marketing. Turn reward points on or off, set how many points buyers earn per 1.00 and what 100 points are worth (with the sentence buyers see), and see how many buyers have points, what they'd be worth, how many were swapped, and who holds the most. A customer's page in the app shows their points and lets you add or take some with a note they see.
+
+### Bank transfers in the app (after launch, part 375)
+
+The Orders tab has a Bank transfers row. It lists orders waiting for the buyer's transfer, oldest first, with the day each should arrive by and which are past due. People who look after money can turn bank transfers on or off, write the account buyers pay into, and set the days to pay. An order waiting on a transfer says so in the app, and Mark as paid sends it to the supplier as soon as the money is in.
