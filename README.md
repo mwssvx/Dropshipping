@@ -2008,3 +2008,7 @@ The app's Settings has a Shipping pause row for people who look after shipping. 
 ### Running late emails in the app (after launch, part 382)
 
 The app's Settings has a Running late emails row for people who look after shipping. Turn on one friendly email to buyers whose order hasn't shipped after 3 to 14 days, add your own words, and choose whether buyers also hear once when a shipped parcel is past its delivery date.
+
+### Holiday order-by date in the app (after launch, part 383)
+
+The app's Settings has a Holiday order-by date row for people who look after shipping. Name the holiday and the day orders must arrive by, and product pages and the cart say the last day to order, counted from the slowest delivery date. Turn it off to remove the line.

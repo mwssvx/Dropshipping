@@ -2004,3 +2004,37 @@ test("running late emails turned on from the app", async ({ page, browser }) => 
   await page.getByRole("button", { name: "Save running late emails" }).click();
   await expect(page.getByText("Running late emails are off.")).toBeVisible();
 });
+
+test("a holiday order-by date set from the app shows on product pages", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `hd${Date.now()}`);
+  // A supplier's product has delivery dates to count back from.
+  await web.goto(`${WEB}/admin/products/import`);
+  await web.getByRole("link", { name: /sunset projection lamp/i }).click();
+  await web.getByRole("button", { name: "Import and publish" }).click();
+  await expect(web.getByText("Imported and live on your store.")).toBeVisible();
+  const stocking = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+
+  await signIn(page, email);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("link", { name: /^Holiday order-by date/ }).click();
+  await expect(page.getByRole("heading", { name: "Holiday order-by date", level: 1 })).toBeVisible();
+  await page.getByRole("switch", { name: "Show an order-by date for a holiday" }).click();
+  await expect(page.getByRole("textbox", { name: "Holiday" })).toHaveValue("Christmas");
+  const arrive = new Date(Date.now() + 60 * 86_400_000);
+  await page.getByRole("textbox", { name: "Must arrive by" }).fill(arrive.toISOString().slice(0, 10));
+  await page.getByRole("button", { name: "Save holiday date" }).click();
+  const short = arrive.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+  await expect(page.getByText(`Saved. Product pages say when to order for Christmas, arriving by ${short}.`)).toBeVisible();
+  await shot(page, "383-app-holiday-date");
+
+  const buyer = await (await browser.newContext()).newPage();
+  await buyer.goto(stocking);
+  await expect(buyer.locator("#holiday-deadline")).toHaveText(/^Order by [A-Z][a-z]{2} \d{1,2} to get it in time for Christmas\.$/);
+
+  await page.getByRole("switch", { name: "Show an order-by date for a holiday" }).click();
+  await page.getByRole("button", { name: "Save holiday date" }).click();
+  await expect(page.getByText("Removed. Product pages no longer give an order-by date.")).toBeVisible();
+  await buyer.reload();
+  await expect(buyer.getByRole("heading", { name: /Sunset Projection Lamp/ })).toBeVisible();
+  await expect(buyer.locator("#holiday-deadline")).toHaveCount(0);
+});
