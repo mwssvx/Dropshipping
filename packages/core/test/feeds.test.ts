@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { schema } from "@sf/db";
 import {
-  createGiftCardProduct, createSale, DemoModel, googleFeedXml, metaFeedCsv, percentOff, plainText, productFeed, saveTranslation, setShopLanguages,
+  addShippingRate, createGiftCardProduct, createSale, createShippingZone, DemoModel, validGtin, googleFeedXml, metaFeedCsv, percentOff, plainText, productFeed, saveTranslation, setShopLanguages,
 } from "../src";
 import { makeFixture } from "../evals/fixture";
 
@@ -53,7 +53,7 @@ describe("product feeds", () => {
     expect(xml).toContain("<g:availability>in_stock</g:availability><g:price>");
 
     const csv = metaFeedCsv(items).split("\n");
-    expect(csv[0]).toBe("id,item_group_id,title,description,availability,condition,price,sale_price,sale_price_effective_date,link,image_link,additional_image_link,brand,color,size");
+    expect(csv[0]).toBe("id,item_group_id,title,description,availability,condition,price,sale_price,sale_price_effective_date,link,image_link,additional_image_link,brand,color,size,gtin,shipping,shipping_weight");
     expect(csv.find((l) => l.startsWith(small!.id))).toContain(`,in stock,new,${(regular / 100).toFixed(2)} USD,`);
   });
 
@@ -71,5 +71,31 @@ describe("product feeds", () => {
     // A language the store doesn't offer is ignored.
     expect((await productFeed(f.db, shop, { origin, language: "fr" })).language).toBeNull();
     expect(plainText("<p>Soft &amp; warm</p><ul><li>USB</li><li>Timer</li></ul>")).toBe("Soft & warm USB Timer");
+  });
+
+  it("carries real barcodes, the shipping cost to the store's country and the weight", async () => {
+    expect(validGtin("4006381333931")).toBe("4006381333931");
+    expect(validGtin("0360-0029-1452")).toBe("036000291452");
+    expect(validGtin("4006381333932")).toBeNull();
+    expect(validGtin("SKU-123")).toBeNull();
+    expect(validGtin("00000000")).toBeNull();
+
+    const f = await setup();
+    const zone = await createShippingZone(f.db, f.shopRow.id, { name: "Home", countries: [f.shopRow.country] });
+    await addShippingRate(f.db, f.shopRow.id, zone.id, { name: "Standard", priceMinor: 499, freeOverMinor: null, minDays: 3, maxDays: 5 });
+    const [small, large] = await f.variants(f.products.lamp.id);
+    await f.db.update(schema.variants).set({ barcode: "4006381333931", sku: null, weightGrams: 350 }).where(eq(schema.variants.id, small!.id));
+    await f.db.update(schema.variants).set({ barcode: "12345", sku: null }).where(eq(schema.variants.id, large!.id));
+    const { items } = await productFeed(f.db, await f.shop(), { origin });
+    const item = items.find((i) => i.id === small!.id)!;
+    expect(item).toMatchObject({ gtin: "4006381333931", weightGrams: 350, shipping: { country: f.shopRow.country, priceMinor: 499 } });
+    const xml = googleFeedXml(f.shopRow, origin, items);
+    const entry = (id: string) => xml.split("<item>").find((e) => e.includes(`<g:id>${id}</g:id>`))!;
+    expect(entry(small!.id)).toContain("<g:gtin>4006381333931</g:gtin>");
+    expect(entry(small!.id)).not.toContain("identifier_exists");
+    expect(entry(small!.id)).toContain(`<g:shipping><g:country>${f.shopRow.country}</g:country><g:price>4.99 USD</g:price>`);
+    expect(entry(small!.id)).toContain("<g:shipping_weight>350 g</g:shipping_weight>");
+    expect(entry(large!.id)).toContain("<g:identifier_exists>no</g:identifier_exists>");
+    expect(metaFeedCsv(items).split("\n").find((l) => l.startsWith(small!.id))).toContain(`,4006381333931,${f.shopRow.country}::Standard:4.99 USD,350 g`);
   });
 });

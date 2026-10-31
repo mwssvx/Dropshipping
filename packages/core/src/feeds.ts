@@ -12,6 +12,7 @@ import { listActiveProducts } from "./products";
 import { salePrice, salesFor } from "./sales";
 import { csvCell } from "./payouts";
 import { reviewPhotoUrl } from "./reviews";
+import { homeShipping } from "./delivery";
 
 type Shop = typeof schema.shops.$inferSelect;
 
@@ -37,7 +38,21 @@ export type FeedItem = {
   size: string | null;
   /** What one holds and the amount its price per unit is for, as Google writes them ("250g", "100g"). */
   unitPricing: { measure: string; base: string } | null;
+  /** The option's barcode when it's a real GTIN (UPC, EAN or ITF-14 with a good check digit). */
+  gtin: string | null;
+  weightGrams: number | null;
+  /** The cheapest shipping to the store's country, with handling and transit days when known. */
+  shipping: { country: string; priceMinor: number; handlingDays: number; transit: { min: number; max: number } | null } | null;
 };
+
+/** A barcode Google takes as a GTIN: 8, 12, 13 or 14 digits whose last digit checks out. */
+export function validGtin(code: string | null | undefined) {
+  const digits = code?.replace(/[\s-]/g, "") ?? "";
+  if (!/^(\d{8}|\d{12}|\d{13}|\d{14})$/.test(digits) || /^0+$/.test(digits)) return null;
+  const body = digits.slice(0, -1).split("").reverse().map(Number);
+  const sum = body.reduce((n, d, i) => n + d * (i % 2 === 0 ? 3 : 1), 0);
+  return (10 - (sum % 10)) % 10 === Number(digits.at(-1)) ? digits : null;
+}
 
 /** Plain text from a description that may hold HTML, on one line. */
 export const plainText = (html: string) =>
@@ -70,6 +85,7 @@ export async function productFeed(db: Db, shop: Shop, opts: { origin: string; la
   const raw = await listActiveProducts(db, shop.id);
   const products = await localizeProducts(db, shop.id, language, raw);
   const sales = await salesFor(db, shop.id, products.map((p) => p.id), opts.now);
+  const shipping = await homeShipping(db, shop, products.filter((p) => !p.giftCard && !p.digital).flatMap((p) => p.variants));
   const items: FeedItem[] = [];
   const issues: FeedIssue[] = [];
   for (const p of products) {
@@ -111,6 +127,9 @@ export async function productFeed(db: Db, shop: Shop, opts: { origin: string; la
         color: optionNamed(v.options, ["color", "colour", "farbe", "couleur"]),
         size: optionNamed(v.options, ["size", "größe", "taille", "talla"]),
         unitPricing: googleUnitPricing(v.contents),
+        gtin: validGtin(v.barcode),
+        weightGrams: p.digital ? null : v.weightGrams,
+        shipping: p.digital ? null : (shipping.get(v.id) ?? null),
       });
     }
   }
@@ -150,10 +169,19 @@ export function googleFeedXml(shop: Pick<Shop, "name">, origin: string, items: F
       i.saleDates ? tag("g:sale_price_effective_date", dates(i.saleDates)) : "",
       tag("g:condition", "new"),
       tag("g:brand", i.brand),
-      i.sku ? tag("g:mpn", i.sku) : tag("g:identifier_exists", "no"),
+      i.gtin ? tag("g:gtin", i.gtin) : "",
+      i.sku ? tag("g:mpn", i.sku) : i.gtin ? "" : tag("g:identifier_exists", "no"),
       tag("g:color", i.color),
       tag("g:size", i.size),
       i.unitPricing ? tag("g:unit_pricing_measure", i.unitPricing.measure) + tag("g:unit_pricing_base_measure", i.unitPricing.base) : "",
+      i.shipping
+        ? `<g:shipping>${tag("g:country", i.shipping.country)}${tag("g:price", price(i.shipping.priceMinor, i.currency))}${
+            i.shipping.transit
+              ? tag("g:min_handling_time", "0") + tag("g:max_handling_time", String(i.shipping.handlingDays)) + tag("g:min_transit_time", String(i.shipping.transit.min)) + tag("g:max_transit_time", String(i.shipping.transit.max))
+              : ""
+          }</g:shipping>`
+        : "",
+      i.weightGrams ? tag("g:shipping_weight", `${i.weightGrams} g`) : "",
       "</item>",
     ]
       .filter(Boolean)
@@ -173,7 +201,7 @@ ${entries.join("\n")}
 
 /** Meta (Facebook and Instagram) catalog CSV. */
 export function metaFeedCsv(items: FeedItem[]) {
-  const header = ["id", "item_group_id", "title", "description", "availability", "condition", "price", "sale_price", "sale_price_effective_date", "link", "image_link", "additional_image_link", "brand", "color", "size"];
+  const header = ["id", "item_group_id", "title", "description", "availability", "condition", "price", "sale_price", "sale_price_effective_date", "link", "image_link", "additional_image_link", "brand", "color", "size", "gtin", "shipping", "shipping_weight"];
   const rows = items.map((i) => [
     i.id,
     i.groupId,
@@ -190,6 +218,10 @@ export function metaFeedCsv(items: FeedItem[]) {
     i.brand,
     i.color,
     i.size,
+    i.gtin,
+    // Meta's "country:region:service:price".
+    i.shipping ? `${i.shipping.country}::Standard:${price(i.shipping.priceMinor, i.currency)}` : "",
+    i.weightGrams ? `${i.weightGrams} g` : "",
   ]);
   return [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\n") + "\n";
 }

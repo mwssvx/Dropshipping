@@ -179,11 +179,32 @@ export async function productShipping(db: Db, shop: Shop, item: { priceMinor: nu
 }
 
 /**
+ * What shipping costs each option to the store's own country, for search engines and product
+ * feeds: the cheapest rate that fits its weight at its price (free over the threshold), with the
+ * handling and transit days when known. Options no rate fits are left out.
+ */
+export async function homeShipping(
+  db: Db,
+  shop: Shop,
+  variants: { id: string; priceMinor: number; weightGrams: number | null; shipDaysMin: number | null; shipDaysMax: number | null }[],
+) {
+  const out = new Map<string, { country: string; priceMinor: number; handlingDays: number; transit: { min: number; max: number } | null }>();
+  const { zones } = await listShippingZones(db, shop.id);
+  const all = zoneFor(zones, shop.country)?.rates ?? [];
+  for (const v of variants) {
+    const rates = all.filter((r) => fitsWeight(r, v.weightGrams ?? 0));
+    const price = (r: Rate) => (r.freeOverMinor !== null && v.priceMinor >= r.freeOverMinor ? 0 : r.priceMinor);
+    const best = [...rates].sort((a, b) => price(a) - price(b) || (a.maxDays ?? 99) - (b.maxDays ?? 99))[0];
+    if (best) out.set(v.id, { country: shop.country, priceMinor: price(best), handlingDays: shop.processingDays, transit: transitDays([v], best) });
+  }
+  return out;
+}
+
+/**
  * Shipping and returns for search engines, per option (schema.org `OfferShippingDetails` and
- * `MerchantReturnPolicy`), to the store's own country: the cheapest rate that fits the option's
- * weight at its price (free over the threshold), how long it takes, and the return window. Google
- * shows these as "Free delivery" and "30-day returns" beside the product, and Merchant Center
- * asks for them. Gift cards and downloads have neither.
+ * `MerchantReturnPolicy`), to the store's own country, from `homeShipping` and the return window.
+ * Google shows these as "Free delivery" and "30-day returns" beside the product, and Merchant
+ * Center asks for them. Gift cards and downloads have neither.
  */
 export async function searchOfferExtras(
   db: Db,
@@ -197,27 +218,23 @@ export async function searchOfferExtras(
     shop.returnWindowDays > 0
       ? { "@type": "MerchantReturnPolicy", applicableCountry: shop.country, returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow", merchantReturnDays: shop.returnWindowDays, returnMethod: "https://schema.org/ReturnByMail" }
       : { "@type": "MerchantReturnPolicy", applicableCountry: shop.country, returnPolicyCategory: "https://schema.org/MerchantReturnNotPermitted" };
-  const { zones } = await listShippingZones(db, shop.id);
-  const all = zoneFor(zones, shop.country)?.rates ?? [];
+  const shipping = await homeShipping(db, shop, variants);
   for (const v of variants) {
-    const rates = all.filter((r) => fitsWeight(r, v.weightGrams ?? 0));
-    const price = (r: Rate) => (r.freeOverMinor !== null && v.priceMinor >= r.freeOverMinor ? 0 : r.priceMinor);
-    const best = [...rates].sort((a, b) => price(a) - price(b) || (a.maxDays ?? 99) - (b.maxDays ?? 99))[0];
-    const transit = best ? transitDays([v], best) : null;
+    const ship = shipping.get(v.id);
     out.set(v.id, {
       hasMerchantReturnPolicy: returns,
-      ...(best
+      ...(ship
         ? {
             shippingDetails: {
               "@type": "OfferShippingDetails",
-              shippingRate: { "@type": "MonetaryAmount", value: (price(best) / 100).toFixed(2), currency: shop.currency },
-              shippingDestination: { "@type": "DefinedRegion", addressCountry: shop.country },
-              ...(transit
+              shippingRate: { "@type": "MonetaryAmount", value: (ship.priceMinor / 100).toFixed(2), currency: shop.currency },
+              shippingDestination: { "@type": "DefinedRegion", addressCountry: ship.country },
+              ...(ship.transit
                 ? {
                     deliveryTime: {
                       "@type": "ShippingDeliveryTime",
-                      handlingTime: { "@type": "QuantitativeValue", minValue: 0, maxValue: shop.processingDays, unitCode: "DAY" },
-                      transitTime: { "@type": "QuantitativeValue", minValue: transit.min, maxValue: transit.max, unitCode: "DAY" },
+                      handlingTime: { "@type": "QuantitativeValue", minValue: 0, maxValue: ship.handlingDays, unitCode: "DAY" },
+                      transitTime: { "@type": "QuantitativeValue", minValue: ship.transit.min, maxValue: ship.transit.max, unitCode: "DAY" },
                     },
                   }
                 : {}),
