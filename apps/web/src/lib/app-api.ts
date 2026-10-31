@@ -56,6 +56,12 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  analyticsReport,
+  comparisonRange,
+  CUTOFF_TIME_ZONES,
+  defaultCutoffZone,
+  periodTotals,
+  whenBuyersBuy,
   countryName,
   createPaymentLink,
   listActiveProducts,
@@ -469,6 +475,32 @@ const routes: Record<string, Handler> = {
     await resendPaymentLink(await refunds(), shop.id, params.id!);
     const o = await getOrder(db, shop.id, params.id!);
     return { ok: true, message: `Emailed to ${o.email} again.` };
+  },
+  // How the store is doing over 7, 30 or 90 days, against the days before or the same days last year, as on the web.
+  "GET analytics": async ({ url, db, shop }) => {
+    const days = [7, 30, 90].find((d) => String(d) === url.searchParams.get("days")) ?? 7;
+    const compare = url.searchParams.get("compare") === "year" ? "year" : "previous";
+    const now = new Date();
+    const to = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) + 86_400_000;
+    const range = { from: new Date(to - days * 86_400_000), to: new Date(to) };
+    const zone = shop.shipCutoff?.timeZone ?? defaultCutoffZone(shop.country);
+    const [r, before, when] = await Promise.all([
+      analyticsReport(db, shop.id, range),
+      periodTotals(db, shop.id, comparisonRange(range, compare), now),
+      whenBuyersBuy(db, shop.id, range, CUTOFF_TIME_ZONES.some(([z]) => z === zone) ? zone : "UTC"),
+    ]);
+    return {
+      days,
+      compare,
+      now: { salesMinor: r.salesMinor, orders: r.orders, averageOrderMinor: r.averageOrderMinor, visitors: r.visitors, conversion: r.conversion },
+      before,
+      byDay: r.days.map((d) => ({ date: d.date, salesMinor: d.salesMinor, orders: d.orders })),
+      funnel: r.funnel,
+      topProducts: r.topProducts.slice(0, 5),
+      salesBySource: r.salesBySource.slice(0, 5),
+      sources: r.sources.slice(0, 5),
+      busiest: when.busiest,
+    };
   },
   "GET questions": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
@@ -1039,6 +1071,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("disputes")) return "money";
   if (path.startsWith("questions")) return "reviews";
   if (path.startsWith("payment-links")) return "orders";
+  if (path.startsWith("analytics")) return "analytics";
   if (path.startsWith("checkouts")) return "orders";
   if (path.startsWith("store-status")) return "theme";
   if (path.startsWith("gift-cards")) return "gift_cards";

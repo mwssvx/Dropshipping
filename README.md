@@ -1916,3 +1916,7 @@ Questions shoppers ask on a product page now reach the phone: a push notificatio
 ### Payment links from the app (after launch, part 359)
 
 The Orders tab has Create a payment link, for a buyer who asked by message, phone or in person: pick the products and how many, add their address, a code and a note, and we email them a link to pay by card, with shipping and tax worked out as at checkout. The order then waits in the app with the link to share in a chat (or email it again), and once they pay it's an ordinary order that goes to the supplier.
+
+### Analytics in the app (after launch, part 360)
+
+Today has an Analytics button for people who can see the store's numbers. It shows sales after refunds, orders, visitors and how many of them bought, over the last 7, 30 or 90 days, each with how it moved against the days before or the same days last year. Below that: sales by day, the busiest time of the week, the steps from visit to order, the best sellers, what each source sold and where visitors came from, all counted the same way as the website's Analytics page.

@@ -84,6 +84,7 @@ export default function TodayScreen() {
               )}
             </Section>
           )}
+          {can("analytics") && <Button label="Analytics" kind="secondary" onPress={() => router.push("/analytics")} />}
           {can("inbox") && <Button label="Buyer inbox" kind="secondary" onPress={() => router.push("/inbox")} />}
           {can("reviews") && <Button label={t.waiting?.reviews ? `Reviews (${t.waiting.reviews} to check)` : "Reviews"} kind="secondary" onPress={() => router.push("/reviews")} />}
           {can("reviews") && <Button label={t.waiting?.questions ? `Questions (${t.waiting.questions} to answer)` : "Questions"} kind="secondary" onPress={() => router.push("/questions")} />}
