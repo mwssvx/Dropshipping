@@ -56,6 +56,11 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  BANK_DETAILS_MAX,
+  markTransferPaid,
+  setBankTransfer,
+  TRANSFER_DAYS,
+  transferDueBy,
   adjustPoints,
   customerPoints,
   describeRewards,
@@ -207,6 +212,7 @@ import type { Db } from "@sf/db";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { BRAND } from "./brand";
+import { afterOrderPaid } from "./webhooks";
 import { agents, campaigns, db, fulfillment, logged, mailer, platformUrl, notifyLater, payments, refunds, stock, storeAddress, partnerPortalUrl, subscriptions, supplierPortalUrl, suppliers, tax, testPayments } from "./server";
 
 type User = { id: string; email: string };
@@ -448,6 +454,8 @@ const routes: Record<string, Handler> = {
       customer: buyer,
       // A payment link still waiting: the link to share again, and the note that went with it.
       payLink: o.source === "payment_link" && (o.paymentStatus === "pending" || o.paymentStatus === "failed") ? { url: `${await storeAddress(shop)}/pay/${o.id}`, note: o.note } : null,
+      // The buyer chose to pay by bank transfer: when it should arrive, and whether this person can mark it paid.
+      transfer: o.manualPayment === "bank_transfer" && o.paymentStatus === "pending" ? { dueBy: transferDueBy(shop, o), canMark: can(role, "money") } : null,
       // A buyer's bank pulling the money back, with what the evidence has and lacks while it waits for an answer.
       disputes: can(role, "money") ? await orderDisputes(db, shop, o.id) : [],
       // On the store's blocked list (by email or address), so checkout turns them away.
@@ -1132,6 +1140,37 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, `${points > 0 ? "Added" : "Took away"} ${Math.abs(points).toLocaleString("en-US")} reward points in the app`, { href: `/admin/customers/${params.id}` });
     return { ok: true, points: balance, message: `Saved. They have ${balance.toLocaleString("en-US")} points now.` };
   },
+  // Bank transfers: orders waiting for the buyer's transfer, and the account details buyers pay into.
+  "GET bank-transfers": async ({ db, shop, role }) => {
+    const waiting = (await listOrders(db, shop.id))
+      .filter((o) => o.manualPayment === "bank_transfer" && o.paymentStatus === "pending")
+      .sort((a, b) => (a.manualPaymentAt?.getTime() ?? 0) - (b.manualPaymentAt?.getTime() ?? 0))
+      .slice(0, 200);
+    return {
+      on: !!shop.bankTransfer && shop.plan !== "free",
+      details: shop.bankTransfer?.details ?? "",
+      days: shop.bankTransfer?.days ?? TRANSFER_DAYS.default,
+      limits: { ...TRANSFER_DAYS, detailsMax: BANK_DETAILS_MAX },
+      freePlan: shop.plan === "free",
+      canEdit: can(role, "money"),
+      waiting: waiting.map((o) => ({ ...orderSummary(o), dueBy: transferDueBy(shop, o) })),
+    };
+  },
+  "PUT bank-transfers": async ({ req, db, shop, user }) => {
+    const b = await body<{ on?: unknown; details?: unknown; days?: unknown }>(req);
+    const on = b.on === true;
+    await setBankTransfer(db, shop, on ? { details: str(b.details), days: Number(b.days) } : null);
+    await logged({ shop, user, db }, on ? "Turned on bank transfers in the app" : "Turned off bank transfers in the app", { href: "/admin/orders?show=transfers" });
+    return { ok: true, message: on ? "Saved. Buyers can now pay by bank transfer on the payment page." : "Saved. Buyers pay by card only." };
+  },
+  "POST orders/:id/transfer-paid": async ({ params, db, shop, user }) => {
+    const o = await getOrder(db, shop.id, params.id!);
+    const paid = await markTransferPaid(db, shop.id, o.id);
+    if (!paid) return { ok: true, message: "This order is already paid." };
+    afterOrderPaid(o.id);
+    await logged({ shop, user, db }, "Marked the bank transfer for order {order} as paid in the app", { orderId: o.id });
+    return { ok: true, message: "Marked as paid. It goes to the supplier now, and the buyer gets their confirmation." };
+  },
   "GET questions": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
     const rows = await listQuestions(db, shop.id);
@@ -1693,6 +1732,7 @@ const routes: Record<string, Handler> = {
 function routeArea(key: string): Area | null {
   if (key === "POST orders/:id/refund") return "refunds";
   if (key === "POST customers/:id/credit") return "gift_cards";
+  if (key === "POST orders/:id/transfer-paid" || key === "PUT bank-transfers") return "money";
   const path = key.split(" ")[1]!;
   if (path.startsWith("orders")) return "orders";
   if (path.startsWith("products") || path.startsWith("imports")) return "products";
@@ -1718,6 +1758,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("campaigns")) return "marketing";
   if (path.startsWith("survey")) return "marketing";
   if (path.startsWith("rewards")) return "marketing";
+  if (path.startsWith("bank-transfers")) return "orders";
   if (path.startsWith("checkouts")) return "orders";
   if (path.startsWith("store-status")) return "theme";
   if (path.startsWith("gift-cards")) return "gift_cards";
