@@ -1669,3 +1669,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Buyers say it arrived** (`markArrivedByBuyer` in `packages/core/src/buyer-arrived.ts`): a shipped order's page asks "Got your order? Let the store know it arrived." with one button, in the buyer's language. Many carriers, and every parcel a store adds tracking to by hand, never report a delivery, so orders sat at "Shipped" for good. Pressing it marks the parcels delivered that day, which starts the return window and review requests like a carrier's delivery scan.
 2. It shows on the order's timeline as "Changed by the customer: Said it arrived", sends no email, takes the order off "Past their delivery date", and stops the "still on its way" email, which now points buyers at the button. Pickups and local deliveries have their own buttons for the store. No migration.
+
+### Saved addresses (after launch, part 299)
+
+1. **Send it to another place you've used** (`savedAddresses` in `packages/core/src/buyers.ts`): a signed-in buyer who has had orders sent to more than one address gets a "Your addresses" menu at the top of checkout's delivery details, newest first, with up to five of them and "A new address". Picking one fills in the name, address, postal code, country and phone (and the shipping rates follow), so a buyer who sends gifts to their mum or orders to work doesn't type it all again.
+2. The addresses come from the buyer's paid orders, so there's nothing extra to store or keep up: the same place typed a little differently counts once, pickups and unpaid tries are left out, and the fields stay editable. In six languages. No migration.

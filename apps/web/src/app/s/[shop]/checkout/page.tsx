@@ -1,6 +1,6 @@
 import { PixelEvent } from "@/components/PixelEvent";
 import { redirect } from "next/navigation";
-import { addonOffer, formatDeliveryWindow, rateDeliveryWindows, formatHandoverDay, handoverDates, convertAmount, convertPrice, protectionFee, countryName, fitsWeight, formatMoney, GIFT_CARD_SEND_DAYS, lastCheckoutDetails, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, onHoliday, LOCAL_DELIVERY_RATE_ID, localDeliveryPrice, PICKUP_RATE_ID, storePixels, taxExemptionFor, tipAmount, UserError } from "@sf/core";
+import { addonOffer, formatDeliveryWindow, rateDeliveryWindows, formatHandoverDay, handoverDates, convertAmount, convertPrice, protectionFee, countryName, fitsWeight, formatMoney, GIFT_CARD_SEND_DAYS, lastCheckoutDetails, savedAddresses, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, onHoliday, LOCAL_DELIVERY_RATE_ID, localDeliveryPrice, PICKUP_RATE_ID, storePixels, taxExemptionFor, tipAmount, UserError } from "@sf/core";
 import { buyerFx } from "@/lib/currency";
 import { currentBuyer } from "@/lib/buyer";
 import { readCart, readDiscountCode, readGiftCardCode } from "@/lib/cart";
@@ -44,6 +44,13 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
   // Signed-in buyers start with the details from their last order.
   const saved = buyer ? await lastCheckoutDetails(await db(), shop.id, buyer.email) : null;
   const initial = saved ? { email: saved.email, ...(saved.address ? Object.fromEntries(Object.entries(saved.address).map(([k, v]) => [k, String(v ?? "")])) : {}) } : undefined;
+  // And can send it to another address they've used before.
+  const addresses = buyer
+    ? (await savedAddresses(await db(), shop.id, buyer.email)).map((a) => ({
+        label: [a.name, a.line1, a.line2, `${a.city} ${a.postalCode}`.trim()].filter(Boolean).join(", "),
+        values: Object.fromEntries(Object.entries(a).map(([k, v]) => [k, String(v ?? "")])),
+      }))
+    : undefined;
   // Every rate the buyer could pick, priced for this cart in their currency, so the summary
   // follows the country and rate they choose.
   // Gift cards and downloads need no address, shipping or delivery add-ons.
@@ -113,6 +120,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
         handle={handle}
         defaultCountry={shop.country}
         initial={initial}
+        addresses={addresses}
         askPhone={shop.checkoutPhone}
         paidByGiftCard={!!quote.giftCard && quote.dueMinor === 0}
         countries={countries}
@@ -126,7 +134,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
           giftRecipientEmail: t.giftRecipientEmail, giftNote: t.giftNote, orderNote: t.orderNote,
           giftCardTo: t.giftCardTo, giftCardEmail: t.giftCardEmail, giftCardName: t.giftCardName, giftCardFrom: t.giftCardFrom,
           giftCardMessage: t.giftCardMessage, giftCardSendOn: t.giftCardSendOn, giftCardNote: t.giftCardNote,
-          pickupDay: t.pickupDay, deliveryDay: t.deliveryDay,
+          pickupDay: t.pickupDay, deliveryDay: t.deliveryDay, savedAddresses: t.savedAddresses, newAddress: t.newAddress,
         }}
         giftCardDays={quote.items.some((i) => i.giftCard) ? { min: new Date().toISOString().slice(0, 10), max: new Date(Date.now() + GIFT_CARD_SEND_DAYS * 86_400_000).toISOString().slice(0, 10) } : null}
         taxLabel={exempt ? t.taxExempt : quote.pricesIncludeTax ? t.taxIncluded : t.taxNextStep}

@@ -40,7 +40,7 @@ export type CheckoutText = Record<
   | "checkout" | "orderSummary" | "contact" | "newsAndOffers" | "delivery" | "email" | "fullName" | "address" | "address2" | "city" | "region" | "phone"
   | "postalCode" | "country" | "shipping" | "noShipping" | "placeOrder" | "continueToPayment" | "continuing" | "notAvailable" | "tax"
   | "giftCheckbox" | "giftFrom" | "giftMessage" | "giftRecipientEmail" | "giftNote" | "orderNote"
-  | "giftCardTo" | "giftCardEmail" | "giftCardName" | "giftCardFrom" | "giftCardMessage" | "giftCardSendOn" | "giftCardNote" | "pickupDay" | "deliveryDay",
+  | "giftCardTo" | "giftCardEmail" | "giftCardName" | "giftCardFrom" | "giftCardMessage" | "giftCardSendOn" | "giftCardNote" | "pickupDay" | "deliveryDay" | "savedAddresses" | "newAddress",
   string
 >;
 
@@ -49,6 +49,8 @@ type Props = {
   text: CheckoutText;
   defaultCountry: string;
   initial?: Record<string, string>;
+  /** A signed-in buyer's past addresses, newest first, each as form values with a one-line label. */
+  addresses?: { label: string; values: Record<string, string> }[];
   /** Whether the store asks for a phone number for the courier. */
   askPhone: "off" | "optional" | "required";
   paidByGiftCard?: boolean;
@@ -140,7 +142,7 @@ export function Checkout({ summary, footer, taxLabel, totalLabel, totalWithoutSh
 }
 
 function CheckoutForm({
-  handle, text: t, initial, askPhone, paidByGiftCard, countries, zones, country, onCountry, onPostal, rates, rate, onRate, protection, protect, onProtect, giftWrap, ageCheck, gift, onGift, wrap, onWrap, tips, tipPercent, onTip, giftCardDays,
+  handle, text: t, initial, addresses, askPhone, paidByGiftCard, countries, zones, country, onCountry, onPostal, rates, rate, onRate, protection, protect, onProtect, giftWrap, ageCheck, gift, onGift, wrap, onWrap, tips, tipPercent, onTip, giftCardDays,
 }: Omit<Props, "summary" | "footer" | "taxLabel" | "totalLabel" | "totalWithoutShipping" | "defaultCountry" | "currency"> & {
   country: string;
   onCountry: (c: string) => void;
@@ -181,6 +183,31 @@ function CheckoutForm({
       </fieldset>
       <fieldset className="flex flex-col gap-4">
         <legend className="font-semibold mb-2">{t.delivery}</legend>
+        {addresses && addresses.length > 1 && (
+          <div className="field">
+            <label className="label" htmlFor="savedAddress">{t.savedAddresses}</label>
+            <select
+              className="input"
+              id="savedAddress"
+              defaultValue="0"
+              onChange={(e) => {
+                // Fills the fields below; they stay editable, and nothing is sent from this menu itself.
+                const picked = addresses[Number(e.target.value)]?.values;
+                const f = e.currentTarget.form;
+                if (!f) return;
+                for (const k of ["name", "line1", "line2", "city", "region", "postalCode", "phone"]) {
+                  const input = f.elements.namedItem(k);
+                  if (input instanceof HTMLInputElement) input.value = picked?.[k] ?? "";
+                }
+                if (picked?.country && countries.some(([c]) => c === picked.country)) onCountry(picked.country);
+                onPostal(picked?.postalCode ?? "");
+              }}
+            >
+              {addresses.map((a, i) => <option key={i} value={i}>{a.label}</option>)}
+              <option value="new">{t.newAddress}</option>
+            </select>
+          </div>
+        )}
         <Field id="name" label={t.fullName} autoComplete="name" required values={v} />
         <Field id="line1" label={t.address} autoComplete="address-line1" required values={v} />
         <Field id="line2" label={t.address2} autoComplete="address-line2" values={v} />

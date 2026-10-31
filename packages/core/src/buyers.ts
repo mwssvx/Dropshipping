@@ -121,6 +121,37 @@ export async function lastCheckoutDetails(db: Db, shopId: string, buyerEmail: st
   return { email: buyerEmail, address: last?.shippingAddress ?? null };
 }
 
+/** How many past addresses a signed-in buyer can pick from at checkout. */
+export const SAVED_ADDRESSES_MAX = 5;
+
+/** Two addresses are the same place for the same person when these match, ignoring case and spacing. */
+const addressKey = (a: Address) => [a.name, a.line1, a.line2 ?? "", a.city, a.postalCode, a.country].map((x) => x.toLowerCase().replace(/\s+/g, " ").trim()).join("|");
+
+/**
+ * The different addresses a buyer has had orders sent to, newest first, so they can send this one
+ * to home, work or their mum's without typing it again. Read from their paid orders, so there's
+ * nothing extra to keep: an address they stop using drops off once five newer ones come along.
+ */
+export async function savedAddresses(db: Db, shopId: string, buyerEmail: string): Promise<Address[]> {
+  const orders = await db.query.orders.findMany({
+    where: and(eq(schema.orders.shopId, shopId), eq(schema.orders.email, buyerEmail.toLowerCase()), inArray(schema.orders.paymentStatus, [...PLACED]), eq(schema.orders.pickup, false)),
+    orderBy: desc(schema.orders.paidAt),
+    columns: { shippingAddress: true },
+    limit: 100,
+  });
+  const seen = new Set<string>();
+  const out: Address[] = [];
+  for (const { shippingAddress: a } of orders) {
+    if (!a?.line1 || !a.postalCode) continue;
+    const key = addressKey(a);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(a);
+    if (out.length === SAVED_ADDRESSES_MAX) break;
+  }
+  return out;
+}
+
 /**
  * The items of a past order that can still be bought, to put in the cart. Products the store took
  * down or that sold out are left out and counted, so the page can say so.
