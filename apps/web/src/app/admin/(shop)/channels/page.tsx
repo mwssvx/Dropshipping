@@ -20,6 +20,9 @@ export default async function ChannelsPage() {
   const unshipped = physical.length - shipped.length;
   const cheapest = shipped.length ? Math.min(...shipped.map((i) => i.shipping!.priceMinor)) : null;
   const noWeight = shipped.filter((i) => !i.weightGrams).length;
+  // Options sent from a supplier's warehouse in another country, by country.
+  const abroad = [...new Set(physical.map((i) => i.shipsFrom).filter((c): c is string => !!c && c !== shop.country))];
+  const fromAbroad = physical.filter((i) => i.shipsFrom && i.shipsFrom !== shop.country).length;
   const feeds = [
     {
       id: "google",
@@ -71,6 +74,12 @@ export default async function ChannelsPage() {
                 {unshipped > 0 && cheapest !== null && <span className="hint">{unshipped} {unshipped === 1 ? "option is" : "options are"} too heavy for every rate.</span>}{" "}
                 <Link href="/admin/shipping" className="underline">Shipping rates</Link>
               </li>
+              {fromAbroad > 0 && (
+                <li id="feed-ships-from">
+                  <span className="num font-semibold">{fromAbroad}</span> {fromAbroad === 1 ? "option ships" : "options ship"} from {abroad.map(countryName).join(", ")}, and the Google feed says so (ships from country).{" "}
+                  <span className="hint">Google expects longer delivery from abroad, so it&apos;s less likely to flag your delivery times.{fromAbroad < physical.length && ` The rest ship from ${countryName(shop.country)}.`}</span>
+                </li>
+              )}
               {noWeight > 0 && <li><span className="num font-semibold">{noWeight}</span> {noWeight === 1 ? "option has" : "options have"} no weight. <span className="hint">Google uses it to check shipping costs.</span></li>}
             </ul>
           </section>

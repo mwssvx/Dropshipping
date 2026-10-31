@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { schema } from "@sf/db";
 import {
-  addShippingRate, createGiftCardProduct, createSale, createShippingZone, DemoModel, validGtin, googleFeedXml, metaFeedCsv, percentOff, plainText, productFeed, saveTranslation, setShopLanguages,
+  addShippingRate, setCustomsInfo, createGiftCardProduct, createSale, createShippingZone, DemoModel, validGtin, googleFeedXml, metaFeedCsv, percentOff, plainText, productFeed, saveTranslation, setShopLanguages,
 } from "../src";
 import { makeFixture } from "../evals/fixture";
 
@@ -97,5 +97,12 @@ describe("product feeds", () => {
     expect(entry(small!.id)).toContain("<g:shipping_weight>350 g</g:shipping_weight>");
     expect(entry(large!.id)).toContain("<g:identifier_exists>no</g:identifier_exists>");
     expect(metaFeedCsv(items).split("\n").find((l) => l.startsWith(small!.id))).toContain(`,4006381333931,${f.shopRow.country}::Standard:4.99 USD,350 g`);
+    // Every physical option says where it ships from: home, unless it's sent from a warehouse abroad.
+    expect(entry(small!.id)).toContain(`<g:ships_from_country>${f.shopRow.country}</g:ships_from_country>`);
+    await setCustomsInfo(f.db, f.shopRow.id, f.products.lamp.id, { shipsFrom: "CN" });
+    const abroad = await productFeed(f.db, await f.shop(), { origin });
+    expect(abroad.items.filter((i) => i.groupId === f.products.lamp.id).every((i) => i.shipsFrom === "CN")).toBe(true);
+    expect(abroad.items.filter((i) => i.groupId === f.products.projector.id).every((i) => i.shipsFrom === f.shopRow.country)).toBe(true);
+    expect(googleFeedXml(f.shopRow, origin, abroad.items).split("<item>").find((e) => e.includes(`<g:id>${small!.id}</g:id>`))).toContain("<g:ships_from_country>CN</g:ships_from_country>");
   });
 });
