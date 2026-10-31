@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { schema } from "@sf/db";
 import {
-  addShippingRate, setCustomsInfo, createGiftCardProduct, createSale, createShippingZone, DemoModel, validGtin, googleFeedXml, metaFeedCsv, percentOff, plainText, productFeed, saveTranslation, setShopLanguages,
+  addShippingRate, setCustomsInfo, setProductProcessingDays, createGiftCardProduct, createSale, createShippingZone, DemoModel, validGtin, googleFeedXml, metaFeedCsv, percentOff, plainText, productFeed, saveTranslation, setShopLanguages,
 } from "../src";
 import { makeFixture } from "../evals/fixture";
 
@@ -104,5 +104,10 @@ describe("product feeds", () => {
     expect(abroad.items.filter((i) => i.groupId === f.products.lamp.id).every((i) => i.shipsFrom === "CN")).toBe(true);
     expect(abroad.items.filter((i) => i.groupId === f.products.projector.id).every((i) => i.shipsFrom === f.shopRow.country)).toBe(true);
     expect(googleFeedXml(f.shopRow, origin, abroad.items).split("<item>").find((e) => e.includes(`<g:id>${small!.id}</g:id>`))).toContain("<g:ships_from_country>CN</g:ships_from_country>");
+    // A made-to-order product sends its own handling time.
+    await setProductProcessingDays(f.db, f.shopRow.id, f.products.lamp.id, 6);
+    const slow = await productFeed(f.db, await f.shop(), { origin });
+    expect(slow.items.find((i) => i.id === small!.id)!.shipping!.handlingDays).toBe(6);
+    expect(slow.items.find((i) => i.groupId === f.products.projector.id)!.shipping!.handlingDays).toBe(f.shopRow.processingDays);
   });
 });

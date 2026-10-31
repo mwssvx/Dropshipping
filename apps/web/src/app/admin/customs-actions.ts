@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { setBlockedCountries, setCustomsInfo, setMinAge, setReorderDays, setSwatches, UserError } from "@sf/core";
+import { setBlockedCountries, setCustomsInfo, setMinAge, setProductProcessingDays, setReorderDays, setSwatches, UserError } from "@sf/core";
 import { requireShop } from "@/lib/server";
 
 export type CustomsState = { error?: string; saved?: boolean };
@@ -74,6 +74,22 @@ export async function swatchesAction(productId: string, _: SwatchesState, form: 
   for (const [key, value] of form.entries()) if (key.startsWith("swatch:")) colors[key.slice("swatch:".length)] = String(value);
   try {
     await setSwatches(db, shop.id, productId, colors);
+    revalidatePath(`/admin/products/${productId}`);
+    return { saved: true };
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+}
+
+export type ProcessingDaysState = { error?: string; saved?: boolean };
+
+/** Saves the days a product takes to get ready before it ships, or goes back to the store's. */
+export async function processingDaysAction(productId: string, _: ProcessingDaysState, form: FormData): Promise<ProcessingDaysState> {
+  const { shop, db } = await requireShop("products");
+  const raw = String(form.get("processingDays") ?? "").trim();
+  try {
+    await setProductProcessingDays(db, shop.id, productId, raw ? Number(raw) : null);
     revalidatePath(`/admin/products/${productId}`);
     return { saved: true };
   } catch (e) {

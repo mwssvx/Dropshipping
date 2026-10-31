@@ -186,6 +186,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       hs_code: p.hsCode,
       origin_country: p.originCountry,
       ships_from: p.shipsFrom,
+      processing_days: p.processingDays,
       min_age: p.minAge,
       reorder_days: p.reorderDays,
       blocked_countries: p.blockedCountries,
@@ -445,6 +446,7 @@ const importSchema = z.object({
         swatches: z.record(z.string().max(200), z.string()).optional(),
         origin_country: z.string().max(10).nullable().optional(),
         ships_from: z.string().max(10).nullable().optional(),
+        processing_days: z.number().int().min(0).max(30).nullable().optional(),
         purchase_limit: z
           .object({ min: z.number().int().min(2).max(99).nullable(), max: z.number().int().min(1).max(99).nullable(), per_customer: z.number().int().min(1).max(999).nullable() })
           .nullable()
@@ -666,6 +668,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
           hsCode: /^\d{6,10}$/.test(x.hs_code ?? "") ? x.hs_code! : null,
           originCountry: countryCode(x.origin_country),
           shipsFrom: countryCode(x.ships_from),
+          processingDays: x.processing_days ?? null,
           minAge: x.min_age != null && x.min_age >= 13 && x.min_age <= 25 ? x.min_age : null,
           reorderDays: x.reorder_days != null && x.reorder_days >= 7 && x.reorder_days <= 180 ? x.reorder_days : null,
           blockedCountries: x.blocked_countries ?? [],

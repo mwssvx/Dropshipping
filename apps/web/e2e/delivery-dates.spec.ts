@@ -24,6 +24,7 @@ test("buyers see when their order will arrive", async ({ page, browser }, info) 
   await page.getByRole("button", { name: "Import and publish" }).click();
   await expect(page.getByText("Imported and live on your store.")).toBeVisible();
   const store = (await page.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!;
+  const productAdmin = page.url();
 
   // On by default, with 2 processing days; the merchant makes it 3.
   await page.goto("/admin/shipping");
@@ -44,6 +45,20 @@ test("buyers see when their order will arrive", async ({ page, browser }, info) 
   await expect(estimate).toContainText(new RegExp(`Arrives ${WINDOW.source} to United States`));
   await expect(estimate).toContainText("Ships within 3 days, then 6–10 days in transit.");
   await shot(buyer, "282-delivery-estimate");
+
+  // Made to order: this product takes a week to get ready, and its dates count that instead.
+  await page.goto(productAdmin);
+  const preparing = page.getByRole("region", { name: "Preparing time" });
+  await preparing.getByLabel("Days to get it ready").fill("40");
+  await preparing.getByRole("button", { name: "Save preparing time" }).click();
+  await expect(preparing.getByRole("alert")).toContainText("Enter 0 to 30 days");
+  await preparing.getByLabel("Days to get it ready").fill("7");
+  await preparing.getByRole("button", { name: "Save preparing time" }).click();
+  await expect(preparing.getByRole("status")).toHaveText("Saved. Delivery dates for this product count it.");
+  await expect(preparing.getByRole("note")).toContainText("Ready to ship in 7 days");
+  await buyer.reload();
+  await expect(estimate).toContainText("Ships within 7 days, then 6–10 days in transit.");
+  await page.goto("/admin/shipping");
 
   await buyer.getByRole("button", { name: "Add to cart" }).click();
   await expect(buyer.getByRole("link", { name: /^Cart, 1 item/ })).toBeVisible();

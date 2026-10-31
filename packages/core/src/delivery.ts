@@ -4,7 +4,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { schema, type Db, type ShipCutoff } from "@sf/db";
 import { z } from "zod";
-import { UserError } from "./errors";
+import { NotFoundError, UserError } from "./errors";
 import { holidayOrderBy } from "./holiday-deadline";
 import { preorderDeadline } from "./preorders";
 import { nextCutoff, shipDay } from "./ship-cutoff";
@@ -66,6 +66,39 @@ export async function setDeliveryEstimates(db: Db, shopId: string, input: z.inpu
   return parsed.data;
 }
 
+/** The most days a product can take to get ready on its own. */
+export const PRODUCT_PROCESSING_MAX = 30;
+
+/**
+ * Sets the days this product takes to get ready before it ships (made to order, print on demand),
+ * instead of the store's processing days; null goes back to the store's.
+ */
+export async function setProductProcessingDays(db: Db, shopId: string, productId: string, days: number | null) {
+  if (days !== null && !(Number.isInteger(days) && days >= 0 && days <= PRODUCT_PROCESSING_MAX)) {
+    throw new UserError(`Enter 0 to ${PRODUCT_PROCESSING_MAX} days, or leave it empty for your store's processing days.`);
+  }
+  const [row] = await db
+    .update(schema.products)
+    .set({ processingDays: days, updatedAt: new Date() })
+    .where(and(eq(schema.products.id, productId), eq(schema.products.shopId, shopId)))
+    .returning({ processingDays: schema.products.processingDays });
+  if (!row) throw new NotFoundError("Product");
+  return row;
+}
+
+/** The days an order takes to get ready: the slowest of its products, each its own or the store's. */
+export const processingFor = (shop: Pick<Shop, "processingDays">, products: { processingDays: number | null }[]) =>
+  products.reduce((most, p) => Math.max(most, p.processingDays ?? shop.processingDays), products.length ? 0 : shop.processingDays);
+
+/** Supplier days and processing days of the products behind these options. */
+async function variantDays(db: Db, variantIds: string[]) {
+  return db
+    .select({ shipDaysMin: schema.variants.shipDaysMin, shipDaysMax: schema.variants.shipDaysMax, processingDays: schema.products.processingDays })
+    .from(schema.variants)
+    .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
+    .where(inArray(schema.variants.id, variantIds));
+}
+
 /** The zone's rates for a country, falling back to the store's own country when it doesn't ship there. */
 async function ratesFor(db: Db, shop: Shop, country: string | null) {
   const { zones } = await listShippingZones(db, shop.id);
@@ -82,7 +115,7 @@ const cheapest = (rates: Rate[]) => [...rates].sort((a, b) => a.priceMinor - b.p
  */
 export async function productDelivery(db: Db, shop: Shop, productId: string, opts: { country?: string | null; now?: Date } = {}) {
   if (!shop.deliveryEstimates) return null;
-  const product = await db.query.products.findFirst({ where: and(eq(schema.products.id, productId), eq(schema.products.shopId, shop.id)), columns: { giftCard: true, digital: true } });
+  const product = await db.query.products.findFirst({ where: and(eq(schema.products.id, productId), eq(schema.products.shopId, shop.id)), columns: { giftCard: true, digital: true, processingDays: true } });
   if (!product || product.giftCard || product.digital) return null;
   const { country, rates } = await ratesFor(db, shop, opts.country ?? null);
   if (!rates.length) return null;
@@ -92,9 +125,10 @@ export async function productDelivery(db: Db, shop: Shop, productId: string, opt
   const now = opts.now ?? new Date();
   // The countdown shows once the cutoff is less than a day away.
   // No "order in the next hour" while shipping is paused.
-  const next = shop.shipCutoff && !activeShipPause(shop, now) ? nextCutoff(now, shop.processingDays, shop.shipCutoff) : null;
+  const days = processingFor(shop, [product]);
+  const next = shop.shipCutoff && !activeShipPause(shop, now) ? nextCutoff(now, days, shop.shipCutoff) : null;
   const cutoff = next && next.msLeft <= DAY ? next : null;
-  const window = deliveryWindow(shippingStart(shop, now), shop.processingDays, transit.min, transit.max, shop.shipCutoff);
+  const window = deliveryWindow(shippingStart(shop, now), days, transit.min, transit.max, shop.shipCutoff);
   return { ...window, country, cutoff, holiday: holidayOrderBy(shop.holidayDeadline, window, shop.shipCutoff, now) };
 }
 
@@ -115,7 +149,7 @@ export async function cartDelivery(
   if (!goods.length) return null;
   const { country, rates } = await ratesFor(db, shop, opts.country ?? null);
   if (!rates.length) return null;
-  const variants = await db.query.variants.findMany({ where: inArray(schema.variants.id, goods.map((i) => i.variantId)), columns: { shipDaysMin: true, shipDaysMax: true } });
+  const variants = await variantDays(db, goods.map((i) => i.variantId));
   const transit = transitDays(variants, cheapest(rates));
   if (!transit) return null;
   const now = opts.now ?? new Date();
@@ -125,7 +159,7 @@ export async function cartDelivery(
     return !latest || d > latest ? d : latest;
   }, null);
   if (preorder && preorder > now) return { ...deliveryWindow(preorder, 0, transit.min, transit.max), country, holiday: null };
-  const window = deliveryWindow(shippingStart(shop, now), shop.processingDays, transit.min, transit.max, shop.shipCutoff);
+  const window = deliveryWindow(shippingStart(shop, now), processingFor(shop, variants), transit.min, transit.max, shop.shipCutoff);
   return { ...window, country, holiday: holidayOrderBy(shop.holidayDeadline, window, shop.shipCutoff, now) };
 }
 
@@ -146,7 +180,8 @@ export async function rateDeliveryWindows(
   if (!shop.deliveryEstimates) return out;
   const goods = items.filter((i) => !i.giftCard && !i.digital);
   if (!goods.length) return out;
-  const variants = await db.query.variants.findMany({ where: inArray(schema.variants.id, goods.map((i) => i.variantId)), columns: { shipDaysMin: true, shipDaysMax: true } });
+  const variants = await variantDays(db, goods.map((i) => i.variantId));
+  const days = processingFor(shop, variants);
   const preorder = goods.reduce<Date | null>((latest, i) => {
     if (!i.preorderShipsBy) return latest;
     const d = preorderDeadline({ shipsBy: i.preorderShipsBy, limit: null });
@@ -155,7 +190,7 @@ export async function rateDeliveryWindows(
   for (const r of rates) {
     const transit = transitDays(variants, r);
     if (!transit) continue;
-    out.set(r.id, preorder && preorder > now ? deliveryWindow(preorder, 0, transit.min, transit.max) : deliveryWindow(shippingStart(shop, now), shop.processingDays, transit.min, transit.max, shop.shipCutoff));
+    out.set(r.id, preorder && preorder > now ? deliveryWindow(preorder, 0, transit.min, transit.max) : deliveryWindow(shippingStart(shop, now), days, transit.min, transit.max, shop.shipCutoff));
   }
   return out;
 }
@@ -168,7 +203,7 @@ export async function rateDeliveryWindows(
 export async function orderDelivery(db: Db, shop: Shop, order: Order, opts: { evenIfHidden?: boolean } = {}) {
   if ((!shop.deliveryEstimates && !opts.evenIfHidden) || !order.paidAt || order.pickup || order.localDelivery || order.paymentStatus === "refunded" || order.fulfillmentStatus === "delivered") return null;
   const lines = await db
-    .select({ shipDaysMin: schema.variants.shipDaysMin, shipDaysMax: schema.variants.shipDaysMax, giftCard: schema.products.giftCard, digital: schema.products.digital })
+    .select({ shipDaysMin: schema.variants.shipDaysMin, shipDaysMax: schema.variants.shipDaysMax, giftCard: schema.products.giftCard, digital: schema.products.digital, processingDays: schema.products.processingDays })
     .from(schema.orderLines)
     .innerJoin(schema.variants, eq(schema.variants.id, schema.orderLines.variantId))
     .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
@@ -186,7 +221,7 @@ export async function orderDelivery(db: Db, shop: Shop, order: Order, opts: { ev
   if (allShipped) return deliveryWindow(new Date(lastShipped), 0, transit.min, transit.max);
   // A pre-order waiting for stock is counted from the date it's promised to ship by.
   if (order.preorderShipsBy && order.fulfillmentStatus === "unfulfilled") return deliveryWindow(order.preorderShipsBy, 0, transit.min, transit.max);
-  return deliveryWindow(shippingStart(shop, order.paidAt), shop.processingDays, transit.min, transit.max, shop.shipCutoff);
+  return deliveryWindow(shippingStart(shop, order.paidAt), processingFor(shop, goods), transit.min, transit.max, shop.shipCutoff);
 }
 
 const short = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
@@ -229,7 +264,7 @@ export async function productShipping(db: Db, shop: Shop, item: { priceMinor: nu
 export async function homeShipping(
   db: Db,
   shop: Shop,
-  variants: { id: string; priceMinor: number; weightGrams: number | null; shipDaysMin: number | null; shipDaysMax: number | null }[],
+  variants: { id: string; priceMinor: number; weightGrams: number | null; shipDaysMin: number | null; shipDaysMax: number | null; processingDays?: number | null }[],
 ) {
   const out = new Map<string, { country: string; priceMinor: number; handlingDays: number; transit: { min: number; max: number } | null }>();
   const { zones } = await listShippingZones(db, shop.id);
@@ -238,7 +273,7 @@ export async function homeShipping(
     const rates = all.filter((r) => fitsWeight(r, v.weightGrams ?? 0));
     const price = (r: Rate) => (r.freeOverMinor !== null && v.priceMinor >= r.freeOverMinor ? 0 : r.priceMinor);
     const best = [...rates].sort((a, b) => price(a) - price(b) || (a.maxDays ?? 99) - (b.maxDays ?? 99))[0];
-    if (best) out.set(v.id, { country: shop.country, priceMinor: price(best), handlingDays: shop.processingDays, transit: transitDays([v], best) });
+    if (best) out.set(v.id, { country: shop.country, priceMinor: price(best), handlingDays: v.processingDays ?? shop.processingDays, transit: transitDays([v], best) });
   }
   return out;
 }
@@ -259,13 +294,13 @@ export function merchantReturnPolicy(shop: Pick<Shop, "country" | "returnWindowD
 export async function searchOfferExtras(
   db: Db,
   shop: Shop,
-  product: { id: string; giftCard: boolean; digital: boolean },
+  product: { id: string; giftCard: boolean; digital: boolean; processingDays?: number | null },
   variants: { id: string; priceMinor: number; weightGrams: number | null; shipDaysMin: number | null; shipDaysMax: number | null }[],
 ) {
   const out = new Map<string, Record<string, unknown>>();
   if (product.giftCard || product.digital) return out;
   const returns = merchantReturnPolicy(shop);
-  const shipping = await homeShipping(db, shop, variants);
+  const shipping = await homeShipping(db, shop, variants.map((v) => ({ ...v, processingDays: product.processingDays ?? null })));
   for (const v of variants) {
     const ship = shipping.get(v.id);
     out.set(v.id, {

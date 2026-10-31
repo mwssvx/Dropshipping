@@ -4,7 +4,7 @@
 // cancelling, ad tracking) and adds them as ordinary pages the merchant can edit. The
 // accessibility statement is what the European Accessibility Act asks EU stores to publish. A page that
 // already exists at the same address is never replaced. They're a starting point, not legal advice.
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, gt, inArray } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { UserError } from "./errors";
 import { holidayReturnsDates } from "./holiday-returns";
@@ -62,6 +62,8 @@ async function shippingPolicy(db: Db, shop: Shop) {
   const { zones, isDefault } = await listShippingZones(db, shop.id);
   const money = (m: number) => formatMoney(m, shop.currency);
   const parts = [`We prepare orders within ${shop.processingDays} business ${shop.processingDays === 1 ? "day" : "days"} of payment, then send you an email with tracking as soon as it's on its way.`];
+  const slower = await db.query.products.findFirst({ where: and(eq(schema.products.shopId, shop.id), eq(schema.products.status, "active"), gt(schema.products.processingDays, shop.processingDays)), columns: { id: true } });
+  if (slower) parts.push("Some items are made to order and take longer to prepare. Their product page says how long, and the delivery date at checkout counts it.");
   const lines: string[] = [];
   for (const z of zones) {
     const where = isDefault ? "Everywhere we ship" : list(z.countries.map(countryName));
