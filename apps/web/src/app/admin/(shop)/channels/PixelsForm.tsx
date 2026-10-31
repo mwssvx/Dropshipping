@@ -4,7 +4,7 @@ import { FormError } from "@/components/FormError";
 import { adPixelsAction, type PixelState } from "../../pixel-actions";
 
 /** The store's ad tags, and who is asked before they load. */
-export function PixelsForm({ meta, tiktok, google, consent }: { meta: string; tiktok: string; google: string; consent: "everyone" | "eu_uk" }) {
+export function PixelsForm({ meta, tiktok, google, pinterest, consent }: { meta: string; tiktok: string; google: string; pinterest: string; consent: "everyone" | "eu_uk" }) {
   const [state, action, pending] = useActionState(adPixelsAction, {} as PixelState);
   return (
     // Submitted by hand so React doesn't reset the fields after an error.
@@ -22,7 +22,7 @@ export function PixelsForm({ meta, tiktok, google, consent }: { meta: string; ti
           {state.saved ? "Saved. Your store now reports views, carts, checkouts and orders to these tags." : "Saved. No ad tags are loaded on your store."}
         </p>
       )}
-      <div className="grid sm:grid-cols-3 gap-3">
+      <div className="grid sm:grid-cols-2 gap-3">
         <div className="field">
           <label className="label" htmlFor="px-meta">Meta pixel ID</label>
           <input className="input num" id="px-meta" name="meta" inputMode="numeric" autoComplete="off" placeholder="1234567890123456" defaultValue={meta} />
@@ -34,6 +34,10 @@ export function PixelsForm({ meta, tiktok, google, consent }: { meta: string; ti
         <div className="field">
           <label className="label" htmlFor="px-google">Google tag ID</label>
           <input className="input" id="px-google" name="google" autoComplete="off" placeholder="G-ABC123DEF4" defaultValue={google} />
+        </div>
+        <div className="field">
+          <label className="label" htmlFor="px-pinterest">Pinterest tag ID</label>
+          <input className="input num" id="px-pinterest" name="pinterest" inputMode="numeric" autoComplete="off" placeholder="2612345678901" defaultValue={pinterest} />
         </div>
       </div>
       <fieldset className="flex flex-col gap-2">

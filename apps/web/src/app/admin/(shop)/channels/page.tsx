@@ -107,7 +107,7 @@ export default async function ChannelsPage() {
               language, and nothing loads until they agree. Saying no doesn&apos;t stop anyone from shopping.
             </p>
           </div>
-          <PixelsForm meta={shop.adPixels?.meta ?? ""} tiktok={shop.adPixels?.tiktok ?? ""} google={shop.adPixels?.google ?? ""} consent={shop.cookieConsent} />
+          <PixelsForm meta={shop.adPixels?.meta ?? ""} tiktok={shop.adPixels?.tiktok ?? ""} google={shop.adPixels?.google ?? ""} pinterest={shop.adPixels?.pinterest ?? ""} consent={shop.cookieConsent} />
         </section>
         <section className="card overflow-hidden" aria-labelledby="issues-heading">
           <h2 id="issues-heading" className="font-semibold px-5 pt-4 pb-2">To fix</h2>

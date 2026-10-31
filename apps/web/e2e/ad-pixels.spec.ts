@@ -35,6 +35,7 @@ test("ad tags load after the buyer agrees and hear about the purchase once", asy
   await expect(section.getByRole("alert")).toContainText("A Meta pixel ID is 10 to 20 digits");
   await section.getByLabel("Meta pixel ID").fill(META);
   await section.getByLabel("Google tag ID").fill("g-abc123def4");
+  await section.getByLabel("Pinterest tag ID").fill("2612345678901");
   await section.getByLabel("Only visitors in the EU, EEA, UK and Switzerland").check();
   await section.getByRole("button", { name: "Save ad tracking" }).click();
   await expect(section.getByText("Saved. Your store now reports views, carts, checkouts and orders to these tags.")).toBeVisible();
@@ -44,7 +45,7 @@ test("ad tags load after the buyer agrees and hear about the purchase once", asy
 
   // A buyer in Germany is asked first, and nothing loads until they agree.
   const context = await browser.newContext({ ...info.project.use, extraHTTPHeaders: { "x-vercel-ip-country": "DE" } });
-  await context.route(/connect\.facebook\.net|googletagmanager\.com|analytics\.tiktok\.com/, (r) => r.abort());
+  await context.route(/connect\.facebook\.net|googletagmanager\.com|analytics\.tiktok\.com|s\.pinimg\.com/, (r) => r.abort());
   const buyer = await context.newPage();
   await buyer.goto(store);
   const banner = buyer.getByRole("region", { name: "Cookie settings" });
@@ -79,13 +80,17 @@ test("ad tags load after the buyer agrees and hear about the purchase once", asy
   expect(purchase.currency).toBe("USD");
   // Google hears about it too.
   expect(await buyer.evaluate(() => (window as unknown as { dataLayer: IArguments[] }).dataLayer.some((a) => a[0] === "event" && a[1] === "purchase"))).toBe(true);
+  // And Pinterest, as a checkout with the order's value.
+  const pins = await buyer.evaluate(() => ((window as unknown as { pintrk?: { queue: unknown[][] } }).pintrk?.queue ?? []).map((a) => a.slice(0, 2).join(" ")));
+  expect(pins[0]).toBe("load 2612345678901");
+  expect(pins).toContain("track checkout");
   // Opening the order page again doesn't count a second sale.
   await buyer.reload();
   await expect.poll(() => metaCalls(buyer)).toEqual([`init ${META}`, "track PageView"]);
 
   // A buyer in the US isn't asked, since the store only asks where the law requires it.
   const us = await (await browser.newContext({ ...info.project.use, extraHTTPHeaders: { "x-vercel-ip-country": "US" } })).newPage();
-  await us.context().route(/connect\.facebook\.net|googletagmanager\.com|analytics\.tiktok\.com/, (r) => r.abort());
+  await us.context().route(/connect\.facebook\.net|googletagmanager\.com|analytics\.tiktok\.com|s\.pinimg\.com/, (r) => r.abort());
   await us.goto(store);
   await expect.poll(() => metaCalls(us)).toEqual([`init ${META}`, "track PageView", "track ViewContent"]);
   await expect(us.getByRole("region", { name: "Cookie settings" })).toHaveCount(0);
