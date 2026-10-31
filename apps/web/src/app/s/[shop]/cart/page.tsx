@@ -157,6 +157,9 @@ export default async function CartPage({ params, searchParams }: { params: Promi
               {delivery.holiday && <HolidayDeadline id="cart-holiday" holiday={delivery.holiday} t={t} day={(d) => dayFormat.format(d)} />}
             </p>
           )}
+          {quote.needsShipping && quote.parcels > 1 && (
+            <p id="cart-parcels" className="self-end w-full max-w-xs text-sm hint">{t.inParcels(quote.parcels)}</p>
+          )}
           <dl className="grid grid-cols-[1fr_auto] gap-y-1 num text-sm self-end w-full max-w-xs">
             <dt className="hint">{t.subtotal}</dt><dd className="text-right">{money(shown!.subtotalMinor)}</dd>
             {quote.discount && (

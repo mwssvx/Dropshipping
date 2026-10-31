@@ -1740,3 +1740,7 @@ A rug, a chair or a mirror costs the supplier far more to send than a phone case
 ### Extra shipping in bulk (after launch, part 315)
 
 A furniture or rug line usually has many products with the same extra shipping. The Products list's bulk change gets **Set extra shipping**: tick products or the whole filtered list, enter the amount for each one (empty for none), preview ("no extra shipping" to "$12.00 extra shipping") and apply. Gift cards and downloads are skipped, and it can be undone for a week like every bulk change; a product changed by hand since keeps that change. `{ kind: "surcharge", amountMinor }` in `packages/core/src/bulk-edit.ts`. No migration.
+
+### Orders in more than one parcel (after launch, part 316)
+
+A cart that mixes products from different suppliers, or supplier products and the store's own stock, arrives as separate parcels on different days, and buyers who get half an order often think the rest is lost and write in or open a dispute. The cart and checkout now say "Comes in 2 parcels from different warehouses, so they may arrive on different days" (in the shopper's language), and the buyer's order page lists each parcel with what's in it, whether it has shipped and its own tracking, instead of one list of tracking numbers. Pickup and the store's own delivery are one hand-over and say nothing. `parcelCount` and `orderParcels` in `packages/core/src/parcels.ts`; `quoteCart` returns `parcels`. No migration.
