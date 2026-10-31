@@ -1396,3 +1396,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **"How it works" and "Why shop with us"** (`apps/web/src/theme/Sections.tsx`): a new home page section in the theme editor. Add up to six columns side by side, each with a picture, a title, a few words and a link, under an optional heading. Text can sit centered or on the left.
 2. **Fits any number**: two columns sit side by side from small screens; three, four, five or six spread out on wide screens and stack on phones. A column with no picture, title or text yet stays hidden, so a half-filled row never shows a gap. A link shows only when it has a label.
 3. **Safe links only**: pictures must be https, and links go to a store page or an https address, like every other section. No migration: it lives in the theme.
+
+### Slideshow (after launch, part 245)
+
+1. **Several big pictures that take turns** (`apps/web/src/theme/Slideshow.tsx`): a new home page section in the theme editor. Add up to five slides, each with a picture, a heading, a few words and a button, and pick how many seconds each one shows, the height and where the text sits.
+2. **Shoppers stay in charge**: arrows and dots move between slides, a pause button stops it, and it holds still while a shopper points at it or tabs into it. Shoppers who ask their device for less motion get it paused from the start. Slides not on screen can't be reached by keyboard or screen reader, and the slide a shopper picks is read out.
+3. **No gaps, no jumps**: a slide with no picture and no heading yet stays hidden, and every slide shares one space, so the page doesn't move when they change. The first slide's picture loads first when the slideshow opens the page. Seven new store strings in all six languages. No migration: it lives in the theme.
