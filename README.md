@@ -1764,3 +1764,7 @@ In an order in more than one parcel, the parcel from a warehouse nearby comes mu
 ### Your own parcel counts in an order's status (after launch, part 321)
 
 In an order with supplier products and the store's own stock, the store's parcel has no record until the merchant adds its tracking, so the order read "Shipped" (and later "Delivered") as soon as the supplier's parcel did, and dropped off the list of orders still to send. The order's status now counts the store's own parcel: it reads "Partly shipped" until that parcel goes out too, so it stays on the to-send list, the tracking upload page and the buyer's order page progress. `refreshOrderFulfillment` in `packages/core/src/fulfillment.ts`. No migration.
+
+### Packing slips for an order in two parcels (after launch, part 322)
+
+In an order with supplier products and the store's own stock, the packing slip listed everything, so a buyer opening the store's box saw items on the slip that weren't in it. The slip now lists only what goes in the store's box, with "Coming separately from another warehouse: Sunset Projection Lamp" under the table. Orders all from the store's shelf, or all from suppliers, print as before. `packingSlips` in `packages/core/src/packing-slips.ts` (`separately`). No migration.

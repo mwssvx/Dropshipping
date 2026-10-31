@@ -73,6 +73,14 @@ test("buyers know their order comes in two parcels", async ({ page, browser }, i
   // The merchant sees what's in each parcel, and posts the candle themselves.
   await page.goto("/admin/orders");
   await page.getByRole("link", { name: "#1001" }).first().click();
+  // The packing slip for their box lists the candle, and says the lamp comes separately.
+  await page.waitForURL(/\/admin\/orders\/[0-9a-f-]{36}$/);
+  const orderAdmin = page.url();
+  await page.goto(`${orderAdmin}/packing-slip`);
+  await expect(page.getByRole("cell", { name: "Beeswax Candle" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: /Sunset Projection Lamp/ })).toHaveCount(0);
+  await expect(page.getByLabel("Coming separately")).toHaveText(/^Coming separately from another warehouse: Sunset Projection Lamp/);
+  await page.goto(orderAdmin);
   const mine = page.getByRole("listitem", { name: "Your own parcel" });
   await expect(mine).toContainText("Beeswax Candle");
   await expect(page.getByRole("listitem").filter({ hasText: "Sunset Projection Lamp" }).first()).toBeVisible();

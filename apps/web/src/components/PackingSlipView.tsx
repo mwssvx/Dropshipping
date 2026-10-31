@@ -57,6 +57,11 @@ export function PackingSlipView({ slip, store }: { slip: PackingSlip; store: Sto
           ))}
         </tbody>
       </table>
+      {slip.separately.length > 0 && (
+        <p className="text-muted" aria-label="Coming separately">
+          Coming separately from another warehouse: {slip.separately.map((i) => (i.quantity > 1 ? `${i.title} × ${i.quantity}` : i.title)).join(", ")}.
+        </p>
+      )}
       {slip.gift && (
         <section className="border border-border rounded-md p-4" aria-label="Gift message">
           <p className="font-semibold">A gift from {slip.gift.from}</p>
