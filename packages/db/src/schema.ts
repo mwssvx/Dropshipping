@@ -1331,6 +1331,8 @@ export const reviews = pgTable(
     body: text("body").notNull(),
     status: text("status", { enum: ["pending", "published", "hidden"] }).notNull().default("pending"),
     reply: text("reply"),
+    // When the buyer was emailed the store's reply. Once per review: later edits don't email again.
+    replyNotifiedAt: timestamp("reply_notified_at", { withTimezone: true }),
     // Photos the buyer added, as ids in the media table (served at /api/media/<id>).
     photoIds: jsonb("photo_ids").$type<string[]>().notNull().default([]),
     // Brought over from a review app's export: where from, and a key so the same file adds nothing twice.

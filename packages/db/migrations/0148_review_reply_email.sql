@@ -1,0 +1,1 @@
+ALTER TABLE "reviews" ADD COLUMN "reply_notified_at" timestamp with time zone;

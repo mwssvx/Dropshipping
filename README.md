@@ -1496,3 +1496,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **A new choice for the sign-up pop-up** (Marketing → Sign-up pop-up): "When a visitor is about to leave" waits until the mouse heads out through the top of the window, towards the tabs or the address bar, and opens the pop-up then, so people who are reading aren't interrupted. A glance at the tabs in the first 3 seconds doesn't count. Phones have no mouse, so there it opens after 30 seconds instead.
 2. **Everything else stays the same**: once per browser, never on the cart, checkout or account pages, and not again after "No thanks". It's stored as 0 seconds (`SIGNUP_POPUP_ON_LEAVE` in `packages/core/src/signup-popup.ts`), store files carry it, and the store layout now treats 0 as on. No migration.
+
+### Tell the buyer about your reply (after launch, part 264)
+
+1. **Your reply reaches the buyer** (`notifyReviewReply` in `packages/core/src/reviews.ts`): when you reply to a review on the Reviews page, the buyer who wrote it gets one email with what they wrote, your reply and a link to the review on the product page. A reply to a review still waiting for approval goes out when you publish it. Buyers who answered a complaint this way often update their opinion of the store, and they come back to see the page.
+2. **Once per review**: editing the reply later doesn't email again, reviews brought over from another app never email (there's no order to write to), and buyers who unsubscribed from the store aren't emailed. The reply form says so. The email goes out after the page has answered, so saving stays quick. Migration `0148_review_reply_email` adds `reviews.reply_notified_at`.

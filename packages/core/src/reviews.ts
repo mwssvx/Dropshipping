@@ -1,6 +1,7 @@
 import { and, avg, count, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
+import type { Mailer } from "./email";
 import { NotFoundError, UserError } from "./errors";
 import { saveMedia } from "./mobile/media";
 
@@ -171,6 +172,51 @@ export async function moderateReview(
   const [row] = await db.update(schema.reviews).set(changes).where(eq(schema.reviews.id, current.id)).returning();
   if (removed) await deleteMedia(db, [removed]);
   return row;
+}
+
+const firstName = (name: string | null | undefined) => name?.trim().split(/\s+/)[0] || "there";
+
+/**
+ * Emails the buyer who wrote a review the store's reply, the first time a published review has
+ * one. Only reviews written for an order (so there's an address); imported ones never email, and
+ * nor do buyers who unsubscribed from the store. Returns whether an email went out.
+ */
+export async function notifyReviewReply(db: Db, mailer: Mailer, shop: { id: string; name: string }, reviewId: string, storeAddress: string) {
+  const r = schema.reviews;
+  // Claim first, so two saves at once can't email twice.
+  const [review] = await db
+    .update(r)
+    .set({ replyNotifiedAt: new Date() })
+    .where(and(eq(r.id, reviewId), eq(r.shopId, shop.id), eq(r.status, "published"), sql`${r.reply} is not null`, sql`${r.orderId} is not null`, sql`${r.replyNotifiedAt} is null`))
+    .returning();
+  if (!review?.orderId || !review.reply) return false;
+  const [row] = await db
+    .select({ email: schema.orders.email, address: schema.orders.shippingAddress, title: schema.products.title, handle: schema.products.handle })
+    .from(schema.orders)
+    .innerJoin(schema.products, eq(schema.products.id, review.productId))
+    .where(eq(schema.orders.id, review.orderId));
+  if (!row?.email) return false;
+  const customer = await db.query.customers.findFirst({ where: and(eq(schema.customers.shopId, shop.id), eq(schema.customers.email, row.email)) });
+  if (customer?.unsubscribedAt) return false;
+  const quote = review.body.length > 200 ? `${review.body.slice(0, 199).trimEnd()}…` : review.body;
+  await mailer.send({
+    to: row.email,
+    subject: `${shop.name} replied to your review`,
+    text: [
+      `Hi ${firstName(row.address?.name ?? review.name)},`,
+      ``,
+      `Thanks for reviewing ${row.title}. You wrote:`,
+      ``,
+      ...quote.split("\n").map((l) => `> ${l}`),
+      ``,
+      `${shop.name} replied:`,
+      ``,
+      review.reply,
+      ``,
+      `See it on the product page: ${storeAddress}/products/${row.handle}#review-${review.id}`,
+    ].join("\n"),
+  });
+  return true;
 }
 
 async function deleteMedia(db: Db, ids: string[]) {
