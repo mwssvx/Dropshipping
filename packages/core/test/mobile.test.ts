@@ -136,6 +136,19 @@ describe("push notifications", () => {
     expect((await getPushSettings(f.db, f.owner.id)).kinds.map((k) => k.label)).toContain("Questions shoppers ask about products");
   });
 
+  it("tells the merchant about a wholesale application, once, and not about buyers they added", async () => {
+    const f = await setup();
+    await registerDevice(f.db, f.owner.id, { token: TOKEN, platform: "ios" }, new Date(Date.now() - 3_600_000));
+    const shop = await f.shop();
+    await f.db.insert(schema.customers).values({ shopId: shop.id, email: "buyer@corner.example", wholesaleStatus: "pending", wholesaleCompany: "Corner Shop", wholesaleMessage: "Two gift shops in Austin.", wholesaleRequestedAt: new Date() });
+    await f.db.insert(schema.customers).values({ shopId: shop.id, email: "known@wholesale.example", wholesaleStatus: "approved", wholesaleCompany: "Known Ltd", wholesaleRequestedAt: new Date() });
+    await sendShopNotifications(f.pctx, shop.id);
+    await sendShopNotifications(f.pctx, shop.id);
+    const sent = f.push.sent.filter((m) => m.url === "/wholesale");
+    expect(sent).toEqual([expect.objectContaining({ title: "Corner Shop wants wholesale prices", body: "Two gift shops in Austin." })]);
+    expect((await getPushSettings(f.db, f.owner.id)).kinds.map((k) => k.label)).toContain("Wholesale applications");
+  });
+
   it("forgets phones the push service says are gone", async () => {
     const f = await setup();
     await registerDevice(f.db, f.owner.id, { token: TOKEN, platform: "ios" });

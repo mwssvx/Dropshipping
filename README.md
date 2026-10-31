@@ -1956,3 +1956,7 @@ The Products tab has Suppliers for anyone who looks after them. It shows how eac
 ### Cart links in the app (after launch, part 369)
 
 Today has a Cart links button for people who look after marketing. Name a link, add the products and how many of each, pick one of your codes if you like, and the link is made; Share sends it straight into a DM, a story or a creator's chat. Each link shows its clicks, orders and sales and what it puts in the cart (with anything no longer on sale marked as left out), and can be deleted.
+
+### Wholesale in the app (after launch, part 370)
+
+Customers in the app has Wholesale for people who look after it, and a push notification says when a business applies for wholesale prices. Each application shows the business, its email, tax or resale number and what it wrote, with Approve and Decline (both email the buyer). Approved buyers can lose wholesale prices again, buyers you already know can be added by email, and the screen turns wholesale on or off and sets the discount and the smallest wholesale order.

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useApi } from "../../src/api";
 import { money, when } from "../../src/format";
-import { useSession } from "../../src/session";
+import { useCan, useSession } from "../../src/session";
 import { BackLink, EmptyState, Field, List, LoadError, Loading, Row, Screen } from "../../src/ui";
 
 type Customer = { id: string; name: string | null; email: string; orders: number; spentMinor: number; lastOrderAt: string | null; tags: string[] };
@@ -9,6 +9,7 @@ type Customer = { id: string; name: string | null; email: string; orders: number
 /** The store's customers, latest buyers first, with a search over names and emails. */
 export default function CustomersScreen() {
   const cur = useSession().me?.shop.currency ?? "USD";
+  const can = useCan();
   const [query, setQuery] = useState("");
   const [q, setQ] = useState("");
   // Waits for a pause in typing before asking the server.
@@ -47,6 +48,7 @@ export default function CustomersScreen() {
       {!q ? (
         <List>
           <Row href="/blocked" title="Blocked buyers" subtitle="Emails and addresses checkout turns away" />
+          {can("wholesale") ? <Row href="/wholesale" title="Wholesale" subtitle="Business buyers, their applications and the discount they get" /> : null}
         </List>
       ) : null}
     </Screen>
