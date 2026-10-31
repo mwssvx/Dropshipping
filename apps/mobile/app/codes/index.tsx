@@ -76,6 +76,7 @@ export default function CodesScreen() {
       </Section>
       <LoadError error={list.error} stale={list.stale} retry={list.reload} />
       <List>
+        <Row href="/signup" title="New subscribers" subtitle="A welcome code for signing up, and the pop-up that asks for emails" />
         <Row href="/code-batches" title="One-time codes" subtitle="A batch of codes that each work once, for parcel cards or a market stall" />
       </List>
       {!codes ? (
