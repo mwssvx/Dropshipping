@@ -1639,4 +1639,4 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 ### Store details for search engines (after launch, part 292)
 
-1. **Always on** (`merchantReturnPolicy` in `packages/core/src/delivery.ts`): the store's home page now always tells search engines who the store is (name, address and logo), not only once it has social links, and adds its return window with a link to the Returns policy page when there is one. Google shows a store's return policy in its store details and uses it when a product's own data leaves it out. No migration.
+1. **Always on** (`merchantReturnPolicy` in `packages/core/src/delivery.ts`): the store's home page now always tells search engines who the store is (name, web address and logo), not only once it has social links, and adds its return window with a link to the Returns policy page when there is one. Google shows a store's return policy in its store details and uses it when a product's own data leaves it out. No migration.
