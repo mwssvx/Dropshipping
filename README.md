@@ -1828,3 +1828,7 @@ The app's product screen now has a Customs section for anything that ships: the 
 ### Running low and sold out, in the app (after launch, part 337)
 
 The app's Products tab now has "Low" and "Sold out" lists next to "All" when something on sale is at or under your running-low number (3 unless you changed it), or has none left. Each list only shows up when it has something in it, so you can see what to restock from your phone.
+
+### Product search in the app (after launch, part 338)
+
+The app's Products tab has a search box at the top. Type part of a product's name, an option's name or a SKU and the open list (All, Low, Sold out or Needs details) narrows to what matches.

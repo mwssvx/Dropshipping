@@ -2,9 +2,9 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useApi } from "../../src/api";
 import { money } from "../../src/format";
-import { MISSING, STATUS, type Product } from "../../src/product";
+import { matches, MISSING, STATUS, type Product } from "../../src/product";
 import { useSession } from "../../src/session";
-import { Body, Button, EmptyState, List, LoadError, Loading, Pill, Row, Screen, Segmented } from "../../src/ui";
+import { Body, Button, EmptyState, Field, List, LoadError, Loading, Pill, Row, Screen, Segmented } from "../../src/ui";
 
 export default function ProductsScreen() {
   const router = useRouter();
@@ -17,7 +17,8 @@ export default function ProductsScreen() {
   const low = all.filter((p) => p.status === "active" && p.stockLevel === "low");
   const soldOut = all.filter((p) => p.status === "active" && p.stockLevel === "sold_out");
   const lists = { all, low, sold_out: soldOut, missing: incomplete };
-  const products = lists[show];
+  const [query, setQuery] = useState("");
+  const products = lists[show].filter((p) => matches(p, query));
   // Only the lists with something in them, and the one already picked.
   const tabs = (
     [
@@ -36,8 +37,10 @@ export default function ProductsScreen() {
         <EmptyState heading="No products yet" body="Paste a link from your supplier, or share it to this app from the supplier's app or website." />
       ) : (
         <>
+          <Field label="Search products" value={query} onChangeText={setQuery} placeholder="Name or SKU" autoCapitalize="none" />
+          {query.trim() && products.length === 0 ? <Body muted>{`No products match "${query.trim()}".`}</Body> : null}
           {tabs.length > 1 ? <Segmented label="Which products" value={show} onChange={setShow} options={tabs} /> : null}
-          {(show === "low" || show === "sold_out") && products.length === 0 ? <Body muted>{show === "low" ? "Nothing on sale is running low." : "Nothing on sale is sold out."}</Body> : null}
+          {(show === "low" || show === "sold_out") && lists[show].length === 0 ? <Body muted>{show === "low" ? "Nothing on sale is running low." : "Nothing on sale is sold out."}</Body> : null}
           {show === "missing" ? (
             <Body muted>
               {incomplete.length

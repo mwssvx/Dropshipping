@@ -130,7 +130,7 @@ const productView = (p: ProductRow) => ({
   aiGenerated: p.aiGenerated,
   sourceUrl: p.sourceUrl,
   updatedAt: p.updatedAt,
-  variants: p.variants.map((v) => ({ id: v.id, title: v.title, priceMinor: v.priceMinor, costMinor: v.costMinor, stock: v.stock, weightGrams: v.weightGrams })),
+  variants: p.variants.map((v) => ({ id: v.id, title: v.title, priceMinor: v.priceMinor, costMinor: v.costMinor, stock: v.stock, weightGrams: v.weightGrams, sku: v.sku })),
   /** Goes in a parcel, so it can have a weight. */
   ships: shipsInParcel(p),
   /** The store's own stock: the merchant sets what it costs. */
