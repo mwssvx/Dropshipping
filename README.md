@@ -1517,3 +1517,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **On the store** (`reportReview` in `packages/core/src/reviews.ts`, `review_reports`): every review has a small "Report" link next to Helpful. One report per review and device (the same cookie as Helpful votes); afterwards it reads "Reported. The store will take a look." in the store's language. The review stays up: only the merchant decides.
 2. **For the merchant** (Admin → Reviews): when shoppers have reported something, a red "Reported (2)" filter appears next to "No reply yet". Each reported review says how many shoppers reported it and has "Keep it", which leaves it up and takes it off the list; hiding it deals with it too. A device can't report the same review again after it's kept.
 3. **Also fixed**: tapping Helpful (or Report) on a second review now updates the page straight away; before, the page only scrolled until a reload. MIGRATION `0149_review_reports` (`review_reports`, `reviews.report_count`).
+
+### Waiting for your review (after launch, part 268)
+
+1. **On the buyer's account** (`apps/web/src/app/s/[shop]/account/page.tsx`): once something they bought has shipped, signed-in buyers see "Waiting for your review" with each product and its order number, and "Write a review" opens that order's review form. A product drops off the list once it's reviewed. Orders not yet shipped, refunded orders and free replacements aren't asked about, the same rules as the order page.
+2. **Core**: `awaitingReview(db, shopId, orderIds)` in `packages/core/src/reviews.ts` finds them for all the buyer's orders in two queries. No migration.
