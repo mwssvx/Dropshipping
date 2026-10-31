@@ -1506,3 +1506,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **"With photos"** (`apps/web/src/app/s/[shop]/products/[handle]/page.tsx`): when some of a product's reviews have buyer photos, a "With photos (3)" button sits next to the review order and lists only those reviews. Tapping it again shows them all. It works together with the star rows, "Most helpful" and "Show all", and the stars at the top still count every review.
 2. **One count, not a page of reviews**: `productReviews` in core counts the reviews with photos and the reviews the current list holds in two small queries, so "Show all" is right whatever the filter. Two new store strings in all six languages. No migration.
+
+### Reviews you haven't answered (after launch, part 266)
+
+1. **"No reply yet" and "With photos"** (Admin → Reviews): two filters next to the star buttons. "No reply yet" lists the reviews you haven't answered, so you can work through them; a review drops off the list as soon as you save a reply. "With photos" lists the ones buyers added photos to. Both work with the status tabs, the stars and the search, stay on while you page through, and "Clear" turns everything off.
+2. **Core**: `reviewPage` takes `noReply` and `photos`. No migration.

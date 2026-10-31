@@ -1,4 +1,4 @@
-import { and, avg, count, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, avg, count, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
 import type { Mailer } from "./email";
@@ -106,7 +106,7 @@ export type ReviewStatus = "pending" | "published" | "hidden";
 export async function reviewPage(
   db: Db,
   shopId: string,
-  opts: { status?: ReviewStatus; rating?: number; query?: string; page?: number; size?: number } = {},
+  opts: { status?: ReviewStatus; rating?: number; query?: string; page?: number; size?: number; noReply?: boolean; photos?: boolean } = {},
 ) {
   const size = opts.size ?? REVIEW_PAGE_SIZE;
   const page = Math.max(1, Math.floor(opts.page ?? 1));
@@ -117,6 +117,8 @@ export async function reviewPage(
     eq(r.shopId, shopId),
     opts.status ? eq(r.status, opts.status) : undefined,
     opts.rating ? eq(r.rating, opts.rating) : undefined,
+    opts.noReply ? isNull(r.reply) : undefined,
+    opts.photos ? sql`jsonb_array_length(${r.photoIds}) > 0` : undefined,
     like
       ? or(
           sql`lower(${r.name}) like ${like}`,
