@@ -51,6 +51,8 @@ type Props = {
   initial?: Record<string, string>;
   /** Import duties for orders abroad: the countries a note shows for, and the note with "{country}" in it. */
   duties?: { countries: string[]; note: string } | null;
+  /** "Comes in 2 parcels…", when the cart comes from more than one supplier or warehouse. */
+  parcelsNote?: string | null;
   /** A signed-in buyer's past addresses, newest first, each as form values with a one-line label. */
   addresses?: { label: string; values: Record<string, string> }[];
   /** Whether the store asks for a phone number for the courier. */
@@ -144,7 +146,7 @@ export function Checkout({ summary, footer, taxLabel, totalLabel, totalWithoutSh
 }
 
 function CheckoutForm({
-  handle, text: t, initial, addresses, duties, askPhone, paidByGiftCard, countries, zones, country, onCountry, onPostal, rates, rate, onRate, protection, protect, onProtect, giftWrap, ageCheck, gift, onGift, wrap, onWrap, tips, tipPercent, onTip, giftCardDays,
+  handle, text: t, initial, addresses, duties, parcelsNote, askPhone, paidByGiftCard, countries, zones, country, onCountry, onPostal, rates, rate, onRate, protection, protect, onProtect, giftWrap, ageCheck, gift, onGift, wrap, onWrap, tips, tipPercent, onTip, giftCardDays,
 }: Omit<Props, "summary" | "footer" | "taxLabel" | "totalLabel" | "totalWithoutShipping" | "defaultCountry" | "currency"> & {
   country: string;
   onCountry: (c: string) => void;
@@ -248,6 +250,7 @@ function CheckoutForm({
           {duties && duties.countries.includes(country) && !rate?.pickup && !rate?.postalPrefixes && (
             <p className="hint text-sm" id="duties-note">{duties.note.replace("{country}", countries.find(([c]) => c === country)?.[1] ?? country)}</p>
           )}
+          {parcelsNote && rates.length > 0 && !rate?.pickup && !rate?.postalPrefixes && <p className="hint text-sm" id="parcels-note">{parcelsNote}</p>}
           {rate?.dates && (
             <div className="field">
               <label className="label" htmlFor="handoverOn">{rate.pickup ? t.pickupDay : t.deliveryDay}</label>

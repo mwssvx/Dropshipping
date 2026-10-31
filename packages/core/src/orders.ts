@@ -28,6 +28,7 @@ import { FREE_GIFT_NOTE, freeGiftFor } from "./free-gift";
 import { minimumOrder } from "./min-order";
 import { countryName, fitsWeight, listShippingZones, priceRate, zoneFor } from "./shipping";
 import { surchargeFor } from "./shipping-surcharge";
+import { parcelCount } from "./parcels";
 import { formatWeight } from "./weight";
 import { MAX_TAGS, normalizeTags } from "./customers";
 import { cartLineKey, cleanPersonalization, missingPersonalization, personalizationValues } from "./personalization";
@@ -327,6 +328,8 @@ export async function quoteCart(
     shippingMinor,
     /** What bulky products add to every carrier rate, already in `shippingMinor` when one is used. */
     surchargeMinor: ships ? surchargeMinor : 0,
+    /** How many parcels it comes in: one per supplier, plus one from the store's own shelf. */
+    parcels: parcelCount(rows.filter((r) => wanted.some((l) => l.variantId === r.variant.id)).map((r) => r.product)),
     totalMinor,
     goodsMinor,
     /** What the goods weigh in grams, from their options' weights. 0 when none are set. */

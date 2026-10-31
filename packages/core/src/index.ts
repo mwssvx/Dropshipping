@@ -74,6 +74,7 @@ export * from "./unit-price";
 export * from "./unit-contents";
 export * from "./shipping";
 export * from "./shipping-surcharge";
+export * from "./parcels";
 export * from "./returns";
 export * from "./replacements";
 export * from "./subscriptions";

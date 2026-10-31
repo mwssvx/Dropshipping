@@ -1,6 +1,6 @@
 import { PixelEvent } from "@/components/PixelEvent";
 import { notFound } from "next/navigation";
-import { canMarkArrived, buyerAmounts, formatHandoverDay, handoverDayOptions, buyerCancelOptions, buyerThread, formatDeliveryDate, formatDeliveryWindow, orderDelivery, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems, formatShipsBy, storePixels, surveyFor, orderDownloads, formatFileSize, transferDueBy } from "@sf/core";
+import { canMarkArrived, buyerAmounts, formatHandoverDay, handoverDayOptions, buyerCancelOptions, buyerThread, formatDeliveryDate, formatDeliveryWindow, orderDelivery, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems, formatShipsBy, storePixels, surveyFor, orderDownloads, formatFileSize, transferDueBy, orderParcels } from "@sf/core";
 import Link from "next/link";
 import { db, fulfillment, storeAddress } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
@@ -47,6 +47,8 @@ export default async function OrderStatusPage({ params, searchParams }: { params
   const t = referCode ? await storeT(handle) : null;
   const referLink = referCode ? `${await storeAddress(shop)}/refer/${referCode}` : null;
   const shipped = order.fulfillments.filter((f) => f.trackingNumber);
+  // An order from more than one supplier comes in separate parcels, each with its own tracking.
+  const parcels = order.pickup || order.localDelivery ? [] : await orderParcels(await db(), order);
   const edit = order.paymentStatus === "paid" ? await orderEditOptions(await fulfillment(), shop.id, order.id, "buyer") : null;
   const cancel = order.paymentStatus === "paid" ? await buyerCancelOptions(await fulfillment(), shop.id, order.id) : null;
   const lastEdit = order.edits.at(-1);
@@ -240,7 +242,37 @@ export default async function OrderStatusPage({ params, searchParams }: { params
           </ul>
         </section>
       )}
-      {shipped.length > 0 && (
+      {paid && parcels.length > 1 && (
+        <section className="card p-5 flex flex-col gap-3 text-sm" aria-labelledby="parcels">
+          <div>
+            <h2 id="parcels" className="font-semibold">Your order comes in {parcels.length} parcels</h2>
+            <p className="hint">They come from different warehouses, so they may arrive on different days. Each one has its own tracking once it ships.</p>
+          </div>
+          <ol className="flex flex-col gap-3">
+            {parcels.map((p, i) => {
+              const s = p.shipment;
+              return (
+                <li key={p.key} className="flex flex-col gap-1" aria-label={`Parcel ${i + 1}`}>
+                  <p className="font-medium">
+                    Parcel {i + 1}:{" "}
+                    <span className="hint font-normal">
+                      {s?.status === "delivered" ? "Delivered" : s?.trackingNumber ? "On its way" : "Not shipped yet"}
+                    </span>
+                  </p>
+                  <p>{p.items.map((it) => (it.quantity > 1 ? `${it.title} × ${it.quantity}` : it.title)).join(", ")}</p>
+                  {s?.trackingNumber && (
+                    <p>
+                      {s.carrier}:{" "}
+                      {s.trackingUrl ? <a className="underline num" href={s.trackingUrl} target="_blank" rel="noreferrer">{s.trackingNumber}</a> : <span className="num">{s.trackingNumber}</span>}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        </section>
+      )}
+      {shipped.length > 0 && !(paid && parcels.length > 1) && (
         <section className="card p-5 flex flex-col gap-2 text-sm" aria-labelledby="tracking">
           <h2 id="tracking" className="font-semibold">Tracking</h2>
           {shipped.map((f) => (

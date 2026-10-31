@@ -130,6 +130,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
         initial={initial}
         addresses={addresses}
         duties={duties}
+        parcelsNote={hasGoods && quote.parcels > 1 ? t.inParcels(quote.parcels) : null}
         askPhone={shop.checkoutPhone}
         paidByGiftCard={!!quote.giftCard && quote.dueMinor === 0}
         countries={countries}
