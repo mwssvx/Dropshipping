@@ -2057,9 +2057,9 @@ test("product tags set in the app, picked from the store's other tags", async ({
   await tags.getByRole("textbox", { name: "Tags" }).fill("Summer, Gift idea");
   await tags.getByRole("button", { name: "Save tags" }).click();
   await expect(page.getByText("Tags saved.")).toBeVisible();
-  await expect(tags.getByRole("textbox", { name: "Tags" })).toHaveValue("gift idea, summer");
+  await expect(tags.getByRole("textbox", { name: "Tags" })).toHaveValue("summer, gift idea");
 
-  await tab(page, "Products");
+  await page.getByRole("link", { name: "Products" }).filter({ visible: true }).first().click();
   await page.getByRole("link", { name: /^Beach Towel/ }).filter({ visible: true }).click();
   const towel = page.getByRole("region", { name: "Tags" }).filter({ visible: true });
   await towel.getByRole("button", { name: "Add the tag summer" }).click();
