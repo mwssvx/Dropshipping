@@ -13,6 +13,8 @@ export type Product = {
   ownStock: boolean;
   /** What it still lacks. */
   missing: ("photo" | "description" | "weight" | "customs" | "cost")[];
+  hsCode: string | null;
+  originCountry: string | null;
 };
 
 export const MISSING: Record<Product["missing"][number], string> = {

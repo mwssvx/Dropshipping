@@ -334,4 +334,21 @@ test("weight and cost of the store's own stock, set from the app", async ({ page
   await tab(page, "Products");
   await page.getByRole("tab", { name: "Needs details (1)" }).click();
   await expect(page.getByText("No photo · No description · No customs details", { exact: true })).toBeVisible();
+
+  // Customs details from the phone too: a wrong code says how it should look.
+  await page.getByRole("link", { name: /Beeswax Candle/ }).click();
+  await page.getByRole("textbox", { name: "HS code" }).fill("34");
+  await page.getByRole("textbox", { name: "Made in (country code)" }).fill("us");
+  await expect(page.getByRole("textbox", { name: "Made in (country code)" })).toHaveValue("US");
+  await page.getByRole("button", { name: "Save customs details" }).click();
+  await expect(page.getByText("An HS code is 6 to 10 digits, like 6912.00 or 691200.")).toBeVisible();
+  await page.getByRole("textbox", { name: "HS code" }).fill("3406.00");
+  await shot(page, "336-app-customs");
+  await page.getByRole("button", { name: "Save customs details" }).click();
+  await expect(page.getByText("Customs details saved.")).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "HS code" })).toHaveValue("340600");
+  await page.goto("/");
+  await tab(page, "Products");
+  await page.getByRole("tab", { name: "Needs details (1)" }).click();
+  await expect(page.getByText("No photo · No description", { exact: true })).toBeVisible();
 });

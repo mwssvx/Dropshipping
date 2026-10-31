@@ -39,6 +39,7 @@ import {
   shipsInParcel,
   isOwnStock,
   missingDetails,
+  setCustomsInfo,
   productPhotos,
   sendPriceDrops,
   sendStockAlerts,
@@ -135,6 +136,8 @@ const productView = (p: ProductRow) => ({
   ownStock: isOwnStock(p),
   /** What it still lacks, like a photo or a weight. */
   missing: missingDetails(p),
+  hsCode: p.hsCode,
+  originCountry: p.originCountry,
 });
 
 const isHeld = (o: OrderRow) => o.heldAt != null && ["paid", "partially_refunded"].includes(o.paymentStatus);
@@ -317,6 +320,12 @@ const routes: Record<string, Handler> = {
     await sendStockAlerts(ctx, { shopId: shop.id });
     await sendPriceDrops(ctx, { shopId: shop.id });
     return productView(product);
+  },
+  "PUT products/:id/customs": async ({ req, params, db, shop }) => {
+    const b = await body<{ hsCode?: unknown; originCountry?: unknown }>(req);
+    // Where it ships from stays as it is: that's set on the website.
+    await setCustomsInfo(db, shop.id, params.id!, { hsCode: str(b.hsCode), originCountry: str(b.originCountry) });
+    return productView(await getProduct(db, shop.id, params.id!));
   },
   "POST products/:id/listing": async ({ params, shop }) => {
     const run = await writeListing(await agents(), shop, params.id!);
