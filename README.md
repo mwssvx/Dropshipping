@@ -1844,3 +1844,7 @@ Today in the app now has a Reviews button for anyone whose role covers reviews. 
 ### Customers in the app (after launch, part 341)
 
 Today in the app now has a Customers button for roles that cover customers. It lists your latest buyers with their orders and what they've spent, and searches by name or email. A customer's screen shows their orders (each opens), what they've spent, their average order and store credit, and lets you change your team's note and tags about them.
+
+### From an order to its customer, in the app (after launch, part 342)
+
+An order in the app now says, under the buyer, whether it's their first order or how many they've placed, with their tags, and opens their customer screen. It shows for roles that can open customers.

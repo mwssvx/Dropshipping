@@ -13,6 +13,7 @@ import {
   startBuyerMessage,
   submitReview,
   updateCustomerNotes,
+  customerOfOrder,
 } from "../src";
 import { DAY, makeFixture } from "../evals/fixture";
 
@@ -31,6 +32,9 @@ describe("customer profiles", () => {
     expect(profile.orders).toEqual([expect.objectContaining({ id: first.id, number: first.number, items: 1 })]);
     expect(profile.addresses).toEqual([first.shippingAddress]);
     expect(profile.storeCreditMinor).toBe(0);
+    // An order links to its buyer, with how many orders they've paid for.
+    expect(await customerOfOrder(f.db, shop.id, first.email)).toEqual({ id: customer.id, orders: 1, tags: [] });
+    expect(await customerOfOrder(f.db, shop.id, "nobody@example.com")).toBeNull();
 
     expect(normalizeTags("VIP,  wholesale   lead , vip,")).toEqual(["vip", "wholesale lead"]);
     expect(() => normalizeTags("x".repeat(31))).toThrow("30 characters");

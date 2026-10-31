@@ -33,6 +33,14 @@ async function findCustomer(db: Db, shopId: string, customerId: string) {
 const ordersOf = (db: Db, shopId: string, email: string) =>
   db.query.orders.findMany({ where: and(eq(schema.orders.shopId, shopId), eq(schema.orders.email, email)), orderBy: desc(schema.orders.createdAt) });
 
+/** The customer behind an order's email, with how many orders they've paid for, for linking an order to them. */
+export async function customerOfOrder(db: Db, shopId: string, email: string) {
+  const customer = await db.query.customers.findFirst({ where: and(eq(schema.customers.shopId, shopId), eq(schema.customers.email, email)), columns: { id: true, tags: true } });
+  if (!customer) return null;
+  const orders = (await ordersOf(db, shopId, email)).filter((o) => (PLACED as readonly string[]).includes(o.paymentStatus)).length;
+  return { id: customer.id, orders, tags: customer.tags };
+}
+
 const addressKey = (a: Address) => [a.name, a.line1, a.line2 ?? "", a.city, a.postalCode, a.country].join("|").toLowerCase();
 
 export async function getCustomerProfile(db: Db, shopId: string, customerId: string) {

@@ -453,4 +453,8 @@ test("a customer's orders, note and tags, from the app", async ({ page, browser 
   // An order opens from there.
   await page.getByRole("link", { name: /Order #1001/ }).click();
   await expect(page.getByText("Beeswax Candle").first()).toBeVisible();
+  // And the order leads back to them, with their tags.
+  const them = page.getByRole("link", { name: "Customer Ada Buyer" });
+  await expect(them).toContainText("2 orders from them");
+  await expect(them).toContainText("vip, local");
 });
