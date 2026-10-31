@@ -331,7 +331,7 @@ const importSchema = z.object({
       welcome_offer: z.object({ percent_off: z.number().int().min(5).max(50), min_subtotal: z.number().int().min(0), days: z.number().int().min(7).max(90) }).nullable().optional(),
       winback_offer: z.object({ after_days: z.union([z.literal(30), z.literal(60), z.literal(90), z.literal(180)]), percent_off: z.number().int().min(5).max(50), days: z.number().int().min(7).max(60) }).nullable().optional(),
       birthday_offer: z.object({ percent_off: z.number().int().min(5).max(50), days: z.number().int().min(7).max(60) }).nullable().optional(),
-      signup_popup_seconds: z.union([z.literal(5), z.literal(15), z.literal(30), z.literal(60)]).nullable().optional(),
+      signup_popup_seconds: z.union([z.literal(0), z.literal(5), z.literal(15), z.literal(30), z.literal(60)]).nullable().optional(),
       thank_you_note: z.string().max(500).nullable().optional(),
       chat_buttons: z.object({ whatsapp: z.string().regex(/^[1-9]\d{7,14}$/).nullable(), telegram: z.string().regex(/^[A-Za-z][A-Za-z0-9_]{4,31}$/).nullable() }).nullable().optional(),
       after_checkout_offer: z.object({ product: handle, percent_off: z.number().int().min(0).max(50), active: z.boolean() }).nullable().optional(),

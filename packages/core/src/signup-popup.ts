@@ -9,9 +9,19 @@ import { UserError } from "./errors";
 /** Seconds after arriving that the pop-up can open. */
 export const SIGNUP_POPUP_SECONDS = [5, 15, 30, 60] as const;
 
-/** Turns the pop-up on after this many seconds, or off with null. */
+/**
+ * Stored instead of a number of seconds: open when the visitor looks about to leave (the mouse
+ * heads for the tabs or the address bar). Phones have no mouse, so there it opens after
+ * SIGNUP_POPUP_LEAVE_FALLBACK seconds instead.
+ */
+export const SIGNUP_POPUP_ON_LEAVE = 0;
+export const SIGNUP_POPUP_LEAVE_FALLBACK = 30;
+
+/** Turns the pop-up on after this many seconds (or SIGNUP_POPUP_ON_LEAVE), or off with null. */
 export async function setSignupPopup(db: Db, shopId: string, seconds: number | null) {
-  if (seconds !== null && !(SIGNUP_POPUP_SECONDS as readonly number[]).includes(seconds)) throw new UserError("Pick when the pop-up opens: after 5, 15, 30 or 60 seconds.");
+  if (seconds !== null && seconds !== SIGNUP_POPUP_ON_LEAVE && !(SIGNUP_POPUP_SECONDS as readonly number[]).includes(seconds)) {
+    throw new UserError("Pick when the pop-up opens: when a visitor is about to leave, or after 5, 15, 30 or 60 seconds.");
+  }
   await db.update(schema.shops).set({ signupPopupSeconds: seconds, updatedAt: new Date() }).where(eq(schema.shops.id, shopId));
   return seconds;
 }
