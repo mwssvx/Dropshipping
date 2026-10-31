@@ -1896,3 +1896,7 @@ The app's Settings has Store status for roles that can change the store's look. 
 ### Block a buyer from the app (after launch, part 354)
 
 An order in the app has Block this buyer under the buyer's details. With a reason only your team sees, it adds their email and delivery address to the blocked list, and checkout turns them away before they pay, as when it's done on the website. An order from someone already blocked says so. Unblocking stays on the website, under Blocked buyers.
+
+### Left at checkout, in the app (after launch, part 355)
+
+The All list on the app's Orders tab ends with Left at checkout: buyers from the last 30 days who got to checkout and didn't pay, what they left, whether the reminder (or the reminder with a code) went out, and whether they came back and paid. It shows how many were left, what they were worth and how many came back, says so when reminder emails are off, and tapping a buyer starts an email to them.

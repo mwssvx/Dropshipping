@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  abandonedCheckouts,
+  ABANDONED_DAYS,
   isOrderBuyerBlocked,
   blockOrderBuyer,
   activeClosure,
@@ -695,6 +697,28 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, `${b.action === "off" ? "Turned off" : "Turned back on"} the gift card ending ${card.last4} in the app`, { href: "/admin/gift-cards" });
     return { ok: true, message: b.action === "off" ? `The card ending ${card.last4} is off. It can't be spent until you turn it back on.` : `The card ending ${card.last4} works again.` };
   },
+  "GET checkouts": async ({ db, shop }) => {
+    // Checkouts left unpaid in the last 30 days, as on the web's Abandoned checkouts page.
+    const { checkouts, totals } = await abandonedCheckouts(db, shop.id, { size: 50 });
+    return {
+      days: ABANDONED_DAYS,
+      remindersOn: shop.abandonedCartEmails,
+      totals,
+      checkouts: checkouts.map((c) => ({
+        id: c.id,
+        number: c.number,
+        name: c.name,
+        email: c.email,
+        totalMinor: c.totalMinor,
+        currency: c.currency,
+        items: c.items,
+        createdAt: c.createdAt,
+        reminder: c.offered ? "code" : c.reminded ? "sent" : "none",
+        // The order they paid with in the end: this checkout, or a new one.
+        paidAs: c.recoveredBy,
+      })),
+    };
+  },
   "GET customers": async ({ url, db, shop }) => {
     const q = (url.searchParams.get("q") ?? "").slice(0, 100);
     // The ones who bought most recently first; a search looks at names and emails.
@@ -838,6 +862,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("reviews")) return "reviews";
   if (path.startsWith("customers")) return "customers";
   if (path.startsWith("codes")) return "marketing";
+  if (path.startsWith("checkouts")) return "orders";
   if (path.startsWith("store-status")) return "theme";
   if (path.startsWith("gift-cards")) return "gift_cards";
   if (path.startsWith("sales")) return "marketing";

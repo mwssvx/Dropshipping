@@ -80,6 +80,11 @@ export default function OrdersScreen() {
           })}
         </List>
       )}
+      {show === "all" && !q && list.data ? (
+        <List>
+          <Row href="/checkouts" title="Left at checkout" subtitle="Buyers who didn't pay, whether they were reminded, and who came back" right={<Pill label="See" />} />
+        </List>
+      ) : null}
     </Screen>
   );
 }
