@@ -21,10 +21,11 @@ const KINDS = [
   ["remove_tag", "Remove a tag"],
   ["ships_from", "Set where they ship from"],
   ["processing", "Set preparing time"],
+  ["surcharge", "Set extra shipping"],
 ] as const;
 type Kind = (typeof KINDS)[number][0];
 
-export function BulkProducts({ rows, collections, tags = [], recent, total = rows.length, list = {}, maxAll = 500, home = "US", storeDays = 2 }: {
+export function BulkProducts({ rows, collections, tags = [], recent, total = rows.length, list = {}, maxAll = 500, home = "US", storeDays = 2, currency = "USD" }: {
   rows: BulkRow[];
   collections: { id: string; title: string }[];
   tags?: string[];
@@ -37,6 +38,8 @@ export function BulkProducts({ rows, collections, tags = [], recent, total = row
   home?: string;
   /** The store's processing days, which an empty preparing time means. */
   storeDays?: number;
+  /** The store's currency, for extra shipping amounts. */
+  currency?: string;
 }) {
   const [state, action] = useActionState(bulkEditAction, {} as BulkState);
   // Controlled, because React clears a form's own fields after each submit.
@@ -48,6 +51,7 @@ export function BulkProducts({ rows, collections, tags = [], recent, total = row
   const [tag, setTag] = useState("");
   const [country, setCountry] = useState("");
   const [days, setDays] = useState("");
+  const [amount, setAmount] = useState("");
   const [belowCost, setBelowCost] = useState(false);
   // Every product in the list, on every page, rather than the ones ticked here.
   const [everything, setEverything] = useState(false);
@@ -58,7 +62,7 @@ export function BulkProducts({ rows, collections, tags = [], recent, total = row
   const all = picked.size === rows.length && rows.length > 0;
   const count = everything ? total : picked.size;
   // A preview is for the products and change it was made from; touching either asks again.
-  const key = JSON.stringify([everything ? "all" : [...picked].sort(), kind, percent, ending, collectionId, tag, country, days]);
+  const key = JSON.stringify([everything ? "all" : [...picked].sort(), kind, percent, ending, collectionId, tag, country, days, amount]);
   const preview = state.preview && state.key === key ? state.preview : null;
   const needsCollection = kind === "add" || kind === "remove";
 
@@ -80,6 +84,7 @@ export function BulkProducts({ rows, collections, tags = [], recent, total = row
         <input type="hidden" name="tag" value={tag} />
         <input type="hidden" name="country" value={country} />
         <input type="hidden" name="days" value={days} />
+        <input type="hidden" name="amount" value={amount} />
         <input type="hidden" name="key" value={key} />
         {belowCost && <input type="hidden" name="belowCost" value="on" />}
         {state.done && (
@@ -143,6 +148,13 @@ export function BulkProducts({ rows, collections, tags = [], recent, total = row
                   <label className="label" htmlFor="bulk-days">Days to get them ready</label>
                   <input className="input w-40 num" id="bulk-days" value={days} inputMode="numeric" maxLength={2} onChange={(e) => setDays(e.target.value)} placeholder={String(storeDays)} aria-describedby="bulk-days-hint" />
                   <span className="hint text-sm" id="bulk-days-hint">Empty for your store&apos;s {storeDays}.</span>
+                </div>
+              )}
+              {kind === "surcharge" && (
+                <div className="field">
+                  <label className="label" htmlFor="bulk-amount">Extra shipping for each one ({currency})</label>
+                  <input className="input w-40 num" id="bulk-amount" value={amount} inputMode="decimal" maxLength={9} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" aria-describedby="bulk-amount-hint" />
+                  <span className="hint text-sm" id="bulk-amount-hint">Empty for none.</span>
                 </div>
               )}
               <button type="submit" className="btn btn-secondary" name="intent" value="preview">Preview</button>
