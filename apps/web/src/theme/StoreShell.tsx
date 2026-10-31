@@ -6,6 +6,7 @@ import { storeText, type StoreText } from "@/lib/store-text";
 import { SectionView } from "./Sections";
 import { CurrencyPicker } from "./CurrencyPicker";
 import { LanguagePicker } from "./LanguagePicker";
+import { HeaderSearch } from "./HeaderSearch";
 import { MenuDropdown } from "./MenuDropdown";
 import { SocialIcons } from "./SocialIcons";
 import { storeHref, themeLayoutAttrs, themeStyle } from "./style";
@@ -67,7 +68,7 @@ export function StoreShell({
         </>
       )}
       {announcement && <SectionView section={announcement} data={data} first={false} />}
-      <header className={`border-b border-border ${settings.stickyHeader ? "sticky top-0 z-30 bg-surface" : ""}`}>
+      <header className={`border-b border-border ${settings.stickyHeader ? "sticky top-0 z-30 bg-surface" : "relative"}`}>
         <div className={`max-w-6xl mx-auto px-4 sm:px-6 flex items-center gap-4 ${header === "centered" ? "h-20 md:grid md:grid-cols-[1fr_auto_1fr]" : "h-16 justify-between"}`}>
           {header === "centered" && <div className="hidden md:block" aria-hidden />}
           <Link href={base || "/"} className={`text-xl font-bold tracking-tight truncate flex items-center gap-2 ${header === "centered" ? "md:text-2xl md:justify-center mr-auto md:mr-0" : ""}`}>
@@ -99,9 +100,10 @@ export function StoreShell({
               </details>
             )}
             {picker && picker.currencies.length > 1 && <CurrencyPicker {...picker} />}
-            <Link href={`${base}/search`} className="p-2 hover:text-accent" aria-label={t.search}>
-              <svg viewBox="0 0 20 20" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden><circle cx="8.5" cy="8.5" r="5.5" /><path d="M13 13l4.5 4.5" strokeLinecap="round" /></svg>
-            </Link>
+            <HeaderSearch action={`${base}/search`} labels={{
+              search: t.search, suggestions: t.suggestions, soldOut: t.soldOut, seeAll: t.seeAllResults("%s"),
+              kinds: { collection: t.linkCollection, page: t.linkPage, post: t.linkPost }, placeholder: t.searchProducts, close: t.close,
+            }} />
             <Link href={`${base}/saved`} className="p-2 hover:text-accent" aria-label={t.savedItems}>
               <svg viewBox="0 0 20 20" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden><path d="M10 17s-6.5-4.1-6.5-8.6A3.4 3.4 0 0 1 10 6a3.4 3.4 0 0 1 6.5 2.4C16.5 12.9 10 17 10 17z" strokeLinejoin="round" /></svg>
             </Link>

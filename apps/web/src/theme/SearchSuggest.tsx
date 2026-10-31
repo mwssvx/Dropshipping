@@ -63,11 +63,11 @@ export function SearchSuggest({ suggestUrl, defaultValue, placeholder, autoFocus
 
   return (
     <div className="relative flex-1">
-      <label className="sr-only" htmlFor="q">{labels.search}</label>
+      <label className="sr-only" htmlFor={`${id}-q`}>{labels.search}</label>
       <input
         ref={input}
         className="input w-full"
-        id="q"
+        id={`${id}-q`}
         name="q"
         type="search"
         value={value}
