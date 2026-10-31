@@ -1892,3 +1892,7 @@ Today has a Gift cards button for roles that handle gift cards. When a buyer ask
 ### A holiday break from the app (after launch, part 353)
 
 The app's Settings has Store status for roles that can change the store's look. Going away, you can put the store on a break from the phone, with the day it opens again by itself and a message for buyers. Buyers can still look around but can't order, as when it's set on the website, and Open the store now ends the break early. A store behind a password page can be opened from the phone too; the password itself is set on the website.
+
+### Block a buyer from the app (after launch, part 354)
+
+An order in the app has Block this buyer under the buyer's details. With a reason only your team sees, it adds their email and delivery address to the blocked list, and checkout turns them away before they pay, as when it's done on the website. An order from someone already blocked says so. Unblocking stays on the website, under Blocked buyers.

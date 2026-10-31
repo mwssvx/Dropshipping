@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  isOrderBuyerBlocked,
+  blockOrderBuyer,
   activeClosure,
   setStoreClosure,
   listGiftCards,
@@ -326,6 +328,8 @@ const routes: Record<string, Handler> = {
     const postYourself = o.paymentStatus === "paid" && !o.pickup && !o.localDelivery && (ownParcel ? !ownParcel.shipment?.trackingNumber : parcels.length === 0 && o.fulfillments.length === 0);
     return {
       customer: buyer,
+      // On the store's blocked list (by email or address), so checkout turns them away.
+      blocked: await isOrderBuyerBlocked(db, shop.id, o),
       // Collected by the buyer or dropped off by the store: no tracking, the merchant says when it's done.
       handover:
         o.pickup || o.localDelivery
@@ -373,6 +377,12 @@ const routes: Record<string, Handler> = {
       refundableMinor: ["paid", "partially_refunded"].includes(o.paymentStatus) ? o.totalMinor - o.refundedMinor : 0,
       risk: o.risk ? { level: o.risk.level, reasons: o.risk.reasons } : null,
     };
+  },
+  "POST orders/:id/block": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ note?: unknown }>(req);
+    const order = await blockOrderBuyer(db, shop.id, params.id!, str(b.note));
+    await logged({ shop, user, db }, `Blocked the buyer of order #${order.number} from checking out in the app`, { orderId: order.id, href: "/admin/blocked" });
+    return { ok: true, message: `${order.shippingAddress.name} can't check out at your store any more, with this email or address. Unblock them under Blocked buyers on the website.` };
   },
   "POST orders/:id/handover": async ({ req, params, db, shop, user }) => {
     const b = await body<{ step?: unknown }>(req);

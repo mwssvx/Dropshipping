@@ -41,6 +41,8 @@ type Detail = {
   sameAddress?: { orders: { id: string; number: number; createdAt: string; ownItems: boolean }[]; oneBox: boolean } | null;
   /** The store's own items wait to be posted. `own`: only part of the order, the rest comes from a supplier. */
   postYourself?: { own: boolean } | null;
+  /** On the store's blocked list, so checkout turns them away. */
+  blocked?: boolean;
   /** Picked up by the buyer, or delivered by the store itself. */
   handover?: { kind: "pickup" | "delivery"; day: string | null; readyAt: string | null; done: boolean } | null;
   /** The buyer, when this person can open customers. */
@@ -70,7 +72,7 @@ export default function OrderScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const order = useApi<Detail>(`orders/${id}`);
   const can = useCan();
-  const [panel, setPanel] = useState<null | "refund" | "tracking">(null);
+  const [panel, setPanel] = useState<null | "refund" | "tracking" | "block">(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{ tone: "success" | "critical"; text: string } | null>(null);
   const [amount, setAmount] = useState("");
@@ -78,6 +80,7 @@ export default function OrderScreen() {
   const [carrier, setCarrier] = useState("");
   const [tracking, setTracking] = useState("");
   const [also, setAlso] = useState<string[]>([]);
+  const [why, setWhy] = useState("");
 
   async function run(key: string, path: string, body: unknown) {
     setBusy(key);
@@ -231,6 +234,18 @@ export default function OrderScreen() {
               subtitle={o.customer.tags.length ? o.customer.tags.join(", ") : "See their orders, note and tags"}
               a11y={`Customer ${o.shippingAddress.name}`}
             />
+          ) : null}
+          {o.blocked ? (
+            <Pill label="Blocked from checking out" tone="critical" />
+          ) : panel === "block" ? (
+            <>
+              <Body muted>Checkout turns them away before they pay, by this email and delivery address. Use it for repeat chargebacks, stolen cards or return abuse.</Body>
+              <Field label="Why (only your team sees this)" value={why} onChangeText={setWhy} />
+              <Button label={`Block ${o.shippingAddress.name}`} kind="danger" busy={busy === "block"} onPress={() => run("block", `orders/${o.id}/block`, { note: why })} />
+              <Button label="Cancel" kind="ghost" onPress={() => setPanel(null)} />
+            </>
+          ) : can("orders") ? (
+            <Button label="Block this buyer…" kind="ghost" onPress={() => setPanel("block")} />
           ) : null}
         </Card>
       </Section>
