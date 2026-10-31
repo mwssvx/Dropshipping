@@ -156,6 +156,14 @@ export const SECTION_FIELDS: Record<SectionType, Field[]> = {
     { key: "buttonLabel", label: "Button label", kind: "text", max: 40 },
     { key: "buttonLink", label: "Button link", kind: "link" },
   ],
+  before_after: [
+    { key: "heading", label: "Heading", kind: "text", max: 120 },
+    { key: "text", label: "Text", kind: "textarea", max: 400 },
+    { key: "beforeUrl", label: "Before photo", kind: "image" },
+    { key: "afterUrl", label: "After photo", kind: "image" },
+    { key: "beforeLabel", label: "Before label (optional)", kind: "text", max: 30, hint: "Leave empty for “Before” in the shopper's language." },
+    { key: "afterLabel", label: "After label (optional)", kind: "text", max: 30, hint: "Leave empty for “After” in the shopper's language." },
+  ],
 };
 
 /** A saved moment as the editor's computer shows it, for a datetime-local input. */

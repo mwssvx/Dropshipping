@@ -275,6 +275,16 @@ const sectionSchemas = {
     buttonLabel: text(40),
     buttonLink: link,
   }),
+  // Two photos of the same thing, before and after, with a handle shoppers drag to compare. It
+  // isn't shown until both photos are set.
+  before_after: z.object({
+    heading: text(120),
+    text: text(400),
+    beforeUrl: imageUrl,
+    afterUrl: imageUrl,
+    beforeLabel: text(30),
+    afterLabel: text(30),
+  }),
 } as const;
 
 export type SectionType = keyof typeof sectionSchemas;
@@ -303,6 +313,7 @@ export const SECTION_LABELS: Record<SectionType, { name: string; about: string }
   blog_posts: { name: "Blog posts", about: "Your newest blog posts with their pictures and a line from each. It fills itself as you publish." },
   scrolling_text: { name: "Scrolling text", about: "A few short messages that glide across the page in a loop, like “Free shipping · 30-day returns · Made to last”. Shoppers can pause it, and it stays still for those who ask for less motion." },
   gallery: { name: "Photo gallery", about: "Up to eight square photos in a grid, like your Instagram or buyers using your products, each with an optional link, and a button like “Follow us”." },
+  before_after: { name: "Before and after", about: "Two photos of the same thing, before and after using your product, with a handle shoppers drag to compare them. Use real photos only." },
 };
 
 const sectionId = z.string().regex(/^[a-z0-9]{4,24}$/, "Section ids are short lowercase codes.");

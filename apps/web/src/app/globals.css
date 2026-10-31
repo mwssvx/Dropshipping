@@ -105,6 +105,8 @@
 .sf-marquee[data-paused] .sf-marquee-track { animation-play-state: paused; }
 @media (hover: hover) { .sf-marquee:hover .sf-marquee-track { animation-play-state: paused; } }
 @media (prefers-reduced-motion: reduce) { .sf-marquee-track { animation: none; } }
+/* Before and after: the slider itself is invisible, so its focus ring goes on the photos. */
+.sf-before-after:has(.sf-before-after-range:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 .sf-hover-photo { display: none; }
 @media (hover: hover) {
   .store[data-hover-photo="on"] .sf-hover-photo { display: block; opacity: 0; transition: opacity 0.3s; }

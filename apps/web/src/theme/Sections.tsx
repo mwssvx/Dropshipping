@@ -14,6 +14,7 @@ import { AnnouncementBar } from "./AnnouncementBar";
 import { Slideshow } from "./Slideshow";
 import { Countdown } from "./Countdown";
 import { ScrollingText } from "./ScrollingText";
+import { BeforeAfter } from "./BeforeAfter";
 import { storeHref } from "./style";
 
 /*
@@ -426,6 +427,22 @@ function Gallery({ s, data }: Props<"gallery">) {
   );
 }
 
+function BeforeAfterSection({ s, data }: Props<"before_after">) {
+  const t = data.t ?? storeText(null);
+  if (!s.beforeUrl || !s.afterUrl) return null;
+  return (
+    <section className="max-w-4xl mx-auto px-4 sm:px-6 py-12 flex flex-col gap-6" aria-label={s.heading || undefined}>
+      {(s.heading || s.text) && (
+        <div className="flex flex-col gap-2 text-center">
+          {s.heading && <h2 className="text-3xl font-bold tracking-tight">{s.heading}</h2>}
+          {s.text && <p className="text-muted leading-relaxed whitespace-pre-line">{s.text}</p>}
+        </div>
+      )}
+      <BeforeAfter beforeUrl={s.beforeUrl} afterUrl={s.afterUrl} before={s.beforeLabel || t.before} after={s.afterLabel || t.after} slider={t.compareSlider} />
+    </section>
+  );
+}
+
 function RichText({ s }: Props<"rich_text">) {
   if (!s.heading && !s.text) return null;
   return (
@@ -693,6 +710,7 @@ export function SectionView({ section, data, first }: { section: Section; data: 
     case "blog_posts": return <BlogPosts s={section.settings} data={data} first={first} />;
     case "scrolling_text": return <ScrollingTextSection s={section.settings} data={data} first={first} />;
     case "gallery": return <Gallery s={section.settings} data={data} first={first} />;
+    case "before_after": return <BeforeAfterSection s={section.settings} data={data} first={first} />;
   }
 }
 
