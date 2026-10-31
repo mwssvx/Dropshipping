@@ -407,8 +407,9 @@ function assistant(s: State, req: ModelRequest): BetaContentBlock[] {
     if (/\b(what('s| is) on my calendar|my calendar|my (schedule|agenda)|calendar (this|next) week)\b/.test(ask) && !/\b(add|put|schedule|book)\b/.test(ask)) {
       return [toolCall("read_calendar", { days: /\bmonth\b/.test(ask) ? 30 : 7 })];
     }
-    const cal = ask.match(/\b(?:add|put|schedule|book) (?:a |an |the )?(.{2,80}?) (?:on|to|in) my calendar(?: (?:on|for|at) (\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2})?))?/);
-    if (cal) return [toolCall("add_calendar_event", { title: cal[1]!.replace(/^\w/, (c) => c.toUpperCase()), start: cal[2] ?? new Date(Date.now() + 86_400_000).toISOString().slice(0, 10), end: null, description: null, location: null })];
+    const cal = ask.match(/\b(?:add|put|schedule|book) (?:a |an |the )?(.{2,80}?) (?:on|to|in) my calendar(?: (?:on|for|at) (\d{4}-\d{2}-\d{2}(?:t\d{2}:\d{2})?))?/);
+    // The question was lower-cased, so the T in a time was too.
+    if (cal) return [toolCall("add_calendar_event", { title: cal[1]!.replace(/^\w/, (c) => c.toUpperCase()), start: cal[2]?.toUpperCase() ?? new Date(Date.now() + 86_400_000).toISOString().slice(0, 10), end: null, description: null, location: null })];
     const mail = ask.match(/\b(?:e-?mail|write to|send (?:an )?e-?mail to) ([^\s@]+@[^\s@]+\.[a-z]{2,})\b(?:.*?\b(?:about|saying|that) (.+))?/);
     if (mail) {
       const store = req.system.match(/admin of (.+?), an online store/)?.[1] ?? "us";

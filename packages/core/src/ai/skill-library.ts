@@ -6,6 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { UserError } from "../errors";
 import { isPrivateHost } from "../webhooks";
+import { SKILLS } from "./skills";
 
 export type CustomSkill = { name: string; title: string; when: string; playbook: string; sourceUrl: string | null; addedAt: string };
 
@@ -80,10 +81,12 @@ export function parseSkillMarkdown(text: string, sourceUrl: string | null = null
     .split(/\n\s*\n/)
     .map((p) => p.replace(/\s+/g, " ").trim())
     .find((p) => p.length > 10 && !p.startsWith("#"));
-  const name = slug(fields.name || heading || (sourceUrl ? sourceUrl.split("/").filter((p) => p && !/\.md$/i.test(p)).at(-1) ?? "" : ""));
-  if (!name || name.length < 2) throw new UserError("The skill needs a name: a `name:` line at the top, or a heading.");
+  const given = slug(fields.name || heading || (sourceUrl ? sourceUrl.split("/").filter((p) => p && !/\.md$/i.test(p)).at(-1) ?? "" : ""));
+  if (!given || given.length < 2) throw new UserError("The skill needs a name: a `name:` line at the top, or a heading.");
+  // A built-in skill keeps its name; the owner's one sits next to it.
+  const name = given in SKILLS ? `${given}-custom` : given;
   const title = (fields.title || heading || titleCase(name)).slice(0, 80);
-  const when = (fields.description || firstParagraph || `questions about ${title.toLowerCase()}`).slice(0, SKILL_WHEN_MAX);
+  const when = (fields.description || firstParagraph || `questions about ${title.toLowerCase()}`).replace(/\s+/g, " ").trim().slice(0, SKILL_WHEN_MAX);
   if (!body || body.length < 20) throw new UserError("The skill has no playbook under its heading.");
   if (body.length > SKILL_PLAYBOOK_MAX) throw new UserError(`The playbook is too long (${body.length} characters; the limit is ${SKILL_PLAYBOOK_MAX}). Shorten it, or paste the part that matters.`);
   return { name, title, when, playbook: body, sourceUrl, addedAt: new Date().toISOString() };

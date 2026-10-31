@@ -71,23 +71,29 @@ export const overdueTasks = (db: Db, shopId: string, now = new Date()) =>
 
 const key = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 
-/** The open task that best matches a few of its words, for ticking one off by describing it. */
-export function findTask(tasks: Pick<Task, "id" | "title">[], text: string) {
+/** Open tasks that share at least half the words of a description, best first. */
+export function matchTasks<T extends Pick<Task, "id" | "title">>(tasks: T[], text: string) {
   const want = key(text).split(" ").filter((w) => w.length > 2);
-  let best: Pick<Task, "id" | "title"> | null = null;
-  let score = 0;
-  for (const t of tasks) {
-    const words = new Set(key(t.title).split(" "));
-    const s = want.filter((w) => words.has(w)).length / Math.max(want.length, 1);
-    if (s > score) [best, score] = [t, s];
-  }
-  return score >= 0.5 ? best : null;
+  return tasks
+    .map((task) => {
+      const words = new Set(key(task.title).split(" "));
+      return { task, score: want.filter((w) => words.has(w)).length / Math.max(want.length, 1) };
+    })
+    .filter((m) => m.score >= 0.5)
+    .sort((a, b) => b.score - a.score);
 }
 
-/** "Tomorrow", "in 3 days", "overdue by 2 days", for lists. */
+/** The one open task that best matches a few of its words, for ticking one off by describing it. Null when none or several match equally. */
+export function findTask<T extends Pick<Task, "id" | "title">>(tasks: T[], text: string) {
+  const m = matchTasks(tasks, text);
+  if (!m.length || (m.length > 1 && m[1]!.score === m[0]!.score)) return null;
+  return m[0]!.task;
+}
+
+/** "Tomorrow", "in 3 days", "overdue by 2 days", for lists. Counts calendar days (UTC), so a task due at the end of today is "Today" all day. */
 export function dueLabel(dueAt: Date | null, now = new Date()) {
   if (!dueAt) return null;
-  const days = Math.round((dueAt.getTime() - now.getTime()) / DAY);
+  const days = Math.floor(dueAt.getTime() / DAY) - Math.floor(now.getTime() / DAY);
   if (days < -1) return `${-days} days overdue`;
   if (days === -1) return "1 day overdue";
   if (days === 0) return "Today";

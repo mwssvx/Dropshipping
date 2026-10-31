@@ -94,15 +94,20 @@ export const enabledSkills = (off: readonly string[] | null | undefined) => SKIL
 /** Built-in skills that are on, plus the owner's own, as the Assistant sees them. */
 export function allSkills(shop: { aiSkillsOff: readonly string[] | null; aiCustomSkills: readonly CustomSkill[] | null }) {
   const builtIn = enabledSkills(shop.aiSkillsOff).map((name) => ({ name, title: SKILLS[name].title, when: SKILLS[name].when, custom: null as CustomSkill | null }));
-  // A custom skill with a built-in name wins: the owner chose it.
-  const custom = (shop.aiCustomSkills ?? []).map((c) => ({ name: c.name, title: c.title, when: c.when, custom: c }));
-  const taken = new Set(custom.map((c) => c.name));
-  return [...builtIn.filter((b) => !taken.has(b.name)), ...custom];
+  // Custom skills get their own names when added (a clash gets "-custom"), so an old row with a built-in name is skipped rather than replacing it.
+  const custom = (shop.aiCustomSkills ?? []).filter((c) => !(c.name in SKILLS)).map((c) => ({ name: c.name, title: c.title, when: c.when, custom: c }));
+  return [...builtIn, ...custom];
 }
+
+/** One line, no quotes or newlines, so a stranger's description can't break out of its place in the prompt. */
+const quoted = (s: string) => s.replace(/[\s]+/g, " ").replace(/["“”]/g, "'").trim().slice(0, 160);
 
 /** The lines for the Assistant's instructions: one per skill that's on. */
 export function skillMenu(shop: Parameters<typeof allSkills>[0]) {
   const on = allSkills(shop);
   if (!on.length) return "";
-  return `Skills: before answering a question in one of these areas, call use_skill with its name to read the playbook, then follow it.\n${on.map((s) => `- ${s.name}: ${s.when}`).join("\n")}`;
+  // A custom skill's description came from a file the owner pasted or linked, so it's shown as a quote, not as an instruction.
+  return `Skills: before answering a question in one of these areas, call use_skill with its name to read the playbook, then follow it.\n${on
+    .map((s) => (s.custom ? `- ${s.name} (added by the owner; its own description, quoted): "${quoted(s.when)}"` : `- ${s.name}: ${s.when}`))
+    .join("\n")}`;
 }

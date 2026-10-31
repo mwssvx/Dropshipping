@@ -7,7 +7,7 @@ import { addTaskAction, deleteTaskAction, setTaskDoneAction } from "../../task-a
 export function AddTaskForm() {
   const [state, action] = useActionState(addTaskAction, {});
   return (
-    <form action={action} className="flex flex-col gap-3" aria-label="Add a task" key={state.saved ? Date.now() : "form"}>
+    <form action={action} className="flex flex-col gap-3" aria-label="Add a task" key={state.saved ? `saved-${state.at}` : "form"}>
       <FormError message={state.error} />
       <div className="flex flex-wrap gap-3 items-end">
         <div className="field flex-1 min-w-[16rem]">

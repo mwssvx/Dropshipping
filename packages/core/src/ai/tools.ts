@@ -33,8 +33,8 @@ import { createDiscount } from "../discounts";
 import { createCollection } from "../collections";
 import { createCampaign } from "../campaigns";
 import { AT_RISK_TAG, atRiskCustomers, tagAtRisk } from "../churn";
-import { addTask, dueLabel, findTask, listTasks, parseDueDate, setTaskDone } from "../tasks";
-import { CALENDAR_DAYS_MAX, EMAIL_BODY_MAX, EMAIL_LIST_MAX, googleToken, parseEventTime, whenLabel } from "../connectors/google";
+import { addTask, dueLabel, findTask, matchTasks, listTasks, parseDueDate, setTaskDone } from "../tasks";
+import { CALENDAR_DAYS_MAX, dayOf, EMAIL_BODY_MAX, EMAIL_LIST_MAX, googleToken, isAllDay, parseEventTime, whenLabel } from "../connectors/google";
 import { aiImpact, aiMonth, impactLines, timeSaved } from "./impact";
 import { findNote, MEMORY_MAX_NOTES, MEMORY_NOTE_MAX, normalizeMemory } from "./memory";
 import { addMessage, BUYER_TOPICS, discardDrafts, sendBuyerMessage, setConversationStatus, type BuyerTopic } from "./conversations";
@@ -1642,7 +1642,11 @@ const taskTools = [
     async run(i, run) {
       const open = await listTasks(run.ctx.db, run.shop.id, "open", 100);
       const match = findTask(open, i.task);
-      if (!match) throw new UserError(`No open task matches "${i.task}". Read the list with read_tasks and use the task's own words.`);
+      if (!match) {
+        const several = matchTasks(open, i.task);
+        if (several.length > 1) throw new UserError(`Several tasks match "${i.task}": ${several.map((m) => `“${m.task.title}”`).join(", ")}. Ask the owner which one, then use that task's own words.`);
+        throw new UserError(`No open task matches "${i.task}". Read the list with read_tasks and use the task's own words.`);
+      }
       await setTaskDone(run.ctx.db, run.shop.id, match.id, true);
       return { done: match.title, left: open.length - 1 };
     },
@@ -1650,6 +1654,17 @@ const taskTools = [
 ];
 
 /** The owner's Google account, when connected: a token for the call, or a plain reason why not. */
+const dayLabel = (d: Date) => d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+
+/** Start and end of an event from the model's text. A bare date is a whole day; its end is the start of the next day (exclusive, as calendars count). */
+function eventTimes(i: { start: string; end: string | null }) {
+  const allDay = isAllDay(i.start);
+  const start = parseEventTime(i.start);
+  const end = i.end ? (allDay ? new Date(parseEventTime(i.end).getTime() + DAY) : parseEventTime(i.end)) : new Date(start.getTime() + (allDay ? DAY : 3_600_000));
+  if (end <= start) throw new UserError("The event ends before it starts. Give an end after the start, or null.");
+  return { start, end, allDay };
+}
+
 async function google(run: RunScope) {
   if (!run.ctx.google) throw new UserError("Google isn't set up on this platform yet, so email and calendar aren't available.");
   const { token, email } = await googleToken({ db: run.ctx.db, google: run.ctx.google, connectorSecret: run.ctx.connectorSecret }, run.shop.id);
@@ -1718,11 +1733,11 @@ const googleTools = [
   tool({
     name: "add_calendar_event",
     kind: "change",
-    description: "Put an event on the owner's connected Google Calendar when they ask (a supplier call, a sale start, a deadline). Times in ISO form with the owner's time zone offset, e.g. 2026-11-15T14:00+01:00; UTC when no offset is given. It waits for their OK.",
+    description: "Put an event on the owner's connected Google Calendar when they ask (a supplier call, a sale start, a deadline). Times in ISO form with the owner's time zone offset, e.g. 2026-11-15T14:00+01:00; UTC when no offset is given. A bare date like 2026-11-20 makes an all-day event. It waits for their OK.",
     input: z.object({
       title: z.string().min(2).max(120),
-      start: z.string().max(40).describe("e.g. 2026-11-15T14:00+01:00"),
-      end: z.string().max(40).nullable().describe("null for an hour after the start"),
+      start: z.string().max(40).describe("e.g. 2026-11-15T14:00+01:00, or 2026-11-20 for all day"),
+      end: z.string().max(40).nullable().describe("null for an hour after the start (or the same day for an all-day event)"),
       description: z.string().max(1000).nullable(),
       location: z.string().max(200).nullable(),
     }),
@@ -1730,17 +1745,15 @@ const googleTools = [
     summary: (i) => `Calendar event: “${i.title}” at ${i.start}`,
     async propose(i, run) {
       await google(run);
-      const start = parseEventTime(i.start);
-      const end = i.end ? parseEventTime(i.end) : new Date(start.getTime() + 3_600_000);
-      if (end <= start) throw new UserError("The event ends before it starts. Give an end after the start, or null.");
-      return { ...i, end: end.toISOString(), preview: [`${whenLabel(start.toISOString(), "UTC")} to ${whenLabel(end.toISOString(), "UTC")} (UTC)`, ...(i.location ? [`At ${i.location}`] : []), ...(i.description ? [i.description] : [])] };
+      const { start, end, allDay } = eventTimes(i);
+      const when = allDay ? `All day ${dayLabel(start)}${dayOf(end) !== dayOf(new Date(start.getTime() + DAY)) ? ` to ${dayLabel(new Date(end.getTime() - DAY))}` : ""}` : `${whenLabel(start.toISOString(), "UTC")} to ${whenLabel(end.toISOString(), "UTC")} (UTC)`;
+      return { ...i, end: allDay ? dayOf(new Date(end.getTime() - DAY)) : end.toISOString(), preview: [when, ...(i.location ? [`At ${i.location}`] : []), ...(i.description ? [i.description] : [])] };
     },
     async run(i, run) {
       const g = await google(run);
-      const start = parseEventTime(i.start);
-      const end = i.end ? parseEventTime(i.end) : new Date(start.getTime() + 3_600_000);
-      const e = await g.api.createEvent(g.token, { title: i.title, start, end, description: i.description, location: i.location });
-      return { added: e.title, when: `${whenLabel(e.start, "UTC")} UTC`, link: e.link };
+      const { start, end, allDay } = eventTimes(i);
+      const e = await g.api.createEvent(g.token, { title: i.title, start, end, allDay, description: i.description, location: i.location });
+      return { added: e.title, when: allDay ? `${e.start} (all day)` : `${whenLabel(e.start, "UTC")} UTC`, link: e.link };
     },
   }),
 ];

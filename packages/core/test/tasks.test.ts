@@ -21,6 +21,10 @@ describe("the to-do list", () => {
     expect(dueLabel(open[0]!.dueAt, now)).toBe("2 days overdue");
     expect(dueLabel(open[1]!.dueAt, now)).toBe("Today");
     expect(dueLabel(null)).toBeNull();
+    // Due dates are the end of the day, and the label counts calendar days: still "Today" early in the morning, "Tomorrow" the day before.
+    expect(dueLabel(parseDueDate("2026-11-15"), new Date("2026-11-15T08:00:00Z"))).toBe("Today");
+    expect(dueLabel(parseDueDate("2026-11-15"), new Date("2026-11-14T23:30:00Z"))).toBe("Tomorrow");
+    expect(dueLabel(parseDueDate("2026-11-15"), new Date("2026-11-17T01:00:00Z"))).toBe("2 days overdue");
 
     const today = await todaySummary(f.db, shop, now);
     expect(today.attention.find((a) => a.kind === "tasks")).toMatchObject({ title: "3 on your to-do list", body: "1 overdue, 1 due today.", url: "/tasks", tone: "warning" });
@@ -34,6 +38,9 @@ describe("the to-do list", () => {
     expect(await listTasks(f.db, shop.id)).toHaveLength(3);
     expect(findTask(open, "the backup supplier")?.title).toBe("Add a backup supplier for the lamp");
     expect(findTask(open, "something else entirely")).toBeNull();
+    // Two tasks matching equally well is no match: the Assistant asks which one.
+    expect(findTask([{ id: "a", title: "Order new packaging" }, { id: "b", title: "Order new lamps" }], "the new order")).toBeNull();
+    expect(findTask([{ id: "a", title: "Order new packaging" }, { id: "b", title: "Order new lamps" }], "order the new lamps")?.id).toBe("b");
   });
 
   it("stops at the limit, and reads dates the Assistant gives", async () => {
