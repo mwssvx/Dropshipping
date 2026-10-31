@@ -1565,3 +1565,54 @@ test("an email campaign written, tested and sent from the app", async ({ page, b
   }).toPass({ timeout: 20_000 });
   await mail.close();
 });
+
+test("the buyer survey set up in the app, and what a buyer answered", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `sv${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Linen Towel");
+  await web.getByLabel("Price", { exact: true }).fill("15.00");
+  await web.getByLabel("Stock", { exact: true }).fill("5");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const towel = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Analytics", exact: true }).click();
+  await page.getByRole("link", { name: /^How buyers found you/ }).click();
+  await expect(page.getByRole("heading", { name: "Buyer survey", level: 1 })).toBeVisible();
+  await page.getByRole("button", { name: "Set up the question" }).click();
+  await page.getByRole("textbox", { name: "Answers, one per line" }).fill("Instagram\nA friend");
+  await page.getByRole("button", { name: "Start asking" }).click();
+  await expect(page.getByText("Saved. Buyers see the question on their order page right after paying.")).toBeVisible();
+  await expect(page.getByText("Instagram · A friend · or their own words")).toBeVisible();
+
+  const buyer = await (await browser.newContext()).newPage();
+  await buyer.goto(towel);
+  await buyer.getByRole("button", { name: "Add to cart" }).click();
+  await expect(buyer.getByRole("link", { name: /^Cart, 1 item/ })).toBeVisible();
+  await buyer.getByRole("link", { name: "Check out" }).click();
+  await buyer.getByRole("textbox", { name: "Email" }).first().fill(`ada-${Date.now()}@example.com`);
+  await buyer.getByLabel("Full name").fill("Ada Lovelace");
+  await buyer.getByLabel("Address", { exact: true }).fill("1 Main St");
+  await buyer.getByLabel("City").fill("Austin");
+  await buyer.getByLabel("State or region").fill("TX");
+  await buyer.getByLabel("Postal code").fill("78701");
+  await buyer.getByRole("button", { name: "Continue to payment" }).click();
+  await buyer.getByRole("button", { name: /^Pay / }).click();
+  await expect(buyer.getByRole("heading", { name: "Thank you, Ada!" })).toBeVisible();
+  const question = buyer.getByRole("region", { name: "How did you hear about us?" });
+  await question.getByRole("radio", { name: "Other" }).check();
+  await question.getByLabel("Tell us where").fill("A newsletter");
+  await question.getByRole("button", { name: "Send answer" }).click();
+  await expect(buyer.getByRole("region", { name: "How did you hear about us?" })).toHaveCount(0);
+
+  await page.reload();
+  await expect(page.getByText("1 of 1 order answered (100%).")).toBeVisible();
+  await expect(page.getByRole("region", { name: "What buyers said" }).getByText("1 order · 100%")).toBeVisible();
+  await expect(page.getByRole("region", { name: "In their own words" }).getByText("A newsletter")).toBeVisible();
+  await shot(page, "373-app-survey");
+
+  await page.getByRole("button", { name: "Stop asking" }).click();
+  await expect(page.getByText("The survey is off. Answers so far stay here.")).toBeVisible();
+  await expect(page.getByText("Not asking yet")).toBeVisible();
+});

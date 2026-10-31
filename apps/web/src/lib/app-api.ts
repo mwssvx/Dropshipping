@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  setSurvey,
+  surveyReport,
   audienceSizes,
   AUDIENCE_LABELS,
   campaignAllowance,
@@ -1073,6 +1075,19 @@ const routes: Record<string, Handler> = {
     await deleteCampaign(db, shop.id, params.id!);
     return { ok: true, message: "Draft deleted." };
   },
+  // The buyer survey: "How did you hear about us?" on the order page, and what buyers answered.
+  "GET survey": async ({ url, db, shop }) => {
+    const days = [30, 90, 365].find((d) => String(d) === url.searchParams.get("days")) ?? 30;
+    const r = await surveyReport(db, shop.id, days);
+    return { survey: shop.survey, days, orders: r.orders, answered: r.answered, rows: r.rows, others: r.others };
+  },
+  "PUT survey": async ({ req, db, shop, user }) => {
+    const b = await body<{ on?: unknown; question?: unknown; options?: unknown; other?: unknown }>(req);
+    const on = b.on !== false;
+    await setSurvey(db, shop.id, on ? { question: str(b.question), options: (Array.isArray(b.options) ? b.options : []).map((o) => str(o)), other: b.other === true } : null);
+    await logged({ shop, user, db }, on ? "Saved the buyer survey in the app" : "Turned off the buyer survey in the app", { href: "/admin/survey" });
+    return { ok: true, message: on ? "Saved. Buyers see the question on their order page right after paying." : "The survey is off. Answers so far stay here." };
+  },
   "GET questions": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
     const rows = await listQuestions(db, shop.id);
@@ -1657,6 +1672,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("wholesale")) return "wholesale";
   if (path.startsWith("partners")) return "marketing";
   if (path.startsWith("campaigns")) return "marketing";
+  if (path.startsWith("survey")) return "marketing";
   if (path.startsWith("checkouts")) return "orders";
   if (path.startsWith("store-status")) return "theme";
   if (path.startsWith("gift-cards")) return "gift_cards";
