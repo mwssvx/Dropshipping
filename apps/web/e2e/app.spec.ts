@@ -846,3 +846,49 @@ test("a buyer blocked from an order in the app can't check out again", async ({ 
   await web.goto(`${WEB}/admin/blocked`);
   await expect(web.getByText("ada@example.com").first()).toBeVisible();
 });
+
+test("checkouts left unpaid, and the reminder sent, shown in the app", async ({ page, browser }) => {
+  const id = `lc${Date.now()}`;
+  const { web, email } = await merchant(browser, id);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Beeswax Candle");
+  await web.getByLabel("Price", { exact: true }).fill("12.00");
+  await web.getByLabel("Stock", { exact: true }).fill("6");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const candle = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+
+  await signIn(page, email);
+  await tab(page, "Orders");
+  await page.getByRole("tab", { name: "All" }).click();
+  await page.getByRole("link", { name: /Left at checkout/ }).click();
+  await expect(page.getByText("Nobody left at checkout")).toBeVisible();
+
+  // A buyer leaves at payment, and the reminder goes out.
+  const left = `left-${id}@example.com`;
+  const buyer = await (await browser.newContext()).newPage();
+  await buyer.goto(candle);
+  await buyer.getByRole("button", { name: "Add to cart" }).click();
+  await buyer.getByRole("link", { name: "Check out" }).click();
+  await buyer.getByLabel("Email").fill(left);
+  await buyer.getByLabel("Full name").fill("Grace Hopper");
+  await buyer.getByLabel("Address", { exact: true }).fill("1 Main St");
+  await buyer.getByLabel("City").fill("Austin");
+  await buyer.getByLabel("State or region").fill("TX");
+  await buyer.getByLabel("Postal code").fill("78701");
+  await buyer.getByRole("button", { name: "Continue to payment" }).click();
+  await expect(buyer.getByRole("button", { name: /^Pay/ })).toBeVisible();
+  await buyer.context().close();
+  await web.goto(`${WEB}/admin/marketing`);
+  await web.getByRole("region", { name: "Checkout reminders" }).getByRole("button", { name: "Send reminders now" }).click();
+  await expect(web.getByRole("region", { name: "Checkout reminders" }).getByText("Sent, last 30 days").locator("..")).toContainText("1");
+
+  await page.reload();
+  // Tapping a buyer starts an email to them, so the row is a button.
+  const row = page.getByRole("button", { name: "Checkout by Grace Hopper" });
+  await expect(row).toContainText("· 1 item ·");
+  await expect(row).toContainText("Reminded");
+  await expect(row).toContainText("Not yet");
+  await expect(page.getByText("Left unpaid")).toBeVisible();
+  await shot(page, "355-app-left-at-checkout");
+});
