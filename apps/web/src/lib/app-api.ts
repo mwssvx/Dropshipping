@@ -1404,7 +1404,8 @@ const routes: Record<string, Handler> = {
     const b = await body<{ on?: unknown; price?: unknown; note?: unknown }>(req);
     let saved = null;
     if (b.on === true) {
-      const raw = str(b.price).trim().replace(/^[^\d]+/, "");
+      // A currency sign in front is fine; letters aren't.
+      const raw = str(b.price).trim().replace(/^[$€£¥₹]\s*/, "");
       let priceMinor = 0;
       try {
         priceMinor = raw ? parseMoney(raw) : 0;
