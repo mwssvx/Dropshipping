@@ -1768,3 +1768,7 @@ In an order with supplier products and the store's own stock, the store's parcel
 ### Packing slips for an order in two parcels (after launch, part 322)
 
 In an order with supplier products and the store's own stock, the packing slip listed everything, so a buyer opening the store's box saw items on the slip that weren't in it. The slip now lists only what goes in the store's box, with "Coming separately from another warehouse: Sunset Projection Lamp" under the table. Orders all from the store's shelf, or all from suppliers, print as before. `packingSlips` in `packages/core/src/packing-slips.ts` (`separately`). No migration.
+
+### Orders going to the same address (after launch, part 323)
+
+A buyer who comes back the next day for one more thing has two orders going to one door. The admin order page now lists the buyer's other paid orders to the same address from the last 30 days that haven't shipped yet. "1 Main St" and "1 main st." count as the same address, but a different flat doesn't. When both orders hold something you post yourself, it says those items can go in one box, so you pay postage once. Supplier parcels still ship on their own.
