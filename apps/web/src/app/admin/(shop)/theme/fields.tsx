@@ -15,7 +15,7 @@ type Field =
   | { key: string; label: string; kind: "text" | "textarea" | "image" | "link" | "datetime"; hint?: string; max?: number }
   | { key: string; label: string; kind: "select"; options: { value: string; label: string }[] }
   | { key: string; label: string; kind: "number"; min: number; max: number }
-  | { key: string; label: string; kind: "collection" | "collections" | "faq" | "quotes" | "badges" | "product" | "products" | "logos" | "messages" | "columns" | "slides" | "marquee" | "gallery" };
+  | { key: string; label: string; kind: "collection" | "collections" | "faq" | "quotes" | "badges" | "product" | "products" | "logos" | "messages" | "columns" | "slides" | "marquee" | "gallery"; hint?: string };
 
 export const TRUST_ICON_LABELS: Record<TrustIcon, string> = {
   shipping: "Delivery truck",
@@ -164,6 +164,11 @@ export const SECTION_FIELDS: Record<SectionType, Field[]> = {
     { key: "beforeLabel", label: "Before label (optional)", kind: "text", max: 30, hint: "Leave empty for “Before” in the shopper's language." },
     { key: "afterLabel", label: "After label (optional)", kind: "text", max: 30, hint: "Leave empty for “After” in the shopper's language." },
   ],
+  collection_tabs: [
+    { key: "heading", label: "Heading", kind: "text", max: 120 },
+    { key: "collectionIds", label: "Tabs", kind: "collections", hint: "Pick up to 5, one tab each, in the order you tick them. Pick none to use your first collections." },
+    { key: "limit", label: "Products per tab", kind: "number", min: 2, max: 12 },
+  ],
 };
 
 /** A saved moment as the editor's computer shows it, for a datetime-local input. */
@@ -263,7 +268,7 @@ export function SectionForm<T extends SectionType>({
               <fieldset className="flex flex-col gap-2">
                 <legend className="label mb-1">{f.label}</legend>
                 {collections.length === 0 && <span className="hint">You have no collections yet. Create one under Collections.</span>}
-                {collections.length > 0 && <span className="hint">Pick none to show them all.</span>}
+                {collections.length > 0 && <span className="hint">{f.hint ?? "Pick none to show them all."}</span>}
                 {collections.map((c) => {
                   const picked = (v as string[]).includes(c.id);
                   return (
@@ -343,7 +348,7 @@ export function SectionForm<T extends SectionType>({
               <ListItems label={f.label} items={v as Record<string, string>[]} onChange={(x) => set(f.key, x)} max={ANNOUNCE_MAX - 1} noun="message"
                 fields={[{ key: "text", label: "Extra message" }, { key: "link", label: "Extra message link" }]} blank={{ text: "", link: "" }} />
             )}
-            {"hint" in f && f.hint && <span className="hint">{f.hint}</span>}
+            {"hint" in f && f.hint && f.kind !== "collections" && <span className="hint">{f.hint}</span>}
           </div>
         );
       })}

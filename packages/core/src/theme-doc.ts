@@ -106,6 +106,17 @@ export const COLUMNS_MAX = 6;
 export const MARQUEE_MAX = 8;
 /** Photos in one gallery. */
 export const GALLERY_MAX = 8;
+/** Collections in one "Collection tabs" section. */
+export const COLLECTION_TABS_MAX = 5;
+
+/**
+ * The tabs a "Collection tabs" section shows: the picked collections in the order picked, or the
+ * first ones when none are picked, leaving out any with no products on sale.
+ */
+export function collectionTabs<C extends { id: string; productIds: string[] }>(picked: string[], collections: C[], onSale: (id: string) => boolean): C[] {
+  const chosen = picked.length ? picked.map((id) => collections.find((c) => c.id === id)).filter((c): c is C => !!c) : collections;
+  return chosen.filter((c) => c.productIds.some(onSale)).slice(0, COLLECTION_TABS_MAX);
+}
 
 /** The most links one dropdown in the header menu holds. */
 export const MENU_CHILDREN_MAX = 10;
@@ -285,6 +296,13 @@ const sectionSchemas = {
     beforeLabel: text(30),
     afterLabel: text(30),
   }),
+  // A few collections as tabs over one product grid. Picking none uses the first collections
+  // that have products.
+  collection_tabs: z.object({
+    heading: text(120),
+    collectionIds: z.array(z.string().uuid()).max(COLLECTION_TABS_MAX, `Pick up to ${COLLECTION_TABS_MAX} collections.`).default([]),
+    limit: z.number().int().min(2).max(12).default(8),
+  }),
 } as const;
 
 export type SectionType = keyof typeof sectionSchemas;
@@ -314,6 +332,7 @@ export const SECTION_LABELS: Record<SectionType, { name: string; about: string }
   scrolling_text: { name: "Scrolling text", about: "A few short messages that glide across the page in a loop, like “Free shipping · 30-day returns · Made to last”. Shoppers can pause it, and it stays still for those who ask for less motion." },
   gallery: { name: "Photo gallery", about: "Up to eight square photos in a grid, like your Instagram or buyers using your products, each with an optional link, and a button like “Follow us”." },
   before_after: { name: "Before and after", about: "Two photos of the same thing, before and after using your product, with a handle shoppers drag to compare them. Use real photos only." },
+  collection_tabs: { name: "Collection tabs", about: "Up to five collections as tabs over one product grid, so shoppers switch between “New in”, “Best sellers” and “Gifts” without leaving the page." },
 };
 
 const sectionId = z.string().regex(/^[a-z0-9]{4,24}$/, "Section ids are short lowercase codes.");
