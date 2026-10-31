@@ -6,6 +6,7 @@ import { StoreShell } from "@/theme/StoreShell";
 import { activeClosure, LANGUAGES, needsConsent, paymentMethods, shopCurrencies, shopLanguages, SIGNUP_POPUP_QUIET, CHAT_BUTTON_QUIET, chatLinks, storePixels, storeWideCountdown } from "@sf/core";
 import { SignupPopup } from "@/components/SignupPopup";
 import { ChatButtons } from "@/components/ChatButtons";
+import { BackToTop } from "@/theme/BackToTop";
 import { currentBuyer } from "@/lib/buyer";
 import { SaleCountdown } from "@/components/SaleCountdown";
 import { AdPixels } from "@/components/AdPixels";
@@ -97,6 +98,7 @@ export default async function StoreLayout({ children, params }: { children: Reac
           text={{ whatsapp: t.chatWhatsApp, telegram: t.chatTelegram, hello: t.chatHello }}
         />
       )}
+      {theme.settings.backToTop && <BackToTop label={t.backToTop} />}
       {pixels && <AdPixels ids={pixels} ask={ask} text={{ message: t.cookieMessage, accept: t.cookieAccept, decline: t.cookieDecline, settings: t.cookieSettings }} />}
     </StoreShell>
   );

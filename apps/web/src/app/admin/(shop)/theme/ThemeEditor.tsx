@@ -405,6 +405,10 @@ function StylePanel({ doc, onChange }: { doc: ThemeDoc; onChange: (d: ThemeDoc) 
           <input type="checkbox" className="mt-0.5" checked={s.cardRatings} onChange={(e) => set({ cardRatings: e.target.checked })} />
           <span>Show star ratings on product cards<span className="block hint">The average of a product’s published reviews and how many there are. Products without reviews show no stars.</span></span>
         </label>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-0.5" checked={s.backToTop} onChange={(e) => set({ backToTop: e.target.checked })} />
+          <span>Show a “Back to top” button on long pages<span className="block hint">It appears in the corner once a shopper has scrolled two screens down.</span></span>
+        </label>
       </fieldset>
       <fieldset className="flex flex-col gap-2">
         <legend className="font-semibold mb-1">Corners</legend>
