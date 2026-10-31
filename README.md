@@ -1848,3 +1848,7 @@ Today in the app now has a Customers button for roles that cover customers. It l
 ### From an order to its customer, in the app (after launch, part 342)
 
 An order in the app now says, under the buyer, whether it's their first order or how many they've placed, with their tags, and opens their customer screen. It shows for roles that can open customers.
+
+### Discount codes in the app (after launch, part 343)
+
+Today has a Discount codes button for roles that can open marketing. It lists every code with what it does, how often it was used and what it sold, with a switch to turn each one off or back on. A store can make an everyday code from the phone: a percent off, an amount off or free shipping, optionally for first orders only. Limits, dates, buy X get Y and codes for chosen products stay on the website. Codes made or switched from the app show in the activity log as done in the app.

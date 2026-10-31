@@ -51,6 +51,10 @@ import {
   getCustomerProfile,
   updateCustomerNotes,
   customerOfOrder,
+  listDiscounts,
+  describeDiscount,
+  createDiscount,
+  setDiscountActive,
   productPhotos,
   sendPriceDrops,
   sendStockAlerts,
@@ -83,7 +87,7 @@ import {
 } from "@sf/core";
 import type { Db } from "@sf/db";
 import { BRAND } from "./brand";
-import { agents, db, fulfillment, mailer, platformUrl, notifyLater, payments, refunds, stock, storeAddress, suppliers, testPayments } from "./server";
+import { agents, db, fulfillment, logged, mailer, platformUrl, notifyLater, payments, refunds, stock, storeAddress, suppliers, testPayments } from "./server";
 
 type User = { id: string; email: string };
 type ShopLink = { id: string; name: string; handle: string; role: string };
@@ -422,6 +426,40 @@ const routes: Record<string, Handler> = {
     return { ok: true, message: "Sent. We'll tell you when it's checked." };
   },
 
+  "GET codes": async ({ db, shop }) => ({
+    codes: (await listDiscounts(db, shop.id)).map((d) => ({
+      id: d.id,
+      code: d.code,
+      summary: describeDiscount(d, shop.currency),
+      automatic: d.automatic,
+      firstOrderOnly: d.firstOrderOnly,
+      active: d.active,
+      used: d.used,
+      salesMinor: d.salesMinor,
+      usageLimit: d.usageLimit,
+      endsAt: d.endsAt,
+    })),
+  }),
+  "POST codes": async ({ req, db, shop, user }) => {
+    const b = await body<{ code?: unknown; kind?: unknown; value?: unknown; firstOrderOnly?: unknown; usageLimit?: unknown }>(req);
+    // The everyday kinds from the phone; buy X get Y, products and dates are on the website.
+    const kind = b.kind === "amount" || b.kind === "free_shipping" ? b.kind : "percent";
+    const created = await createDiscount(db, shop.id, {
+      code: str(b.code),
+      kind,
+      value: typeof b.value === "number" ? Math.round(b.value) : 0,
+      firstOrderOnly: b.firstOrderOnly === true,
+      usageLimit: typeof b.usageLimit === "number" ? Math.round(b.usageLimit) : null,
+    });
+    await logged({ shop, user, db }, `Created the discount code ${created.code} in the app`, { href: "/admin/marketing" });
+    return { ok: true, message: `${created.code} is ready: ${describeDiscount(created, shop.currency)}.` };
+  },
+  "POST codes/:id": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ active?: unknown }>(req);
+    const row = await setDiscountActive(db, shop.id, params.id!, b.active === true);
+    await logged({ shop, user, db }, `${row.active ? "Turned on" : "Turned off"} the discount code ${row.code} in the app`, { href: "/admin/marketing" });
+    return { ok: true, message: row.active ? `${row.code} works again.` : `${row.code} is off. Buyers who try it are told it doesn't work.` };
+  },
   "GET customers": async ({ url, db, shop }) => {
     const q = (url.searchParams.get("q") ?? "").slice(0, 100);
     // The ones who bought most recently first; a search looks at names and emails.
@@ -553,6 +591,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("inbox")) return "inbox";
   if (path.startsWith("reviews")) return "reviews";
   if (path.startsWith("customers")) return "customers";
+  if (path.startsWith("codes")) return "marketing";
   if (path === "today") return "home";
   return null;
 }

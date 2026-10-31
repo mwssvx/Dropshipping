@@ -458,3 +458,45 @@ test("a customer's orders, note and tags, from the app", async ({ page, browser 
   await expect(them).toContainText("2 orders from them");
   await expect(them).toContainText("vip, local");
 });
+
+test("a discount code made, checked and turned off from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `dc${Date.now()}`);
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Discount codes" }).click();
+  await expect(page.getByText("No codes yet")).toBeVisible();
+
+  await page.getByRole("textbox", { name: "Code" }).fill("welcome 10");
+  await expect(page.getByRole("textbox", { name: "Code" })).toHaveValue("WELCOME10");
+  await page.getByRole("textbox", { name: "Percent off" }).fill("10");
+  await page.getByRole("switch", { name: "First order only" }).click();
+  await shot(page, "343-app-new-code");
+  await page.getByRole("button", { name: "Create code" }).click();
+  await expect(page.getByText("WELCOME10 is ready: 10% off.")).toBeVisible();
+  await expect(page.getByText("10% off · first order only")).toBeVisible();
+  await expect(page.getByText("Not used yet")).toBeVisible();
+
+  // The same code twice is refused with the reason.
+  await page.getByRole("textbox", { name: "Code" }).fill("WELCOME10");
+  await page.getByRole("tab", { name: "Free shipping" }).click();
+  await expect(page.getByRole("textbox", { name: "Percent off" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Create code" }).click();
+  await expect(page.getByText("You already have a code called WELCOME10.")).toBeVisible();
+
+  // An amount off, in money.
+  await page.getByRole("textbox", { name: "Code" }).fill("FIVE");
+  await page.getByRole("tab", { name: "Amount off" }).click();
+  await page.getByRole("textbox", { name: "Amount off" }).fill("5");
+  await page.getByRole("button", { name: "Create code" }).click();
+  await expect(page.getByText(/FIVE is ready: \$5\.00 off/)).toBeVisible();
+
+  await page.getByRole("switch", { name: "WELCOME10 is on" }).click();
+  await expect(page.getByText("WELCOME10 is off. Buyers who try it are told it doesn't work.")).toBeVisible();
+  await expect(page.getByRole("switch", { name: "WELCOME10 is on" })).not.toBeChecked();
+
+  // The website sees the same codes, and the activity log says it was done from the app.
+  await web.goto(`${WEB}/admin/marketing`);
+  await expect(web.getByText("WELCOME10").first()).toBeVisible();
+  await expect(web.getByText("FIVE").first()).toBeVisible();
+  await web.goto(`${WEB}/admin/activity`);
+  await expect(web.getByText("Turned off the discount code WELCOME10 in the app")).toBeVisible();
+});
