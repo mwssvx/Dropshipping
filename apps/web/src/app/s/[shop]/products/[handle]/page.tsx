@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, formatDeliveryWindow, giftCardBonusNow, holidayReturnsNow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, breadcrumbCollection, collectionFromReferer, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, comingSoonProduct, COMPARE_MAX, defaultCutoffZone, countdownTo, shipsToCountry, recentSalesCount, RECENT_SALES_DAYS, starsFilter, REVIEWS_SHOWN, REVIEWS_SHOWN_ALL, reviewSort, reviewsQuery, helpfulVotes, reportedReviews } from "@sf/core";
+import { bundlesForProduct, formatDeliveryWindow, giftCardBonusNow, holidayReturnsNow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, breadcrumbCollection, collectionFromReferer, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, comingSoonProduct, COMPARE_MAX, defaultCutoffZone, countdownTo, shipsToCountry, recentSalesCount, RECENT_SALES_DAYS, starsFilter, postsFeaturing, REVIEWS_SHOWN, REVIEWS_SHOWN_ALL, reviewSort, reviewsQuery, helpfulVotes, reportedReviews } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { ShareButtons } from "@/components/ShareButtons";
 import { SaleCountdown } from "@/components/SaleCountdown";
@@ -128,7 +128,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
     many && defs.length > 0 &&
     product.variants.every((x) => Object.keys(x.options ?? {}).sort().join("|") === names) &&
     new Set(product.variants.map((x) => JSON.stringify(defs.map((d) => x.options?.[d.name])))).size === product.variants.length;
-  const [reviews, questions, rawUpsells, base, fx, chart, rawRecent, soldLately] = await Promise.all([
+  const [reviews, questions, rawUpsells, base, fx, chart, rawRecent, soldLately, posts] = await Promise.all([
     productReviews(await db(), product.id, query.reviews === "all" ? REVIEWS_SHOWN_ALL : REVIEWS_SHOWN, { stars: starsFilter(query.stars), photos: query.photos === "1", sort: reviewSort(query.sort) }),
     productQuestions(await db(), product.id),
     upsellsFor(await db(), shop.id, [product.id]),
@@ -137,6 +137,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
     sizeChartForProduct(await db(), shop.id, product.id),
     readRecent(shop.id).then(async (ids) => recentlyViewed(await db(), shop.id, ids, { exclude: [product.id] })),
     shop.recentSales ? recentSalesCount(await db(), shop.id, product.id) : null,
+    postsFeaturing(await db(), shop.id, product.id),
   ]);
   const recent = await localProducts(shopHandle, rawRecent);
   const asked = await headers();
@@ -679,6 +680,26 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
           <SubmitButton className="btn btn-secondary self-start">{t.askButton}</SubmitButton>
         </form>
       </section>
+      {posts.length > 0 && (
+        <section className="md:col-span-2 flex flex-col gap-4 border-t border-border pt-8" aria-labelledby="from-our-blog">
+          <h2 id="from-our-blog" className="text-xl font-semibold">{t.fromOurBlog}</h2>
+          <ul className="grid gap-6 sm:grid-cols-3">
+            {posts.map((p) => (
+              <li key={p.id}>
+                <article className="flex flex-col gap-2">
+                  {p.imageUrl && (
+                    <Link href={`${base}/blog/${p.handle}`} className="sf-media block aspect-[3/2] rounded-lg bg-sunken overflow-hidden" tabIndex={-1} aria-hidden>
+                      <img src={p.imageUrl} alt="" loading="lazy" className="size-full object-cover" />
+                    </Link>
+                  )}
+                  <h3 className="font-semibold leading-snug"><Link href={`${base}/blog/${p.handle}`} className="hover:underline">{p.title}</Link></h3>
+                  {p.summary && <p className="hint text-sm line-clamp-2">{p.summary}</p>}
+                </article>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <RecentlyViewed items={recent} base={base} currency={shop.currency} fx={fx} title={t.recentlyViewed} soldOut={t.soldOut} className="md:col-span-2 border-t border-border pt-8" />
       <RememberView cookie={recentCookie(shop.id)} productId={product.id} />
     </main>
