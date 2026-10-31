@@ -1327,3 +1327,44 @@ test("a supplier price rise raised from the app, and the price watch set there",
   await web.goto(`${WEB}/admin/price-changes`);
   await expect(web.getByRole("list", { name: "Price rises dealt with" }).getByRole("listitem").first()).toContainText("Price raised");
 });
+
+test("a supplier of your own added, changed and removed from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `sp${Date.now()}`);
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Suppliers/ }).click();
+  await expect(page.getByRole("heading", { name: "Suppliers", level: 1 })).toBeVisible();
+  await expect(page.getByText("None yet")).toBeVisible();
+
+  await page.getByRole("textbox", { name: "Supplier name" }).fill("Northwind Wholesale");
+  await page.getByRole("textbox", { name: "Supplier email" }).fill("orders@northwind.example");
+  await page.getByRole("button", { name: "Add supplier" }).click();
+  await expect(page.getByText(/^Northwind Wholesale added\./)).toBeVisible();
+  const card = page.getByRole("group", { name: "Northwind Wholesale" });
+  await expect(card.getByText("orders@northwind.example · 0 products")).toBeVisible();
+  await shot(page, "368-app-suppliers");
+
+  // The same email can't be added twice.
+  await page.getByRole("textbox", { name: "Supplier name" }).fill("Northwind Again");
+  await page.getByRole("textbox", { name: "Supplier email" }).fill("orders@northwind.example");
+  await page.getByRole("button", { name: "Add supplier" }).click();
+  await expect(page.getByText("Northwind Wholesale already uses orders@northwind.example.")).toBeVisible();
+
+  await card.getByRole("button", { name: "Change Northwind Wholesale" }).click();
+  await card.getByRole("textbox", { name: "Email" }).fill("sales@northwind.example");
+  await card.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Northwind Wholesale saved.")).toBeVisible();
+  await expect(card.getByText(/^sales@northwind\.example/)).toBeVisible();
+
+  await card.getByRole("button", { name: "Give Northwind Wholesale a new link" }).click();
+  await expect(page.getByText("Northwind Wholesale has a new link.", { exact: false })).toBeVisible();
+
+  // The website lists it too.
+  await web.goto(`${WEB}/admin/suppliers`);
+  await expect(web.getByText("sales@northwind.example").first()).toBeVisible();
+
+  await card.getByRole("button", { name: "Remove Northwind Wholesale…" }).click();
+  await page.getByRole("button", { name: "Remove Northwind Wholesale", exact: true }).click();
+  await expect(page.getByText("Northwind Wholesale removed.")).toBeVisible();
+  await expect(page.getByText("None yet")).toBeVisible();
+});

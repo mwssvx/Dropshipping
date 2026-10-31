@@ -3,13 +3,14 @@ import { useState } from "react";
 import { useApi } from "../../src/api";
 import { money } from "../../src/format";
 import { matches, MISSING, STATUS, type Product } from "../../src/product";
-import { useSession } from "../../src/session";
+import { useCan, useSession } from "../../src/session";
 import { Body, Button, EmptyState, Field, List, LoadError, Loading, Pill, Row, Screen, Segmented } from "../../src/ui";
 
 export default function ProductsScreen() {
   const router = useRouter();
   const list = useApi<{ products: Product[]; priceRises?: number }>("products");
   const cur = useSession().me?.shop.currency ?? "USD";
+  const can = useCan();
   const [show, setShow] = useState<"all" | "low" | "sold_out" | "missing">("all");
   const all = list.data?.products ?? [];
   // Archived products are off the store, so what they lack doesn't matter.
@@ -73,6 +74,7 @@ export default function ProductsScreen() {
           title={list.data?.priceRises ? `Price changes (${list.data.priceRises} to look at)` : "Price changes"}
           subtitle="When a supplier starts charging more"
         />
+        {can("suppliers") ? <Row href="/suppliers" title="Suppliers" subtitle="How each is doing, and your own wholesalers and makers" /> : null}
       </List>
     </Screen>
   );

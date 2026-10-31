@@ -1948,3 +1948,7 @@ The Products tab has Count stock, for the stock you keep yourself. Walk the shel
 ### Price changes in the app (after launch, part 367)
 
 The Products tab has Price changes, with a count when a supplier has started charging more. Each rise shows the cost before and after, the price, and the margin before and after, in red when it's below the margin you want. One tap raises the price with your pricing rule (noted in the activity log), or keeps it, and the website shows it dealt with. The same screen sets the margin that sends a warning and turns automatic raises on or off, and in test mode can simulate a rise.
+
+### Suppliers in the app (after launch, part 368)
+
+The Products tab has Suppliers for anyone who looks after them. It shows how each supplier did over the last 90 days (orders, how fast they ship and arrive, orders they couldn't take, problems, and a grade), warns about orders they haven't shipped after a week and products with no backup supplier, and lists which services are connected. Your own suppliers (wholesalers, warehouses, makers) can be added, changed, given a new private link, or removed, and the Share button sends them their link.
