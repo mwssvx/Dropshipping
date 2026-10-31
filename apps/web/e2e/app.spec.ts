@@ -1368,3 +1368,42 @@ test("a supplier of your own added, changed and removed from the app", async ({ 
   await expect(page.getByText("Northwind Wholesale removed.")).toBeVisible();
   await expect(page.getByText("None yet")).toBeVisible();
 });
+
+test("a cart link made in the app fills a shopper's cart", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `cl${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/import`);
+  await web.getByRole("link", { name: /sunset projection lamp/i }).click();
+  await web.getByRole("button", { name: "Import and publish" }).click();
+  await expect(web.getByText("Imported and live on your store.")).toBeVisible();
+
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Cart links" }).click();
+  await expect(page.getByRole("heading", { name: "Cart links", level: 1 })).toBeVisible();
+  await page.getByRole("textbox", { name: "Link name" }).fill("Story bundle");
+  await page.getByRole("textbox", { name: "Add a product" }).fill("sunset");
+  await page.getByRole("button", { name: /^Add Sunset Projection Lamp/ }).first().click();
+  const line = page.getByRole("group", { name: /^In the cart: Sunset Projection Lamp/ });
+  await line.getByRole("button", { name: /^One more/ }).click();
+  await expect(line.getByText("2", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Make the link" }).click();
+  await expect(page.getByText("“Story bundle” is ready. Share it anywhere.")).toBeVisible();
+  const card = page.getByRole("group", { name: "Story bundle" });
+  await expect(card.getByText("0 clicks · 0 orders", { exact: false })).toBeVisible();
+  await expect(card.getByText(/^2 × Sunset Projection Lamp/)).toBeVisible();
+  await shot(page, "369-app-cart-links");
+
+  // A shopper opening the link gets the lamps in their cart.
+  await web.goto(`${WEB}/admin/cart-links`);
+  const url = await web.getByLabel("Link for Story bundle").inputValue();
+  const buyer = await (await browser.newContext()).newPage();
+  await buyer.goto(url);
+  await expect(buyer).toHaveURL(/\/cart\?utm_source=link-story-bundle/);
+  await expect(buyer.getByRole("link", { name: /^Cart, 2 items/ })).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByRole("group", { name: "Story bundle" }).getByText(/^1 click · 0 orders/)).toBeVisible();
+  await page.getByRole("button", { name: "Delete Story bundle…" }).click();
+  await page.getByRole("button", { name: "Delete Story bundle", exact: true }).click();
+  await expect(page.getByText("“Story bundle” deleted.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Story bundle" })).toHaveCount(0);
+});

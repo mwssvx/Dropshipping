@@ -56,6 +56,11 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  CART_LINK_MAX_LINES,
+  cartLinkChoices,
+  createCartLink,
+  deleteCartLink,
+  listCartLinks,
   addOwnSupplier,
   listOwnSuppliers,
   removeOwnSupplier,
@@ -855,6 +860,43 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, `Removed ${own?.name ?? "a supplier"} in the app`, { href: "/admin/suppliers" });
     return { ok: true, message: `${own?.name ?? "The supplier"} removed.` };
   },
+  // Cart links: one link that fills a shopper's cart with chosen products (and a code), for a DM or a creator.
+  "GET cart-links": async ({ db, shop }) => {
+    const [links, choices, discounts, store] = await Promise.all([listCartLinks(db, shop.id), cartLinkChoices(db, shop.id), listDiscounts(db, shop.id), storeAddress(shop)]);
+    return {
+      max: CART_LINK_MAX_LINES,
+      links: links.map((l) => ({
+        id: l.id,
+        name: l.name,
+        url: `${store}/cart/link/${l.token}`,
+        clicks: l.clicks,
+        orders: l.orders,
+        salesMinor: l.salesMinor,
+        items: l.items.map((i) => ({ quantity: i.quantity, title: i.title, onSale: i.onSale })),
+        discountCode: l.discountCode,
+      })),
+      options: choices.flatMap((p) => p.variants.map((v) => ({ id: v.id, title: v.title === "Default" ? p.title : `${p.title} – ${v.title}`, draft: p.draft }))),
+      // Codes the merchant made or gave a partner; one-off batch, personal and reward codes aren't for sharing.
+      codes: discounts.filter((d) => d.active && (d.source === "merchant" || d.source === "partner")).map((d) => d.code),
+    };
+  },
+  "POST cart-links": async ({ req, db, shop, user }) => {
+    const b = await body<{ name?: unknown; lines?: unknown; discountCode?: unknown }>(req);
+    const lines = (Array.isArray(b.lines) ? b.lines : [])
+      .slice(0, CART_LINK_MAX_LINES)
+      .map((l: { variantId?: unknown; quantity?: unknown }) => ({ variantId: str(l?.variantId), quantity: Number(l?.quantity) || 1 }))
+      .filter((l) => l.variantId);
+    const link = await createCartLink(db, shop.id, { name: str(b.name), lines, discountCode: str(b.discountCode).trim() || null });
+    await logged({ shop, user, db }, `Made the cart link “${link.name}” in the app`, { href: "/admin/cart-links" });
+    return { ok: true, message: `“${link.name}” is ready. Share it anywhere.`, url: `${await storeAddress(shop)}/cart/link/${link.token}` };
+  },
+  "DELETE cart-links/:id": async ({ params, db, shop, user }) => {
+    const link = (await listCartLinks(db, shop.id)).find((l) => l.id === params.id);
+    if (!link) throw new NotFoundError("Cart link");
+    await deleteCartLink(db, shop.id, link.id);
+    await logged({ shop, user, db }, `Deleted the cart link “${link.name}” in the app`, { href: "/admin/cart-links" });
+    return { ok: true, message: `“${link.name}” deleted. Its link no longer fills a cart.` };
+  },
   "GET questions": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
     const rows = await listQuestions(db, shop.id);
@@ -1435,6 +1477,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("restock") || path.startsWith("stock-count")) return "products";
   if (path.startsWith("price-changes")) return "products";
   if (path.startsWith("suppliers")) return "suppliers";
+  if (path.startsWith("cart-links")) return "marketing";
   if (path.startsWith("checkouts")) return "orders";
   if (path.startsWith("store-status")) return "theme";
   if (path.startsWith("gift-cards")) return "gift_cards";

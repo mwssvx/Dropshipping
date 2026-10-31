@@ -1952,3 +1952,7 @@ The Products tab has Price changes, with a count when a supplier has started cha
 ### Suppliers in the app (after launch, part 368)
 
 The Products tab has Suppliers for anyone who looks after them. It shows how each supplier did over the last 90 days (orders, how fast they ship and arrive, orders they couldn't take, problems, and a grade), warns about orders they haven't shipped after a week and products with no backup supplier, and lists which services are connected. Your own suppliers (wholesalers, warehouses, makers) can be added, changed, given a new private link, or removed, and the Share button sends them their link.
+
+### Cart links in the app (after launch, part 369)
+
+Today has a Cart links button for people who look after marketing. Name a link, add the products and how many of each, pick one of your codes if you like, and the link is made; Share sends it straight into a DM, a story or a creator's chat. Each link shows its clicks, orders and sales and what it puts in the cart (with anything no longer on sale marked as left out), and can be deleted.
