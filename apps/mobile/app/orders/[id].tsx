@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Linking, View } from "react-native";
+import { Linking, Share, View } from "react-native";
 import { api, useApi } from "../../src/api";
 import { FULFILMENT, money, PAYMENT, parseMoney, when } from "../../src/format";
 import { BackLink, Banner, Body, Button, Card, Field, Heading, List, LoadError, Loading, Pill, Row, Screen, Section, Toggle } from "../../src/ui";
@@ -60,6 +60,8 @@ type Detail = {
     submittedAt: string | null;
     checks: { label: string; ok: boolean; detail: string }[];
   }[];
+  /** A payment link still waiting to be paid. */
+  payLink?: { url: string; note: string | null } | null;
   /** The buyer, when this person can open customers. */
   customer?: { id: string; orders: number; tags: string[] } | null;
 };
@@ -84,7 +86,7 @@ const span = (w: { from: string; to: string }) => {
 };
 
 export default function OrderScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, made } = useLocalSearchParams<{ id: string; made?: string }>();
   const order = useApi<Detail>(`orders/${id}`);
   const can = useCan();
   const [panel, setPanel] = useState<null | "refund" | "tracking" | "block" | "accept">(null);
@@ -127,7 +129,22 @@ export default function OrderScreen() {
         <Pill label={PAYMENT[o.paymentStatus] ?? o.paymentStatus} tone={o.paymentStatus === "paid" ? "success" : "neutral"} />
         <Pill label={f.label} tone={f.tone} />
       </View>
-      {note ? <Banner tone={note.tone}>{note.text}</Banner> : null}
+      {note ? <Banner tone={note.tone}>{note.text}</Banner> : made ? <Banner tone="success">{made}</Banner> : null}
+
+      {o.payLink ? (
+        <Card>
+          <View role="region" aria-label="Payment link" style={{ gap: space(2) }}>
+            <Heading>{`Waiting for ${o.shippingAddress.name.split(" ")[0]} to pay`}</Heading>
+            {o.payLink.note ? <Body muted>{o.payLink.note}</Body> : null}
+            <Body muted>Once they pay, it goes to the supplier like any other order.</Body>
+            <Body>{o.payLink.url}</Body>
+            <View style={{ flexDirection: "row", gap: space(2), flexWrap: "wrap" }}>
+              <Button label="Share the link" onPress={() => void Share.share({ message: o.payLink!.url, url: o.payLink!.url })} disabled={!!busy} />
+              <Button label="Email it again" kind="secondary" onPress={() => run("resend", `orders/${o.id}/payment-link`, {})} busy={busy === "resend"} disabled={!!busy} />
+            </View>
+          </View>
+        </Card>
+      ) : null}
 
       {(o.disputes ?? []).map((d) => {
         const s = DISPUTE_STATUS[d.status];

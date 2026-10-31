@@ -80,6 +80,11 @@ export default function OrdersScreen() {
           })}
         </List>
       )}
+      {!q && list.data ? (
+        <List>
+          <Row href="/payment-link" title="Create a payment link" subtitle="For a buyer who asked by message: we email them a link to pay" right={<Pill label="New" />} />
+        </List>
+      ) : null}
       {show === "all" && !q && list.data ? (
         <List>
           <Row href="/checkouts" title="Left at checkout" subtitle="Buyers who didn't pay, whether they were reminded, and who came back" right={<Pill label="See" />} />

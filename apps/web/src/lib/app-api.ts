@@ -56,6 +56,12 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  countryName,
+  createPaymentLink,
+  listActiveProducts,
+  listShippingZones,
+  resendPaymentLink,
+  shipsTo,
   answerQuestion,
   listQuestions,
   setQuestionPublished,
@@ -124,7 +130,7 @@ import {
 import type { Db } from "@sf/db";
 import { revalidatePath } from "next/cache";
 import { BRAND } from "./brand";
-import { agents, campaigns, db, fulfillment, logged, mailer, platformUrl, notifyLater, payments, refunds, stock, storeAddress, suppliers, testPayments } from "./server";
+import { agents, campaigns, db, fulfillment, logged, mailer, platformUrl, notifyLater, payments, refunds, stock, storeAddress, suppliers, tax, testPayments } from "./server";
 
 type User = { id: string; email: string };
 type ShopLink = { id: string; name: string; handle: string; role: string };
@@ -363,6 +369,8 @@ const routes: Record<string, Handler> = {
     const postYourself = o.paymentStatus === "paid" && !o.pickup && !o.localDelivery && (ownParcel ? !ownParcel.shipment?.trackingNumber : parcels.length === 0 && o.fulfillments.length === 0);
     return {
       customer: buyer,
+      // A payment link still waiting: the link to share again, and the note that went with it.
+      payLink: o.source === "payment_link" && (o.paymentStatus === "pending" || o.paymentStatus === "failed") ? { url: `${await storeAddress(shop)}/pay/${o.id}`, note: o.note } : null,
       // A buyer's bank pulling the money back, with what the evidence has and lacks while it waits for an answer.
       disputes: can(role, "money") ? await orderDisputes(db, shop, o.id) : [],
       // On the store's blocked list (by email or address), so checkout turns them away.
@@ -414,6 +422,53 @@ const routes: Record<string, Handler> = {
       refundableMinor: ["paid", "partially_refunded"].includes(o.paymentStatus) ? o.totalMinor - o.refundedMinor : 0,
       risk: o.risk ? { level: o.risk.level, reasons: o.risk.reasons } : null,
     };
+  },
+  // Payment links: an order built for a buyer who asked by message, emailed to them to pay by card.
+  "GET payment-links/new": async ({ db, shop }) => {
+    const [products, { zones }] = await Promise.all([listActiveProducts(db, shop.id), listShippingZones(db, shop.id)]);
+    const countries = shipsTo(zones)
+      .map((c) => [c, countryName(c)] as [string, string])
+      .sort((a, b) => a[1].localeCompare(b[1]));
+    return {
+      variants: products
+        .filter((p) => !p.giftCard)
+        .flatMap((p) => p.variants.map((v) => ({ id: v.id, title: v.title === "Default" ? p.title : `${p.title} – ${v.title}`, priceMinor: v.priceMinor, stock: v.stock }))),
+      countries,
+      defaultCountry: countries.some(([c]) => c === shop.country) ? shop.country : (countries[0]?.[0] ?? "US"),
+    };
+  },
+  "POST payment-links": async ({ req, db, shop, user }) => {
+    const b = await body<Record<string, unknown>>(req);
+    const lines = (Array.isArray(b.lines) ? b.lines : [])
+      .slice(0, 20)
+      .map((l: { variantId?: unknown; quantity?: unknown }) => ({ variantId: str(l?.variantId), quantity: Math.min(99, Math.max(0, Math.floor(Number(l?.quantity) || 0))) }))
+      .filter((l) => l.variantId);
+    const opt = (k: string) => str(b[k]).trim() || undefined;
+    const { order, sent } = await createPaymentLink(
+      await refunds(),
+      shop,
+      {
+        email: str(b.email).trim(),
+        address: { name: str(b.name).trim(), line1: str(b.line1).trim(), line2: opt("line2"), city: str(b.city).trim(), region: opt("region"), postalCode: str(b.postalCode).trim(), country: str(b.country).trim(), phone: opt("phone") },
+        lines,
+        discountCode: opt("discountCode") ?? null,
+        note: str(b.note),
+      },
+      tax(),
+    );
+    await logged({ shop, user, db }, `Made a payment link for order {order} in the app`, { orderId: order.id });
+    return {
+      ok: true,
+      orderId: order.id,
+      url: `${await storeAddress(shop)}/pay/${order.id}`,
+      sent,
+      message: sent ? `Payment link emailed to ${order.email}.` : "The order is ready, but the email didn't go out. Share the link instead.",
+    };
+  },
+  "POST orders/:id/payment-link": async ({ params, db, shop }) => {
+    await resendPaymentLink(await refunds(), shop.id, params.id!);
+    const o = await getOrder(db, shop.id, params.id!);
+    return { ok: true, message: `Emailed to ${o.email} again.` };
   },
   "GET questions": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
@@ -983,6 +1038,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("codes")) return "marketing";
   if (path.startsWith("disputes")) return "money";
   if (path.startsWith("questions")) return "reviews";
+  if (path.startsWith("payment-links")) return "orders";
   if (path.startsWith("checkouts")) return "orders";
   if (path.startsWith("store-status")) return "theme";
   if (path.startsWith("gift-cards")) return "gift_cards";
