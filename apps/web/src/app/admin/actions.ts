@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   addManualTracking,
+  addTrackingToSameBox,
   createProduct,
   duplicateProduct,
   createShop,
@@ -316,15 +317,14 @@ export async function setBuyerCancelAction(_: FormState, form: FormData): Promis
 }
 
 export async function addTrackingAction(orderId: string, _: FormState, form: FormData): Promise<FormState> {
-  return orderAction(orderId, async (shopId) =>
-    addManualTracking(await fulfillment(), shopId, orderId, {
-      carrier: String(form.get("carrier") ?? ""),
-      trackingNumber: String(form.get("trackingNumber") ?? ""),
-      url: String(form.get("trackingUrl") ?? ""),
-      own: form.get("own") === "1",
-    }),
-    "Added tracking to order {order}",
-  );
+  const input = { carrier: String(form.get("carrier") ?? ""), trackingNumber: String(form.get("trackingNumber") ?? ""), url: String(form.get("trackingUrl") ?? "") };
+  // Orders to the same door packed in the same box get the same tracking.
+  const also = form.getAll("also").map(String);
+  return orderAction(orderId, async (shopId) => {
+    const ctx = await fulfillment();
+    await addManualTracking(ctx, shopId, orderId, { ...input, own: form.get("own") === "1" });
+    await addTrackingToSameBox(ctx, shopId, orderId, also, input);
+  }, "Added tracking to order {order}");
 }
 
 export async function checkTrackingAction(orderId: string, _: FormState, _form: FormData): Promise<FormState> {

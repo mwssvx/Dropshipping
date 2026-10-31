@@ -5,6 +5,7 @@
 import { and, eq, gte, inArray, isNull, lte, ne, sql } from "drizzle-orm";
 import { schema, type Address, type Db } from "@sf/db";
 import { addressKey } from "./blocklist";
+import { addManualTracking, type FulfillmentContext } from "./fulfillment";
 
 const DAYS = 30;
 const DAY = 86_400_000;
@@ -119,4 +120,28 @@ export async function ordersToSameAddress(
     orders: same.map(({ shippingAddress: _, ...c }) => ({ ...c, ownItems: own.has(c.id) })),
     ownItems: own.has(order.id),
   };
+}
+
+/**
+ * After posting the store's own items for one order, the same tracking for the other orders to
+ * that door that were packed in the same box. Only orders that really share the door and still
+ * wait on the store's own items get it. Returns their numbers.
+ */
+export async function addTrackingToSameBox(
+  ctx: FulfillmentContext,
+  shopId: string,
+  orderId: string,
+  alsoIds: string[],
+  input: { carrier: string; trackingNumber: string; url?: string },
+): Promise<number[]> {
+  if (!alsoIds.length) return [];
+  const order = await ctx.db.query.orders.findFirst({ where: and(eq(schema.orders.id, orderId), eq(schema.orders.shopId, shopId)) });
+  if (!order) return [];
+  const { orders } = await ordersToSameAddress(ctx.db, shopId, order);
+  const done: number[] = [];
+  for (const other of orders.filter((o) => o.ownItems && alsoIds.includes(o.id))) {
+    await addManualTracking(ctx, shopId, other.id, { ...input, own: true });
+    done.push(other.number);
+  }
+  return done;
 }

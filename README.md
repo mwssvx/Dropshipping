@@ -1800,3 +1800,7 @@ The product list's "what's missing" filters gain "No cost": products with an opt
 ### Same box on packing slips (after launch, part 330)
 
 When an order's packing slip goes to the same address as another unshipped order that also has items you post, the slip says "Order #1001 goes to the same address and also has items you post. Pack them in this box." The note shows on screen only and isn't printed, on single slips and on slips printed for many orders.
+
+### One tracking number for a shared box (after launch, part 331)
+
+When you add tracking for your own items and other orders to the same address also have items you post, the tracking form lists them with "Order #1001 gets this tracking too". Tick them and each order gets the same tracking, and each buyer gets the shipping email. Only orders that really go to that door and still wait on your own items can get it.

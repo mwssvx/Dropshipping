@@ -64,10 +64,11 @@ test("the merchant sees two orders going to the same address", async ({ page, br
   await expect(page.getByLabel("Same box")).toContainText("Order #1001 goes to the same address and also has items you post.");
   await page.goto(orderAdmin);
 
-  // Once this one is posted, the other order no longer lists it.
+  // Both candles go in one box: the tracking goes on both orders.
   await page.getByRole("button", { name: "Add tracking yourself" }).first().click();
   await page.getByLabel("Carrier").fill("USPS");
   await page.getByLabel("Tracking number").fill("9400111899");
+  await page.getByRole("checkbox", { name: "Order #1001 gets this tracking too" }).check();
   await page.getByRole("button", { name: "Mark as shipped" }).click();
   await expect(page.getByText("9400111899", { exact: true }).or(page.getByRole("link", { name: "9400111899" })).first()).toBeVisible();
   await page.goto("/admin/orders");
@@ -75,4 +76,5 @@ test("the merchant sees two orders going to the same address", async ({ page, br
   await page.waitForURL(/\/admin\/orders\/[0-9a-f-]{36}$/);
   await expect(page.getByRole("heading", { name: "Order #1001" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Also going to this address" })).toHaveCount(0);
+  await expect(page.getByText("9400111899", { exact: true }).or(page.getByRole("link", { name: "9400111899" })).first()).toBeVisible();
 });
