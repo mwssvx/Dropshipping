@@ -252,9 +252,22 @@ async function placeWithBackup(ctx: FulfillmentContext, order: Order, claimed: F
 
 /** The order's delivery status follows its fulfilments. */
 export async function refreshOrderFulfillment(db: Db, orderId: string, at = new Date()) {
-  const rows = (await db.query.fulfillments.findMany({ where: eq(schema.fulfillments.orderId, orderId) })).filter(
+  const rows: Pick<Fulfillment, "status" | "problemCode" | "supplierId">[] = (await db.query.fulfillments.findMany({ where: eq(schema.fulfillments.orderId, orderId) })).filter(
     (f) => f.status !== "cancelled",
   );
+  // In an order the suppliers send part of, the store's own stock is a parcel too, and it has no row
+  // until the merchant adds its tracking. Without it, the order would read "shipped" or even
+  // "delivered" once the supplier's parcel did, and drop off the merchant's list of orders to send.
+  if (rows.length && !rows.some((f) => f.supplierId === null)) {
+    const [own] = await db
+      .select({ id: schema.orderLines.id })
+      .from(schema.orderLines)
+      .innerJoin(schema.variants, eq(schema.variants.id, schema.orderLines.variantId))
+      .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
+      .where(and(eq(schema.orderLines.orderId, orderId), isNull(schema.products.supplierId), eq(schema.products.giftCard, false), eq(schema.products.digital, false)))
+      .limit(1);
+    if (own) rows.push({ status: "pending", problemCode: null, supplierId: null });
+  }
   const all = (s: Fulfillment["status"][]) => rows.every((f) => s.includes(f.status));
   let status: Order["fulfillmentStatus"];
   if (!rows.length) status = "unfulfilled";

@@ -81,6 +81,9 @@ describe("orders in more than one parcel", () => {
     expect(dates.get(shipped.key)!.from.getTime()).toBeGreaterThanOrEqual(shipped.shipment!.shippedAt!.getTime() + 6 * day - day);
     expect(dates.get(waiting.key)).toBeTruthy();
     expect(dates.get(waiting.key)!.from.getTime()).not.toBe(dates.get(shipped.key)!.from.getTime());
+    // The coaster hasn't gone out, so the order isn't "shipped" and stays on the list to send.
+    const status = async () => (await f.db.query.orders.findFirst({ where: eq(schema.orders.id, order.id) }))!.fulfillmentStatus;
+    expect(await status()).toBe("partially_shipped");
     // Checking again sends nothing new.
     await syncTracking(f.ctx, { orderId: order.id });
     expect(mail()).toHaveLength(1);
@@ -90,11 +93,13 @@ describe("orders in more than one parcel", () => {
     expect(mail().map((m) => m.subject).at(-1)).toBe(`Order #${order.number}: parcel 2 of 2 is on its way`);
     expect(mail().at(-1)!.text).toContain("USPS: 9400111");
     expect(mail().at(-1)!.text).toContain("this is the last parcel");
+    expect(await status()).toBe("shipped");
 
     // The lamps arrive, but the coaster hasn't: no "delivered" yet.
     f.advance(6 * 86_400_000);
     await syncTracking(f.ctx, { orderId: order.id });
     expect(mail().some((m) => m.subject.includes("delivered"))).toBe(false);
+    expect(await status()).toBe("shipped");
   });
 
   it("posts the store's own parcel without touching a supplier's", async () => {

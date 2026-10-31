@@ -1760,3 +1760,7 @@ The merchant app's order screen now shows an order in more than one parcel as "C
 ### Delivery dates for each parcel (after launch, part 320)
 
 In an order in more than one parcel, the parcel from a warehouse nearby comes much sooner than the one from abroad, but the order page gave one date for everything. Each parcel on the buyer's order page now has its own "Expected delivery", counted from payment with its own items' preparing and transit days, or from the day it shipped once it has, and each parcel's shipping email says when that parcel should arrive. A parcel with no known shipping days (the store's own stock under a rate with no days) shows no date. `parcelDeliveries` in `packages/core/src/delivery.ts`. No migration.
+
+### Your own parcel counts in an order's status (after launch, part 321)
+
+In an order with supplier products and the store's own stock, the store's parcel has no record until the merchant adds its tracking, so the order read "Shipped" (and later "Delivered") as soon as the supplier's parcel did, and dropped off the list of orders still to send. The order's status now counts the store's own parcel: it reads "Partly shipped" until that parcel goes out too, so it stays on the to-send list, the tracking upload page and the buyer's order page progress. `refreshOrderFulfillment` in `packages/core/src/fulfillment.ts`. No migration.
