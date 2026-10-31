@@ -400,6 +400,13 @@ function assistant(s: State, req: ModelRequest): BetaContentBlock[] {
         toolCall("create_discount", { code, kind: pct ? "percent" : "free_shipping", value: pct ? Number(pct) : 0, min_order: over ? Number(over) : null, days: days ? Number(days) : null, usage_limit: null, once_per_customer: /once (per|a) (customer|buyer)/.test(ask) }),
       ];
     }
+    if (/\b(remind me|add .{2,80} to (my|the) (to[- ]?do )?list|note (this |that )?down|to[- ]?do:)/.test(ask)) {
+      const title = ask.replace(/^.*?\b(?:remind me to|remind me|add|note down|note|to[- ]?do:)\s*/i, "").replace(/\s+to (my|the) (to[- ]?do )?list\b.*$/i, "").replace(/\s+(?:by|on|before) \d{4}-\d{2}-\d{2}\b.*$/i, "").replace(/\s+tomorrow\b.*$/i, "").replace(/[.!]+$/, "").trim();
+      const when = ask.match(/\b(?:on|by|before) (\d{4}-\d{2}-\d{2})\b/)?.[1] ?? (/\btomorrow\b/.test(ask) ? new Date(Date.now() + 86_400_000).toISOString().slice(0, 10) : null);
+      return [toolCall("add_task", { title: title.replace(/^\w/, (c) => c.toUpperCase()) || "Follow up", due: when, note: null, link: null })];
+    }
+    if (/\b(what('s| is) on my (to[- ]?do )?list|my (to[- ]?do|task)s?\b|to[- ]?do list)/.test(ask)) return [toolCall("read_tasks", {})];
+    if (/\b(i('ve| have)? (done|finished)|tick off|mark .{2,80} (as )?done)\b/.test(ask)) return [toolCall("complete_task", { task: ask.replace(/^.*?\b(?:done|finished|tick off|mark)\s*/i, "").replace(/\s+(as )?done\b.*$/i, "").replace(/[.!]+$/, "").trim() })];
     if (/\b(what (has|did|does) (the |my )?ai|ai (do|did|done)|time (it )?saved|worth (it|the cost))\b/.test(ask)) return [toolCall("read_ai_impact", { month: /\blast month\b/.test(ask) ? "last" : "this" })];
     if (/\b(win[- ](them[- ])?back|stopped buying|slipping away|at risk|regulars?|lapsed|haven't (ordered|bought))\b/.test(ask)) return [toolCall("read_regulars_at_risk", {})];
     const coll = ask.match(/\b(?:collection|page) (?:of|for|with) (?:all )?(?:my |the |our )?([a-z0-9 '&-]{3,40}?)s?(?: products)?(?: called ["“]?([^"”]{2,60})["”]?)?[.!]?$/);
@@ -432,6 +439,15 @@ function assistant(s: State, req: ModelRequest): BetaContentBlock[] {
   if (c.isError) return [text(`I couldn't do that: ${strip(c.result)}`)];
   const r = c.result;
   switch (c.name) {
+    case "add_task":
+      return [text(`Added to your list: “${r.added}”${r.due ? `, due ${r.due}` : ""}. It's on Today and the To do page.`)];
+    case "read_tasks": {
+      const tasks = r.tasks as { title: string; due: string | null }[];
+      if (!tasks.length) return [text("Your list is empty. Tell me “remind me to…” and I'll add things to it.")];
+      return [text(`${tasks.length} on your list:\n${tasks.map((t) => `• ${t.title}${t.due ? ` (${t.due.replace(/^\S+ /, "").replace(/[()]/g, "")})` : ""}`).join("\n")}`)];
+    }
+    case "complete_task":
+      return [text(`Ticked off “${r.done}”. ${r.left === 0 ? "Your list is clear." : `${r.left} left.`}`)];
     case "read_ai_impact": {
       const work = r.work as string[];
       if (!work.length) return [text(`Nothing yet ${r.so_far ? "this month" : `in ${r.month}`}. Once buyers ask questions or you use the helpers, I'll tally it up here.`)];

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { can, formatMoney, listOrders, listProducts, listRequirements, soldOutAtSupplier, twoStepStatus } from "@sf/core";
+import { can, dueLabel, formatMoney, listOrders, listProducts, listRequirements, listTasks, soldOutAtSupplier, twoStepStatus } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "./PageHeader";
 
@@ -8,13 +8,15 @@ export const metadata = { title: "Home" };
 export default async function AdminHome({ searchParams }: { searchParams: Promise<{ denied?: string }> }) {
   const { shop, db, role, user } = await requireShop("home");
   const { denied } = await searchParams;
-  const [orders, products, requirements, twoStep, soldOut] = await Promise.all([
+  const [orders, products, requirements, twoStep, soldOut, tasks] = await Promise.all([
     listOrders(db, shop.id),
     listProducts(db, shop.id),
     listRequirements(db, shop.id),
     twoStepStatus(db, user.id),
     can(role, "products") ? soldOutAtSupplier(db, shop.id) : [],
+    listTasks(db, shop.id, "open", 6),
   ]);
+  const now = new Date();
   const seesMoney = can(role, "money");
   const holds = seesMoney ? requirements.filter((r) => r.holdsPayouts) : [];
   const paid = orders.filter((o) => o.paymentStatus === "paid");
@@ -57,6 +59,24 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
                 <span className="text-2xl font-semibold num">{v}</span>
               </div>
             ))}
+          </section>
+          <section className="card" aria-labelledby="todo-heading">
+            <div className="flex justify-between items-baseline gap-3 px-4 pt-4">
+              <h2 id="todo-heading" className="font-semibold">To do</h2>
+              <Link href="/admin/tasks" className="link text-sm">{tasks.length ? "See all" : "Add something"} →</Link>
+            </div>
+            {tasks.length === 0 ? (
+              <p className="hint px-4 pb-4 pt-1 text-sm">Nothing on your list. Tell the Assistant &ldquo;remind me to…&rdquo; or add it on the To do page.</p>
+            ) : (
+              <ul className="p-2">
+                {tasks.slice(0, 5).map((t) => (
+                  <li key={t.id} className="flex items-center justify-between gap-3 px-2 py-2 text-sm">
+                    <span className="min-w-0 truncate">{t.title}</span>
+                    {t.dueAt && <span className={`hint whitespace-nowrap ${t.dueAt < now ? "text-critical" : ""}`}>{dueLabel(t.dueAt, now)}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
           <section className="card">
             <h2 className="font-semibold px-4 pt-4">Needs your attention</h2>

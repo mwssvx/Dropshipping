@@ -33,6 +33,7 @@ import { createDiscount } from "../discounts";
 import { createCollection } from "../collections";
 import { createCampaign } from "../campaigns";
 import { AT_RISK_TAG, atRiskCustomers, tagAtRisk } from "../churn";
+import { addTask, dueLabel, findTask, listTasks, parseDueDate, setTaskDone } from "../tasks";
 import { aiImpact, aiMonth, impactLines, timeSaved } from "./impact";
 import { findNote, MEMORY_MAX_NOTES, MEMORY_NOTE_MAX, normalizeMemory } from "./memory";
 import { addMessage, BUYER_TOPICS, discardDrafts, sendBuyerMessage, setConversationStatus, type BuyerTopic } from "./conversations";
@@ -1599,7 +1600,56 @@ async function discountPreview(run: RunScope, i: DiscountAsk, now = new Date()) 
   return lines;
 }
 
+const taskTools = [
+  tool({
+    name: "read_tasks",
+    kind: "read",
+    description: "The owner's to-do list: open tasks with their dates, overdue first.",
+    input: z.object({}),
+    summary: () => "Read the to-do list",
+    async run(_, run) {
+      const now = new Date();
+      const open = await listTasks(run.ctx.db, run.shop.id, "open", 50);
+      return { open: open.length, tasks: open.map((t) => ({ title: t.title, due: t.dueAt ? `${t.dueAt.toISOString().slice(0, 10)} (${dueLabel(t.dueAt, now)})` : null, note: t.note, added_by: t.source === "owner" ? "the owner" : "you" })) };
+    },
+  }),
+  tool({
+    name: "add_task",
+    kind: "change",
+    description:
+      "Add something to the owner's to-do list, when they ask you to remind them or to note something down, or when they agree to a next step that needs them later. Short, starting with a verb. The owner sees the list on Today and the To do page.",
+    input: z.object({
+      title: z.string().min(2).max(160).describe('e.g. "Add a backup supplier for the lamp"'),
+      due: z.string().nullable().describe("YYYY-MM-DD, or null when no date was given"),
+      note: z.string().max(1000).nullable().describe("Why, or what to do, in a sentence; null if the title says it all"),
+      link: z.string().max(200).nullable().describe("An admin page it's about, e.g. /admin/products, or null"),
+    }),
+    policy: () => AUTO,
+    summary: (i) => `Added to the to-do list: ${i.title}`,
+    async run(i, run) {
+      const t = await addTask(run.ctx.db, run.shop.id, { title: i.title, note: i.note, dueAt: parseDueDate(i.due), href: i.link, source: "assistant", by: "assistant" });
+      return { added: t.title, due: t.dueAt ? t.dueAt.toISOString().slice(0, 10) : null, note: "It's on the To do page and on Today." };
+    },
+  }),
+  tool({
+    name: "complete_task",
+    kind: "change",
+    description: "Tick a task off the owner's list when they say it's done. Describe it in a few of its words.",
+    input: z.object({ task: z.string().min(2).max(160) }),
+    policy: () => AUTO,
+    summary: (i) => `Ticked off: ${i.task}`,
+    async run(i, run) {
+      const open = await listTasks(run.ctx.db, run.shop.id, "open", 100);
+      const match = findTask(open, i.task);
+      if (!match) throw new UserError(`No open task matches "${i.task}". Read the list with read_tasks and use the task's own words.`);
+      await setTaskDone(run.ctx.db, run.shop.id, match.id, true);
+      return { done: match.title, left: open.length - 1 };
+    },
+  }),
+];
+
 const chatShopTools = [
+  ...taskTools,
   tool({
     name: "read_ai_impact",
     kind: "read",
