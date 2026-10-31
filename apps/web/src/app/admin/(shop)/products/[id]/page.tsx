@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { can, formatMoney, getProduct, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts, launchListCount, detailsText, MAX_DETAILS, stockHistory, incomingStock, countryName, SHIPPING_COUNTRIES, productSwatches, digitalFileFor, formatFileSize, MAX_DIGITAL_FILE_BYTES, DOWNLOADS_PER_ITEM, CONTENT_UNITS, CONTENT_UNIT_LABELS, unitPrice, formatUnitPrice, type StockMovement } from "@sf/core";
+import { can, formatMoney, getProduct, productReviewSummary, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts, launchListCount, detailsText, MAX_DETAILS, stockHistory, incomingStock, countryName, SHIPPING_COUNTRIES, productSwatches, digitalFileFor, formatFileSize, MAX_DIGITAL_FILE_BYTES, DOWNLOADS_PER_ITEM, CONTENT_UNITS, CONTENT_UNIT_LABELS, unitPrice, formatUnitPrice, type StockMovement } from "@sf/core";
 import { requireShop, storeAddress, suppliers } from "@/lib/server";
 import { duplicateProductAction, updateProductAction } from "../../../actions";
 import { comingSoonAction } from "../../../publish-actions";
@@ -74,6 +74,8 @@ export default async function EditProductPage({ params, searchParams }: { params
   const incoming = !found.sourceUrl && !found.giftCard ? await incomingStock(db, shop.id, found.id) : [];
   const preSold = product.preorder ? await preordersSold(db, product.id) : 0;
   const saves = await savedCount(db, shop.id, product.id);
+  const reviews = !product.giftCard && can(role, "reviews") ? await productReviewSummary(db, shop.id, product.id) : null;
+  const reviewsLink = (q: string) => `/admin/reviews?${q}&product=${product.id}`;
   const waiting = product.variants.filter((v) => waitingBy.has(v.id)).map((v) => ({ option: v.title, count: waitingBy.get(v.id)! }));
   const others = (await listProducts(db, shop.id)).filter((p) => p.id !== product.id && p.status !== "archived");
   return (
@@ -240,6 +242,51 @@ export default async function EditProductPage({ params, searchParams }: { params
                 const unit = unitPrice(v.priceMinor, v.contents);
                 return { id: v.id, title: v.title, amount: v.contents ? String(v.contents.amount) : "", unit: v.contents?.unit ?? "g", example: unit ? formatUnitPrice(formatMoney(unit.priceMinor, shop.currency), unit.per) : null };
               })} />
+          </section>
+        )}
+        {reviews && (
+          <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="product-reviews-heading">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 id="product-reviews-heading" className="font-semibold">Reviews</h2>
+              {reviews.count > 0 && <Link href={reviewsLink("show=published")} className="text-sm underline">See all {reviews.count}</Link>}
+            </div>
+            {reviews.count === 0 ? (
+              <p className="hint text-sm">No published reviews yet. Buyers are asked for one once their order arrives.</p>
+            ) : (
+              <>
+                <p className="text-sm">
+                  <span className="text-warning" aria-hidden>★</span> <span className="font-semibold num">{reviews.average?.toFixed(1)}</span> out of 5 from{" "}
+                  <span className="num">{reviews.count}</span> {reviews.count === 1 ? "review" : "reviews"}
+                </p>
+                <ul className="flex flex-col gap-1 text-sm" aria-label="Reviews by stars">
+                  {[5, 4, 3, 2, 1].map((n) => (
+                    <li key={n} className="flex items-center gap-2">
+                      <span className="w-8 num hint">{n}★</span>
+                      <span className="h-2 flex-1 rounded-full bg-sunken overflow-hidden" aria-hidden>
+                        <span className="block h-full bg-warning" style={{ width: `${Math.round((reviews.breakdown[n - 1]! / reviews.count) * 100)}%` }} />
+                      </span>
+                      <Link href={reviewsLink(`show=published&stars=${n}`)} className="w-10 text-right num hint hover:underline" aria-label={`${reviews.breakdown[n - 1]} with ${n} star${n > 1 ? "s" : ""}`}>{reviews.breakdown[n - 1]}</Link>
+                    </li>
+                  ))}
+                </ul>
+                <ul className="flex flex-col gap-2 border-t border-border pt-3" aria-label="Newest reviews">
+                  {reviews.latest.map((r) => (
+                    <li key={r.id} className="text-sm">
+                      <span className="text-warning" role="img" aria-label={`${r.rating} out of 5 stars`}>{"★".repeat(r.rating)}</span> <span className="font-medium">{r.name}</span>
+                      <span className="hint"> · {r.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                      <p className="line-clamp-2">{r.body}</p>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {(reviews.waiting > 0 || reviews.reported > 0 || reviews.unanswered > 0) && (
+              <p className="text-sm flex flex-wrap gap-x-4 gap-y-1">
+                {reviews.waiting > 0 && <Link href={reviewsLink("show=pending")} className="underline">{reviews.waiting} waiting for you to publish</Link>}
+                {reviews.reported > 0 && <Link href={reviewsLink("show=published&reported=1")} className="underline text-critical">{reviews.reported} reported by shoppers</Link>}
+                {reviews.unanswered > 0 && <Link href={reviewsLink("show=published&reply=none")} className="underline">{reviews.unanswered} with no reply yet</Link>}
+              </p>
+            )}
           </section>
         )}
         <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="badge-heading">

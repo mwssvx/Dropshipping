@@ -18,6 +18,8 @@ export async function GET(request: Request) {
     noReply: p.get("reply") === "none",
     photos: p.get("photos") === "1",
     reported: p.get("reported") === "1",
+    // reviewListWhere keeps it to this store, so another store's product id finds nothing.
+    productId: /^[0-9a-f-]{36}$/i.test(p.get("product") ?? "") ? p.get("product")! : undefined,
     emails: can(role, "customers"),
     photoUrl: (id) => new URL(reviewPhotoUrl(id), origin).toString(),
   });

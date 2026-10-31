@@ -1542,3 +1542,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Product review feed** (`reviewFeedXml` in `packages/core/src/feeds.ts`, `/feeds/reviews.xml`): the store's published reviews in Google's product review feed format (2.3), with the reviewer's name, date, words, buyer photos, stars and a link to the review. Products are matched by their SKUs, the store as brand, their name and link, like the product feed. Reviews from an order here are marked as asked for after it shipped. Hidden and waiting reviews, reviews shoppers reported, and reviews of products not on sale stay out.
 2. **On Sales channels**: a "Stars in Google Shopping" card with the feed link, how many published reviews the store has (Google wants 50 before it shows stars), and where to paste it in Merchant Center (Product ratings). No migration.
+
+### Reviews on the product page (after launch, part 273)
+
+1. **A Reviews card** (`apps/web/src/app/admin/(shop)/products/[id]/page.tsx`, `productReviewSummary` in `packages/core/src/reviews.ts`): each product's admin page shows its average stars, how many reviews gave each rating (a tap opens just those), the three newest, and links to the ones waiting to be published, reported by shoppers or with no reply yet. Only for staff who can see reviews.
+2. **Reviews of one product**: the Reviews page takes `?product=` from those links, says which product it's showing, keeps it when changing tab, and "Clear" lets go of it. The CSV download follows it too. No migration.

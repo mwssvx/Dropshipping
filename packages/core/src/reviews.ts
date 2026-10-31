@@ -140,7 +140,7 @@ export type ReviewStatus = "pending" | "published" | "hidden";
  * matching a search over the reviewer's name, what they wrote and the product's title. Returns the
  * total so the page can say how many match.
  */
-export type ReviewListFilters = { status?: ReviewStatus; rating?: number; query?: string; noReply?: boolean; photos?: boolean; reported?: boolean };
+export type ReviewListFilters = { status?: ReviewStatus; rating?: number; query?: string; noReply?: boolean; photos?: boolean; reported?: boolean; productId?: string };
 
 /** The admin review list's filters as one condition, shared by the list and its download. */
 export function reviewListWhere(db: Db, shopId: string, opts: ReviewListFilters) {
@@ -154,6 +154,7 @@ export function reviewListWhere(db: Db, shopId: string, opts: ReviewListFilters)
     opts.noReply ? isNull(r.reply) : undefined,
     opts.photos ? sql`jsonb_array_length(${r.photoIds}) > 0` : undefined,
     opts.reported ? gt(r.reportCount, 0) : undefined,
+    opts.productId ? eq(r.productId, opts.productId) : undefined,
     like
       ? or(
           sql`lower(${r.name}) like ${like}`,
@@ -410,6 +411,23 @@ export async function reportedReviews(db: Db, voter: string | undefined, reviewI
 export async function reportedReviewCount(db: Db, shopId: string) {
   const [row] = await db.select({ n: count() }).from(schema.reviews).where(and(eq(schema.reviews.shopId, shopId), gt(schema.reviews.reportCount, 0)));
   return Number(row?.n ?? 0);
+}
+
+/** For the admin product page: its stars, the newest reviews, and how many wait for a look or were reported. */
+export async function productReviewSummary(db: Db, shopId: string, productId: string) {
+  const r = schema.reviews;
+  const [published, [counts]] = await Promise.all([
+    productReviews(db, productId, 3),
+    db
+      .select({
+        waiting: sql<number>`count(*) filter (where ${r.status} = 'pending')::int`,
+        reported: sql<number>`count(*) filter (where ${r.reportCount} > 0)::int`,
+        unanswered: sql<number>`count(*) filter (where ${r.status} = 'published' and ${r.reply} is null)::int`,
+      })
+      .from(r)
+      .where(and(eq(r.shopId, shopId), eq(r.productId, productId))),
+  ]);
+  return { count: published.count, average: published.average, breakdown: published.breakdown, latest: published.reviews, waiting: counts?.waiting ?? 0, reported: counts?.reported ?? 0, unanswered: counts?.unanswered ?? 0 };
 }
 
 /** A product card's stars: the average of its published reviews and how many there are. */

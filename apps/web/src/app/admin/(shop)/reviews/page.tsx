@@ -14,7 +14,7 @@ const TABS = [
   { key: "hidden", label: "Hidden" },
 ] as const;
 
-export default async function ReviewsPage({ searchParams }: { searchParams: Promise<{ show?: string; stars?: string; q?: string; page?: string; reply?: string; photos?: string; reported?: string }> }) {
+export default async function ReviewsPage({ searchParams }: { searchParams: Promise<{ show?: string; stars?: string; q?: string; page?: string; reply?: string; photos?: string; reported?: string; product?: string }> }) {
   const { shop, db } = await requireShop("reviews");
   const params = await searchParams;
   const status = TABS.find((t) => t.key === params.show)?.key ?? "pending";
@@ -25,9 +25,13 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
   const photos = params.photos === "1";
   // Reported reviews are always published (hiding one clears its reports), so this filter opens that tab.
   const reported = params.reported === "1" && status === "published";
-  const filtered = Boolean(q || stars || noReply || photos || reported);
+  // From a product's page: only its reviews.
+  const product = /^[0-9a-f-]{36}$/i.test(params.product ?? "")
+    ? await db.query.products.findFirst({ where: (p, { and, eq }) => and(eq(p.id, params.product!), eq(p.shopId, shop.id)), columns: { id: true, title: true } })
+    : undefined;
+  const filtered = Boolean(q || stars || noReply || photos || reported || product);
   const [{ reviews: rows, total }, counts, requests, reportedCount, savedReplies] = await Promise.all([
-    reviewPage(db, shop.id, { status, rating: stars, query: q, page, noReply, photos, reported }),
+    reviewPage(db, shop.id, { status, rating: stars, query: q, page, noReply, photos, reported, productId: product?.id }),
     reviewCounts(db, shop.id),
     reviewRequestStats(db, shop.id),
     reportedReviewCount(db, shop.id),
@@ -41,7 +45,7 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
     ...(orderNumber != null ? { "{order_number}": `#${orderNumber}` } : {}),
   });
   const pages = Math.max(1, Math.ceil(total / REVIEW_PAGE_SIZE));
-  const href = (change: { show?: string; stars?: number | null; q?: string | null; page?: number; noReply?: boolean; photos?: boolean; reported?: boolean }) => {
+  const href = (change: { show?: string; stars?: number | null; q?: string | null; page?: number; noReply?: boolean; photos?: boolean; reported?: boolean; product?: boolean }) => {
     const next = new URLSearchParams({ show: change.show ?? status });
     const s = change.stars === undefined ? stars : change.stars;
     if (s) next.set("stars", String(s));
@@ -50,6 +54,7 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
     if (change.noReply ?? noReply) next.set("reply", "none");
     if (change.photos ?? photos) next.set("photos", "1");
     if (change.reported ?? reported) next.set("reported", "1");
+    if (product && change.product !== false) next.set("product", product.id);
     if (change.page && change.page > 1) next.set("page", String(change.page));
     return `/admin/reviews?${next}`;
   };
@@ -97,6 +102,7 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
             {noReply && <input type="hidden" name="reply" value="none" />}
             {photos && <input type="hidden" name="photos" value="1" />}
             {reported && <input type="hidden" name="reported" value="1" />}
+            {product && <input type="hidden" name="product" value={product.id} />}
             <label htmlFor="review-q" className="sr-only">Search reviews</label>
             <input id="review-q" name="q" type="search" defaultValue={q} placeholder="Name, words or product" className="input flex-1" />
             <button className="btn btn-secondary">Search</button>
@@ -120,7 +126,7 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
         </div>
         {filtered && (
           <p className="hint text-sm">
-            {total} {total === 1 ? "review matches" : "reviews match"}{q && <> &ldquo;{q}&rdquo;</>}{stars && <> with {stars} star{stars > 1 ? "s" : ""}</>}{noReply && <>, no reply yet</>}{photos && <>, with photos</>}{reported && <>, reported by shoppers</>}. <Link href={href({ stars: null, q: null, noReply: false, photos: false, reported: false })} className="underline">Clear</Link>
+            {total} {total === 1 ? "review matches" : "reviews match"}{q && <> &ldquo;{q}&rdquo;</>}{stars && <> with {stars} star{stars > 1 ? "s" : ""}</>}{noReply && <>, no reply yet</>}{photos && <>, with photos</>}{reported && <>, reported by shoppers</>}{product && <> for <Link href={`/admin/products/${product.id}`} className="underline">{product.title}</Link></>}. <Link href={href({ stars: null, q: null, noReply: false, photos: false, reported: false, product: false })} className="underline">Clear</Link>
           </p>
         )}
         {rows.length === 0 ? (
