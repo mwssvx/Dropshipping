@@ -70,4 +70,14 @@ test("a merchant tags many products at once, then undoes it", async ({ page }, i
   await expect(page.getByRole("table", { name: "What will change" }).getByRole("row", { name: /Magnetic Phone Stand/ })).toContainText("$12.00 extra shipping");
   await page.getByRole("button", { name: "Apply to 2 products" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Set extra shipping to $12.00 each on 2 products." })).toBeVisible();
+
+  // Each weighs 800 g packed, for shipping rates by weight.
+  await page.getByRole("checkbox", { name: "Select all products" }).check();
+  await page.getByLabel("Change", { exact: true }).selectOption({ label: "Set the weight" });
+  await page.getByLabel("Packed weight of each (kg)").fill("0.8");
+  await page.getByRole("checkbox", { name: "Only options with no weight yet" }).uncheck();
+  await page.getByRole("button", { name: "Preview" }).click();
+  await expect(page.getByRole("table", { name: "What will change" }).getByRole("row", { name: /Magnetic Phone Stand/ }).first()).toContainText("800 g");
+  await page.getByRole("button", { name: "Apply to 2 products" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Set the weight to 800 g on 2 products." })).toBeVisible();
 });

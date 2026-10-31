@@ -1,6 +1,6 @@
 // Bulk edit: change many products at once from the Products list. Publish, hide or archive them,
 // move prices up or down by a percent, set or clear the crossed-out "was" price, or add them to a
-// collection, add or remove a tag, set where they ship from, how long they take to prepare, or their extra shipping. Every change is saved with what it replaced, so the merchant can undo it for a week.
+// collection, add or remove a tag, set where they ship from, how long they take to prepare, their extra shipping, or what they weigh. Every change is saved with what it replaced, so the merchant can undo it for a week.
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { schema, type BulkEditAction, type BulkEditSnapshot, type Db } from "@sf/db";
 import { z } from "zod";
@@ -12,6 +12,7 @@ import { PRODUCT_PROCESSING_MAX } from "./delivery";
 import { formatMoney } from "./money";
 import { SHIPPING_SURCHARGE_MAX } from "./shipping-surcharge";
 import { MAX_PRODUCT_TAGS } from "./products";
+import { formatWeight, MAX_WEIGHT_GRAMS } from "./weight";
 
 type Shop = typeof schema.shops.$inferSelect;
 
@@ -22,6 +23,7 @@ export const MAX_BULK_PRODUCTS = 500;
 
 const DAYS_ERROR = `Enter 0 to ${PRODUCT_PROCESSING_MAX} days, or leave it empty for your store's.`;
 const SURCHARGE_ERROR = "Enter an amount from 0 to 1,000, or leave it empty for no extra shipping.";
+const WEIGHT_ERROR = "Enter the weight in kg, more than 0 and under 1,000.";
 
 const actionSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("status"), status: z.enum(["active", "draft", "archived"]) }),
@@ -39,6 +41,7 @@ const actionSchema = z.discriminatedUnion("kind", [
     days: z.number({ error: DAYS_ERROR }).int(DAYS_ERROR).min(0, DAYS_ERROR).max(PRODUCT_PROCESSING_MAX, DAYS_ERROR).nullable(),
   }),
   z.object({ kind: z.literal("surcharge"), amountMinor: z.number().int().min(0, SURCHARGE_ERROR).max(SHIPPING_SURCHARGE_MAX, SURCHARGE_ERROR) }),
+  z.object({ kind: z.literal("weight"), grams: z.number({ error: WEIGHT_ERROR }).int(WEIGHT_ERROR).min(1, WEIGHT_ERROR).max(MAX_WEIGHT_GRAMS, WEIGHT_ERROR), onlyMissing: z.boolean().default(false) }),
 ]);
 
 export type BulkEditInput = z.input<typeof actionSchema>;
@@ -63,7 +66,7 @@ async function plan(db: Db, shop: Shop, productIds: string[], input: BulkEditInp
   const variants = await db.query.variants.findMany({ where: inArray(schema.variants.productId, ids) });
   const money = (n: number | null) => (n == null ? "none" : formatMoney(n, shop.currency));
   const changes: BulkChange[] = [];
-  const snapshot: BulkEditSnapshot = { products: [], variants: [], collection: [], tags: [], shipsFrom: [], processing: [], surcharge: [] };
+  const snapshot: BulkEditSnapshot = { products: [], variants: [], collection: [], tags: [], shipsFrom: [], processing: [], surcharge: [], weight: [] };
   let skipped = 0;
   // Products that already have as many tags as they can.
   let full = 0;
@@ -143,6 +146,19 @@ async function plan(db: Db, shop: Shop, productIds: string[], input: BulkEditInp
       changes.push({ productId: p.id, product: p.title, variant: null, before: extra(p.shippingSurchargeMinor), after: extra(action.amountMinor), belowCost: false });
       snapshot.surcharge!.push({ productId: p.id, before: p.shippingSurchargeMinor, after: action.amountMinor });
     }
+  } else if (action.kind === "weight") {
+    for (const p of products) {
+      if (p.giftCard || p.digital) {
+        skipped++;
+        continue;
+      }
+      for (const v of variants.filter((x) => x.productId === p.id)) {
+        // "Only those with no weight" leaves weights the merchant already set alone.
+        if (v.weightGrams === action.grams || (action.onlyMissing && v.weightGrams != null)) continue;
+        changes.push({ productId: p.id, product: p.title, variant: v.title, before: v.weightGrams == null ? "no weight" : formatWeight(v.weightGrams), after: formatWeight(action.grams), belowCost: false });
+        snapshot.weight!.push({ variantId: v.id, before: v.weightGrams, after: action.grams });
+      }
+    }
   } else {
     for (const p of products) {
       // Gift cards are sold at their face value.
@@ -201,6 +217,8 @@ export function describeBulkAction(action: BulkEditAction, collectionTitle?: str
       return action.days === null ? "Set preparing time to your store's" : `Set preparing time to ${action.days} ${action.days === 1 ? "day" : "days"}`;
     case "surcharge":
       return action.amountMinor ? `Set extra shipping to ${formatMoney(action.amountMinor, currency)} each` : "Removed extra shipping";
+    case "weight":
+      return `Set the weight to ${formatWeight(action.grams)}${action.onlyMissing ? " where it was missing" : ""}`;
   }
 }
 
@@ -233,6 +251,7 @@ export async function applyBulkEdit(db: Db, shop: Shop, productIds: string[], in
     for (const c of snapshot.shipsFrom ?? []) await tx.update(schema.products).set({ shipsFrom: c.after }).where(eq(schema.products.id, c.productId));
     for (const c of snapshot.processing ?? []) await tx.update(schema.products).set({ processingDays: c.after }).where(eq(schema.products.id, c.productId));
     for (const c of snapshot.surcharge ?? []) await tx.update(schema.products).set({ shippingSurchargeMinor: c.after }).where(eq(schema.products.id, c.productId));
+    for (const c of snapshot.weight ?? []) await tx.update(schema.variants).set({ weightGrams: c.after }).where(eq(schema.variants.id, c.variantId));
     const touched = [...new Set(changes.map((c) => c.productId))];
     if (action.kind !== "status") await tx.update(schema.products).set({ updatedAt: now }).where(inArray(schema.products.id, touched));
     const [edit] = await tx.insert(schema.bulkEdits).values({ shopId: shop.id, summary, action, snapshot, products: touched.length, createdBy: opts.userId ?? null, createdAt: now }).returning();
@@ -329,6 +348,22 @@ export async function undoBulkEdit(db: Db, shopId: string, editId: string, now =
         await tx.update(schema.products).set({ shippingSurchargeMinor: c.before, updatedAt: now }).where(eq(schema.products.id, c.productId));
         restored++;
       }
+    }
+    // A weight goes back only where nobody has typed another since.
+    if (snapshot.weight?.length) {
+      const rows = await tx.query.variants.findMany({ where: inArray(schema.variants.id, snapshot.weight.map((c) => c.variantId)), columns: { id: true, productId: true, weightGrams: true } });
+      const touched = new Set<string>();
+      for (const c of snapshot.weight) {
+        const row = rows.find((r) => r.id === c.variantId);
+        if (!row || row.weightGrams !== c.after) {
+          kept++;
+          continue;
+        }
+        await tx.update(schema.variants).set({ weightGrams: c.before }).where(eq(schema.variants.id, c.variantId));
+        touched.add(row.productId);
+        restored++;
+      }
+      if (touched.size) await tx.update(schema.products).set({ updatedAt: now }).where(inArray(schema.products.id, [...touched]));
     }
   });
   return { restored, kept };

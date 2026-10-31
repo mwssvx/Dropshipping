@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { schema } from "@sf/db";
 import { applyBulkEdit, createGiftCardProduct, DemoModel, previewBulkEdit, undoBulkEdit } from "../src";
 import { makeFixture } from "../evals/fixture";
@@ -80,5 +80,42 @@ describe("extra shipping in bulk", () => {
     expect([await extra(lamp.id), await extra(stand.id), await extra(projector.id)]).toEqual([0, 1500, 900]);
     const none = await applyBulkEdit(f.db, shop, ids, { kind: "surcharge", amountMinor: 0 });
     expect(none.summary).toBe("Removed extra shipping on 2 products");
+  });
+});
+
+describe("weight in bulk", () => {
+  it("sets the packed weight on every option, or only where it's missing, and undoes it", async () => {
+    const f = await makeFixture(new DemoModel());
+    const shop = await f.shop();
+    const { lamp, stand, projector } = f.products;
+    const card = await createGiftCardProduct(f.db, shop, [2500]);
+    const ids = [lamp.id, stand.id, projector.id, card.id];
+    await f.db.update(schema.variants).set({ weightGrams: null }).where(inArray(schema.variants.productId, ids));
+    await f.db.update(schema.variants).set({ weightGrams: 300 }).where(eq(schema.variants.productId, stand.id));
+    const weights = async (id: string) => (await f.variants(id)).map((v) => v.weightGrams);
+    const options = async (id: string) => (await f.variants(id)).length;
+    const expected = (await options(lamp.id)) + (await options(projector.id));
+
+    await expect(previewBulkEdit(f.db, shop, ids, { kind: "weight", grams: 0 })).rejects.toThrow("weight in kg");
+    // Only where it's missing: the stand keeps its 300 g, the gift card has no weight.
+    const preview = await previewBulkEdit(f.db, shop, ids, { kind: "weight", grams: 1500, onlyMissing: true });
+    expect([preview.products, preview.skipped, preview.changes.length]).toEqual([2, 1, expected]);
+    expect(preview.changes[0]).toMatchObject({ before: "no weight", after: "1.5 kg" });
+    const edit = await applyBulkEdit(f.db, shop, ids, { kind: "weight", grams: 1500, onlyMissing: true });
+    expect(edit.summary).toBe("Set the weight to 1.5 kg where it was missing on 2 products");
+    expect(new Set(await weights(lamp.id))).toEqual(new Set([1500]));
+    expect(new Set(await weights(stand.id))).toEqual(new Set([300]));
+
+    // An option weighed by hand since keeps it on undo.
+    const [first] = await f.variants(lamp.id);
+    await f.db.update(schema.variants).set({ weightGrams: 900 }).where(eq(schema.variants.id, first!.id));
+    expect(await undoBulkEdit(f.db, shop.id, edit.id)).toEqual({ restored: expected - 1, kept: 1 });
+    expect((await f.variants(lamp.id)).find((v) => v.id === first!.id)!.weightGrams).toBe(900);
+    expect(new Set(await weights(projector.id))).toEqual(new Set([null]));
+
+    // Every option, the stand too.
+    const all = await applyBulkEdit(f.db, shop, ids, { kind: "weight", grams: 250 });
+    expect(all.summary).toBe("Set the weight to 250 g on 3 products");
+    expect(new Set(await weights(stand.id))).toEqual(new Set([250]));
   });
 });
