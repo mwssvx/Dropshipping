@@ -1,6 +1,6 @@
 "use client";
 import { useId } from "react";
-import { ANNOUNCE_MAX, COLUMNS_MAX, LOGOS_MAX, LOOK_MAX, SLIDES_MAX, MENU_CHILDREN_MAX, TRUST_ICONS, type MenuItem, type MenuLink, type SectionSettings, type SectionType, type TrustIcon } from "@sf/core/theme";
+import { ANNOUNCE_MAX, COLUMNS_MAX, LOGOS_MAX, MARQUEE_MAX, LOOK_MAX, SLIDES_MAX, MENU_CHILDREN_MAX, TRUST_ICONS, type MenuItem, type MenuLink, type SectionSettings, type SectionType, type TrustIcon } from "@sf/core/theme";
 
 /*
  * Form controls for the theme editor. Every control is labelled and edits one value.
@@ -15,7 +15,7 @@ type Field =
   | { key: string; label: string; kind: "text" | "textarea" | "image" | "link" | "datetime"; hint?: string; max?: number }
   | { key: string; label: string; kind: "select"; options: { value: string; label: string }[] }
   | { key: string; label: string; kind: "number"; min: number; max: number }
-  | { key: string; label: string; kind: "collection" | "collections" | "faq" | "quotes" | "badges" | "product" | "products" | "logos" | "messages" | "columns" | "slides" };
+  | { key: string; label: string; kind: "collection" | "collections" | "faq" | "quotes" | "badges" | "product" | "products" | "logos" | "messages" | "columns" | "slides" | "marquee" };
 
 export const TRUST_ICON_LABELS: Record<TrustIcon, string> = {
   shipping: "Delivery truck",
@@ -144,6 +144,11 @@ export const SECTION_FIELDS: Record<SectionType, Field[]> = {
     { key: "heading", label: "Heading", kind: "text", max: 120, hint: "Leave empty for “From the blog” in the shopper's language." },
     { key: "limit", label: "How many to show", kind: "number", min: 2, max: 6 },
   ],
+  scrolling_text: [
+    { key: "items", label: "Messages", kind: "marquee" },
+    { key: "speed", label: "Speed", kind: "select", options: [{ value: "slow", label: "Slow" }, { value: "medium", label: "Medium" }, { value: "fast", label: "Fast" }] },
+    { key: "size", label: "Text size", kind: "select", options: [{ value: "large", label: "Large" }, { value: "small", label: "Small" }] },
+  ],
 };
 
 /** A saved moment as the editor's computer shows it, for a datetime-local input. */
@@ -210,7 +215,7 @@ export function SectionForm<T extends SectionType>({
         const v = values[f.key];
         return (
           <div key={f.key} className="field">
-            {!["faq", "collections", "quotes", "badges", "products", "logos", "messages", "columns", "slides"].includes(f.kind) && <label className="label" htmlFor={id}>{f.label}</label>}
+            {!["faq", "collections", "quotes", "badges", "products", "logos", "messages", "columns", "slides", "marquee"].includes(f.kind) && <label className="label" htmlFor={id}>{f.label}</label>}
             {f.kind === "text" && <input id={id} className="input" value={String(v ?? "")} maxLength={f.max} onChange={(e) => set(f.key, e.target.value)} />}
             {f.kind === "textarea" && <textarea id={id} className="input" rows={4} value={String(v ?? "")} maxLength={f.max} onChange={(e) => set(f.key, e.target.value)} />}
             {f.kind === "datetime" && (
@@ -306,6 +311,10 @@ export function SectionForm<T extends SectionType>({
                   { key: "linkLabel", label: "Column link label" },
                   { key: "link", label: "Column link" },
                 ]} blank={{ imageUrl: "", title: "", text: "", linkLabel: "", link: "" }} />
+            )}
+            {f.kind === "marquee" && (
+              <ListItems label={f.label} items={v as Record<string, string>[]} onChange={(x) => set(f.key, x)} max={MARQUEE_MAX} noun="message"
+                fields={[{ key: "text", label: "Message" }]} blank={{ text: "" }} />
             )}
             {f.kind === "messages" && (
               <ListItems label={f.label} items={v as Record<string, string>[]} onChange={(x) => set(f.key, x)} max={ANNOUNCE_MAX - 1} noun="message"

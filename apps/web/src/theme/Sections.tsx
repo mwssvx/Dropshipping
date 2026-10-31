@@ -13,6 +13,7 @@ import { SectionVideo } from "./SectionVideo";
 import { AnnouncementBar } from "./AnnouncementBar";
 import { Slideshow } from "./Slideshow";
 import { Countdown } from "./Countdown";
+import { ScrollingText } from "./ScrollingText";
 import { storeHref } from "./style";
 
 /*
@@ -382,6 +383,13 @@ function BlogPosts({ s, data }: Props<"blog_posts">) {
   );
 }
 
+function ScrollingTextSection({ s, data }: Props<"scrolling_text">) {
+  const t = data.t ?? storeText(null);
+  const items = s.items.map((i) => i.text.trim()).filter(Boolean);
+  if (!items.length) return null;
+  return <ScrollingText items={items} speed={s.speed} large={s.size === "large"} labels={{ region: t.marquee, pause: t.marqueePause, play: t.marqueePlay }} />;
+}
+
 function RichText({ s }: Props<"rich_text">) {
   if (!s.heading && !s.text) return null;
   return (
@@ -647,6 +655,7 @@ export function SectionView({ section, data, first }: { section: Section; data: 
     case "featured_product": return <FeaturedProduct s={section.settings} data={data} first={first} />;
     case "countdown": return <CountdownSection s={section.settings} data={data} first={first} />;
     case "blog_posts": return <BlogPosts s={section.settings} data={data} first={first} />;
+    case "scrolling_text": return <ScrollingTextSection s={section.settings} data={data} first={first} />;
   }
 }
 

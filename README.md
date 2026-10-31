@@ -1430,3 +1430,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Your newest posts, by themselves** (`apps/web/src/theme/Sections.tsx`): a new home page section in the theme editor. It shows the two to six newest published blog posts, each with its picture, title, date, reading time and a line from it, plus "View all" to the blog. New posts appear as soon as they're published, so nothing needs updating by hand.
 2. **Never empty**: while the blog has no published posts the section stays hidden, on the store and in the editor preview. Posts load only on stores whose home page shows them (`latestPosts` in `packages/core/src/blog.ts`). Dates follow the shopper's language. Two new store strings in all six languages. No migration: it lives in the theme.
+
+### Scrolling text (after launch, part 251)
+
+1. **A moving row of short messages** (`apps/web/src/theme/ScrollingText.tsx`): a new home page section in the theme editor. Add up to eight short messages ("Free shipping over $50", "30-day returns"), pick slow, medium or fast and large or small text, and they glide across the page in an endless loop with a small star between them.
+2. **Easy to stop**: it holds still while a shopper points at it, and a pause button stops it for good. Shoppers who ask their device for less motion get a still, centered row from the very first paint. Screen readers hear each message once, not the copy that makes the loop seamless.
+3. Empty messages are skipped and an empty row isn't shown. Three new store strings in all six languages. No migration: it lives in the theme.
