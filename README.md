@@ -1537,3 +1537,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Your reviews are yours** (`reviewsCsv` in `packages/core/src/review-import.ts`, `/admin/reviews/export.csv`): "Download these (CSV)" on the Reviews page gives the list on screen (tab, stars, search and filters), and "download every review" gives them all. The file uses the columns of Shopify's Product Reviews export, so it goes back into this store, another store here, or most review apps. Extra columns at the end carry the product title, order number, photo links and helpful votes. Buyer emails are filled in only for staff who can see customers.
 2. **Safe both ways**: text a spreadsheet would run as a formula starts with `'`, which the import drops again, and bringing a downloaded file back into the same store adds nothing twice, even for reviews that came from orders. No migration.
+
+### Stars in Google Shopping (after launch, part 272)
+
+1. **Product review feed** (`reviewFeedXml` in `packages/core/src/feeds.ts`, `/feeds/reviews.xml`): the store's published reviews in Google's product review feed format (2.3), with the reviewer's name, date, words, buyer photos, stars and a link to the review. Products are matched by their SKUs, the store as brand, their name and link, like the product feed. Reviews from an order here are marked as asked for after it shipped. Hidden and waiting reviews, reviews shoppers reported, and reviews of products not on sale stay out.
+2. **On Sales channels**: a "Stars in Google Shopping" card with the feed link, how many published reviews the store has (Google wants 50 before it shows stars), and where to paste it in Merchant Center (Product ratings). No migration.
