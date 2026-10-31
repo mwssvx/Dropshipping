@@ -124,6 +124,18 @@ describe("push notifications", () => {
     expect((await getPushSettings(f.db, f.owner.id)).kinds.map((k) => k.label)).toEqual(expect.arrayContaining(["Returns buyers ask for", "Reviews waiting for your OK"]));
   });
 
+  it("tells the merchant about a shopper's question on a product, once", async () => {
+    const f = await setup();
+    await registerDevice(f.db, f.owner.id, { token: TOKEN, platform: "ios" }, new Date(Date.now() - 3_600_000));
+    const shop = await f.shop();
+    await f.db.insert(schema.productQuestions).values({ shopId: shop.id, productId: f.products.stand.id, name: "Grace", email: "grace@example.com", body: "Does it fold flat for travel?" });
+    await sendShopNotifications(f.pctx, shop.id);
+    await sendShopNotifications(f.pctx, shop.id);
+    const sent = f.push.sent.filter((m) => m.url === "/questions");
+    expect(sent).toEqual([expect.objectContaining({ title: `Grace asked about ${f.products.stand.title}`, body: "Does it fold flat for travel?" })]);
+    expect((await getPushSettings(f.db, f.owner.id)).kinds.map((k) => k.label)).toContain("Questions shoppers ask about products");
+  });
+
   it("forgets phones the push service says are gone", async () => {
     const f = await setup();
     await registerDevice(f.db, f.owner.id, { token: TOKEN, platform: "ios" });
