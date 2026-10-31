@@ -5,6 +5,7 @@
 import { and, eq, gte, inArray, isNotNull, ne, or } from "drizzle-orm";
 import { PUSH_KINDS, schema, type Db, type PushKind } from "@sf/db";
 import { formatMoney } from "../money";
+import { RETURN_REASON_LABELS } from "../returns";
 import { REQUIREMENT_KINDS } from "../payouts";
 import { UserError } from "../errors";
 import { can, type Area, type Role } from "../team";
@@ -83,6 +84,8 @@ export const PUSH_LABELS: Record<PushKind, string> = {
   agent_proposal: "Changes waiting for your OK",
   escalation_reply: "Replies from our support team",
   buyer_message: "Buyer questions that need you",
+  return_request: "Returns buyers ask for",
+  review: "Reviews waiting for your OK",
 };
 /** Who gets each kind: staff, for example, don't hear about payouts or AI proposals. */
 const PUSH_AREA: Record<PushKind, Area> = {
@@ -94,6 +97,8 @@ const PUSH_AREA: Record<PushKind, Area> = {
   agent_proposal: "assistant",
   escalation_reply: "assistant",
   buyer_message: "inbox",
+  return_request: "returns",
+  review: "reviews",
 };
 
 /** Not a kind of its own: turning this off makes new-order notifications silent. */
@@ -142,7 +147,7 @@ const clip = (s: string, n = 140) => (s.length > n ? `${s.slice(0, n - 1)}…` :
 
 /** What happened in a store since `since`, as notifications. `url` is a path inside the app. */
 export async function collectPushEvents(db: Db, shopId: string, since: Date): Promise<PushEvent[]> {
-  const [shop, orders, failed, holds, actions, staff, disputes, asks] = await Promise.all([
+  const [shop, orders, failed, holds, actions, staff, disputes, asks, returns, reviews] = await Promise.all([
     db.query.shops.findFirst({ where: eq(schema.shops.id, shopId) }),
     db.query.orders.findMany({
       where: and(eq(schema.orders.shopId, shopId), inArray(schema.orders.paymentStatus, ["paid", "partially_refunded"]), gte(schema.orders.paidAt, since)),
@@ -202,6 +207,18 @@ export async function collectPushEvents(db: Db, shopId: string, since: Date): Pr
         ),
       )
       .limit(50),
+    // Returns still waiting for an answer, and reviews held for the merchant's OK.
+    db
+      .select({ r: schema.returnRequests, number: schema.orders.number })
+      .from(schema.returnRequests)
+      .innerJoin(schema.orders, eq(schema.orders.id, schema.returnRequests.orderId))
+      .where(and(eq(schema.returnRequests.shopId, shopId), eq(schema.returnRequests.status, "requested"), gte(schema.returnRequests.createdAt, since)))
+      .limit(50),
+    db.query.reviews.findMany({
+      where: and(eq(schema.reviews.shopId, shopId), eq(schema.reviews.status, "pending"), gte(schema.reviews.createdAt, since)),
+      columns: { id: true, name: true, rating: true, body: true, createdAt: true },
+      limit: 50,
+    }),
   ]);
   if (!shop) return [];
   const events: PushEvent[] = [];
@@ -235,6 +252,13 @@ export async function collectPushEvents(db: Db, shopId: string, since: Date): Pr
   }
   for (const { m, c } of asks) {
     events.push({ kind: "buyer_message", ref: m.id, title: c.subject.startsWith("Order #") ? `Question about order ${c.subject.slice(6)}` : c.subject, body: clip(m.body), url: `/inbox/${c.id}`, at: m.createdAt });
+  }
+  for (const { r, number } of returns) {
+    const what = r.giftReturn ? `${r.giftReturn.name} wants to return a gift from order #${number}` : `A return was asked for on order #${number}`;
+    events.push({ kind: "return_request", ref: r.id, title: what, body: clip(`${RETURN_REASON_LABELS[r.reason]}${r.note ? `: ${r.note}` : ""}`), url: "/returns", at: r.createdAt });
+  }
+  for (const r of reviews) {
+    events.push({ kind: "review", ref: r.id, title: `New ${r.rating}-star review from ${r.name}`, body: clip(r.body || "No words, just the stars."), url: "/reviews", at: r.createdAt });
   }
   for (const { m } of staff) {
     events.push({ kind: "escalation_reply", ref: m.id, title: "Our support team replied", body: clip(m.body), url: "/assistant", at: m.createdAt });
