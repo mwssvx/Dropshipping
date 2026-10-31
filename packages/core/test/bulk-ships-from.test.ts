@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eq, inArray } from "drizzle-orm";
 import { schema } from "@sf/db";
-import { applyBulkEdit, createGiftCardProduct, DemoModel, previewBulkEdit, undoBulkEdit } from "../src";
+import { applyBulkEdit, createGiftCardProduct, createProduct, DemoModel, previewBulkEdit, undoBulkEdit } from "../src";
 import { makeFixture } from "../evals/fixture";
 
 describe("ships from in bulk", () => {
@@ -117,5 +117,36 @@ describe("weight in bulk", () => {
     const all = await applyBulkEdit(f.db, shop, ids, { kind: "weight", grams: 250 });
     expect(all.summary).toBe("Set the weight to 250 g on 3 products");
     expect(new Set(await weights(stand.id))).toEqual(new Set([250]));
+  });
+});
+
+describe("cost of your own stock in bulk", () => {
+  it("sets the cost as a percent of the price on the store's own products only, and undoes it", async () => {
+    const f = await makeFixture(new DemoModel());
+    const shop = await f.shop();
+    const { lamp } = f.products;
+    const mug = await createProduct(f.db, shop.id, { title: "Handmade Mug", status: "active", variants: [{ priceMinor: 2000, stock: 5 }, { title: "Large", priceMinor: 2500, stock: 5 }] });
+    const bowl = await createProduct(f.db, shop.id, { title: "Handmade Bowl", status: "active", variants: [{ priceMinor: 3000, stock: 5 }] });
+    await f.db.update(schema.variants).set({ costMinor: 900 }).where(eq(schema.variants.productId, bowl.id));
+    const costs = async (id: string) => (await f.variants(id)).map((v) => v.costMinor).sort();
+    const lampCosts = await costs(lamp.id);
+    const ids = [lamp.id, mug.id, bowl.id];
+
+    await expect(previewBulkEdit(f.db, shop, ids, { kind: "cost", percent: 0 })).rejects.toThrow("1% to 100%");
+    const preview = await previewBulkEdit(f.db, shop, ids, { kind: "cost", percent: 40, onlyMissing: true });
+    // The lamp is the supplier's; the bowl already has a cost.
+    expect([preview.products, preview.skipped]).toEqual([1, 1]);
+    expect(preview.changes.map((c) => c.after).sort()).toEqual(["costs $10.00", "costs $8.00"]);
+    const edit = await applyBulkEdit(f.db, shop, ids, { kind: "cost", percent: 40, onlyMissing: true });
+    expect(edit.summary).toBe("Set the cost to 40% of the price where it was missing on 1 product");
+    expect(await costs(mug.id)).toEqual([1000, 800]);
+    expect(await costs(bowl.id)).toEqual([900]);
+    expect(await costs(lamp.id)).toEqual(lampCosts);
+
+    expect(await undoBulkEdit(f.db, shop.id, edit.id)).toEqual({ restored: 2, kept: 0 });
+    expect(await costs(mug.id)).toEqual([null, null]);
+    const all = await applyBulkEdit(f.db, shop, ids, { kind: "cost", percent: 50 });
+    expect(all.summary).toBe("Set the cost to 50% of the price on 2 products");
+    expect(await costs(bowl.id)).toEqual([1500]);
   });
 });
