@@ -67,8 +67,17 @@ test("a buyer opens a product's photos full screen, steps through them and zooms
   await viewer.getByRole("button", { name: "Zoom out" }).click();
   await expect(viewer.getByRole("img")).not.toHaveAttribute("style", /scale/);
 
-  // A swipe to the left shows the next photo.
-  const box = (await viewer.getByRole("img").boundingBox())!;
+  // A swipe to the left shows the next photo. Zooming out animates, so wait for the photo to settle
+  // at its full-screen size before measuring where to swipe.
+  let box = (await viewer.getByRole("img").boundingBox())!;
+  await expect
+    .poll(async () => {
+      const now = (await viewer.getByRole("img").boundingBox())!;
+      const same = now.width === box.width && now.x === box.x;
+      box = now;
+      return same;
+    })
+    .toBe(true);
   const y = box.y + box.height / 2;
   await buyer.mouse.move(box.x + box.width * 0.8, y);
   await buyer.mouse.down();
