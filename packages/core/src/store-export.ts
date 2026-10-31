@@ -124,6 +124,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       ship_cutoff: shop.shipCutoff,
       holiday_deadline: shop.holidayDeadline,
       late_order_notice: shop.lateOrderNotice,
+      duties: shop.duties,
       survey: shop.survey,
       price_watch: { min_margin_percent: shop.minMarginPercent, auto_reprice: shop.autoReprice },
       reviews_auto_publish: shop.reviewsAutoPublish,
@@ -325,6 +326,7 @@ const importSchema = z.object({
       ship_cutoff: z.object({ hour: z.number().int().min(1).max(23), timeZone: z.string().max(60), weekends: z.boolean() }).nullable().optional(),
       holiday_deadline: z.object({ name: z.string().trim().min(1).max(40), arriveBy: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).nullable().optional(),
       late_order_notice: z.object({ days: z.number().int().min(1).max(30), message: z.string().max(500).nullable(), transit: z.boolean().optional() }).nullable().optional(),
+      duties: z.enum(["off", "buyer_pays", "included"]).optional(),
       tipping: z.object({ percents: z.array(z.number().int().min(1).max(30)).min(1).max(3), note: z.string().max(120).nullable() }).nullable().optional(),
       survey: z.object({ question: z.string().max(120), options: z.array(z.string().max(40)).min(2).max(8), other: z.boolean() }).nullable().optional(),
       local_delivery_area: z
@@ -826,6 +828,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
     if (data.store.ship_cutoff !== undefined) settings.shipCutoff = data.store.ship_cutoff;
     if (data.store.holiday_deadline !== undefined) settings.holidayDeadline = data.store.holiday_deadline;
     if (data.store.late_order_notice !== undefined) settings.lateOrderNotice = data.store.late_order_notice;
+    if (data.store.duties !== undefined) settings.duties = data.store.duties;
     if (data.store.survey !== undefined) settings.survey = data.store.survey;
     if (data.store.price_watch) {
       settings.minMarginPercent = data.store.price_watch.min_margin_percent;

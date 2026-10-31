@@ -76,7 +76,11 @@ async function shippingPolicy(db: Db, shop: Shop) {
   parts.push("Delivery times start when your order ships and can run longer around holidays or at customs.");
   if (shop.localPickup) parts.push(`You can also pick up your order for free from ${shop.localPickup.address.split("\n")[0]}. Choose "Pick up" at checkout and we'll email you when it's ready.`);
   if (shop.localDeliveryArea) parts.push("Near us? At checkout, enter your postal code to see whether we can deliver it ourselves.");
-  parts.push("Orders going to another country may have import duties or taxes charged by your country's customs. These are paid by the buyer when the parcel arrives.");
+  parts.push(
+    shop.duties === "included"
+      ? "Import duties and taxes on orders to other countries are included in our prices, so there's nothing more to pay when your parcel arrives."
+      : "Orders going to another country may have import duties or taxes charged by your country's customs. These are paid by the buyer when the parcel arrives.",
+  );
   parts.push("If your tracking hasn't moved for a while or your parcel arrived damaged, write to us through our contact page and we'll sort it out.");
   return parts.join("\n\n");
 }

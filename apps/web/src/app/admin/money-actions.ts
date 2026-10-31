@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   addTaxRegistration,
+  setDuties,
   changePlan,
   formatMoney,
   parseMoney,
@@ -153,6 +154,20 @@ export async function setPricesIncludeTaxAction(form: FormData) {
   const { shop, db } = await requireShop("taxes");
   await setPricesIncludeTax(db, shop.id, form.get("pricesIncludeTax") === "1");
   revalidatePath("/admin/taxes");
+}
+
+/** What buyers in other countries are told about import duties at checkout and in the shipping policy. */
+export async function setDutiesAction(_: FormState, form: FormData): Promise<FormState> {
+  const { shop, db, user } = await requireShop("taxes");
+  try {
+    const policy = await setDuties(db, shop.id, String(form.get("duties") ?? ""));
+    await logged({ shop, user, db }, policy === "included" ? "Said import duties are included in prices" : policy === "buyer_pays" ? "Told buyers abroad they pay import duties on delivery" : "Stopped mentioning import duties at checkout", { href: "/admin/taxes#duties-heading" });
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath("/admin/taxes");
+  return { saved: true };
 }
 
 export async function saveCurrenciesAction(_: FormState, form: FormData): Promise<FormState> {
