@@ -50,7 +50,7 @@ test("a customs form for an order going abroad", async ({ page, browser }, info)
   await customs.getByLabel("HS code").fill("9405.40");
   await customs.getByLabel("Made in (country code)").fill("cn");
   await customs.getByRole("button", { name: "Save customs info" }).click();
-  await expect(customs.getByRole("status")).toHaveText("Saved. Customs forms for this product now use it.");
+  await expect(customs.getByRole("status")).toHaveText("Saved. Customs forms and duty notes for this product now use it.");
   await expect(customs.getByRole("note")).toHaveText("HS code 940540, made in China.");
 
   await page.goto("/admin/orders");

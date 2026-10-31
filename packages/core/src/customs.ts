@@ -16,18 +16,32 @@ export function countryCode(raw: string | null | undefined) {
   return name && name !== code && name !== "Unknown Region" ? code : null;
 }
 
-/** Sets a product's HS code (6 to 10 digits, dots and spaces allowed) and country of origin; empty clears them. */
-export async function setCustomsInfo(db: Db, shopId: string, productId: string, input: { hsCode?: string | null; originCountry?: string | null }) {
+/**
+ * Sets a product's HS code (6 to 10 digits, dots and spaces allowed), country of origin and the
+ * country it ships from; empty clears them. Ships-from is left alone when it isn't passed, and is
+ * cleared when it's the store's own country, since that's what an empty one means.
+ */
+export async function setCustomsInfo(db: Db, shopId: string, productId: string, input: { hsCode?: string | null; originCountry?: string | null; shipsFrom?: string | null }) {
   const digits = (input.hsCode ?? "").replace(/[\s.]/g, "");
   if (digits && !/^\d{6,10}$/.test(digits)) throw new UserError("An HS code is 6 to 10 digits, like 6912.00 or 691200.");
   const rawOrigin = (input.originCountry ?? "").trim();
   const originCountry = rawOrigin ? countryCode(rawOrigin) : null;
   if (rawOrigin && !originCountry) throw new UserError("Enter the country it was made in as a two-letter code, like CN or US.");
+  let shipsFrom: string | null | undefined;
+  if (input.shipsFrom !== undefined) {
+    const raw = (input.shipsFrom ?? "").trim();
+    shipsFrom = raw ? countryCode(raw) : null;
+    if (raw && !shipsFrom) throw new UserError("Enter the country it ships from as a two-letter code, like CN or US.");
+    if (shipsFrom) {
+      const shop = await db.query.shops.findFirst({ where: eq(schema.shops.id, shopId), columns: { country: true } });
+      if (shop?.country === shipsFrom) shipsFrom = null;
+    }
+  }
   const [row] = await db
     .update(schema.products)
-    .set({ hsCode: digits || null, originCountry, updatedAt: new Date() })
+    .set({ hsCode: digits || null, originCountry, ...(shipsFrom !== undefined && { shipsFrom }), updatedAt: new Date() })
     .where(and(eq(schema.products.id, productId), eq(schema.products.shopId, shopId)))
-    .returning({ hsCode: schema.products.hsCode, originCountry: schema.products.originCountry });
+    .returning({ hsCode: schema.products.hsCode, originCountry: schema.products.originCountry, shipsFrom: schema.products.shipsFrom });
   if (!row) throw new NotFoundError("Product");
   return row;
 }
@@ -82,4 +96,24 @@ export async function customsDeclaration(db: Db, shopId: string, orderId: string
     /** Items still missing an HS code or a country of origin, by name. */
     missing: [...new Set(items.filter((i) => !i.hsCode || !i.originCountry).map((i) => i.description))],
   };
+}
+
+/**
+ * Where each physical product in a list ships from: its own ships-from country, or null for the
+ * store's country. Gift cards and downloads don't ship, so they're left out.
+ */
+export async function shipsFromOf(db: Db, by: { productIds: string[] } | { orderId: string }): Promise<(string | null)[]> {
+  const p = schema.products;
+  const rows =
+    "orderId" in by
+      ? await db
+          .select({ shipsFrom: p.shipsFrom, giftCard: p.giftCard, digital: p.digital })
+          .from(schema.orderLines)
+          .innerJoin(schema.variants, eq(schema.variants.id, schema.orderLines.variantId))
+          .innerJoin(p, eq(p.id, schema.variants.productId))
+          .where(eq(schema.orderLines.orderId, by.orderId))
+      : by.productIds.length
+        ? await db.query.products.findMany({ where: inArray(p.id, by.productIds), columns: { shipsFrom: true, giftCard: true, digital: true } })
+        : [];
+  return rows.filter((r) => !r.giftCard && !r.digital).map((r) => r.shipsFrom);
 }

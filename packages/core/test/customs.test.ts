@@ -8,11 +8,11 @@ describe("customs", () => {
   it("keeps a product's HS code as digits and its origin as a country code", async () => {
     const f = await makeFixture(new DemoModel());
     const shopId = (await f.shop()).id;
-    expect(await setCustomsInfo(f.db, shopId, f.products.lamp.id, { hsCode: " 9405.40 ", originCountry: "cn" })).toEqual({ hsCode: "940540", originCountry: "CN" });
+    expect(await setCustomsInfo(f.db, shopId, f.products.lamp.id, { hsCode: " 9405.40 ", originCountry: "cn" })).toEqual({ hsCode: "940540", originCountry: "CN", shipsFrom: null });
     await expect(setCustomsInfo(f.db, shopId, f.products.lamp.id, { hsCode: "94-05" })).rejects.toThrow("6 to 10 digits");
     await expect(setCustomsInfo(f.db, shopId, f.products.lamp.id, { originCountry: "China" })).rejects.toThrow("two-letter code");
     await expect(setCustomsInfo(f.db, shopId, f.products.lamp.id, { originCountry: "ZZ" })).rejects.toThrow("two-letter code");
-    expect(await setCustomsInfo(f.db, shopId, f.products.lamp.id, { hsCode: "", originCountry: "" })).toEqual({ hsCode: null, originCountry: null });
+    expect(await setCustomsInfo(f.db, shopId, f.products.lamp.id, { hsCode: "", originCountry: "" })).toEqual({ hsCode: null, originCountry: null, shipsFrom: null });
     expect([countryCode("de"), countryCode("XX"), countryCode("")]).toEqual(["DE", null, null]);
   });
 

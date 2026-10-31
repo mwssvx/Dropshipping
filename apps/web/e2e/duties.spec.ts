@@ -17,6 +17,7 @@ test("buyers abroad are told who pays import duties", async ({ page, browser }, 
   await page.getByRole("button", { name: "Import and publish" }).click();
   await expect(page.getByText("Imported and live on your store.")).toBeVisible();
   const store = (await page.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!;
+  const productAdmin = page.url();
 
   await page.goto("/admin/taxes");
   const duties = page.getByRole("region", { name: "Import duties" });
@@ -58,4 +59,22 @@ test("buyers abroad are told who pays import duties", async ({ page, browser }, 
   await home.goto(store);
   await expect(home.locator("#shipping-cost")).toBeVisible();
   await expect(home.locator("#duties-line")).toHaveCount(0);
+  await expect(home.locator("#ships-from")).toHaveCount(0);
+
+  // Shipped from a warehouse in China, buyers at home pay duties too.
+  await page.goto(productAdmin);
+  const customs = page.getByRole("region", { name: "Customs" });
+  await customs.getByLabel("Ships from (country code)").fill("XX");
+  await customs.getByRole("button", { name: "Save customs info" }).click();
+  await expect(customs.getByRole("alert")).toContainText("Enter the country it ships from as a two-letter code");
+  await customs.getByLabel("Ships from (country code)").fill("cn");
+  await customs.getByRole("button", { name: "Save customs info" }).click();
+  await expect(customs.getByRole("status")).toHaveText("Saved. Customs forms and duty notes for this product now use it.");
+  await expect(customs.getByRole("note")).toHaveText("Ships from China.");
+  await home.reload();
+  await expect(home.locator("#ships-from")).toHaveText("Ships from China");
+  await expect(home.locator("#duties-line")).toHaveText("Import duties and taxes for United States may be charged on delivery.");
+  await buyer.reload();
+  await buyer.getByLabel("Country").selectOption("US");
+  await expect(buyer.locator("#duties-note")).toHaveText("Customs in United States may charge import duties or taxes when it arrives. They're paid to the courier and aren't part of this total.");
 });

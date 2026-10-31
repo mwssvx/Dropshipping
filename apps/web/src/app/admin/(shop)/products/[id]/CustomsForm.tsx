@@ -4,7 +4,7 @@ import { FormError } from "@/components/FormError";
 import { customsAction, type CustomsState } from "../../../customs-actions";
 
 /** The HS code and country of origin printed on customs forms. */
-export function CustomsForm({ productId, hsCode, originCountry }: { productId: string; hsCode: string | null; originCountry: string | null }) {
+export function CustomsForm({ productId, hsCode, originCountry, shipsFrom, home }: { productId: string; hsCode: string | null; originCountry: string | null; shipsFrom: string | null; home: string }) {
   const [state, action, pending] = useActionState(customsAction.bind(null, productId), {} as CustomsState);
   return (
     // Submitted by hand so React doesn't reset the fields after an error.
@@ -18,7 +18,7 @@ export function CustomsForm({ productId, hsCode, originCountry }: { productId: s
     >
       <FormError message={state.error} />
       {state.saved && !pending && !state.error && (
-        <p className="banner banner-success" role="status">Saved. Customs forms for this product now use it.</p>
+        <p className="banner banner-success" role="status">Saved. Customs forms and duty notes for this product now use it.</p>
       )}
       <div className="flex flex-wrap gap-3 items-end">
         <div className="field w-48">
@@ -29,7 +29,12 @@ export function CustomsForm({ productId, hsCode, originCountry }: { productId: s
           <label className="label" htmlFor="customs-origin">Made in (country code)</label>
           <input className="input uppercase" id="customs-origin" name="originCountry" maxLength={2} placeholder="CN" defaultValue={originCountry ?? ""} />
         </div>
+        <div className="field w-48">
+          <label className="label" htmlFor="customs-ships-from">Ships from (country code)</label>
+          <input className="input uppercase" id="customs-ships-from" name="shipsFrom" maxLength={2} placeholder={home} defaultValue={shipsFrom ?? ""} aria-describedby="customs-ships-from-hint" />
+        </div>
       </div>
+      <p className="hint text-sm" id="customs-ships-from-hint">Leave Ships from empty when it leaves from {home}, your store&apos;s country.</p>
       <div>
         <button type="submit" className="btn btn-primary" disabled={pending} aria-busy={pending}>{pending ? "Saving…" : "Save customs info"}</button>
       </div>

@@ -1,0 +1,1 @@
+ALTER TABLE "products" ADD COLUMN "ships_from" text;

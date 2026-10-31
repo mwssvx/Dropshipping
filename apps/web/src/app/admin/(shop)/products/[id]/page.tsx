@@ -425,15 +425,15 @@ export default async function EditProductPage({ params, searchParams }: { params
               <h2 id="customs-heading" className="font-semibold">Customs</h2>
               <p className="hint">
                 Printed on the customs form of orders going to another country. The HS code is the tariff number for what this is (look it
-                up in your carrier's or country's tariff finder). The country is where it was made, not where it ships from.
+                up in your carrier's or country's tariff finder). Made in is where it was made. Ships from is where the parcel leaves from, when a supplier sends it from a warehouse in another country: buyers see it on the product page, and the import duties note follows it.
               </p>
             </div>
-            {(product.hsCode || product.originCountry) && (
+            {(product.hsCode || product.originCountry || product.shipsFrom) && (
               <p className="text-sm" role="note">
-                {[product.hsCode && `HS code ${product.hsCode}`, product.originCountry && `made in ${countryName(product.originCountry)}`].filter(Boolean).join(", ")}.
+                {[product.hsCode && `HS code ${product.hsCode}`, product.originCountry && `made in ${countryName(product.originCountry)}`, product.shipsFrom && `ships from ${countryName(product.shipsFrom)}`].filter(Boolean).join(", ").replace(/^./, (c) => c.toUpperCase())}.
               </p>
             )}
-            <CustomsForm productId={product.id} hsCode={product.hsCode} originCountry={product.originCountry} />
+            <CustomsForm productId={product.id} hsCode={product.hsCode} originCountry={product.originCountry} shipsFrom={product.shipsFrom} home={shop.country} />
           </section>
         )}
         {!product.giftCard && (
