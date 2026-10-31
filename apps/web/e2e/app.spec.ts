@@ -1943,3 +1943,41 @@ test("one-time codes made in the app, used once, then turned off", async ({ page
   await expect(page.getByText("Parcel cards codes are off. Codes already used stay used.")).toBeVisible();
   await expect(again).toContainText("Off");
 });
+
+test("shipping paused from the app, shown on the store, then ended", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `sp${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Paper Lantern");
+  await web.getByLabel("Price", { exact: true }).fill("25.00");
+  await web.getByLabel("Stock", { exact: true }).fill("9");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const lantern = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+
+  await signIn(page, email);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("link", { name: /^Shipping pause/ }).click();
+  await expect(page.getByRole("heading", { name: "Shipping pause", level: 1 })).toBeVisible();
+  await page.getByRole("switch", { name: "Pause shipping" }).click();
+  const resumes = new Date(Date.now() + 10 * 86_400_000);
+  await page.getByRole("textbox", { name: "Ships again on" }).fill(resumes.toISOString().slice(0, 10));
+  await page.getByRole("textbox", { name: "Message for buyers (optional)" }).fill("Our supplier is closed for New Year.");
+  await page.getByRole("button", { name: "Save shipping pause" }).click();
+  await expect(page.getByText("Saved. Your store says when orders ship again, and delivery dates move to match.")).toBeVisible();
+  const short = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }).format(resumes);
+  await expect(page.getByText(`Paused until ${short}`)).toBeVisible();
+  await shot(page, "381-app-ship-pause");
+
+  const buyer = await (await browser.newContext()).newPage();
+  await buyer.goto(lantern);
+  const long = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", timeZone: "UTC" }).format(resumes);
+  await expect(buyer.locator("#ship-pause")).toHaveText(`Shipping is paused for a few days. Orders placed now ship from ${long}, and delivery dates count from then.`);
+  await expect(buyer.getByText("Our supplier is closed for New Year.")).toBeVisible();
+
+  await page.getByRole("switch", { name: "Pause shipping" }).click();
+  await page.getByRole("button", { name: "Save shipping pause" }).click();
+  await expect(page.getByText("Shipping pause ended. Delivery dates are back to normal.")).toBeVisible();
+  await buyer.reload();
+  await expect(buyer.getByRole("heading", { name: "Paper Lantern" })).toBeVisible();
+  await expect(buyer.locator("#ship-pause")).toHaveCount(0);
+});
