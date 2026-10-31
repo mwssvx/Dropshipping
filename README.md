@@ -1659,3 +1659,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Parcels that should have arrived** (`ordersPastDelivery` in `packages/core/src/past-delivery.ts`): the Orders page lists shipped orders whose delivery window ended at least a day ago and that aren't marked delivered, most late first, with the day each was due, how late it is, where it's going and its tracking link. "Email these buyers" opens the bulk update for all of them, so a merchant can say what's happening before the "where is my order?" emails and disputes start.
 2. It counts the window buyers see on their order page (from the latest shipment, with the supplier's and the rate's days), even when the store doesn't show dates to buyers. Pickups, local deliveries, refunded orders and orders paid over 120 days ago are left out, and the check reads every candidate order in four queries. No migration.
+
+### Still on its way (after launch, part 297)
+
+1. **An email for late parcels** (`sendLateOrderEmails` in `packages/core/src/late-orders.ts`): the running late email on the Shipping page gains "Also when a shipped parcel is past its delivery date". With it ticked, a buyer whose parcel is a day past the last day of its window (the same count as "Past their delivery date" on the Orders page) gets one "still on its way" email with the tracking link and the store's own words, which heads off most "where is my order?" emails and disputes.
+2. It runs in the same job as the running late email, shows on the order's timeline as "Still on its way", and leaves parcels more than two weeks past their date alone, so turning it on doesn't email old orders. It's kept in the store file. No migration.

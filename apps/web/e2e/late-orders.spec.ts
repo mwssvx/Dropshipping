@@ -21,7 +21,15 @@ test("turn on the running late email for buyers", async ({ page }, info) => {
   await page.getByRole("button", { name: "Save running late email" }).click();
   await expect(page.getByRole("status")).toHaveText("Saved. Buyers hear from you when their order hasn't shipped 5 days after paying.");
 
+  // Shipped parcels that are late too.
+  const transit = page.getByLabel("Also when a shipped parcel is past its delivery date");
+  await expect(transit).not.toBeChecked();
+  await transit.check();
+  await page.getByRole("button", { name: "Save running late email" }).click();
+  await expect(page.getByRole("status")).toHaveText("Saved. Buyers hear from you when their order hasn't shipped 5 days after paying, and when a shipped parcel is past its delivery date.");
+
   await page.reload();
+  await expect(page.getByLabel("Also when a shipped parcel is past its delivery date")).toBeChecked();
   await expect(page.getByLabel("Email buyers when their order is running late")).toBeChecked();
   await expect(page.getByLabel("When it hasn't shipped after")).toHaveValue("5");
   await expect(page.getByLabel("Add a few words (optional)")).toHaveValue("Our supplier is very busy before the holidays.");

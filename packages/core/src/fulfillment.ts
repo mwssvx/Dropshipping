@@ -483,6 +483,7 @@ export const ORDER_EMAIL_LABELS: Record<EmailKind, string> = {
   order_late: "Running late",
   handover_reminder: "Pickup or delivery reminder (the day before)",
   handover_moved: "New pickup or delivery day",
+  order_transit_late: "Still on its way",
 };
 
 async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kind: EmailKind, ref: string) {
