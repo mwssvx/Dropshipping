@@ -38,6 +38,43 @@ export async function reviewableItems(db: Db, shopId: string, paymentIntentId: s
   return unique.map((u) => ({ ...u, review: existing.find((r) => r.productId === u.productId) ?? null }));
 }
 
+/**
+ * For a buyer's account page: the products on each of these orders still waiting for a review, the
+ * same ones the order page asks about (shipped orders, not replacements, one per product), in two
+ * queries for the whole list.
+ */
+export async function awaitingReview(db: Db, shopId: string, orderIds: string[]): Promise<Map<string, { productId: string; title: string }[]>> {
+  const result = new Map<string, { productId: string; title: string }[]>();
+  if (!orderIds.length) return result;
+  const lines = await db
+    .selectDistinct({ orderId: schema.orders.id, productId: schema.products.id, title: schema.products.title })
+    .from(schema.orderLines)
+    .innerJoin(schema.orders, eq(schema.orders.id, schema.orderLines.orderId))
+    .innerJoin(schema.variants, eq(schema.variants.id, schema.orderLines.variantId))
+    .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
+    .where(
+      and(
+        eq(schema.orders.shopId, shopId),
+        inArray(schema.orders.id, orderIds),
+        inArray(schema.orders.fulfillmentStatus, [...REVIEWABLE]),
+        sql`${schema.orders.source} is distinct from 'replacement'`,
+        sql`${schema.orders.paymentStatus} <> 'refunded'`,
+      ),
+    );
+  if (!lines.length) return result;
+  const done = await db
+    .select({ orderId: schema.reviews.orderId, productId: schema.reviews.productId })
+    .from(schema.reviews)
+    .where(and(eq(schema.reviews.shopId, shopId), inArray(schema.reviews.orderId, [...new Set(lines.map((l) => l.orderId))])));
+  const reviewed = new Set(done.map((d) => `${d.orderId}:${d.productId}`));
+  for (const l of lines) {
+    if (reviewed.has(`${l.orderId}:${l.productId}`)) continue;
+    result.set(l.orderId, [...(result.get(l.orderId) ?? []), { productId: l.productId, title: l.title }]);
+  }
+  for (const items of result.values()) items.sort((a, b) => a.title.localeCompare(b.title));
+  return result;
+}
+
 const reviewInput = z.object({
   productId: z.string().uuid(),
   rating: z.number().int().min(1, "Pick 1 to 5 stars.").max(5, "Pick 1 to 5 stars."),

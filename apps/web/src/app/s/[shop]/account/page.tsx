@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { buyerOrders, formatBirthday, formatDeliveryDate, intervalLabel, subscriptionsForEmail, describeReferralProgram, describeRewards, formatMoney, myReferrals, referralCodeFor, REWARD_STEP, rewardsFor } from "@sf/core";
+import { awaitingReview, buyerOrders, formatBirthday, formatDeliveryDate, intervalLabel, subscriptionsForEmail, describeReferralProgram, describeRewards, formatMoney, myReferrals, referralCodeFor, REWARD_STEP, rewardsFor } from "@sf/core";
 import { ReferralCard } from "@/components/ReferralCard";
 import { currentBuyer } from "@/lib/buyer";
 import { db, storeAddress } from "@/lib/server";
@@ -43,6 +43,9 @@ export default async function AccountPage({ params }: { params: Promise<{ shop: 
 
   const orders = await buyerOrders(await db(), shop.id, buyer.email);
   const subs = (await subscriptionsForEmail(await db(), shop.id, buyer.email)).filter((s) => s.status !== "cancelled");
+  // Things they bought that have arrived (or are on their way) and they haven't reviewed yet.
+  const toReview = await awaitingReview(await db(), shop.id, orders.map((o) => o.id));
+  const reviewList = orders.flatMap((o) => (toReview.get(o.id) ?? []).map((item) => ({ ...item, order: o })));
   const rewards = shop.rewardsEnabled ? await rewardsFor(await db(), shop, buyer.email) : null;
   const referCode = shop.referralProgram && orders.length ? await referralCodeFor(await db(), shop, buyer.id) : null;
   const referred = referCode ? await myReferrals(await db(), shop.id, buyer.id) : null;
@@ -62,6 +65,24 @@ export default async function AccountPage({ params }: { params: Promise<{ shop: 
         <span>{buyer.acceptsMarketing ? `You get news and offers from ${shop.name} by email.` : `You don't get marketing emails from ${shop.name}.`}</span>
         <button className="btn btn-secondary">{buyer.acceptsMarketing ? "Stop news and offers" : "Send me news and offers"}</button>
       </form>
+      {reviewList.length > 0 && (
+        <section aria-labelledby="to-review-heading" className="card p-5 flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <h2 id="to-review-heading" className="font-semibold">Waiting for your review</h2>
+            <p className="hint text-sm">Tell other shoppers what you thought. It only takes a minute.</p>
+          </div>
+          <ul className="flex flex-col divide-y divide-border">
+            {reviewList.slice(0, 10).map(({ productId, title, order }) => (
+              <li key={`${order.id}:${productId}`} className="flex flex-wrap items-center justify-between gap-2 py-2 first:pt-0 last:pb-0">
+                <span className="text-sm">
+                  {title} <span className="hint num">· order #{order.number}</span>
+                </span>
+                <Link href={`${base}/orders/${order.ref}#review`} className="btn btn-secondary" aria-label={`Review ${title}`}>Write a review</Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {shop.birthdayOffer && (
         <section aria-labelledby="birthday-heading" className="card p-5 flex flex-col gap-3">
           <h2 id="birthday-heading" className="font-semibold">Your birthday</h2>
