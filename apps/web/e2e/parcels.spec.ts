@@ -63,6 +63,9 @@ test("buyers know their order comes in two parcels", async ({ page, browser }, i
     await expect(parcels).toBeVisible({ timeout: 1000 });
   }).toPass({ timeout: 20_000 });
   await expect(parcels.getByRole("listitem")).toHaveCount(2);
+  // The supplier's parcel has its own dates; the candle has none, since nothing says how long it takes.
+  await expect(parcels.getByRole("listitem").filter({ hasText: "Sunset Projection Lamp" })).toContainText(/Expected delivery: [A-Z][a-z]{2} \d{1,2}/);
+  await expect(parcels.getByRole("listitem").filter({ hasText: "Beeswax Candle" })).not.toContainText("Expected delivery");
   await expect(parcels.getByRole("listitem").filter({ hasText: "Beeswax Candle" })).toContainText("Not shipped yet");
   await expect(parcels.getByRole("listitem").filter({ hasText: "Sunset Projection Lamp" })).toBeVisible();
   await shot(buyer, "316-parcels");

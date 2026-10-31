@@ -10,6 +10,7 @@ import { preorderDeadline } from "./preorders";
 import { nextCutoff, shipDay } from "./ship-cutoff";
 import { activeShipPause, shippingStart } from "./ship-pause";
 import { fitsWeight, listShippingZones, zoneFor, type Rate } from "./shipping";
+import type { Parcel } from "./parcels";
 
 type Shop = typeof schema.shops.$inferSelect;
 type Order = typeof schema.orders.$inferSelect;
@@ -222,6 +223,33 @@ export async function orderDelivery(db: Db, shop: Shop, order: Order, opts: { ev
   // A pre-order waiting for stock is counted from the date it's promised to ship by.
   if (order.preorderShipsBy && order.fulfillmentStatus === "unfulfilled") return deliveryWindow(order.preorderShipsBy, 0, transit.min, transit.max);
   return deliveryWindow(shippingStart(shop, order.paidAt), processingFor(shop, goods), transit.min, transit.max, shop.shipCutoff);
+}
+
+/**
+ * When each parcel of an order in several should arrive: counted from when it shipped once it has,
+ * else from payment with its own items' preparing and transit days, so the parcel from a warehouse
+ * nearby isn't given the far one's dates. Null for a parcel that's delivered or has no dates.
+ */
+export async function parcelDeliveries(db: Db, shop: Shop, order: Order, parcels: Parcel[], opts: { evenIfHidden?: boolean } = {}) {
+  const out = new Map<string, DeliveryWindow | null>();
+  if ((!shop.deliveryEstimates && !opts.evenIfHidden) || !order.paidAt || order.pickup || order.localDelivery || order.paymentStatus === "refunded" || parcels.length < 2) return out;
+  const ids = parcels.flatMap((p) => p.items.map((i) => i.variantId));
+  const rows = await db
+    .select({ id: schema.variants.id, shipDaysMin: schema.variants.shipDaysMin, shipDaysMax: schema.variants.shipDaysMax, processingDays: schema.products.processingDays })
+    .from(schema.variants)
+    .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
+    .where(inArray(schema.variants.id, ids));
+  const { rates } = await ratesFor(db, shop, order.shippingAddress.country);
+  const rate = rates.find((r) => r.name === order.shippingMethod) ?? cheapest(rates);
+  for (const p of parcels) {
+    const goods = rows.filter((r) => p.items.some((i) => i.variantId === r.id));
+    const transit = goods.length ? transitDays(goods, rate) : null;
+    const s = p.shipment;
+    if (!transit || s?.status === "delivered") out.set(p.key, null);
+    else if (s?.shippedAt && (s.status === "shipped" || s.trackingNumber)) out.set(p.key, deliveryWindow(s.shippedAt, 0, transit.min, transit.max));
+    else out.set(p.key, deliveryWindow(shippingStart(shop, order.paidAt), processingFor(shop, goods), transit.min, transit.max, shop.shipCutoff));
+  }
+  return out;
 }
 
 const short = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });

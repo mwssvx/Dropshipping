@@ -17,7 +17,7 @@ export const parcelCount = (products: { supplierId: string | null; giftCard?: bo
 
 export type Parcel = {
   key: string;
-  items: { title: string; quantity: number }[];
+  items: { title: string; quantity: number; variantId: string }[];
   /** The parcel once the supplier or the merchant has it, with its tracking when shipped. */
   shipment: Pick<Fulfillment, "id" | "status" | "carrier" | "trackingNumber" | "trackingUrl" | "shippedAt" | "deliveredAt" | "createdAt"> | null;
 };
@@ -43,7 +43,7 @@ export async function orderParcels(
     if (!row || row.giftCard || row.digital) continue;
     const key = parcelKey(row);
     const group = groups.get(key) ?? { key, items: [], shipment: null };
-    group.items.push({ title: line.title, quantity: line.quantity });
+    group.items.push({ title: line.title, quantity: line.quantity, variantId: row.variantId });
     groups.set(key, group);
   }
   if (groups.size < 2) return [];
@@ -72,7 +72,7 @@ const listItems = (p: Parcel) => p.items.map((i) => `  ${i.title}${i.quantity > 
  * The shipping email for one parcel of an order that comes in several: what's in it, its tracking,
  * and what comes separately, so a buyer with half an order knows the rest isn't lost.
  */
-export function parcelShippedEmail(input: { first: string; shopName: string; orderNumber: number; link: string; parcels: Parcel[]; index: number }) {
+export function parcelShippedEmail(input: { first: string; shopName: string; orderNumber: number; link: string; parcels: Parcel[]; index: number; /** "Nov 4 – Nov 7", when the store shows dates. */ arrives?: string | null }) {
   const { first, shopName, orderNumber, link, index } = input;
   const parcels = byShipping(input.parcels);
   const p = parcels[index]!;
@@ -89,6 +89,7 @@ export function parcelShippedEmail(input: { first: string; shopName: string; ord
       ...listItems(p),
       ``,
       `Track it: ${s.carrier}: ${s.trackingNumber}${s.trackingUrl ? `  ${s.trackingUrl}` : ""}`,
+      ...(input.arrives ? [`Expected delivery: ${input.arrives}`] : []),
       ``,
       ...(waiting.length
         ? [`Still to come in ${waiting.length === 1 ? "a separate parcel" : "separate parcels"}:`, ...waiting.flatMap(listItems), ``, `We'll email you its tracking as soon as it ships.`]
