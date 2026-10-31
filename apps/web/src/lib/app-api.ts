@@ -47,6 +47,9 @@ import {
   moderateReview,
   notifyReviewReply,
   unfilledFields,
+  listCustomers,
+  getCustomerProfile,
+  updateCustomerNotes,
   productPhotos,
   sendPriceDrops,
   sendStockAlerts,
@@ -145,6 +148,18 @@ const productView = (p: ProductRow) => ({
   missing: missingDetails(p),
   hsCode: p.hsCode,
   originCountry: p.originCountry,
+});
+
+const customerView = (p: Awaited<ReturnType<typeof getCustomerProfile>>) => ({
+  id: p.customer.id,
+  name: p.customer.name,
+  email: p.customer.email,
+  note: p.customer.note,
+  tags: p.customer.tags,
+  stats: p.stats,
+  storeCreditMinor: p.storeCreditMinor,
+  // The latest 20 is plenty on a phone; the website has the rest.
+  orders: p.orders.slice(0, 20),
 });
 
 const isHeld = (o: OrderRow) => o.heldAt != null && ["paid", "partially_refunded"].includes(o.paymentStatus);
@@ -403,6 +418,23 @@ const routes: Record<string, Handler> = {
     return { ok: true, message: "Sent. We'll tell you when it's checked." };
   },
 
+  "GET customers": async ({ url, db, shop }) => {
+    const q = (url.searchParams.get("q") ?? "").slice(0, 100);
+    // The ones who bought most recently first; a search looks at names and emails.
+    const rows = await listCustomers(db, shop.id, { query: q || undefined, limit: 50 });
+    return {
+      customers: rows.map((c) => ({ id: c.id, name: c.name, email: c.email, orders: c.orders, spentMinor: c.spentMinor, lastOrderAt: c.lastOrderAt, tags: c.tags })),
+    };
+  },
+  "GET customers/:id": async ({ params, db, shop }) => customerView(await getCustomerProfile(db, shop.id, params.id!)),
+  "PATCH customers/:id": async ({ req, params, db, shop }) => {
+    const b = await body<{ note?: unknown; tags?: unknown }>(req);
+    await updateCustomerNotes(db, shop.id, params.id!, {
+      ...(typeof b.note === "string" ? { note: b.note } : {}),
+      ...(typeof b.tags === "string" ? { tags: b.tags } : {}),
+    });
+    return customerView(await getCustomerProfile(db, shop.id, params.id!));
+  },
   "GET reviews": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show");
     // Waiting for your OK, published with no reply yet, or the latest of all.
@@ -516,6 +548,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("assistant") || path.startsWith("actions")) return "assistant";
   if (path.startsWith("inbox")) return "inbox";
   if (path.startsWith("reviews")) return "reviews";
+  if (path.startsWith("customers")) return "customers";
   if (path === "today") return "home";
   return null;
 }

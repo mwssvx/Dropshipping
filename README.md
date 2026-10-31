@@ -1840,3 +1840,7 @@ The app's Orders tab has a "To post" list: paid orders with your own stock in th
 ### Reviews in the app (after launch, part 340)
 
 Today in the app now has a Reviews button for anyone whose role covers reviews. "To check" lists reviews waiting for your OK, with Publish and Hide; "No reply" lists live reviews you haven't answered; "All" shows the latest. Write a reply under any review and post it: it shows on your store, and a buyer who reviewed an order gets an email the first time.
+
+### Customers in the app (after launch, part 341)
+
+Today in the app now has a Customers button for roles that cover customers. It lists your latest buyers with their orders and what they've spent, and searches by name or email. A customer's screen shows their orders (each opens), what they've spent, their average order and store credit, and lets you change your team's note and tags about them.
