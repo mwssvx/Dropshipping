@@ -1446,3 +1446,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Show the difference** (`apps/web/src/theme/BeforeAfter.tsx`): a new home page section in the theme editor. Add a before photo and an after photo of the same thing, like a stain before and after your cleaner, with a heading and a few words, and shoppers drag the handle across to compare them.
 2. **Works for everyone**: underneath it's a plain slider, so keyboard users move it with the arrow keys and screen readers hear "Before 40%, After 60%"; a focus ring shows around the photos. The labels default to "Before" and "After" in the shopper's language, or say your own ("Day 1", "Day 30"). The section stays hidden until both photos are set, and the editor reminds you to use real photos only. Three new store strings in all six languages. No migration: it lives in the theme.
+
+### Email signup in the footer (after launch, part 254)
+
+1. **Ask on every page** (`apps/web/src/theme/FooterSignup.tsx`): tick "Ask for emails in the footer of every page" in the theme editor's Style tab and every store page's footer gets a short "Get news and offers by email" form, not just the home page.
+2. **Shoppers stay put**: signing up answers right there in the footer, so a shopper reading a product page never loses their place. It's the same confirm-by-email signup as the home page form and the pop-up, so nobody is added without confirming. The editor preview shows the form with its button greyed out. Off by default; one new store string in all six languages. No migration: it lives in the theme.

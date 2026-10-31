@@ -409,6 +409,10 @@ function StylePanel({ doc, onChange }: { doc: ThemeDoc; onChange: (d: ThemeDoc) 
           <input type="checkbox" className="mt-0.5" checked={s.backToTop} onChange={(e) => set({ backToTop: e.target.checked })} />
           <span>Show a “Back to top” button on long pages<span className="block hint">It appears in the corner once a shopper has scrolled two screens down.</span></span>
         </label>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-0.5" checked={s.footerSignup} onChange={(e) => set({ footerSignup: e.target.checked })} />
+          <span>Ask for emails in the footer of every page<span className="block hint">Shoppers sign up without leaving the page and confirm by email, like the home page signup.</span></span>
+        </label>
       </fieldset>
       <fieldset className="flex flex-col gap-2">
         <legend className="font-semibold mb-1">Corners</legend>
