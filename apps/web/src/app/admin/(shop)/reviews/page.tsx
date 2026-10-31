@@ -82,7 +82,7 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
         </form>
         <section className="card p-4 flex flex-col gap-2" aria-labelledby="requests-heading">
           <h2 id="requests-heading" className="font-semibold">Review requests</h2>
-          <ReviewRequestForm days={shop.reviewRequestDays} />
+          <ReviewRequestForm days={shop.reviewRequestDays} reminder={shop.reviewReminder} />
           {requests.sent > 0 && (
             <p className="hint text-sm">
               Last 30 days: {requests.sent} sent, and {requests.reviewed} of those orders got a review.

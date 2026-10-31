@@ -1587,3 +1587,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **A thank-you for every review** (`packages/core/src/review-rewards.ts`, Reviews → Thank-you code): a store can email buyers 5% to 30% off their next order once they review something they bought, whatever the stars, once per order. The code is one-time, works only with their email, and lasts 60 days. Shopify stores get this from a reviews app.
 2. **Said out loud**: the review request email and the order page tell buyers about it ("Leave a review, good or bad…"), and those reviews show "Got a thank-you code for reviewing" on the store in every store language, because the FTC and Google ask for paid-for reviews to say so. Reviews brought over from another platform never get one.
 3. **What it brought**: the card shows codes sent, used and the sales they made. The setting goes along in the store file. Migration `0153_review_rewards`.
+
+### Review reminders (after launch, part 282)
+
+1. **One more ask** (`sendReviewReminders` in `packages/core/src/review-requests.ts`): under Review requests, "Send one reminder a week later to buyers who haven't reviewed yet". A week after the request, a buyer who hasn't reviewed anything from that order gets "Still time to review the …", with the same star links, saying it's the last time they'll be asked. Most review apps send this second email; it roughly doubles how many buyers answer.
+2. **Never pushy**: once per order, not after a review from the order, not to buyers who unsubscribed, and only for requests from the last two weeks, so turning it on doesn't email old buyers. It runs with the review requests, so no new scheduled job. The setting goes along in the store file. Migration `0154_review_reminders`.

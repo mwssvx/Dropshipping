@@ -1,7 +1,7 @@
 // Review requests: a few days after an order arrives, the buyer gets one email asking how it was,
 // with a link to the review form on their order page. Once per order, never for gifts (the buyer
 // didn't receive it) or free replacements, and never to buyers who unsubscribed from the store.
-import { and, count, eq, gte, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, count, eq, gte, inArray, isNull, lte, ne, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { UserError } from "./errors";
 import type { FulfillmentContext } from "./fulfillment";
@@ -12,9 +12,9 @@ const DAY = 86_400_000;
 const LOOKBACK_DAYS = 30;
 const BATCH = 200;
 
-export async function setReviewRequestDays(db: Db, shopId: string, days: number) {
+export async function setReviewRequestDays(db: Db, shopId: string, days: number, reminder?: boolean) {
   if (!Number.isInteger(days) || days < 0 || days > 30) throw new UserError("Pick 1 to 30 days, or 0 to turn it off.");
-  await db.update(schema.shops).set({ reviewRequestDays: days, updatedAt: new Date() }).where(eq(schema.shops.id, shopId));
+  await db.update(schema.shops).set({ reviewRequestDays: days, ...(reminder === undefined ? {} : { reviewReminder: reminder && days > 0 }), updatedAt: new Date() }).where(eq(schema.shops.id, shopId));
 }
 
 const firstName = (name: string | null | undefined) => name?.trim().split(/\s+/)[0] || "there";
@@ -54,38 +54,95 @@ export async function sendReviewRequests(ctx: FulfillmentContext, scope: { shopI
     if (customer?.unsubscribedAt) continue;
     const items = (await reviewableItems(db, shop.id, order.paymentIntentId)).filter((i) => !i.review);
     if (!items.length) continue;
-    const page = await ctx.orderStatusUrl(shop, order);
-    const link = `${page}#review`;
-    // With one product, a tap on a rating opens the form with those stars already picked.
-    const rate = (n: number) => {
-      const url = new URL(page);
-      url.searchParams.set("rate", String(n));
-      return `${url}#review`;
-    };
-    const what = items.length === 1 ? items[0]!.title : `your order #${order.number}`;
-    const base = ctx.storeAddress ? await ctx.storeAddress(shop) : new URL(link).origin;
-    const unsubscribe = customer ? `${base}/unsubscribe/${customer.emailToken}` : null;
-    await ctx.mailer.send({
-      to: order.email,
-      subject: `How was ${what}?`,
-      text: [
-        `Hi ${firstName(order.shippingAddress?.name)},`,
-        ``,
-        `Your order from ${shop.name} arrived a few days ago. How was it? A quick review, with a photo if you like, helps other buyers and means a lot to us.`,
-        ``,
-        ...(shop.reviewRewardPercent ? [`As a thank you, we'll email you ${shop.reviewRewardPercent}% off your next order once you've left one, whatever you think of it.`, ``] : []),
-        ...(items.length === 1
-          ? [`Tap a rating to start:`, ...[5, 4, 3, 2, 1].map((n) => `${"★".repeat(n)}${"☆".repeat(5 - n)}  ${rate(n)}`)]
-          : [...items.slice(0, 5).map((i) => `- ${i.title}`), ``, `Leave a review: ${link}`]),
-        ``,
-        `Something wrong with it? Reply from your order page and we'll sort it out.`,
-        ...(unsubscribe ? [``, "—", `${shop.name}. One email per order. Don't want these? Unsubscribe: ${unsubscribe}`] : []),
-      ].join("\n"),
-      ...(unsubscribe ? { headers: { "List-Unsubscribe": `<${unsubscribe}/one-click>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" } } : {}),
-    });
+    await sendRequestEmail(ctx, shop, order as typeof order & { email: string }, customer, items, false);
     sent++;
   }
-  return { sent };
+  return { sent, reminders: await sendReviewReminders(ctx, now, scope) };
+}
+
+/** The reminder goes this long after the request, and only for requests up to a week older. */
+export const REVIEW_REMINDER_DAYS = 7;
+
+/**
+ * One reminder for review requests sent a week ago, when the store has it on and the buyer hasn't
+ * reviewed anything from the order. Never twice, and never after they unsubscribed.
+ */
+async function sendReviewReminders(ctx: FulfillmentContext, now: Date, scope: { shopId?: string; limit?: number }) {
+  const { db } = ctx;
+  const o = schema.orders;
+  const due = await db
+    .select({ order: o, shop: schema.shops })
+    .from(o)
+    .innerJoin(schema.shops, eq(schema.shops.id, o.shopId))
+    .where(
+      and(
+        scope.shopId ? eq(o.shopId, scope.shopId) : undefined,
+        eq(schema.shops.status, "active"),
+        eq(schema.shops.reviewReminder, true),
+        sql`${schema.shops.reviewRequestDays} > 0`,
+        isNull(o.reviewRemindedAt),
+        lte(o.reviewRequestedAt, new Date(now.getTime() - REVIEW_REMINDER_DAYS * DAY)),
+        gte(o.reviewRequestedAt, new Date(now.getTime() - 2 * REVIEW_REMINDER_DAYS * DAY)),
+        inArray(o.paymentStatus, ["paid", "partially_refunded"]),
+        sql`not exists (select 1 from ${schema.reviews} r where r.order_id = ${o.id})`,
+      ),
+    )
+    .orderBy(o.createdAt)
+    .limit(scope.limit ?? BATCH);
+  let sent = 0;
+  for (const { order, shop } of due) {
+    const [claimed] = await db.update(o).set({ reviewRemindedAt: now }).where(and(eq(o.id, order.id), isNull(o.reviewRemindedAt))).returning({ id: o.id });
+    if (!claimed || !order.email || !order.paymentIntentId) continue;
+    const customer = await db.query.customers.findFirst({ where: and(eq(schema.customers.shopId, shop.id), eq(schema.customers.email, order.email)) });
+    if (customer?.unsubscribedAt) continue;
+    const items = (await reviewableItems(db, shop.id, order.paymentIntentId)).filter((i) => !i.review);
+    if (!items.length) continue;
+    await sendRequestEmail(ctx, shop, order as typeof order & { email: string }, customer, items, true);
+    sent++;
+  }
+  return sent;
+}
+
+/** The review request, or its one reminder a week later. */
+async function sendRequestEmail(
+  ctx: FulfillmentContext,
+  shop: typeof schema.shops.$inferSelect,
+  order: typeof schema.orders.$inferSelect & { email: string },
+  customer: typeof schema.customers.$inferSelect | undefined,
+  items: { title: string }[],
+  reminder: boolean,
+) {
+  const page = await ctx.orderStatusUrl(shop, order);
+  const link = `${page}#review`;
+  // With one product, a tap on a rating opens the form with those stars already picked.
+  const rate = (n: number) => {
+    const url = new URL(page);
+    url.searchParams.set("rate", String(n));
+    return `${url}#review`;
+  };
+  const what = items.length === 1 ? items[0]!.title : `your order #${order.number}`;
+  const base = ctx.storeAddress ? await ctx.storeAddress(shop) : new URL(link).origin;
+  const unsubscribe = customer ? `${base}/unsubscribe/${customer.emailToken}` : null;
+  await ctx.mailer.send({
+    to: order.email,
+    subject: reminder ? `Still time to review ${what}` : `How was ${what}?`,
+    text: [
+      `Hi ${firstName(order.shippingAddress?.name)},`,
+      ``,
+      reminder
+        ? `We asked last week how your order from ${shop.name} was. If you have a minute, a quick review (good or bad) helps other buyers decide. This is the last we'll ask about it.`
+        : `Your order from ${shop.name} arrived a few days ago. How was it? A quick review, with a photo if you like, helps other buyers and means a lot to us.`,
+      ``,
+      ...(shop.reviewRewardPercent ? [`As a thank you, we'll email you ${shop.reviewRewardPercent}% off your next order once you've left one, whatever you think of it.`, ``] : []),
+      ...(items.length === 1
+        ? [`Tap a rating to start:`, ...[5, 4, 3, 2, 1].map((n) => `${"★".repeat(n)}${"☆".repeat(5 - n)}  ${rate(n)}`)]
+        : [...items.slice(0, 5).map((i) => `- ${i.title}`), ``, `Leave a review: ${link}`]),
+      ``,
+      `Something wrong with it? Reply from your order page and we'll sort it out.`,
+      ...(unsubscribe ? [``, "—", `${shop.name}. ${shop.reviewReminder ? "Two emails per order at most" : "One email per order"}. Don't want these? Unsubscribe: ${unsubscribe}`] : []),
+    ].join("\n"),
+    ...(unsubscribe ? { headers: { "List-Unsubscribe": `<${unsubscribe}/one-click>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" } } : {}),
+  });
 }
 
 /** For the Reviews page: requests sent in the last 30 days, and how many of those orders have a review. */
