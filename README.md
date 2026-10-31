@@ -1374,3 +1374,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **The cover image on the collection's page**: a collection with a cover image now shows it behind its title and description at the top of its page, darkened at the bottom so the words stay readable, with corners that follow the theme. Before, the cover image only showed on collection tiles.
 2. **Easy to turn off**: theme editor → Style → "Show a collection's photo behind its title". Collections without a cover image show just the title, as before.
+
+### Collections and pages in search (after launch, part 241)
+
+1. **Search finds more than products** (`packages/core/src/search-pages.ts`): searching the store also lists up to four collections and four pages or blog posts with every typed word in their title, above the products, so "shipping" leads to the Shipping page and "desk lamp" to the Desk lamps collection. Unpublished pages and draft posts stay out.
+2. **As the buyer types**: the suggestions under the search box add the best two collections and pages after the products, each marked Collection, Page or Article, and the arrow keys reach them too.
+3. **In the buyer's language**: titles match in the store's own words and the buyer's translation, and show in the buyer's language. The merchant's search fixes apply, as they do for products.

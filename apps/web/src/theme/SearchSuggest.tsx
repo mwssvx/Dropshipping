@@ -3,9 +3,10 @@
 import { useEffect, useId, useRef, useState } from "react";
 
 type Suggestion = { title: string; url: string; imageUrl: string | null; price: string; compareAt: string | null; soldOut: boolean };
+type Found = { kind: "collection" | "page" | "post"; title: string; url: string };
 
 /**
- * The search box, with products suggested as the buyer types. Without JavaScript it's a plain
+ * The search box, with products suggested as the buyer types, then collections, pages and posts. Without JavaScript it's a plain
  * search field in its form. Arrow keys move through the suggestions, Enter opens one (or runs the
  * search when none is picked), and Escape closes them.
  */
@@ -14,10 +15,11 @@ export function SearchSuggest({ suggestUrl, defaultValue, placeholder, autoFocus
   defaultValue: string;
   placeholder: string;
   autoFocus: boolean;
-  labels: { search: string; suggestions: string; soldOut: string; seeAll: string };
+  labels: { search: string; suggestions: string; soldOut: string; seeAll: string; kinds: Record<Found["kind"], string> };
 }) {
   const [value, setValue] = useState(defaultValue);
   const [items, setItems] = useState<Suggestion[]>([]);
+  const [links, setLinks] = useState<Found[]>([]);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const input = useRef<HTMLInputElement>(null);
@@ -28,6 +30,7 @@ export function SearchSuggest({ suggestUrl, defaultValue, placeholder, autoFocus
   useEffect(() => {
     if (q.length < 2) {
       setItems([]);
+      setLinks([]);
       return;
     }
     const abort = new AbortController();
@@ -35,8 +38,9 @@ export function SearchSuggest({ suggestUrl, defaultValue, placeholder, autoFocus
       try {
         const res = await fetch(`${suggestUrl}?${new URLSearchParams({ q })}`, { signal: abort.signal });
         if (!res.ok) return;
-        const body = (await res.json()) as { products: Suggestion[] };
+        const body = (await res.json()) as { products: Suggestion[]; links?: Found[] };
         setItems(body.products);
+        setLinks(body.links ?? []);
         setActive(-1);
       } catch {
         // A newer keystroke took over, or the network dropped: the plain search still works.
@@ -48,11 +52,12 @@ export function SearchSuggest({ suggestUrl, defaultValue, placeholder, autoFocus
     };
   }, [q, suggestUrl]);
 
-  const shown = open && q.length >= 2 && items.length > 0;
-  // The last row runs the full search.
-  const count = items.length + 1;
+  const shown = open && q.length >= 2 && items.length + links.length > 0;
+  // Products, then collections and pages; the last row runs the full search.
+  const rows = [...items.map((p) => p.url), ...links.map((l) => l.url)];
+  const count = rows.length + 1;
   const go = (i: number) => {
-    if (i < items.length) window.location.assign(items[i]!.url);
+    if (i < rows.length) window.location.assign(rows[i]!);
     else input.current?.form?.requestSubmit();
   };
 
@@ -120,8 +125,18 @@ export function SearchSuggest({ suggestUrl, defaultValue, placeholder, autoFocus
               </span>
             </li>
           ))}
-          <li id={`${id}-${items.length}`} role="option" aria-selected={active === items.length} onClick={() => go(items.length)} onMouseEnter={() => setActive(items.length)}
-            className={`px-2 py-2 rounded-md cursor-pointer text-sm font-medium text-accent ${active === items.length ? "bg-sunken" : ""}`}>
+          {links.map((l, k) => {
+            const i = items.length + k;
+            return (
+              <li key={l.url} id={`${id}-${i}`} role="option" aria-selected={active === i} onClick={() => go(i)} onMouseEnter={() => setActive(i)}
+                className={`flex items-center gap-3 px-2 py-2 rounded-md cursor-pointer ${active === i ? "bg-sunken" : ""}`}>
+                <span className="flex-1 min-w-0 truncate">{l.title}</span>
+                <span className="hint text-sm whitespace-nowrap">{labels.kinds[l.kind]}</span>
+              </li>
+            );
+          })}
+          <li id={`${id}-${rows.length}`} role="option" aria-selected={active === rows.length} onClick={() => go(rows.length)} onMouseEnter={() => setActive(rows.length)}
+            className={`px-2 py-2 rounded-md cursor-pointer text-sm font-medium text-accent ${active === rows.length ? "bg-sunken" : ""}`}>
             {labels.seeAll.split("%s").join(q)}
           </li>
         </ul>

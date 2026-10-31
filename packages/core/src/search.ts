@@ -58,6 +58,9 @@ const words = (q: string) =>
     .slice(0, 8)
     .map((w) => (w.length > 3 && w.endsWith("s") ? w.slice(0, -1) : w));
 
+/** Search text and words the way product search reads them, for searching other things alike. */
+export { plain as plainSearchText, words as searchWords };
+
 type Variant = ActiveProduct["variants"][number];
 const lowestPrice = (p: ActiveProduct) => Math.min(...p.variants.map((v) => v.priceMinor));
 const variantInStock = (v: Variant) => v.stock === null || v.stock > 0;

@@ -15,6 +15,7 @@ export * from "./themes";
 export * from "./collections";
 export * from "./collection-rules";
 export * from "./search";
+export * from "./search-pages";
 export * from "./search-terms";
 export * from "./lowest-price";
 export * from "./two-step";
