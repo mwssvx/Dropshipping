@@ -2052,3 +2052,7 @@ The app's Returns screen has a Holiday returns row. Keep returns open longer for
 ### Selling gift cards from the app (after launch, part 393)
 
 The app's Gift cards screen can put gift cards on sale: type the amounts (up to 8) and they go on the store, sent by email right after paying. Once they're on sale, the screen shows the amounts and opens the gift card's product. The holiday checklist's gift cards line opens it.
+
+### Delivery dates in the app (after launch, part 394)
+
+Settings in the app has a Delivery dates row under Shipping. Turn the arrival dates on product pages, the cart, checkout and receipts on or off, and set the days an order takes to get ready. The holiday checklist's delivery dates line opens it.
