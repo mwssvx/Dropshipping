@@ -82,7 +82,7 @@ test("sign in, then import a product, let AI write it and put it on sale in unde
 
   // Quick price edit.
   await page.getByRole("textbox", { name: "Price" }).fill("24.00");
-  await page.getByRole("button", { name: "Save price and stock" }).click();
+  await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Saved.", { exact: true })).toBeVisible();
   await page.goto("/products");
   await expect(page.getByRole("link", { name: /Magnetic Phone Stand/ })).toContainText("$24.00");
@@ -302,4 +302,27 @@ test("two orders to the same address say the store's items can share a box", asy
   await page.getByRole("tab", { name: "All" }).click();
   await page.getByRole("link", { name: "Order #1001" }).click();
   await expect(page.getByText("USPS 9400111899")).toBeVisible();
+});
+
+test("weight and cost of the store's own stock, set from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `wc${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Beeswax Candle");
+  await web.getByLabel("Price", { exact: true }).fill("12.00");
+  await web.getByLabel("Stock", { exact: true }).fill("6");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /Beeswax Candle/ }).click();
+  await page.getByRole("textbox", { name: "What it costs you" }).fill("4.50");
+  await expect(page.getByText("You keep $7.50 of each before fees.")).toBeVisible();
+  await page.getByRole("textbox", { name: "Weight packed (kg)" }).fill("0.3");
+  await shot(page, "334-app-weight-cost");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Saved.", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("textbox", { name: "What it costs you" })).toHaveValue("4.50");
+  await expect(page.getByRole("textbox", { name: "Weight packed (kg)" })).toHaveValue("0.3");
 });

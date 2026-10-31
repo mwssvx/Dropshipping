@@ -1812,3 +1812,7 @@ When you post your own items, the order page says what the box weighs packed ("W
 ### Post your own parcel from the app (after launch, part 333)
 
 The app's order screen now has "Post it yourself" (or "Your own parcel" when a supplier sends the rest) on orders with your own stock still to send. Tap "Add tracking", type the carrier and number, and the buyer gets their email. When other orders to the same address share the box, switch on "Order #1001 gets this tracking too" and they get the same tracking.
+
+### Weight and cost from the app (after launch, part 334)
+
+The app's product screen now has "Weight packed (kg)" for anything that ships, so shipping rates by weight and packing slips work for products added on the phone. Your own stock also gets "What it costs you", with what you keep of each before fees shown under it, so Money can count your profit. Supplier products keep the supplier's cost. The button is now "Save changes".

@@ -8,6 +8,8 @@ import {
   getPushSettings,
   LogPushSender,
   patchProduct,
+  createProduct,
+  createGiftCardProduct,
   registerDevice,
   saveMedia,
   getMedia,
@@ -136,6 +138,29 @@ describe("today and quick edits", () => {
     expect(p.variants[0]).toMatchObject({ priceMinor: 2599, stock: 12, costMinor: v!.costMinor });
     expect(p.title).toBe(f.products.stand.title);
     await expect(patchProduct(f.db, shop.id, f.products.stand.id, { variants: [{ id: v!.id, priceMinor: -1 }] })).rejects.toThrow(UserError);
+  });
+
+  it("sets the packed weight of anything that ships, and the cost of the store's own stock", async () => {
+    const f = await setup();
+    const shop = await f.shop();
+    const [stand] = await f.variants(f.products.stand.id);
+    // A supplier product: its weight can be set, its cost stays the supplier's.
+    const p = await patchProduct(f.db, shop.id, f.products.stand.id, { variants: [{ id: stand!.id, weightGrams: 180 }] });
+    expect(p.variants[0]).toMatchObject({ weightGrams: 180, costMinor: stand!.costMinor });
+    await expect(patchProduct(f.db, shop.id, f.products.stand.id, { variants: [{ id: stand!.id, costMinor: 100 }] })).rejects.toThrow("keep the supplier's cost");
+    await expect(patchProduct(f.db, shop.id, f.products.stand.id, { variants: [{ id: stand!.id, weightGrams: 0 }] })).rejects.toThrow("more than 0");
+    // The store's own candle: both, and either can be cleared.
+    const own = await createProduct(f.db, shop.id, { title: "Beeswax Candle", variants: [{ priceMinor: 1200, stock: 5 }] });
+    const [candle] = await f.variants(own.id);
+    const set = await patchProduct(f.db, shop.id, own.id, { variants: [{ id: candle!.id, weightGrams: 300, costMinor: 450 }] });
+    expect(set.variants[0]).toMatchObject({ weightGrams: 300, costMinor: 450, priceMinor: 1200, stock: 5 });
+    const cleared = await patchProduct(f.db, shop.id, own.id, { variants: [{ id: candle!.id, weightGrams: null, costMinor: null }] });
+    expect(cleared.variants[0]).toMatchObject({ weightGrams: null, costMinor: null });
+    // A gift card neither ships nor costs anything.
+    const card = await createGiftCardProduct(f.db, shop, [2500]);
+    const [gift] = await f.variants(card.id);
+    await expect(patchProduct(f.db, shop.id, card.id, { variants: [{ id: gift!.id, weightGrams: 10 }] })).rejects.toThrow("don't ship");
+    await expect(patchProduct(f.db, shop.id, card.id, { variants: [{ id: gift!.id, costMinor: 10 }] })).rejects.toThrow("Gift cards have no cost");
   });
 
   it("keeps only real photos up to 5 MB", async () => {

@@ -521,29 +521,47 @@ const patchInput = z.object({
         id: z.string().uuid(),
         priceMinor: z.number().int().min(0, "Price can't be negative.").optional(),
         stock: z.number().int().min(0, "Stock can't be negative.").nullish(),
+        weightGrams: z.number().int().min(1, "Leave the weight empty, or enter more than 0.").max(MAX_WEIGHT_GRAMS, "Keep the weight under 1,000 kg.").nullish(),
+        costMinor: z.number().int().min(0, "Cost can't be negative.").nullish(),
       }),
     )
     .optional(),
 });
 
-/** Quick edits from the phone: status, and price or stock per variant. Everything else stays. */
+/**
+ * Quick edits from the phone: status, and price, stock, packed weight or (for the store's own
+ * stock) cost per variant. Everything else stays.
+ */
 export async function patchProduct(db: Db, shopId: string, productId: string, input: z.input<typeof patchInput>) {
   const parsed = patchInput.safeParse(input);
   if (!parsed.success) throw new UserError(parsed.error.issues[0]!.message);
   const { status, variants } = parsed.data;
   const current = await getProduct(db, shopId, productId);
   if (status === "active" && current.variants.every((v) => v.priceMinor === 0)) throw new UserError("Set a price before making it active.");
+  if (variants?.some((v) => v.weightGrams !== undefined) && !shipsInParcel(current)) throw new UserError("Gift cards and downloads don't ship, so they have no weight.");
+  if (variants?.some((v) => v.costMinor !== undefined) && !isOwnStock(current))
+    throw new UserError(current.giftCard ? "Gift cards have no cost." : "Supplier products keep the supplier's cost.");
   await db.transaction(async (tx) => {
     await tx.update(schema.products).set({ ...(status ? { status } : {}), ...(status && status !== "draft" ? { publishAt: null } : {}), updatedAt: new Date() }).where(eq(schema.products.id, productId));
     for (const v of variants ?? []) {
       if (!current.variants.some((c) => c.id === v.id)) throw new NotFoundError("Variant");
-      const set = { ...(v.priceMinor !== undefined ? { priceMinor: v.priceMinor } : {}), ...(v.stock !== undefined ? { stock: v.stock } : {}) };
+      const set = {
+        ...(v.priceMinor !== undefined ? { priceMinor: v.priceMinor } : {}),
+        ...(v.stock !== undefined ? { stock: v.stock } : {}),
+        ...(v.weightGrams !== undefined ? { weightGrams: v.weightGrams } : {}),
+        ...(v.costMinor !== undefined ? { costMinor: v.costMinor } : {}),
+      };
       if (Object.keys(set).length) await tx.update(schema.variants).set(set).where(eq(schema.variants.id, v.id));
     }
     await recordStockEdits(tx as unknown as Db, productId, new Map(current.variants.map((c) => [c.id, c.stock])));
   });
   return getProduct(db, shopId, productId);
 }
+
+/** A product that goes in a parcel: not a gift card or a download. */
+export const shipsInParcel = (p: { giftCard: boolean; digital: boolean }) => !p.giftCard && !p.digital;
+/** The store's own stock, whose cost the merchant sets: not from a supplier, and not a gift card. */
+export const isOwnStock = (p: { giftCard: boolean; supplierId: string | null }) => !p.giftCard && !p.supplierId;
 
 /** A photo the merchant uploaded from the app becomes the cover; the address is our own media route. */
 export async function setProductImage(db: Db, shopId: string, productId: string, imageUrl: string) {

@@ -8,6 +8,16 @@ export function parseMoney(input: string): number | null {
   return Math.round(Number(clean) * 100);
 }
 
+/** A weight typed in kilograms ("1.5" or "1,5") as grams: null when empty, NaN when it isn't a number. */
+export function parseKg(input: string): number | null {
+  const t = input.trim().replace(",", ".");
+  if (!t) return null;
+  return /^\d+(\.\d+)?$/.test(t) ? Math.round(Number(t) * 1000) : Number.NaN;
+}
+
+/** Grams as kilograms for a field: 1500 is "1.5". */
+export const kg = (grams: number | null) => (grams === null ? "" : String(grams / 1000));
+
 const day = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
 const time = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" });
 
