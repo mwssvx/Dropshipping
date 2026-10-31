@@ -280,6 +280,10 @@ test("two orders to the same address say the store's items can share a box", asy
 
   await signIn(page, email);
   await tab(page, "Orders");
+  // Both have a candle to post, so both are on To post, the oldest first.
+  await page.getByRole("tab", { name: "To post" }).click();
+  await expect(page.getByRole("link", { name: /^Order #100[12]/ })).toHaveCount(2);
+  await expect(page.getByRole("link", { name: /^Order #100[12]/ }).first()).toContainText("#1001");
   await page.getByRole("link", { name: "Order #1002" }).click();
   await expect(page.getByText("Also going to this address")).toBeVisible();
   await expect(page.getByText("Order #1001", { exact: true })).toBeVisible();
@@ -299,6 +303,9 @@ test("two orders to the same address say the store's items can share a box", asy
   // Shipped now, so it no longer lists the other order; that one has the tracking too.
   await page.goto("/");
   await tab(page, "Orders");
+  // Both went in the one box, so nothing is left to post.
+  await page.getByRole("tab", { name: "To post" }).click();
+  await expect(page.getByText("Nothing to post")).toBeVisible();
   await page.getByRole("tab", { name: "All" }).click();
   await page.getByRole("link", { name: "Order #1001" }).click();
   await expect(page.getByText("USPS 9400111899")).toBeVisible();

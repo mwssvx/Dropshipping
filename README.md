@@ -1832,3 +1832,7 @@ The app's Products tab now has "Low" and "Sold out" lists next to "All" when som
 ### Product search in the app (after launch, part 338)
 
 The app's Products tab has a search box at the top. Type part of a product's name, an option's name or a SKU and the open list (All, Low, Sold out or Needs details) narrows to what matches.
+
+### To post, in the app (after launch, part 339)
+
+The app's Orders tab has a "To post" list: paid orders with your own stock in them that don't have tracking for your parcel yet, oldest first, the same orders the packing slips print. Add tracking on an order and it leaves the list.

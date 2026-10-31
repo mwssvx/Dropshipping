@@ -5,10 +5,11 @@ import { FULFILMENT, money, PAYMENT, when } from "../../src/format";
 import { EmptyState, List, LoadError, Loading, Pill, Row, Screen, Segmented } from "../../src/ui";
 
 type Order = { id: string; number: number; name: string; email: string; totalMinor: number; currency: string; paymentStatus: string; fulfillmentStatus: string; held?: boolean; paidAt: string | null; createdAt: string; daysLate?: number };
-type Show = "open" | "problems" | "late" | "all";
+type Show = "open" | "to_post" | "problems" | "late" | "all";
 
 const EMPTY: Record<Show, [string, string]> = {
   open: ["No open orders", "Paid orders that haven't shipped yet show up here."],
+  to_post: ["Nothing to post", "Orders with your own stock in them show up here until you add their tracking, oldest first."],
   problems: ["No problems", "Orders the supplier couldn't take, and orders held for a risk check, show up here."],
   late: ["Nothing late", "Shipped parcels that are past their delivery date show up here, so you can check on them before the buyer asks."],
   all: ["No orders yet", "Share your store link to get your first sale."],
@@ -16,7 +17,7 @@ const EMPTY: Record<Show, [string, string]> = {
 
 export default function OrdersScreen() {
   const params = useLocalSearchParams<{ show?: string }>();
-  const [show, setShow] = useState<Show>(params.show === "problems" || params.show === "held" ? "problems" : params.show === "all" ? "all" : params.show === "late" ? "late" : "open");
+  const [show, setShow] = useState<Show>(params.show === "problems" || params.show === "held" ? "problems" : params.show === "all" ? "all" : params.show === "late" ? "late" : params.show === "to_post" ? "to_post" : "open");
   const list = useApi<{ orders: Order[] }>(`orders?show=${show}`);
   const orders = list.data?.orders ?? [];
 
@@ -28,6 +29,7 @@ export default function OrdersScreen() {
         onChange={setShow}
         options={[
           ["open", "Open"],
+          ["to_post", "To post"],
           ["problems", "Needs you"],
           ["late", "Late"],
           ["all", "All"],

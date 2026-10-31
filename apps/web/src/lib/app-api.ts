@@ -41,6 +41,7 @@ import {
   missingDetails,
   setCustomsInfo,
   stockLevel,
+  ordersToPost,
   productPhotos,
   sendPriceDrops,
   sendStockAlerts,
@@ -221,6 +222,8 @@ const routes: Record<string, Handler> = {
       const rows = (await listOrders(db, shop.id)).filter((o) => late.has(o.id)).sort((a, b) => late.get(b.id)! - late.get(a.id)! || a.number - b.number);
       return { orders: rows.slice(0, 200).map((o) => ({ ...orderSummary(o), daysLate: late.get(o.id)! })) };
     }
+    // Orders with the store's own items to pack and post, oldest first, as on the packing slips.
+    if (show === "to_post") return { orders: (await ordersToPost(db, shop.id)).slice(0, 200).map(orderSummary) };
     const keep = ORDER_FILTERS[show];
     if (!keep) throw new UserError("Unknown filter.");
     // The app shows the latest 200; for all orders that's one page, not the store's whole history.

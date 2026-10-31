@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { schema } from "@sf/db";
-import { addManualTracking, addTrackingToSameBox, doorKey, createProduct, DemoModel, ordersToSameAddress, packingSlips, sameAddressOnList, startCheckout } from "../src";
+import { addManualTracking, addTrackingToSameBox, doorKey, createProduct, DemoModel, ordersToPost, ordersToSameAddress, packingSlips, sameAddressOnList, startCheckout } from "../src";
 import { makeFixture } from "../evals/fixture";
 
 const address = { name: "Ada Lovelace", line1: "1 Main St", city: "Austin", region: "TX", postalCode: "78701", country: "US" };
@@ -26,7 +26,7 @@ describe("orders to the same address", () => {
     const first = await place([{ variantId: coaster!.id, quantity: 1 }]);
     const second = await place([{ variantId: lamp!.id, quantity: 1 }, { variantId: coaster!.id, quantity: 1 }], { ...address, line1: "1 main st." });
     const lampOnly = await place([{ variantId: lamp!.id, quantity: 1 }]);
-    await place([{ variantId: coaster!.id, quantity: 1 }], { ...address, line1: "9 Oak Ave" });
+    const oak = await place([{ variantId: coaster!.id, quantity: 1 }], { ...address, line1: "9 Oak Ave" });
     await place([{ variantId: coaster!.id, quantity: 1 }], address, false);
     const shipped = await place([{ variantId: coaster!.id, quantity: 1 }]);
     await f.db.update(schema.orders).set({ fulfillmentStatus: "shipped" }).where(eq(schema.orders.id, shipped.id));
@@ -48,12 +48,17 @@ describe("orders to the same address", () => {
     const { slips } = await packingSlips(f.db, shop.id, { orderIds: [first.id, second.id, lampOnly.id] });
     expect(slips.map((x) => [x.number, x.sameBox])).toEqual([[first.number, [second.number]], [second.number, [first.number]], [lampOnly.number, []]]);
 
+    // The app's To post list: paid orders with a coaster still to post, oldest first.
+    const toPost = async () => (await ordersToPost(f.db, shop.id)).map((o) => o.number);
+    expect(await toPost()).toEqual([first.number, second.number, oak.number, old.number]);
+
     // Posted in one box: the first order's tracking goes on the second too, never on one without own items.
     const tracking = { carrier: "USPS", trackingNumber: "9400111" };
     await addManualTracking(f.ctx, shop.id, first.id, tracking);
     expect(await addTrackingToSameBox(f.ctx, shop.id, first.id, [second.id, lampOnly.id, shipped.id], tracking)).toEqual([second.number]);
     const posted = await f.db.query.fulfillments.findMany({ where: eq(schema.fulfillments.orderId, second.id) });
     expect(posted.filter((x) => x.supplierId === null).map((x) => x.trackingNumber)).toEqual(["9400111"]);
+    expect(await toPost()).toEqual([oak.number, old.number]);
     // With nothing of its own left to post (no supplier order was placed here), the second one reads shipped.
     expect((await ordersToSameAddress(f.db, shop.id, first)).orders.map((o) => [o.number, o.ownItems])).toEqual([[lampOnly.number, false]]);
 
