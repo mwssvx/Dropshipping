@@ -14,6 +14,7 @@ export async function POST(request: Request) {
         sessionId: String(body.sessionId ?? ""),
         kind: String(body.kind ?? ""),
         productId: typeof body.productId === "string" ? body.productId : null,
+        postId: typeof body.postId === "string" ? body.postId : null,
         referrer: typeof body.referrer === "string" ? body.referrer.slice(0, 500) : null,
         utmSource: typeof body.utmSource === "string" ? body.utmSource.slice(0, 100) : null,
         host: request.headers.get("x-forwarded-host") ?? request.headers.get("host"),

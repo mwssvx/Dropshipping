@@ -14,18 +14,18 @@ function visitId() {
   return id;
 }
 
-export function Track({ shopId, kind, productId }: { shopId: string; kind: "page_view" | "product_view"; productId?: string }) {
+export function Track({ shopId, kind, productId, postId }: { shopId: string; kind: "page_view" | "product_view" | "post_view"; productId?: string; postId?: string }) {
   const path = usePathname();
   useEffect(() => {
     // Counting visits must never break the page.
     try {
       // A link tagged ?utm_source=instagram names its source even when the app hides the referrer.
       const utmSource = new URLSearchParams(location.search).get("utm_source");
-      const body = JSON.stringify({ shopId, kind, productId, sessionId: visitId(), referrer: document.referrer || null, utmSource });
+      const body = JSON.stringify({ shopId, kind, productId, postId, sessionId: visitId(), referrer: document.referrer || null, utmSource });
       if (!navigator.sendBeacon?.("/api/events", new Blob([body], { type: "application/json" }))) {
         void fetch("/api/events", { method: "POST", body, headers: { "content-type": "application/json" }, keepalive: true }).catch(() => {});
       }
     } catch {}
-  }, [shopId, kind, productId, path]);
+  }, [shopId, kind, productId, postId, path]);
   return null;
 }

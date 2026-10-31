@@ -677,6 +677,8 @@ export const orders = pgTable(
     campaignId: uuid("campaign_id").references((): AnyPgColumn => campaigns.id, { onDelete: "set null" }),
     // Where the buyer's visit came from: a referring site ("instagram.com") or its utm_source, null when direct.
     visitSource: text("visit_source"),
+    // The last blog post the buyer read in that visit before checking out, for the blog's sales.
+    visitPostId: uuid("visit_post_id").references((): AnyPgColumn => blogPosts.id, { onDelete: "set null" }),
     // Placed by an approved wholesale buyer at wholesale prices.
     wholesale: boolean("wholesale").notNull().default(false),
     // Paid in part or in full with a gift card. The card is charged total minus this.
@@ -1376,7 +1378,7 @@ export const reviewReports = pgTable(
 );
 
 // What buyers do on the store, for the funnel. No personal data: a random session id from a cookie.
-export const STOREFRONT_EVENTS = ["page_view", "product_view", "add_to_cart", "checkout_start"] as const;
+export const STOREFRONT_EVENTS = ["page_view", "product_view", "add_to_cart", "checkout_start", "post_view"] as const;
 export type StorefrontEventKind = (typeof STOREFRONT_EVENTS)[number];
 
 export const storefrontEvents = pgTable(
@@ -1387,11 +1389,13 @@ export const storefrontEvents = pgTable(
     sessionId: text("session_id").notNull(),
     kind: text("kind", { enum: STOREFRONT_EVENTS }).notNull(),
     productId: uuid("product_id").references(() => products.id, { onDelete: "set null" }),
+    // The blog post a post_view was for.
+    postId: uuid("post_id").references((): AnyPgColumn => blogPosts.id, { onDelete: "set null" }),
     // Where the visitor came from: the referring site's host, or null when direct.
     source: text("source"),
     createdAt: createdAt(),
   },
-  (t) => [index("storefront_events_shop_idx").on(t.shopId, t.createdAt), index("storefront_events_product_idx").on(t.productId)],
+  (t) => [index("storefront_events_shop_idx").on(t.shopId, t.createdAt), index("storefront_events_product_idx").on(t.productId), index("storefront_events_post_idx").on(t.postId)],
 );
 
 // What shoppers typed in the store's search box: one row per store, word and day, with how many
