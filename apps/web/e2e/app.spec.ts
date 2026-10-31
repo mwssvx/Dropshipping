@@ -438,7 +438,7 @@ test("a customer's orders, note and tags, from the app", async ({ page, browser 
   await expect(page.getByText("No one matches")).toBeVisible();
   await page.getByRole("textbox", { name: "Search customers" }).fill("ada@");
   await page.getByRole("link", { name: /Ada Buyer/ }).click();
-  await expect(page.getByText("ada@example.com")).toBeVisible();
+  await expect(page.getByText("ada@example.com", { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: /Order #1001/ })).toBeVisible();
   await expect(page.getByRole("link", { name: /Order #1002/ })).toBeVisible();
 
