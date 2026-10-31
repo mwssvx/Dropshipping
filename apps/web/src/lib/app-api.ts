@@ -14,7 +14,7 @@ import {
   fixProblemOrder,
   getOrder,
   orderDelivery,
-  daysPastDelivery,
+  daysPastDelivery, orderParcels,
   ordersPastDelivery,
   getPushSettings,
   getProduct,
@@ -218,7 +218,17 @@ const routes: Record<string, Handler> = {
     const o = await getOrder(db, shop.id, params.id!);
     // When it should arrive, as on the web order page, and how late a shipped parcel is.
     const arrives = ["paid", "partially_refunded"].includes(o.paymentStatus) ? await orderDelivery(db, shop, o, { evenIfHidden: true }) : null;
+    // An order from more than one supplier (or with the store's own stock), parcel by parcel.
+    const parcels = o.pickup || o.localDelivery ? [] : await orderParcels(db, o);
     return {
+      parcels: parcels.map((p) => ({
+        own: p.key === "own",
+        items: p.items,
+        status: p.shipment?.status ?? null,
+        carrier: p.shipment?.carrier ?? null,
+        trackingNumber: p.shipment?.trackingNumber ?? null,
+        trackingUrl: p.shipment?.trackingUrl ?? null,
+      })),
       expectedDelivery: arrives ? { from: arrives.from, to: arrives.to } : null,
       daysLate: daysPastDelivery(arrives, o),
       ...orderSummary(o),

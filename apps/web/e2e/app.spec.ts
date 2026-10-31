@@ -39,8 +39,8 @@ async function tab(page: Page, name: string) {
   await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
 }
 
-async function buy(browser: Browser, productUrl: string) {
-  const buyer = await (await browser.newContext()).newPage();
+async function buy(browser: Browser, productUrl: string, shopper?: Page) {
+  const buyer = shopper ?? (await (await browser.newContext()).newPage());
   await buyer.goto(productUrl);
   await buyer.getByRole("button", { name: "Add to cart" }).click();
   await buyer.getByRole("link", { name: "Check out" }).click();
@@ -232,4 +232,36 @@ test("a buyer's question: answered from the app with a saved reply", async ({ pa
   await expect(page.getByText("All caught up")).toBeVisible();
   await page.getByRole("tab", { name: "All" }).click();
   await expect(page.getByLabel("Message from Grace Hopper").filter({ visible: true })).toContainText("Answered");
+});
+
+test("an order in two parcels shows what's in each and which one is yours to post", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `p${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/import`);
+  await web.getByRole("link", { name: /sunset projection lamp/i }).click();
+  await web.getByRole("button", { name: "Import and publish" }).click();
+  await expect(web.getByText("Imported and live on your store.")).toBeVisible();
+  const lamp = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Beeswax Candle");
+  await web.getByLabel("Price", { exact: true }).fill("12.00");
+  await web.getByLabel("Stock", { exact: true }).fill("6");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const candle = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+
+  const buyer = await (await browser.newContext()).newPage();
+  await buyer.goto(candle);
+  await buyer.getByRole("button", { name: "Add to cart" }).click();
+  await expect(buyer.getByRole("link", { name: /^Cart, 1 item/ })).toBeVisible();
+  await buy(browser, lamp, buyer);
+
+  await signIn(page, email);
+  await tab(page, "Orders");
+  await page.getByRole("link", { name: "Order #1001" }).click();
+  await expect(page.getByText("Comes in 2 parcels")).toBeVisible();
+  await expect(page.getByText("Sent by you · not shipped yet")).toBeVisible();
+  // Once in the items and once as its own parcel.
+  await expect(page.getByText("Beeswax Candle", { exact: true })).toHaveCount(2);
+  await expect(page.getByText("With the supplier · not shipped yet").or(page.getByText(/^Demo Post /))).toBeVisible();
+  await shot(page, "318-app-parcels");
 });
