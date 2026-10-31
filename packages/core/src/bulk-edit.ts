@@ -1,6 +1,6 @@
 // Bulk edit: change many products at once from the Products list. Publish, hide or archive them,
 // move prices up or down by a percent, set or clear the crossed-out "was" price, or add them to a
-// collection, add or remove a tag, or set where they ship from or how long they take to prepare. Every change is saved with what it replaced, so the merchant can undo it for a week.
+// collection, add or remove a tag, set where they ship from, how long they take to prepare, or their extra shipping. Every change is saved with what it replaced, so the merchant can undo it for a week.
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { schema, type BulkEditAction, type BulkEditSnapshot, type Db } from "@sf/db";
 import { z } from "zod";
@@ -10,6 +10,7 @@ import { countryCode } from "./customs";
 import { countryName } from "./shipping";
 import { PRODUCT_PROCESSING_MAX } from "./delivery";
 import { formatMoney } from "./money";
+import { SHIPPING_SURCHARGE_MAX } from "./shipping-surcharge";
 import { MAX_PRODUCT_TAGS } from "./products";
 
 type Shop = typeof schema.shops.$inferSelect;
@@ -20,6 +21,7 @@ export const UNDO_DAYS = 7;
 export const MAX_BULK_PRODUCTS = 500;
 
 const DAYS_ERROR = `Enter 0 to ${PRODUCT_PROCESSING_MAX} days, or leave it empty for your store's.`;
+const SURCHARGE_ERROR = "Enter an amount from 0 to 1,000, or leave it empty for no extra shipping.";
 
 const actionSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("status"), status: z.enum(["active", "draft", "archived"]) }),
@@ -36,6 +38,7 @@ const actionSchema = z.discriminatedUnion("kind", [
     kind: z.literal("processing"),
     days: z.number({ error: DAYS_ERROR }).int(DAYS_ERROR).min(0, DAYS_ERROR).max(PRODUCT_PROCESSING_MAX, DAYS_ERROR).nullable(),
   }),
+  z.object({ kind: z.literal("surcharge"), amountMinor: z.number().int().min(0, SURCHARGE_ERROR).max(SHIPPING_SURCHARGE_MAX, SURCHARGE_ERROR) }),
 ]);
 
 export type BulkEditInput = z.input<typeof actionSchema>;
@@ -60,7 +63,7 @@ async function plan(db: Db, shop: Shop, productIds: string[], input: BulkEditInp
   const variants = await db.query.variants.findMany({ where: inArray(schema.variants.productId, ids) });
   const money = (n: number | null) => (n == null ? "none" : formatMoney(n, shop.currency));
   const changes: BulkChange[] = [];
-  const snapshot: BulkEditSnapshot = { products: [], variants: [], collection: [], tags: [], shipsFrom: [], processing: [] };
+  const snapshot: BulkEditSnapshot = { products: [], variants: [], collection: [], tags: [], shipsFrom: [], processing: [], surcharge: [] };
   let skipped = 0;
   // Products that already have as many tags as they can.
   let full = 0;
@@ -129,6 +132,17 @@ async function plan(db: Db, shop: Shop, productIds: string[], input: BulkEditInp
       changes.push({ productId: p.id, product: p.title, variant: null, before: days(p.processingDays), after: days(action.days), belowCost: false });
       snapshot.processing!.push({ productId: p.id, before: p.processingDays, after: action.days });
     }
+  } else if (action.kind === "surcharge") {
+    const extra = (n: number) => (n ? `${money(n)} extra shipping` : "no extra shipping");
+    for (const p of products) {
+      if (p.giftCard || p.digital) {
+        skipped++;
+        continue;
+      }
+      if (p.shippingSurchargeMinor === action.amountMinor) continue;
+      changes.push({ productId: p.id, product: p.title, variant: null, before: extra(p.shippingSurchargeMinor), after: extra(action.amountMinor), belowCost: false });
+      snapshot.surcharge!.push({ productId: p.id, before: p.shippingSurchargeMinor, after: action.amountMinor });
+    }
   } else {
     for (const p of products) {
       // Gift cards are sold at their face value.
@@ -169,7 +183,7 @@ export async function previewBulkEdit(db: Db, shop: Shop, productIds: string[], 
   return { changes, skipped, full, products, belowCost: changes.filter((c) => c.belowCost).length };
 }
 
-export function describeBulkAction(action: BulkEditAction, collectionTitle?: string) {
+export function describeBulkAction(action: BulkEditAction, collectionTitle?: string, currency = "USD") {
   switch (action.kind) {
     case "status":
       return { active: "Published", draft: "Hid", archived: "Archived" }[action.status];
@@ -185,6 +199,8 @@ export function describeBulkAction(action: BulkEditAction, collectionTitle?: str
       return action.country ? `Set Ships from to ${countryName(action.country)}` : "Set Ships from to your store's country";
     case "processing":
       return action.days === null ? "Set preparing time to your store's" : `Set preparing time to ${action.days} ${action.days === 1 ? "day" : "days"}`;
+    case "surcharge":
+      return action.amountMinor ? `Set extra shipping to ${formatMoney(action.amountMinor, currency)} each` : "Removed extra shipping";
   }
 }
 
@@ -201,7 +217,7 @@ export async function applyBulkEdit(db: Db, shop: Shop, productIds: string[], in
   }
   const now = opts.now ?? new Date();
   const collection = action.kind === "collection" ? await db.query.collections.findFirst({ where: eq(schema.collections.id, action.collectionId) }) : null;
-  const summary = `${describeBulkAction(action, collection?.title)} on ${products === 1 ? "1 product" : `${products} products`}`;
+  const summary = `${describeBulkAction(action, collection?.title, shop.currency)} on ${products === 1 ? "1 product" : `${products} products`}`;
   return db.transaction(async (tx) => {
     for (const p of snapshot.products) {
       await tx.update(schema.products).set({ status: (action as { status: "active" | "draft" | "archived" }).status, publishAt: null, updatedAt: now }).where(eq(schema.products.id, p.id));
@@ -216,6 +232,7 @@ export async function applyBulkEdit(db: Db, shop: Shop, productIds: string[], in
     for (const t of snapshot.tags ?? []) await setTag(tx, t.productId, t.tag, !t.had, now);
     for (const c of snapshot.shipsFrom ?? []) await tx.update(schema.products).set({ shipsFrom: c.after }).where(eq(schema.products.id, c.productId));
     for (const c of snapshot.processing ?? []) await tx.update(schema.products).set({ processingDays: c.after }).where(eq(schema.products.id, c.productId));
+    for (const c of snapshot.surcharge ?? []) await tx.update(schema.products).set({ shippingSurchargeMinor: c.after }).where(eq(schema.products.id, c.productId));
     const touched = [...new Set(changes.map((c) => c.productId))];
     if (action.kind !== "status") await tx.update(schema.products).set({ updatedAt: now }).where(inArray(schema.products.id, touched));
     const [edit] = await tx.insert(schema.bulkEdits).values({ shopId: shop.id, summary, action, snapshot, products: touched.length, createdBy: opts.userId ?? null, createdAt: now }).returning();
@@ -298,6 +315,18 @@ export async function undoBulkEdit(db: Db, shopId: string, editId: string, now =
           continue;
         }
         await tx.update(schema.products).set({ processingDays: c.before, updatedAt: now }).where(eq(schema.products.id, c.productId));
+        restored++;
+      }
+    }
+    if (snapshot.surcharge?.length) {
+      const rows = await tx.query.products.findMany({ where: inArray(schema.products.id, snapshot.surcharge.map((c) => c.productId)), columns: { id: true, shippingSurchargeMinor: true } });
+      for (const c of snapshot.surcharge) {
+        const row = rows.find((r) => r.id === c.productId);
+        if (!row || row.shippingSurchargeMinor !== c.after) {
+          kept++;
+          continue;
+        }
+        await tx.update(schema.products).set({ shippingSurchargeMinor: c.before, updatedAt: now }).where(eq(schema.products.id, c.productId));
         restored++;
       }
     }

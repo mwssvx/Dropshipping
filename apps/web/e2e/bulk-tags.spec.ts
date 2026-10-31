@@ -61,4 +61,13 @@ test("a merchant tags many products at once, then undoes it", async ({ page }, i
   await expect(page.getByRole("table", { name: "What will change" }).getByRole("row", { name: /Magnetic Phone Stand/ })).toContainText("5 days");
   await page.getByRole("button", { name: "Apply to 2 products" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Set preparing time to 5 days on 2 products." })).toBeVisible();
+
+  // Both are bulky and cost the supplier more to send: $12 more shipping each.
+  await page.getByRole("checkbox", { name: "Select all products" }).check();
+  await page.getByLabel("Change", { exact: true }).selectOption({ label: "Set extra shipping" });
+  await page.getByLabel(/Extra shipping for each one/).fill("12");
+  await page.getByRole("button", { name: "Preview" }).click();
+  await expect(page.getByRole("table", { name: "What will change" }).getByRole("row", { name: /Magnetic Phone Stand/ })).toContainText("$12.00 extra shipping");
+  await page.getByRole("button", { name: "Apply to 2 products" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Set extra shipping to $12.00 each on 2 products." })).toBeVisible();
 });

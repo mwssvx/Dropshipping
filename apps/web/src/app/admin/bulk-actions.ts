@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { applyBulkEdit, MAX_BULK_PRODUCTS, parseProductQuery, previewBulkEdit, productIds, sendPriceDrops, undoBulkEdit, UserError, type BulkEditInput } from "@sf/core";
+import { applyBulkEdit, MAX_BULK_PRODUCTS, parseMoney, parseProductQuery, previewBulkEdit, productIds, sendPriceDrops, undoBulkEdit, UserError, type BulkEditInput } from "@sf/core";
 import { logged, requireShop, stock } from "@/lib/server";
 
 export type BulkState = {
@@ -41,6 +41,15 @@ function actionFrom(form: FormData): BulkEditInput {
     case "processing": {
       const raw = String(form.get("days") ?? "").trim();
       return { kind: "processing", days: raw ? Number(raw) : null };
+    }
+    case "surcharge": {
+      const raw = String(form.get("amount") ?? "").trim();
+      if (!raw) return { kind: "surcharge", amountMinor: 0 };
+      try {
+        return { kind: "surcharge", amountMinor: parseMoney(raw) };
+      } catch {
+        throw new UserError("Enter an amount like 15 or 15.50.");
+      }
     }
     default:
       throw new UserError("Pick what to change.");

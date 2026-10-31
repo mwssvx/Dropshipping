@@ -56,3 +56,29 @@ describe("preparing time in bulk", () => {
     expect(back.summary).toBe("Set preparing time to your store's on 1 product");
   });
 });
+
+describe("extra shipping in bulk", () => {
+  it("sets the extra shipping on many bulky products, skips gift cards, and undoes it", async () => {
+    const f = await makeFixture(new DemoModel());
+    const shop = await f.shop();
+    const { lamp, stand, projector } = f.products;
+    const card = await createGiftCardProduct(f.db, shop, [2500]);
+    const extra = async (id: string) => (await f.db.query.products.findFirst({ where: eq(schema.products.id, id) }))!.shippingSurchargeMinor;
+    await f.db.update(schema.products).set({ shippingSurchargeMinor: 1500 }).where(eq(schema.products.id, stand.id));
+    const ids = [lamp.id, stand.id, projector.id, card.id];
+    await expect(previewBulkEdit(f.db, shop, ids, { kind: "surcharge", amountMinor: 100_001 })).rejects.toThrow("from 0 to 1,000");
+    const preview = await previewBulkEdit(f.db, shop, ids, { kind: "surcharge", amountMinor: 1500 });
+    expect(preview.products).toBe(2);
+    expect(preview.skipped).toBe(1);
+    expect(preview.changes.find((c) => c.productId === lamp.id)).toMatchObject({ before: "no extra shipping", after: "$15.00 extra shipping" });
+    const edit = await applyBulkEdit(f.db, shop, ids, { kind: "surcharge", amountMinor: 1500 });
+    expect(edit.summary).toBe("Set extra shipping to $15.00 each on 2 products");
+    expect([await extra(lamp.id), await extra(stand.id), await extra(projector.id), await extra(card.id)]).toEqual([1500, 1500, 1500, 0]);
+    // A product changed by hand since keeps that change.
+    await f.db.update(schema.products).set({ shippingSurchargeMinor: 900 }).where(eq(schema.products.id, projector.id));
+    expect(await undoBulkEdit(f.db, shop.id, edit.id)).toEqual({ restored: 1, kept: 1 });
+    expect([await extra(lamp.id), await extra(stand.id), await extra(projector.id)]).toEqual([0, 1500, 900]);
+    const none = await applyBulkEdit(f.db, shop, ids, { kind: "surcharge", amountMinor: 0 });
+    expect(none.summary).toBe("Removed extra shipping on 2 products");
+  });
+});
