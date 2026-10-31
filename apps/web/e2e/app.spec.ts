@@ -417,3 +417,40 @@ test("reviews: one waiting is published and another gets a reply, from the app",
   await page.getByRole("tab", { name: "All" }).click();
   await expect(page.getByRole("textbox", { name: "Reply to Ada L." })).toHaveValue("Thanks Ada, glad it suits the room!");
 });
+
+test("a customer's orders, note and tags, from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `cu${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Beeswax Candle");
+  await web.getByLabel("Price", { exact: true }).fill("12.00");
+  await web.getByLabel("Stock", { exact: true }).fill("6");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const candle = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+  await buy(browser, candle);
+  await buy(browser, candle);
+
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Customers" }).click();
+  await expect(page.getByRole("link", { name: /Ada Buyer/ })).toContainText("2 orders");
+  // A search that matches nobody says so.
+  await page.getByRole("textbox", { name: "Search customers" }).fill("nobody");
+  await expect(page.getByText("No one matches")).toBeVisible();
+  await page.getByRole("textbox", { name: "Search customers" }).fill("ada@");
+  await page.getByRole("link", { name: /Ada Buyer/ }).click();
+  await expect(page.getByText("ada@example.com")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Order #1001/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Order #1002/ })).toBeVisible();
+
+  await page.getByRole("textbox", { name: "Note" }).fill("Prefers gift wrap");
+  await page.getByRole("textbox", { name: "Tags" }).fill("vip, local");
+  await shot(page, "341-app-customer");
+  await page.getByRole("button", { name: "Save note and tags" }).click();
+  await expect(page.getByText("Saved.", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("textbox", { name: "Tags" })).toHaveValue("vip, local");
+  await expect(page.getByRole("textbox", { name: "Note" })).toHaveValue("Prefers gift wrap");
+  // An order opens from there.
+  await page.getByRole("link", { name: /Order #1001/ }).click();
+  await expect(page.getByText("Beeswax Candle").first()).toBeVisible();
+});
