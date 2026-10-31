@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { schema } from "@sf/db";
-import { doorKey, createProduct, DemoModel, ordersToSameAddress, sameAddressOnList, startCheckout } from "../src";
+import { doorKey, createProduct, DemoModel, ordersToSameAddress, packingSlips, sameAddressOnList, startCheckout } from "../src";
 import { makeFixture } from "../evals/fixture";
 
 const address = { name: "Ada Lovelace", line1: "1 Main St", city: "Austin", region: "TX", postalCode: "78701", country: "US" };
@@ -43,6 +43,10 @@ describe("orders to the same address", () => {
     const found = await ordersToSameAddress(f.db, shop.id, first);
     expect(found.ownItems).toBe(true);
     expect(found.orders.map((o) => [o.number, o.ownItems])).toEqual([[second.number, true], [lampOnly.number, false]]);
+
+    // The packing slips say which orders share a box: only those with the store's own items.
+    const { slips } = await packingSlips(f.db, shop.id, { orderIds: [first.id, second.id, lampOnly.id] });
+    expect(slips.map((x) => [x.number, x.sameBox])).toEqual([[first.number, [second.number]], [second.number, [first.number]], [lampOnly.number, []]]);
 
     // Once the store has posted its own parcel for the second order, it can't share a box any more.
     await f.db.insert(schema.fulfillments).values({ shopId: shop.id, orderId: second.id, supplierId: null, status: "shipped", carrier: "USPS", trackingNumber: "9400111", shippedAt: new Date() });

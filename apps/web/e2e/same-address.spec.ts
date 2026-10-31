@@ -58,6 +58,11 @@ test("the merchant sees two orders going to the same address", async ({ page, br
   await expect(same).toContainText("has items you post");
   await expect(same).toContainText("can go in one box");
   await shot(page, "323-same-address");
+  // Its packing slip says to pack the other order's items in the same box.
+  const orderAdmin = page.url();
+  await page.goto(`${orderAdmin}/packing-slip`);
+  await expect(page.getByLabel("Same box")).toContainText("Order #1001 goes to the same address and also has items you post.");
+  await page.goto(orderAdmin);
 
   // Once this one is posted, the other order no longer lists it.
   await page.getByRole("button", { name: "Add tracking yourself" }).first().click();
