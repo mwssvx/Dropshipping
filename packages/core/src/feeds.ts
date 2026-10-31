@@ -41,6 +41,8 @@ export type FeedItem = {
   /** The option's barcode when it's a real GTIN (UPC, EAN or ITF-14 with a good check digit). */
   gtin: string | null;
   weightGrams: number | null;
+  /** A download: nothing to ship. */
+  digital: boolean;
   /** The cheapest shipping to the store's country, with handling and transit days when known. */
   shipping: { country: string; priceMinor: number; handlingDays: number; transit: { min: number; max: number } | null } | null;
 };
@@ -129,6 +131,7 @@ export async function productFeed(db: Db, shop: Shop, opts: { origin: string; la
         unitPricing: googleUnitPricing(v.contents),
         gtin: validGtin(v.barcode),
         weightGrams: p.digital ? null : v.weightGrams,
+        digital: p.digital,
         shipping: p.digital ? null : (shipping.get(v.id) ?? null),
       });
     }

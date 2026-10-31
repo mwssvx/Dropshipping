@@ -32,6 +32,10 @@ test("a merchant gets feed links for Google and Meta, and fixes what's missing",
   await page.goto("/admin/channels");
   await expect(page.getByRole("heading", { name: "Sales channels" })).toBeVisible();
   await expect(page.getByRole("status")).toContainText(/1 product \(\d options?\) in your feeds, 1 thing to fix below/);
+  // What Merchant Center checks first: barcodes and shipping.
+  const details = page.getByRole("region", { name: "What the feeds send" });
+  await expect(details).toContainText(/0 of \d options? have a barcode/);
+  await expect(details).toContainText(/Shipping to United States: (free|from \$)/);
   const toFix = page.getByRole("region", { name: "To fix" });
   await expect(toFix).toContainText("Sunset Projection Lamp: Add a photo.");
   const google = await page.getByLabel("Google Shopping feed link").inputValue();

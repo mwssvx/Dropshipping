@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LANGUAGES, productFeed, reviewCounts, shopLanguages } from "@sf/core";
+import { countryName, formatMoney, LANGUAGES, productFeed, reviewCounts, shopLanguages } from "@sf/core";
 import { requireShop, storeAddress } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { CopyLink } from "./CopyLink";
@@ -13,6 +13,13 @@ export default async function ChannelsPage() {
   const [{ items, issues }, reviews] = await Promise.all([productFeed(db, shop, { origin: address }), reviewCounts(db, shop.id)]);
   const products = new Set(items.map((i) => i.groupId)).size;
   const languages = shopLanguages(shop);
+  // What Merchant Center checks first: barcodes, shipping and weight.
+  const physical = items.filter((i) => !i.digital);
+  const withGtin = items.filter((i) => i.gtin).length;
+  const shipped = items.filter((i) => i.shipping);
+  const unshipped = physical.length - shipped.length;
+  const cheapest = shipped.length ? Math.min(...shipped.map((i) => i.shipping!.priceMinor)) : null;
+  const noWeight = shipped.filter((i) => !i.weightGrams).length;
   const feeds = [
     {
       id: "google",
@@ -39,6 +46,23 @@ export default async function ChannelsPage() {
           <span className="font-semibold num">{products}</span> {products === 1 ? "product" : "products"} ({items.length} {items.length === 1 ? "option" : "options"}) in your feeds
           {issues.length > 0 ? `, ${issues.length} ${issues.length === 1 ? "thing" : "things"} to fix below.` : "."}
         </p>
+        {items.length > 0 && (
+          <section className="card p-5 flex flex-col gap-2 text-sm" aria-labelledby="feed-details-heading">
+            <h2 id="feed-details-heading" className="font-semibold">What the feeds send</h2>
+            <ul className="flex flex-col gap-1">
+              <li>
+                <span className="num font-semibold">{withGtin}</span> of <span className="num">{items.length}</span> options have a barcode (UPC or EAN), sent as their GTIN.{" "}
+                {withGtin < items.length && <span className="hint">Add one on a product&apos;s options if it came with one; Google ranks listings with a GTIN higher. Your own designs don&apos;t need one.</span>}
+              </li>
+              <li>
+                {cheapest !== null ? <>Shipping to {countryName(shop.country)}: {cheapest === 0 ? "free" : `from ${formatMoney(cheapest, shop.currency)}`}, from your shipping rates.</> : <>No shipping rate to {countryName(shop.country)} yet, so Google asks you for one.</>}{" "}
+                {unshipped > 0 && cheapest !== null && <span className="hint">{unshipped} {unshipped === 1 ? "option is" : "options are"} too heavy for every rate.</span>}{" "}
+                <Link href="/admin/shipping" className="underline">Shipping rates</Link>
+              </li>
+              {noWeight > 0 && <li><span className="num font-semibold">{noWeight}</span> {noWeight === 1 ? "option has" : "options have"} no weight. <span className="hint">Google uses it to check shipping costs.</span></li>}
+            </ul>
+          </section>
+        )}
         {feeds.map((f) => (
           <section key={f.id} className="card p-5 flex flex-col gap-3" aria-labelledby={`${f.id}-heading`}>
             <h2 id={`${f.id}-heading`} className="font-semibold">{f.name}</h2>
