@@ -67,7 +67,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
         countries: z.countries,
         // Rates for other weights (a heavy-parcel rate on a light cart) don't show.
         rates: z.rates.filter((r) => fitsWeight(r, quote.weightGrams)).map((r) => {
-          const price = quote.discount?.freeShipping ? 0 : priceRate(r, quote.goodsMinor);
+          const price = quote.discount?.freeShipping ? 0 : priceRate(r, quote.goodsMinor) + quote.surchargeMinor;
           const p = presentQuote({ ...quote, shippingMinor: price, taxMinor: 0 }, fx);
           const window = windows.get(r.id);
           const days = window ? t.arrivesOn(formatDeliveryWindow(window, (d) => shortDay.format(d))) : r.minDays !== null && r.maxDays !== null ? t.arrivesIn(r.minDays, r.maxDays) : null;

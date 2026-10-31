@@ -1,0 +1,1 @@
+ALTER TABLE "products" ADD COLUMN "shipping_surcharge_minor" integer DEFAULT 0 NOT NULL;

@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { setBlockedCountries, setCustomsInfo, setMinAge, setProductProcessingDays, setReorderDays, setSwatches, UserError } from "@sf/core";
+import { parseMoney, setBlockedCountries, setCustomsInfo, setMinAge, setProductProcessingDays, setReorderDays, setShippingSurcharge, setSwatches, UserError } from "@sf/core";
 import { requireShop } from "@/lib/server";
 
 export type CustomsState = { error?: string; saved?: boolean };
@@ -90,6 +90,30 @@ export async function processingDaysAction(productId: string, _: ProcessingDaysS
   const raw = String(form.get("processingDays") ?? "").trim();
   try {
     await setProductProcessingDays(db, shop.id, productId, raw ? Number(raw) : null);
+    revalidatePath(`/admin/products/${productId}`);
+    return { saved: true };
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+}
+
+export type SurchargeState = { error?: string; saved?: boolean };
+
+/** Saves what one of a bulky product adds to shipping. Empty is the same as nothing. */
+export async function surchargeAction(productId: string, _: SurchargeState, form: FormData): Promise<SurchargeState> {
+  const { shop, db } = await requireShop("products");
+  const raw = String(form.get("surcharge") ?? "").trim();
+  let minor = 0;
+  if (raw) {
+    try {
+      minor = parseMoney(raw);
+    } catch {
+      return { error: "Enter an amount like 15 or 15.50." };
+    }
+  }
+  try {
+    await setShippingSurcharge(db, shop.id, productId, minor);
     revalidatePath(`/admin/products/${productId}`);
     return { saved: true };
   } catch (e) {
