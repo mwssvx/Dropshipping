@@ -1972,3 +1972,7 @@ Today has an Email campaigns button for people who look after marketing. It show
 ### The buyer survey in the app (after launch, part 373)
 
 Analytics in the app has How buyers found you, for people who look after marketing. Set up "How did you hear about us?" (start from the usual answers, change them, and let buyers type their own), change it or stop asking, and see what buyers said over 30 days, 90 days or a year: how many answered, each answer's orders, share and sales, and what they wrote in their own words.
+
+### Rewards in the app (after launch, part 374)
+
+Today has a Rewards button for people who look after marketing. Turn reward points on or off, set how many points buyers earn per 1.00 and what 100 points are worth (with the sentence buyers see), and see how many buyers have points, what they'd be worth, how many were swapped, and who holds the most. A customer's page in the app shows their points and lets you add or take some with a note they see.

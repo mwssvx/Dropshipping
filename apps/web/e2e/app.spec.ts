@@ -1616,3 +1616,49 @@ test("the buyer survey set up in the app, and what a buyer answered", async ({ p
   await expect(page.getByText("The survey is off. Answers so far stay here.")).toBeVisible();
   await expect(page.getByText("Not asking yet")).toBeVisible();
 });
+
+test("rewards turned on in the app, and points added to a buyer", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `rw${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Wool Socks");
+  await web.getByLabel("Price", { exact: true }).fill("20.00");
+  await web.getByLabel("Stock", { exact: true }).fill("9");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const socks = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Rewards" }).click();
+  await expect(page.getByRole("heading", { name: "Rewards", level: 1 })).toBeVisible();
+  await page.getByRole("switch", { name: "Give reward points" }).click();
+  await page.getByRole("textbox", { name: "Points per $1.00 spent" }).fill("5");
+  await page.getByRole("button", { name: "Save rewards" }).click();
+  await expect(page.getByText("Rewards saved. Buyers earn points from their next order.")).toBeVisible();
+  await expect(page.getByText("No one has points yet")).toBeVisible();
+
+  const buyer = await (await browser.newContext()).newPage();
+  await buyer.goto(socks);
+  await buyer.getByRole("button", { name: "Add to cart" }).click();
+  await buyer.getByRole("link", { name: "Check out" }).click();
+  await buyer.getByRole("textbox", { name: "Email" }).first().fill(`grace-${Date.now()}@example.com`);
+  await buyer.getByLabel("Full name").fill("Grace Hopper");
+  await buyer.getByLabel("Address", { exact: true }).fill("1 Main St");
+  await buyer.getByLabel("City").fill("Austin");
+  await buyer.getByLabel("State or region").fill("TX");
+  await buyer.getByLabel("Postal code").fill("78701");
+  await buyer.getByRole("button", { name: "Continue to payment" }).click();
+  await buyer.getByRole("button", { name: /^Pay / }).click();
+  await expect(buyer.getByRole("heading", { name: "Thank you, Grace!" })).toBeVisible();
+
+  await page.reload();
+  const holder = page.getByRole("link", { name: /^Grace Hopper/ });
+  await expect(holder).toContainText("100 points");
+  await shot(page, "374-app-rewards");
+  await holder.click();
+  const points = page.getByRole("region", { name: "Reward points" });
+  await expect(points.getByText("100", { exact: true })).toBeVisible();
+  await points.getByRole("textbox", { name: "Points to add" }).fill("50");
+  await points.getByRole("textbox", { name: "Note they see" }).fill("Sorry about the late parcel");
+  await points.getByRole("button", { name: "Save points" }).click();
+  await expect(page.getByText("Saved. They have 150 points now.")).toBeVisible();
+});
