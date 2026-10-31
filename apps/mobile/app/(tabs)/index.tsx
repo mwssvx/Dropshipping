@@ -88,6 +88,7 @@ export default function TodayScreen() {
           {can("reviews") && <Button label="Reviews" kind="secondary" onPress={() => router.push("/reviews")} />}
           {can("customers") && <Button label="Customers" kind="secondary" onPress={() => router.push("/customers")} />}
           {can("marketing") && <Button label="Discount codes" kind="secondary" onPress={() => router.push("/codes")} />}
+          {can("returns") && <Button label="Returns" kind="secondary" onPress={() => router.push("/returns")} />}
           <Button label="Import a product" kind="secondary" onPress={() => router.push("/import")} />
         </>
       )}
