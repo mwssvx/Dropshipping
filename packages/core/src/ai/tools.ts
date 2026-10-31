@@ -34,6 +34,7 @@ import { createCollection } from "../collections";
 import { createCampaign } from "../campaigns";
 import { AT_RISK_TAG, atRiskCustomers, tagAtRisk } from "../churn";
 import { addTask, dueLabel, findTask, listTasks, parseDueDate, setTaskDone } from "../tasks";
+import { CALENDAR_DAYS_MAX, EMAIL_BODY_MAX, EMAIL_LIST_MAX, googleToken, parseEventTime, whenLabel } from "../connectors/google";
 import { aiImpact, aiMonth, impactLines, timeSaved } from "./impact";
 import { findNote, MEMORY_MAX_NOTES, MEMORY_NOTE_MAX, normalizeMemory } from "./memory";
 import { addMessage, BUYER_TOPICS, discardDrafts, sendBuyerMessage, setConversationStatus, type BuyerTopic } from "./conversations";
@@ -1648,8 +1649,105 @@ const taskTools = [
   }),
 ];
 
+/** The owner's Google account, when connected: a token for the call, or a plain reason why not. */
+async function google(run: RunScope) {
+  if (!run.ctx.google) throw new UserError("Google isn't set up on this platform yet, so email and calendar aren't available.");
+  const { token, email } = await googleToken({ db: run.ctx.db, google: run.ctx.google, connectorSecret: run.ctx.connectorSecret }, run.shop.id);
+  return { api: run.ctx.google, token, email };
+}
+const EVENT_MAX = 25;
+
+const googleTools = [
+  tool({
+    name: "read_emails",
+    kind: "read",
+    description:
+      "The newest emails in the owner's connected Gmail, with a Gmail search when they ask about something in particular (e.g. from:supplier, subject:invoice, newer_than:7d). Only when the owner asks about their email; summarise, don't quote whole emails back.",
+    input: z.object({ query: z.string().max(200).nullable().describe("A Gmail search, or null for the newest"), max: z.number().int().min(1).max(EMAIL_LIST_MAX).default(5) }),
+    summary: (i) => (i.query ? `Searched the owner's email for “${i.query}”` : "Read the owner's newest emails"),
+    async run(i, run) {
+      const g = await google(run);
+      const list = await g.api.listEmails(g.token, { query: i.query, max: i.max });
+      return { account: g.email, emails: list.map((m) => ({ id: m.id, from: m.from, subject: m.subject, when: whenLabel(m.date, "UTC"), preview: untrusted("email", m.snippet) })) };
+    },
+  }),
+  tool({
+    name: "read_email",
+    kind: "read",
+    description: "One email in full (by the id from read_emails), when the owner wants to know what it says or asks you to act on it.",
+    input: z.object({ id: z.string().min(1).max(100) }),
+    summary: () => "Read one of the owner's emails",
+    async run(i, run) {
+      const g = await google(run);
+      const m = await g.api.getEmail(g.token, i.id);
+      if (!m) throw new UserError("That email isn't there any more.");
+      return { from: m.from, to: m.to, subject: m.subject, when: whenLabel(m.date, "UTC"), text: untrusted("email", m.text.slice(0, EMAIL_BODY_MAX)) };
+    },
+  }),
+  tool({
+    name: "send_email",
+    kind: "change",
+    description: "Send an email from the owner's connected Gmail, as them. Only when they ask you to email someone; it waits for their OK with the full text shown. Plain text, signed with their store's name.",
+    input: z.object({ to: z.string().email().max(200), subject: z.string().min(2).max(150), text: z.string().min(10).max(5000) }),
+    policy: () => needsOk("It sends an email from your Gmail, as you."),
+    summary: (i) => `Email to ${i.to}: “${i.subject}”`,
+    check: (i, run) => brandProblems(brand(run), [{ name: "email", text: i.text }]),
+    async propose(i, run) {
+      const g = await google(run);
+      return { ...i, preview: [`From ${g.email ?? "your Gmail"} to ${i.to}`, `Subject: ${i.subject}`, ...i.text.split("\n").filter((l) => l.trim())] };
+    },
+    async run(i, run) {
+      const g = await google(run);
+      const r = await g.api.sendEmail(g.token, { to: i.to, subject: i.subject, text: i.text });
+      return { sent: true, id: r.id, to: i.to };
+    },
+  }),
+  tool({
+    name: "read_calendar",
+    kind: "read",
+    description: "What's on the owner's connected Google Calendar for the coming days (today first).",
+    input: z.object({ days: z.number().int().min(1).max(CALENDAR_DAYS_MAX).default(7) }),
+    summary: (i) => `Read the owner's calendar for the next ${plural(i.days, "day")}`,
+    async run(i, run) {
+      const g = await google(run);
+      const from = new Date();
+      const events = await g.api.listEvents(g.token, { from, to: new Date(from.getTime() + i.days * 86_400_000), max: EVENT_MAX });
+      return { days: i.days, events: events.map((e) => ({ id: e.id, title: untrusted("calendar", e.title), when: e.allDay ? `${e.start} (all day)` : `${whenLabel(e.start, "UTC")} to ${whenLabel(e.end, "UTC")} UTC`, location: e.location })) };
+    },
+  }),
+  tool({
+    name: "add_calendar_event",
+    kind: "change",
+    description: "Put an event on the owner's connected Google Calendar when they ask (a supplier call, a sale start, a deadline). Times in ISO form with the owner's time zone offset, e.g. 2026-11-15T14:00+01:00; UTC when no offset is given. It waits for their OK.",
+    input: z.object({
+      title: z.string().min(2).max(120),
+      start: z.string().max(40).describe("e.g. 2026-11-15T14:00+01:00"),
+      end: z.string().max(40).nullable().describe("null for an hour after the start"),
+      description: z.string().max(1000).nullable(),
+      location: z.string().max(200).nullable(),
+    }),
+    policy: () => needsOk("It adds an event to your Google Calendar."),
+    summary: (i) => `Calendar event: “${i.title}” at ${i.start}`,
+    async propose(i, run) {
+      await google(run);
+      const start = parseEventTime(i.start);
+      const end = i.end ? parseEventTime(i.end) : new Date(start.getTime() + 3_600_000);
+      if (end <= start) throw new UserError("The event ends before it starts. Give an end after the start, or null.");
+      return { ...i, end: end.toISOString(), preview: [`${whenLabel(start.toISOString(), "UTC")} to ${whenLabel(end.toISOString(), "UTC")} (UTC)`, ...(i.location ? [`At ${i.location}`] : []), ...(i.description ? [i.description] : [])] };
+    },
+    async run(i, run) {
+      const g = await google(run);
+      const start = parseEventTime(i.start);
+      const end = i.end ? parseEventTime(i.end) : new Date(start.getTime() + 3_600_000);
+      const e = await g.api.createEvent(g.token, { title: i.title, start, end, description: i.description, location: i.location });
+      return { added: e.title, when: `${whenLabel(e.start, "UTC")} UTC`, link: e.link };
+    },
+  }),
+];
+
 const chatShopTools = [
   ...taskTools,
+  ...googleTools,
   tool({
     name: "read_ai_impact",
     kind: "read",

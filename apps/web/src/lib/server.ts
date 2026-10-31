@@ -9,6 +9,8 @@ import {
   domainHostFromEnv,
   fxFromEnv,
   type FxProvider,
+  googleFromEnv,
+  type GoogleProvider,
   getSessionUser,
   listShopsForUser,
   mailerFromEnv,
@@ -53,6 +55,7 @@ const local: {
   model?: ModelClient;
   push?: PushSender;
   fx?: FxProvider;
+  google?: GoogleProvider;
 } = {};
 
 /** Exchange rates for stores that sell in more than one currency. */
@@ -245,7 +248,20 @@ export function aiModel(): ModelClient {
 }
 
 export async function agents(): Promise<AgentContext> {
-  return { ...(await refunds()), model: aiModel() };
+  return { ...(await refunds()), model: aiModel(), google: googleProvider(), connectorSecret: process.env.CONNECTOR_SECRET || undefined };
+}
+
+/** The owner's Google account for the Assistant: real with GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, else a fake one. */
+export function googleProvider(): GoogleProvider {
+  local.google ??= googleFromEnv(process.env);
+  return local.google;
+}
+
+/** Ties a Google sign-in to the browser and store that started it. */
+export const GOOGLE_STATE_COOKIE = "sf_google_state";
+
+export async function connectors() {
+  return { db: await db(), google: googleProvider(), connectorSecret: process.env.CONNECTOR_SECRET || undefined };
 }
 
 export function pushSender(): PushSender {
