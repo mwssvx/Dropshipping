@@ -258,6 +258,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
             collections={collections.filter((c) => !c.rules).map((c) => ({ id: c.id, title: c.title }))}
             tags={tags.map((t) => t.tag)}
             home={shop.country}
+            storeDays={shop.processingDays}
             recent={recent.map((r) => ({ id: r.id, summary: r.summary, when: when(r.createdAt), undone: !!r.undoneAt, canUndo: r.canUndo }))}
             total={total}
             list={Object.fromEntries(Object.entries({ q, status, tag, stock, source, collection, missing, margin, unsold }).filter((e): e is [string, string] => !!e[1]))}

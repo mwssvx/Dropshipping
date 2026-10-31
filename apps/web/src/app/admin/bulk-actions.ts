@@ -38,6 +38,10 @@ function actionFrom(form: FormData): BulkEditInput {
     }
     case "ships_from":
       return { kind: "ships_from", country: String(form.get("country") ?? "").trim() || null };
+    case "processing": {
+      const raw = String(form.get("days") ?? "").trim();
+      return { kind: "processing", days: raw ? Number(raw) : null };
+    }
     default:
       throw new UserError("Pick what to change.");
   }
