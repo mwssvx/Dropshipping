@@ -61,7 +61,8 @@ test("the buyer picks a shipping rate for their country and the summary follows"
   await buyer.getByLabel("Country").selectOption("CA");
   await expect(buyer.getByRole("radio")).toHaveCount(1);
   await expect(summary).toContainText("Shipping (Tracked)$6.99");
-  await expect(buyer.getByText("Arrives in 4–8 days")).toBeVisible();
+  // With the store's processing days counted, as real dates.
+  await expect(buyer.getByText(/^Arrives [A-Z][a-z]{2} \d{1,2} – [A-Z][a-z]{2} \d{1,2}$/)).toBeVisible();
   await buyer.getByLabel("Country").selectOption("JP");
   await expect(summary).toContainText("Shipping (Standard)$14.99");
   await buyer.getByLabel("Country").selectOption("US");
