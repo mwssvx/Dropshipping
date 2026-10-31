@@ -3,12 +3,12 @@
 // sale, "Sold out" when nothing can be ordered, and "New" for a while after it was added. A card
 // shows two at most, the merchant's own first. Also where sold-out products sit in lists.
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
-import { schema, SOLD_OUT_DISPLAY, type BadgeSettings, type Db, type SoldOutDisplay } from "@sf/db";
-import { BADGE_MAX_LENGTH } from "./badge-rules";
+import { schema, SOLD_OUT_DISPLAY, type BadgeSettings, type Db, type ProductInfoBlock, type SoldOutDisplay } from "@sf/db";
+import { BADGE_MAX_LENGTH, PRODUCT_INFO_MAX, PRODUCT_INFO_TEXT_MAX, PRODUCT_INFO_TITLE_MAX } from "./badge-rules";
 import { NotFoundError, UserError } from "./errors";
 import { openPreorder } from "./preorders";
 
-export { BADGE_MAX_LENGTH, cardBadges, DEFAULT_BADGES, type Badge, type BadgeFacts } from "./badge-rules";
+export { BADGE_MAX_LENGTH, PRODUCT_INFO_MAX, PRODUCT_INFO_TEXT_MAX, PRODUCT_INFO_TITLE_MAX, cardBadges, DEFAULT_BADGES, type Badge, type BadgeFacts } from "./badge-rules";
 const MAX_NEW_DAYS = 90;
 
 /** Nothing can be ordered: every option is out of stock and there's no open pre-order. */
@@ -61,6 +61,27 @@ export async function setCardQuickAdd(db: Db, shopId: string, on: boolean) {
 export async function setStayAfterAdd(db: Db, shopId: string, on: boolean) {
   await db.update(schema.shops).set({ stayAfterAdd: on, updatedAt: new Date() }).where(eq(schema.shops.id, shopId));
   return on;
+}
+
+/**
+ * Saves the notes shown under every product's description, in order. Rows left empty are dropped;
+ * a row needs both a title and some text.
+ */
+export async function setProductInfo(db: Db, shopId: string, rows: { title?: string; text?: string }[]) {
+  const blocks: ProductInfoBlock[] = [];
+  for (const row of rows) {
+    const title = (row.title ?? "").trim();
+    const text = (row.text ?? "").replace(/\r\n/g, "\n").trim();
+    if (!title && !text) continue;
+    if (!title) throw new UserError("Give each note a title, like “Shipping”.");
+    if (!text) throw new UserError(`Write what “${title.slice(0, PRODUCT_INFO_TITLE_MAX)}” should say.`);
+    if (title.length > PRODUCT_INFO_TITLE_MAX) throw new UserError(`Keep titles under ${PRODUCT_INFO_TITLE_MAX} characters.`);
+    if (text.length > PRODUCT_INFO_TEXT_MAX) throw new UserError(`Keep each note under ${PRODUCT_INFO_TEXT_MAX.toLocaleString("en")} characters.`);
+    blocks.push({ title, text });
+  }
+  if (blocks.length > PRODUCT_INFO_MAX) throw new UserError(`Add up to ${PRODUCT_INFO_MAX} notes.`);
+  await db.update(schema.shops).set({ productInfo: blocks, updatedAt: new Date() }).where(eq(schema.shops.id, shopId));
+  return blocks;
 }
 
 /** Whether product pages show share buttons. */

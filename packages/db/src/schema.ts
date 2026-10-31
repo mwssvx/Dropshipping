@@ -251,6 +251,8 @@ export const shops = pgTable(
     cardQuickAdd: boolean("card_quick_add").notNull().default(true),
     // After "Add to cart", stay on the page with a note instead of opening the cart.
     stayAfterAdd: boolean("stay_after_add").notNull().default(false),
+    // Fold-out notes under every product's description: shipping, returns, care. Up to four.
+    productInfo: jsonb("product_info").$type<ProductInfoBlock[]>().notNull().default([]),
     // Share buttons on product pages: copy the link, WhatsApp, Facebook and Pinterest.
     shareButtons: boolean("share_buttons").notNull().default(true),
     // "12 sold in the last 7 days" on product pages, from real paid orders. Off until the merchant turns it on.
@@ -513,6 +515,7 @@ export type AdPixels = { meta: string | null; tiktok: string | null; google: str
  */
 /** Which automatic badges product cards show: "-20%" on sale, "Sold out", and "New" for this many days (0 is off). */
 export type BadgeSettings = { sale: boolean; soldOut: boolean; newDays: number };
+export type ProductInfoBlock = { title: string; text: string };
 
 export type ChatButtons = { whatsapp: string | null; telegram: string | null };
 export type StoreClosure = { mode: "password" | "holiday"; message: string | null; until: string | null; passwordHash: string | null; accessKey: string | null };

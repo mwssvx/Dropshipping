@@ -1023,6 +1023,13 @@
       "when": 1793431534376,
       "tag": "0146_helpful_reviews",
       "breakpoints": true
+    },
+    {
+      "idx": 146,
+      "version": "7",
+      "when": 1793432677163,
+      "tag": "0147_product_info",
+      "breakpoints": true
     }
   ]
 }
