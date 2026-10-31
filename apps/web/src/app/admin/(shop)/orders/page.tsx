@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BANK_DETAILS_MAX, BUYER_EDIT_HOURS, can, countOrders, countryName, formatMoney, listSavedViews, orderCountries, orderPage, orderTags, ORDER_PLACED_DAYS, placedSince, fulfillmentParam, paymentParam, RISK_HOLD_LABELS, TRANSFER_DAYS, ORDER_TOTALS, totalParam, type OrderTotalRange, buyerParam, formatHandoverDay, handoverParam, handoverSchedule, MAX_BULK_ORDERS, ordersPastDelivery } from "@sf/core";
+import { BANK_DETAILS_MAX, BUYER_EDIT_HOURS, can, countOrders, countryName, formatMoney, listSavedViews, orderCountries, orderPage, orderTags, ORDER_PLACED_DAYS, placedSince, fulfillmentParam, paymentParam, RISK_HOLD_LABELS, TRANSFER_DAYS, ORDER_TOTALS, totalParam, type OrderTotalRange, buyerParam, formatHandoverDay, handoverParam, handoverSchedule, MAX_BULK_ORDERS, ordersPastDelivery, sameAddressOnList } from "@sf/core";
 import { AutoSubmitSelect } from "@/components/AutoSubmitSelect";
 import { SavedViews } from "@/components/SavedViews";
 import { requireShop } from "@/lib/server";
@@ -63,6 +63,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     discountId ? db.query.discounts.findFirst({ where: (d, { and, eq }) => and(eq(d.id, discountId), eq(d.shopId, shop.id)), columns: { id: true, code: true } }) : null,
     ordersPastDelivery(db, shop),
   ]);
+  // Orders on this page going to the same door as another unshipped order, which can share a box.
+  const sameDoor = await sameAddressOnList(db, shop.id, orders);
   // On hold the same way the On hold tab counts it: held for the risk check and not refunded.
   const onHold = (o: (typeof orders)[number]) => !!o.heldAt && (o.paymentStatus === "paid" || o.paymentStatus === "partially_refunded");
   const filtered = !!(q || tag || productId || country || discountId || total || buyer || placed || status || payment || day);
@@ -290,8 +292,14 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                     <td className="hint num">{dateFmt.format(o.createdAt)}</td>
                     <td className="max-w-[240px]">
                       <span className="block truncate">{o.shippingAddress.name}</span>
-                      {(o.tags.length > 0 || o.buyerNote) && (
+                      {(o.tags.length > 0 || o.buyerNote || sameDoor.has(o.id)) && (
                         <span className="flex flex-wrap gap-1 mt-1">
+                          {sameDoor.has(o.id) && (
+                            // Plain text, not a link: the order's own page lists and links the others.
+                            <span className="pill pill-warning text-xs" title="Not shipped yet, so your own items can go in one box">
+                              Same address as {sameDoor.get(o.id)!.slice(0, 3).map((x) => `#${x.number}`).join(", ")}{sameDoor.get(o.id)!.length > 3 ? ` and ${sameDoor.get(o.id)!.length - 3} more` : ""}
+                            </span>
+                          )}
                           {o.buyerNote && <span className="pill pill-info text-xs" title={o.buyerNote}>Has a note</span>}
                           {o.tags.map((t) => <span key={t} className="pill pill-neutral text-xs">{t}</span>)}
                         </span>
