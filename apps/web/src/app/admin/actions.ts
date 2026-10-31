@@ -9,7 +9,7 @@ import {
   createShop,
   importProduct,
   markDeliveredByStore,
-  markPickedUp,
+  markPickedUp, moveHandoverDay,
   markReadyForPickup,
   parseMoney,
   releaseHeldOrder,
@@ -237,6 +237,12 @@ export async function pickedUpAction(orderId: string, _: FormState, _form: FormD
 
 export async function deliveredByStoreAction(orderId: string, _: FormState, _form: FormData): Promise<FormState> {
   return orderAction(orderId, async (shopId) => markDeliveredByStore(await fulfillment(), shopId, orderId), "Marked order {order} delivered");
+}
+
+/** Moves a pickup or local delivery to another day and emails the buyer the new one. */
+export async function moveHandoverDayAction(orderId: string, _: FormState, form: FormData): Promise<FormState> {
+  const day = String(form.get("day") ?? "");
+  return orderAction(orderId, async (shopId) => moveHandoverDay(await fulfillment(), shopId, orderId, day), "Moved the pickup or delivery day of order {order}");
 }
 
 export type OrderNotesState = { error?: string; saved?: boolean; note?: string; tags?: string };

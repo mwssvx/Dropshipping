@@ -146,4 +146,14 @@ test("a buyer picks the day they'll collect their order", async ({ page, browser
   await page.getByRole("link", { name: "#1001" }).first().click();
   await expect(page.getByText(`Collecting on ${label}`)).toBeVisible();
   await expect(page.getByText(`Pickup day moved from ${label0} to ${label}`)).toBeVisible();
+
+  // The store can move it too, and the buyer sees the new day.
+  await page.getByText("Move to another day").click();
+  const storeDay = (await page.locator("#move-day option").first().textContent())!.trim();
+  await page.getByLabel("New day").selectOption({ label: storeDay });
+  await page.getByRole("button", { name: "Move and tell the buyer" }).click();
+  await expect(page.getByText("Moved. The buyer was emailed the new day.")).toBeVisible();
+  await expect(page.getByText(`Collecting on ${storeDay}`)).toBeVisible();
+  await buyer.reload();
+  await expect(buyer.getByText(`Pickup day: ${storeDay}`)).toBeVisible();
 });
