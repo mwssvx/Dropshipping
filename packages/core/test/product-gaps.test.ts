@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { schema } from "@sf/db";
-import { DemoModel, parseProductQuery, productGaps, productPage, productsCsv } from "../src";
+import { DemoModel, listProducts, missingDetails, parseProductQuery, productGaps, productPage, productsCsv } from "../src";
 import { makeFixture } from "../evals/fixture";
 
 describe("products that still lack something", () => {
@@ -27,6 +27,11 @@ describe("products that still lack something", () => {
     // An option with no cost makes the profit report count it as free.
     await f.db.update(schema.variants).set({ costMinor: null }).where(eq(schema.variants.productId, lamp.id));
     expect(await titles("cost")).toEqual(["Sunset Projection Lamp"]);
+    // One product at a time (the app's list) follows the same rules as the filter.
+    const each = new Map((await listProducts(f.db, shop.id)).map((p) => [p.title, missingDetails(p)]));
+    expect(each.get(lamp.title)).toEqual(["cost"]);
+    expect(each.get("Galaxy Projector")).toEqual(["photo", "description", "weight", "customs"]);
+    expect(each.get(stand.title)).toEqual(["description"]);
 
     // Archived products drop out of the counts and the list, unless the archived list is asked for.
     await set(projector.id, { status: "archived" });

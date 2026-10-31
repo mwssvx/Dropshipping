@@ -11,6 +11,16 @@ export type Product = {
   ships: boolean;
   /** The store's own stock: the merchant sets what it costs. */
   ownStock: boolean;
+  /** What it still lacks. */
+  missing: ("photo" | "description" | "weight" | "customs" | "cost")[];
+};
+
+export const MISSING: Record<Product["missing"][number], string> = {
+  photo: "No photo",
+  description: "No description",
+  weight: "No weight",
+  customs: "No customs details",
+  cost: "No cost",
 };
 
 export const STATUS: Record<Product["status"], { label: string; tone: "success" | "neutral" | "warning" }> = {

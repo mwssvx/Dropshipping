@@ -1816,3 +1816,7 @@ The app's order screen now has "Post it yourself" (or "Your own parcel" when a s
 ### Weight and cost from the app (after launch, part 334)
 
 The app's product screen now has "Weight packed (kg)" for anything that ships, so shipping rates by weight and packing slips work for products added on the phone. Your own stock also gets "What it costs you", with what you keep of each before fees shown under it, so Money can count your profit. Supplier products keep the supplier's cost. The button is now "Save changes".
+
+### Products that need details, in the app (after launch, part 335)
+
+The app's Products tab now has "Needs details" next to "All" when a product on your store still lacks a photo, a description, a weight, customs details or a cost. Each product there says what it lacks, like "No weight · No cost", so you can fill it in from the product screen. The rules are the same as the website's "Missing" filter.
