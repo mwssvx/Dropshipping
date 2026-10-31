@@ -1527,3 +1527,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **One tap to start** (`sendReviewRequests` in `packages/core/src/review-requests.ts`): when an order had one product, the "How was it?" email lists five star lines (★★★★★ down to ★☆☆☆☆), each a link to the order page with `?rate=N`. Orders with several products keep the list and the one "Leave a review" link.
 2. **The form is ready** (`ReviewForm.tsx`): the order page picks the tapped stars and puts the cursor in "Your review", so the buyer only has to write a line. They can still change the stars. No migration.
+
+### Saved replies for reviews (after launch, part 270)
+
+1. **Start from a saved reply** (`apps/web/src/app/admin/(shop)/reviews/ReplyForm.tsx`): the review reply box has the same "Start from" menu as the Inbox, using the store's saved replies. `{first_name}` becomes the reviewer's first name ("there" for an erased buyer), `{store_name}` the store and `{order_number}` the order when the review came from one. With no saved replies yet, the box links to Inbox → Saved replies.
+2. **Nothing half-filled goes public**: a field the review can't fill (like `{tracking_link}`) is flagged in the box, and saving is refused until it's replaced (`replyToReviewAction`), since a reply shows to every shopper. No migration.

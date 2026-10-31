@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { REVIEW_PAGE_SIZE, reportedReviewCount, reviewCounts, reviewPage, reviewPhotoUrl, reviewRequestStats } from "@sf/core";
+import { listSavedReplies, REVIEW_PAGE_SIZE, reportedReviewCount, reviewCounts, reviewPage, reviewPhotoUrl, reviewRequestStats } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { keepReportedReviewAction, moderateReviewAction, removeReviewPhotoAction, setReviewsAutoPublishAction } from "../../growth-actions";
 import { PageHeader } from "../PageHeader";
@@ -26,12 +26,20 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
   // Reported reviews are always published (hiding one clears its reports), so this filter opens that tab.
   const reported = params.reported === "1" && status === "published";
   const filtered = Boolean(q || stars || noReply || photos || reported);
-  const [{ reviews: rows, total }, counts, requests, reportedCount] = await Promise.all([
+  const [{ reviews: rows, total }, counts, requests, reportedCount, savedReplies] = await Promise.all([
     reviewPage(db, shop.id, { status, rating: stars, query: q, page, noReply, photos, reported }),
     reviewCounts(db, shop.id),
     reviewRequestStats(db, shop.id),
     reportedReviewCount(db, shop.id),
+    listSavedReplies(db, shop.id),
   ]);
+  const saved = savedReplies.map(({ id, title, body }) => ({ id, title, body }));
+  // What a saved reply's fields become for one review. A name erased to "Verified buyer" isn't one.
+  const replyValues = (name: string, orderNumber: number | null) => ({
+    "{first_name}": name === "Verified buyer" ? "there" : name.trim().split(/\s+/)[0] || "there",
+    "{store_name}": shop.name,
+    ...(orderNumber != null ? { "{order_number}": `#${orderNumber}` } : {}),
+  });
   const pages = Math.max(1, Math.ceil(total / REVIEW_PAGE_SIZE));
   const href = (change: { show?: string; stars?: number | null; q?: string | null; page?: number; noReply?: boolean; photos?: boolean; reported?: boolean }) => {
     const next = new URLSearchParams({ show: change.show ?? status });
@@ -142,7 +150,7 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
                     ))}
                   </ul>
                 )}
-                <ReplyForm id={r.id} reply={r.reply} />
+                <ReplyForm id={r.id} reply={r.reply} saved={saved} values={replyValues(r.name, orderNumber)} />
                 <div className="flex gap-2">
                   {r.status !== "published" && (
                     <form action={moderateReviewAction.bind(null, r.id, "published")}><button className="btn btn-primary">Publish</button></form>

@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
-import { createDiscount, moderateReview, notifyReviewReply, parseMoney, sendAbandonedCartEmails, setAbandonedCartOffer, setDiscountActive, setBirthdayOffer, setGrowthSettings, setSignupPopup, setThankYouNote, setPostPurchaseOffer, setReferralProgram, setReviewRequestDays, setSubscriptionOffer, setUpsell, setWelcomeOffer, setWinbackOffer, UserError } from "@sf/core";
+import { createDiscount, moderateReview, notifyReviewReply, parseMoney, sendAbandonedCartEmails, setAbandonedCartOffer, setDiscountActive, setBirthdayOffer, setGrowthSettings, setSignupPopup, setThankYouNote, setPostPurchaseOffer, setReferralProgram, setReviewRequestDays, setSubscriptionOffer, setUpsell, setWelcomeOffer, setWinbackOffer, unfilledFields, UserError } from "@sf/core";
 import { fulfillment, logged, mailer, requireShop, storeAddress, testPayments } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -239,7 +239,11 @@ export async function removeReviewPhotoAction(id: string, photoId: string) {
 
 export async function replyToReviewAction(id: string, _: FormState, form: FormData): Promise<FormState> {
   const { shop, db } = await requireShop("reviews");
-  await moderateReview(db, shop.id, id, { reply: String(form.get("reply") ?? "") });
+  const reply = String(form.get("reply") ?? "");
+  // A saved reply's field this review couldn't fill would show to every shopper as {tracking_link}.
+  const missing = unfilledFields(reply);
+  if (missing.length) return { error: `Replace ${missing.join(" and ")} first: this review has nothing to fill it with.` };
+  await moderateReview(db, shop.id, id, { reply });
   tellReviewer(shop, db, id);
   revalidatePath("/admin/reviews");
   return { saved: true };
