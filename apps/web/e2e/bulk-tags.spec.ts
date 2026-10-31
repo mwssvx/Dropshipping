@@ -43,4 +43,13 @@ test("a merchant tags many products at once, then undoes it", async ({ page }, i
   await expect(recent.getByText("Undone", { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByRole("navigation", { name: "Filter by tag" })).toHaveCount(0);
+
+  // Both come from the supplier's warehouse in China: set it on all of them at once.
+  await page.getByRole("checkbox", { name: "Select all products" }).check();
+  await page.getByLabel("Change", { exact: true }).selectOption({ label: "Set where they ship from" });
+  await page.getByLabel("Ships from (country code)").fill("CN");
+  await page.getByRole("button", { name: "Preview" }).click();
+  await expect(page.getByRole("table", { name: "What will change" }).getByRole("row", { name: /Magnetic Phone Stand/ })).toContainText("ships from China");
+  await page.getByRole("button", { name: "Apply to 2 products" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Set Ships from to China on 2 products." })).toBeVisible();
 });
