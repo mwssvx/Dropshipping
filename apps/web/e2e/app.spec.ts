@@ -770,3 +770,40 @@ test("a gift card sent, looked up by its code and turned off from the app", asyn
   await web.goto(`${WEB}/admin/activity`);
   await expect(web.getByText(`Gave a $25.00 gift card to ${friend} in the app`)).toBeVisible();
 });
+
+test("a holiday break started and ended from the app's settings", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `hb${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Beeswax Candle");
+  await web.getByLabel("Price", { exact: true }).fill("12.00");
+  await web.getByLabel("Stock", { exact: true }).fill("6");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const candle = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+
+  await signIn(page, email);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await expect(page.getByText("Open", { exact: true })).toBeVisible();
+  await page.getByRole("textbox", { name: "Back on" }).fill("2020-01-01");
+  await page.getByRole("button", { name: "Take a break" }).click();
+  await expect(page.getByText("Pick a date after today, or leave it empty to open the store yourself.")).toBeVisible();
+  const back = new Date(Date.now() + 10 * 86_400_000).toISOString().slice(0, 10);
+  await page.getByRole("textbox", { name: "Back on" }).fill(back);
+  await page.getByRole("textbox", { name: "Message to buyers" }).fill("Back from the trade fair soon.");
+  await shot(page, "353-app-store-break");
+  await page.getByRole("button", { name: "Take a break" }).click();
+  await expect(page.getByText(`Your store is on a break until ${back}. Buyers can look around but can't order.`)).toBeVisible();
+  await expect(page.getByText("On a break", { exact: true })).toBeVisible();
+
+  const buyer = await (await browser.newContext()).newPage();
+  await buyer.goto(candle);
+  await expect(buyer.getByText(/We're taking a break and back on .*orders are paused until then\./)).toBeVisible();
+  await expect(buyer.getByText("Back from the trade fair soon.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Open the store now" }).click();
+  await expect(page.getByText("Your store is open. Buyers can order again.")).toBeVisible();
+  await buyer.reload();
+  await expect(buyer.getByText(/orders are paused/)).toHaveCount(0);
+  await web.goto(`${WEB}/admin/activity`);
+  await expect(web.getByText("Put the store on a break in the app")).toBeVisible();
+});

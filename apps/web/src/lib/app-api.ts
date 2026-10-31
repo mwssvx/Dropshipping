@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  activeClosure,
+  setStoreClosure,
   listGiftCards,
   resendGiftCard,
   setGiftCardDisabled,
@@ -253,6 +255,25 @@ const routes: Record<string, Handler> = {
     return { ok: true };
   },
 
+  "GET store-status": async ({ shop }) => {
+    const c = activeClosure(shop);
+    return { mode: c?.mode ?? "open", message: c?.message ?? null, until: c?.until ?? null };
+  },
+  "PUT store-status": async ({ req, db, shop, user }) => {
+    const b = await body<{ mode?: unknown; message?: unknown; until?: unknown }>(req);
+    // A break or open from the phone; a password page (with its password) is set on the website.
+    const mode = b.mode === "holiday" ? "holiday" : b.mode === "open" ? "open" : null;
+    if (!mode) throw new HttpError(400, "Pick open or a break.");
+    const c = await setStoreClosure(db, shop, { mode, message: str(b.message), until: str(b.until) });
+    await logged({ shop, user, db }, mode === "open" ? "Opened the store to everyone in the app" : "Put the store on a break in the app", { href: "/admin/store-status" });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return {
+      mode,
+      message: c?.message ?? null,
+      until: c?.until ?? null,
+      said: mode === "open" ? "Your store is open. Buyers can order again." : `Your store is on a break${c?.until ? ` until ${c.until}` : ""}. Buyers can look around but can't order.`,
+    };
+  },
   "GET today": async ({ db, shop, role }) => {
     notifyLater(shop.id);
     const [today, returns, reviews] = await Promise.all([
@@ -807,6 +828,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("reviews")) return "reviews";
   if (path.startsWith("customers")) return "customers";
   if (path.startsWith("codes")) return "marketing";
+  if (path.startsWith("store-status")) return "theme";
   if (path.startsWith("gift-cards")) return "gift_cards";
   if (path.startsWith("sales")) return "marketing";
   if (path.startsWith("returns")) return "returns";
