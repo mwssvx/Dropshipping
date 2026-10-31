@@ -200,6 +200,13 @@ export async function homeShipping(
   return out;
 }
 
+/** The store's return window as schema.org `MerchantReturnPolicy`, for its products and for the store as a whole. */
+export function merchantReturnPolicy(shop: Pick<Shop, "country" | "returnWindowDays">, url?: string) {
+  return shop.returnWindowDays > 0
+    ? { "@type": "MerchantReturnPolicy", applicableCountry: shop.country, returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow", merchantReturnDays: shop.returnWindowDays, returnMethod: "https://schema.org/ReturnByMail", ...(url ? { merchantReturnLink: url } : {}) }
+    : { "@type": "MerchantReturnPolicy", applicableCountry: shop.country, returnPolicyCategory: "https://schema.org/MerchantReturnNotPermitted" };
+}
+
 /**
  * Shipping and returns for search engines, per option (schema.org `OfferShippingDetails` and
  * `MerchantReturnPolicy`), to the store's own country, from `homeShipping` and the return window.
@@ -214,10 +221,7 @@ export async function searchOfferExtras(
 ) {
   const out = new Map<string, Record<string, unknown>>();
   if (product.giftCard || product.digital) return out;
-  const returns =
-    shop.returnWindowDays > 0
-      ? { "@type": "MerchantReturnPolicy", applicableCountry: shop.country, returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow", merchantReturnDays: shop.returnWindowDays, returnMethod: "https://schema.org/ReturnByMail" }
-      : { "@type": "MerchantReturnPolicy", applicableCountry: shop.country, returnPolicyCategory: "https://schema.org/MerchantReturnNotPermitted" };
+  const returns = merchantReturnPolicy(shop);
   const shipping = await homeShipping(db, shop, variants);
   for (const v of variants) {
     const ship = shipping.get(v.id);

@@ -45,5 +45,7 @@ test("a merchant links the store's social pages from its footer", async ({ page,
   const ld = await buyer.locator('script[type="application/ld+json"]').allTextContents();
   const org = ld.map((t) => JSON.parse(t)).find((d) => d["@type"] === "Organization");
   expect(org.sameAs).toEqual(["https://instagram.com/mystore", "https://x.com/mystore"]);
+  // And the store's return window, for Google's store details.
+  expect(org.hasMerchantReturnPolicy).toMatchObject({ "@type": "MerchantReturnPolicy", merchantReturnDays: 30 });
   await buyerContext.close();
 });
