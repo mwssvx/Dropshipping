@@ -56,6 +56,14 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  addOwnSupplier,
+  listOwnSuppliers,
+  removeOwnSupplier,
+  resetSupplierLink,
+  SCORE_MIN_ORDERS,
+  supplierLabel,
+  supplierScorecard,
+  updateOwnSupplier,
   applySupplierCost,
   listCostChanges,
   resolveCostChange,
@@ -164,7 +172,7 @@ import {
 import type { Db } from "@sf/db";
 import { revalidatePath } from "next/cache";
 import { BRAND } from "./brand";
-import { agents, campaigns, db, fulfillment, logged, mailer, platformUrl, notifyLater, payments, refunds, stock, storeAddress, subscriptions, suppliers, tax, testPayments } from "./server";
+import { agents, campaigns, db, fulfillment, logged, mailer, platformUrl, notifyLater, payments, refunds, stock, storeAddress, subscriptions, supplierPortalUrl, suppliers, tax, testPayments } from "./server";
 
 type User = { id: string; email: string };
 type ShopLink = { id: string; name: string; handle: string; role: string };
@@ -799,6 +807,54 @@ const routes: Record<string, Handler> = {
     revalidatePath("/admin", "layout");
     return { ok: true, message: action === "raise" ? `Price raised to ${formatMoney(row.newPriceMinor!, shop.currency)}.` : "Price kept as it is." };
   },
+  // Suppliers: how each is doing, and the wholesalers and makers you email orders to.
+  "GET suppliers": async ({ db, shop }) => {
+    const [own, scores] = await Promise.all([listOwnSuppliers(db, shop.id), supplierScorecard(db, shop.id)]);
+    const available = suppliers().available;
+    return {
+      minOrders: SCORE_MIN_ORDERS,
+      scores: scores.map((s) => ({
+        id: s.supplier.id,
+        name: supplierLabel(suppliers(), s.supplier),
+        orders: s.orders,
+        failed: s.failed,
+        failedRate: s.failedRate,
+        shipDays: s.shipDays,
+        deliverDays: s.deliverDays,
+        problems: s.problems,
+        problemRate: s.problemRate,
+        grade: s.grade,
+        late: s.late,
+        productsWithoutBackup: s.grade === "poor" || s.grade === "watch" ? s.productsWithoutBackup : 0,
+      })),
+      services: [
+        { name: "cj", label: "CJ Dropshipping" },
+        { name: "aliexpress", label: "AliExpress" },
+      ].map((x) => ({ ...x, connected: available.some((a) => a.name === x.name) })),
+      own: own.map((o) => ({ id: o.id, name: o.name!, email: o.contactEmail!, link: supplierPortalUrl(o.portalToken), products: o.products, openOrders: o.openOrders })),
+    };
+  },
+  "POST suppliers": async ({ req, db, shop, user }) => {
+    const b = await body<{ name?: unknown; email?: unknown }>(req);
+    const row = await addOwnSupplier(db, shop.id, { name: str(b.name), email: str(b.email) });
+    await logged({ shop, user, db }, `Added ${row.name} as a supplier in the app`, { href: "/admin/suppliers" });
+    return { ok: true, message: `${row.name} added. Pick them as the supplier on their products on the website, and paid orders for those are emailed to them.` };
+  },
+  "PATCH suppliers/:id": async ({ req, params, db, shop }) => {
+    const b = await body<{ name?: unknown; email?: unknown }>(req);
+    const row = await updateOwnSupplier(db, shop.id, params.id!, { name: str(b.name), email: str(b.email) });
+    return { ok: true, message: `${row.name} saved.` };
+  },
+  "POST suppliers/:id/new-link": async ({ params, db, shop }) => {
+    const row = await resetSupplierLink(db, shop.id, params.id!);
+    return { ok: true, message: `${row.name} has a new link. The old one no longer works, so send them this one.`, link: supplierPortalUrl(row.portalToken) };
+  },
+  "DELETE suppliers/:id": async ({ params, db, shop, user }) => {
+    const own = (await listOwnSuppliers(db, shop.id)).find((o) => o.id === params.id);
+    await removeOwnSupplier(db, shop.id, params.id!);
+    await logged({ shop, user, db }, `Removed ${own?.name ?? "a supplier"} in the app`, { href: "/admin/suppliers" });
+    return { ok: true, message: `${own?.name ?? "The supplier"} removed.` };
+  },
   "GET questions": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
     const rows = await listQuestions(db, shop.id);
@@ -1378,6 +1434,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("blocked")) return "customers";
   if (path.startsWith("restock") || path.startsWith("stock-count")) return "products";
   if (path.startsWith("price-changes")) return "products";
+  if (path.startsWith("suppliers")) return "suppliers";
   if (path.startsWith("checkouts")) return "orders";
   if (path.startsWith("store-status")) return "theme";
   if (path.startsWith("gift-cards")) return "gift_cards";
