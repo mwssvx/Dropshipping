@@ -1968,3 +1968,7 @@ Today has a Partners button for people who look after marketing. Add a creator w
 ### Email campaigns in the app (after launch, part 372)
 
 Today has an Email campaigns button for people who look after marketing. It shows how many people said yes to emails and how many free emails are left this month, asks for the mailing address the law wants at the foot of every campaign if it's missing, and lists each campaign with how many it went to, clicked and bought. Write a new one (subject, a few lines, an optional button to a page on your store) for everyone who said yes, those who bought, those who haven't, or those who haven't bought in 90 days; send yourself a test; then send it, or delete the draft. Audiences by tag or product stay on the website.
+
+### The buyer survey in the app (after launch, part 373)
+
+Analytics in the app has How buyers found you, for people who look after marketing. Set up "How did you hear about us?" (start from the usual answers, change them, and let buyers type their own), change it or stop asking, and see what buyers said over 30 days, 90 days or a year: how many answered, each answer's orders, share and sales, and what they wrote in their own words.

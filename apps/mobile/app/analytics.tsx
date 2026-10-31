@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Text, View } from "react-native";
 import { useApi } from "../src/api";
 import { money } from "../src/format";
-import { useSession } from "../src/session";
+import { useCan, useSession } from "../src/session";
 import { BackLink, Body, Card, EmptyState, Heading, List, LoadError, Loading, Row, Screen, Section, Segmented, Stat } from "../src/ui";
 import { color, space } from "../src/theme";
 
@@ -33,6 +33,7 @@ const pct = (x: number | null) => (x === null ? "–" : `${(Math.round(x * 1000)
 /** How the store is doing: sales, orders and visitors over a week, a month or three, against the days before. */
 export default function AnalyticsScreen() {
   const cur = useSession().me?.shop.currency ?? "USD";
+  const can = useCan();
   const [days, setDays] = useState<Days>("7");
   const [compare, setCompare] = useState<"previous" | "year">("previous");
   const data = useApi<Report>(`analytics?days=${days}&compare=${compare}`);
@@ -129,6 +130,11 @@ export default function AnalyticsScreen() {
               </List>
               <Body muted>Add ?utm_source=instagram to the links you post to see each one here.</Body>
             </Section>
+          ) : null}
+          {can("marketing") ? (
+            <List>
+              <Row href="/survey" title="How buyers found you" subtitle="The buyer survey on the order page, and what they answered" />
+            </List>
           ) : null}
           <View style={{ height: space(4) }} />
         </>
