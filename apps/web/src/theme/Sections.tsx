@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { announcementMessages, featuredViewAll, pickFeatured, type Section, type SectionSettings, type TrustIcon } from "@sf/core/theme";
+import { Fragment } from "react";
+import { announcementMessages, collectionTabs, featuredViewAll, pickFeatured, type Section, type SectionSettings, type TrustIcon } from "@sf/core/theme";
 import type { PostCard, StorefrontCatalog } from "@sf/core";
 import { cardBadges, type Badge, type BadgeFacts } from "@sf/core/badges";
 import type { BadgeSettings } from "@sf/db";
@@ -15,6 +16,7 @@ import { Slideshow } from "./Slideshow";
 import { Countdown } from "./Countdown";
 import { ScrollingText } from "./ScrollingText";
 import { BeforeAfter } from "./BeforeAfter";
+import { CollectionTabs } from "./CollectionTabs";
 import { storeHref } from "./style";
 
 /*
@@ -443,6 +445,29 @@ function BeforeAfterSection({ s, data }: Props<"before_after">) {
   );
 }
 
+function CollectionTabsSection({ s, data }: Props<"collection_tabs">) {
+  const t = data.t ?? storeText(null);
+  const { products, collections } = data.catalog;
+  const tabs = collectionTabs(s.collectionIds, collections, (id) => products.some((p) => p.id === id));
+  if (!tabs.length) return null;
+  const grids = tabs.map((c) => {
+    const shown = c.productIds.map((id) => products.find((p) => p.id === id)).filter((p) => !!p).slice(0, s.limit);
+    return (
+      <Fragment key={c.id}>
+        <ProductGrid products={shown} data={data} />
+        <Link href={`${data.base}/collections/${c.handle}`} className="btn btn-secondary self-center">{t.shopCollection(c.title)}</Link>
+      </Fragment>
+    );
+  });
+  return (
+    <section className="max-w-6xl mx-auto px-4 sm:px-6 py-12 flex flex-col gap-6" aria-label={s.heading || undefined}>
+      <SectionHeading text={s.heading} base={data.base} />
+      {/* One collection needs no tabs. */}
+      {tabs.length === 1 ? grids[0] : <CollectionTabs tabs={tabs.map((c) => c.title)} label={s.heading || t.collectionTabs}>{grids}</CollectionTabs>}
+    </section>
+  );
+}
+
 function RichText({ s }: Props<"rich_text">) {
   if (!s.heading && !s.text) return null;
   return (
@@ -711,6 +736,7 @@ export function SectionView({ section, data, first }: { section: Section; data: 
     case "scrolling_text": return <ScrollingTextSection s={section.settings} data={data} first={first} />;
     case "gallery": return <Gallery s={section.settings} data={data} first={first} />;
     case "before_after": return <BeforeAfterSection s={section.settings} data={data} first={first} />;
+    case "collection_tabs": return <CollectionTabsSection s={section.settings} data={data} first={first} />;
   }
 }
 

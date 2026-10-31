@@ -1451,3 +1451,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Ask on every page** (`apps/web/src/theme/FooterSignup.tsx`): tick "Ask for emails in the footer of every page" in the theme editor's Style tab and every store page's footer gets a short "Get news and offers by email" form, not just the home page.
 2. **Shoppers stay put**: signing up answers right there in the footer, so a shopper reading a product page never loses their place. It's the same confirm-by-email signup as the home page form and the pop-up, so nobody is added without confirming. The editor preview shows the form with its button greyed out. Off by default; one new store string in all six languages. No migration: it lives in the theme.
+
+### Collection tabs (after launch, part 255)
+
+1. **Several collections in one spot** (`apps/web/src/theme/CollectionTabs.tsx`): a new home page section in the theme editor. Tick up to five collections, like "New in", "Best sellers" and "Gifts", and shoppers switch between them as tabs over one product grid, with a "Shop all" button under each that opens the whole collection. Tabs come in the order you tick them; tick none and the first collections are used.
+2. **Never empty, works for everyone**: a collection with nothing on sale gets no tab, one collection left shows just its grid without tabs, and none hides the section. The tabs follow the usual pattern for screen readers: the arrow keys, Home and End move between them, and only the chosen tab sits in the Tab order. Two new store strings in all six languages. No migration: it lives in the theme.
