@@ -106,6 +106,13 @@ export default function Settings() {
         </Section>
       ) : null}
       {can("theme") ? <StoreStatusCard /> : null}
+      {can("shipping") ? (
+        <Section title="Shipping">
+          <List>
+            <Row href="/ship-pause" title="Shipping pause" subtitle="Your supplier is closed for a while: keep selling, and say when orders ship" />
+          </List>
+        </Section>
+      ) : null}
       {can("team") ? (
         <Section title="Team">
           <List>

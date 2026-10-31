@@ -56,6 +56,10 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  activeShipPause,
+  setShipPause,
+  SHIP_PAUSE_MAX_DAYS,
+  SHIP_PAUSE_MESSAGE_MAX,
   codeBatchCsv,
   createCodeBatch,
   listCodeBatches,
@@ -1338,6 +1342,20 @@ const routes: Record<string, Handler> = {
     const rows = csv.trim().split("\n").slice(1).map((l) => l.split(","));
     return { codes: rows.map(([code, used, order]) => ({ code: code!, used: used === "yes", order: order || null })), csv };
   },
+  // A shipping pause: the supplier is closed for a while, orders keep coming, and every page says when they ship.
+  "GET ship-pause": async ({ shop }) => ({
+    pause: shop.shipPause,
+    active: !!activeShipPause(shop),
+    maxDays: SHIP_PAUSE_MAX_DAYS,
+    messageMax: SHIP_PAUSE_MESSAGE_MAX,
+  }),
+  "PUT ship-pause": async ({ req, db, shop, user }) => {
+    const b = await body<{ on?: unknown; from?: unknown; resumesOn?: unknown; message?: unknown }>(req);
+    const saved = await setShipPause(db, shop.id, b.on === true ? { from: str(b.from), resumesOn: str(b.resumesOn), message: str(b.message) } : null);
+    await logged({ shop, user, db }, saved ? `Paused shipping until ${saved.resumesOn} in the app` : "Ended the shipping pause in the app", { href: "/admin/shipping#pause-heading" });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: saved ? "Saved. Your store says when orders ship again, and delivery dates move to match." : "Shipping pause ended. Delivery dates are back to normal." };
+  },
   "GET questions": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
     const rows = await listQuestions(db, shop.id);
@@ -1951,6 +1969,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("bank-transfers")) return "orders";
   if (path.startsWith("checkouts")) return "orders";
   if (path.startsWith("store-status")) return "theme";
+  if (path.startsWith("ship-pause")) return "shipping";
   if (path.startsWith("gift-cards")) return "gift_cards";
   if (path.startsWith("sales")) return "marketing";
   if (path.startsWith("returns")) return "returns";

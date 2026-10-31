@@ -2000,3 +2000,7 @@ The app's Customers screen has a "Tag customers automatically" row. Add a rule (
 ### One-time codes in the app (after launch, part 380)
 
 The app's Discount codes screen has a One-time codes row. Make a batch of codes that each work once (a name, how each code starts, how many, and what they give, with an optional smallest order and last day), see how many were used, look through the codes and which order used each one, share them all as a spreadsheet, and turn a batch off or on.
+
+### Shipping pause in the app (after launch, part 381)
+
+The app's Settings has a Shipping pause row for people who look after shipping. When the supplier closes for a while, pause shipping from your phone with the day orders ship again (and, if you like, the day it starts and a note for buyers). Orders keep coming in, every page says when they ship, and delivery dates move to match. Turn it off to end the pause early.
