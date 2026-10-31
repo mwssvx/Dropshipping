@@ -1,0 +1,1 @@
+ALTER TABLE "blog_posts" ADD COLUMN "tags" jsonb DEFAULT '[]'::jsonb NOT NULL;

@@ -32,7 +32,7 @@ export default async function EditPostPage({ params, searchParams }: { params: P
         ) : undefined} />
       <div className="px-4 sm:px-8 flex flex-col gap-6">
         <PostForm action={updatePostAction.bind(null, post.id)} submitLabel="Save" saved={query.saved === "1"} drafted={query.drafted === "1"} products={choices}
-          initial={{ title: post.title, handle: post.handle, excerpt: post.excerpt ?? "", body: post.body, imageUrl: post.imageUrl ?? "", productIds: post.productIds, published: post.status === "published", publishAt: isScheduled(post) ? post.publishedAt!.toISOString() : "" }} />
+          initial={{ title: post.title, handle: post.handle, excerpt: post.excerpt ?? "", body: post.body, imageUrl: post.imageUrl ?? "", productIds: post.productIds, tags: post.tags.join(", "), published: post.status === "published", publishAt: isScheduled(post) ? post.publishedAt!.toISOString() : "" }} />
         <form action={deletePostAction.bind(null, post.id)}>
           <button className="text-sm text-critical hover:underline">Delete this post</button>
         </form>

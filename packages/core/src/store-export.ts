@@ -225,6 +225,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       body: p.body,
       image_url: p.imageUrl,
       products: p.productIds.map((id) => handleOf.get(id)).filter((h): h is string => !!h),
+      tags: p.tags,
       published_at: p.status === "published" ? p.publishedAt?.toISOString() ?? null : null,
     })),
     discount_codes: discounts.map((d) => ({
@@ -477,6 +478,7 @@ const importSchema = z.object({
         body: str(60_000).default(""),
         image_url: str(2000).nullable().optional(),
         products: z.array(handle).max(8).default([]),
+        tags: z.array(str(30)).max(5).default([]),
         published_at: z.string().datetime().nullable().optional(),
       }),
     )
@@ -736,6 +738,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
           body: x.body.replace(/<[^>]*>/g, ""),
           imageUrl: x.image_url && /^https:\/\//.test(x.image_url) ? x.image_url : null,
           productIds: x.products.map((h) => productIds.get(h)).filter((id): id is string => !!id),
+          tags: x.tags,
           status: x.published_at ? ("published" as const) : ("draft" as const),
           publishedAt: x.published_at ? new Date(x.published_at) : null,
         })),

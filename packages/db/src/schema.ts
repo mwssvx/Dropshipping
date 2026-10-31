@@ -1825,6 +1825,8 @@ export const blogPosts = pgTable(
     body: text("body").notNull().default(""),
     imageUrl: text("image_url"),
     productIds: jsonb("product_ids").$type<string[]>().notNull().default([]),
+    // Topics ("Guides", "News"), up to 5: the blog page lists them and shows one topic's posts.
+    tags: jsonb("tags").$type<string[]>().notNull().default([]),
     status: text("status", { enum: ["draft", "published"] }).notNull().default("draft"),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     aiGenerated: boolean("ai_generated").notNull().default(false),
