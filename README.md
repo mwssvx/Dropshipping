@@ -1996,3 +1996,7 @@ The Products tab has a Bundles row for people who look after marketing. Name a s
 ### Tag customers automatically, in the app (after launch, part 379)
 
 The app's Customers screen has a "Tag customers automatically" row. Add a rule (spent at least an amount, placed at least so many orders, bought a product, or haven't ordered in so many days) with the tag it gives, see how many customers have each tag now, and remove a rule. Customers who already match get the tag straight away, and lose it when they stop matching.
+
+### One-time codes in the app (after launch, part 380)
+
+The app's Discount codes screen has a One-time codes row. Make a batch of codes that each work once (a name, how each code starts, how many, and what they give, with an optional smallest order and last day), see how many were used, look through the codes and which order used each one, share them all as a spreadsheet, and turn a batch off or on.

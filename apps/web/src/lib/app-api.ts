@@ -56,6 +56,11 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  codeBatchCsv,
+  createCodeBatch,
+  listCodeBatches,
+  MAX_BATCH,
+  setCodeBatchActive,
   createTagRule,
   deleteTagRule,
   describeTagRule,
@@ -1283,6 +1288,56 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, `Removed the tag rule for "${rule.tag}" in the app`, { href: "/admin/customers#tag-rules" });
     return { ok: true, message: `Removed. Customers it tagged lose “${rule.tag}”, unless you gave it by hand.` };
   },
+  // One-time codes: a batch of codes that each work once, for parcel cards, influencer boxes or a pop-up stand.
+  "GET code-batches": async ({ db, shop }) => {
+    const batches = await listCodeBatches(db, shop.id);
+    return {
+      max: MAX_BATCH,
+      batches: batches.map((b) => ({
+        id: b.id,
+        name: b.name,
+        prefix: b.prefix,
+        count: b.count,
+        used: b.used,
+        active: b.active,
+        offer: b.kind === "free_shipping" ? "Free shipping" : b.kind === "percent" ? `${b.value}% off` : `${formatMoney(b.value, shop.currency)} off`,
+        minSubtotalMinor: b.minSubtotalMinor,
+        endsAt: b.endsAt,
+      })),
+    };
+  },
+  "POST code-batches": async ({ req, db, shop, user }) => {
+    const b = await body<Record<string, unknown>>(req);
+    const kind = (["percent", "amount", "free_shipping"] as const).find((k) => k === b.kind) ?? "percent";
+    const raw = str(b.value).trim().replace(/^[^\d]+/, "");
+    const min = str(b.minSubtotal).trim().replace(/^[^\d]+/, "");
+    const ends = str(b.endsAt).trim();
+    const endsAt = ends ? new Date(`${ends}T23:59:59Z`) : null;
+    if (endsAt && Number.isNaN(endsAt.getTime())) throw new UserError("Enter dates as YYYY-MM-DD.");
+    const batch = await createCodeBatch(db, shop.id, {
+      name: str(b.name),
+      prefix: str(b.prefix),
+      count: Number.parseInt(str(b.count) || "0", 10) || 0,
+      kind,
+      value: kind === "percent" ? Number.parseInt(raw || "0", 10) : kind === "amount" ? parseMoney(raw || "0") : 0,
+      minSubtotalMinor: min ? parseMoney(min) : 0,
+      endsAt,
+    });
+    await logged({ shop, user, db }, `Made ${batch.count} one-time codes (${batch.name}) in the app`, { href: "/admin/marketing#one-time-codes" });
+    return { ok: true, id: batch.id, message: `Made ${batch.count === 1 ? "1 code" : `${batch.count} codes`}. Each one works once.` };
+  },
+  "POST code-batches/:id": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ active?: unknown }>(req);
+    const batch = await setCodeBatchActive(db, shop.id, params.id!, b.active === true);
+    await logged({ shop, user, db }, `${batch.active ? "Turned on" : "Turned off"} the one-time codes ${batch.name} in the app`, { href: "/admin/marketing#one-time-codes" });
+    return { ok: true, message: batch.active ? `${batch.name} codes work again.` : `${batch.name} codes are off. Codes already used stay used.` };
+  },
+  "GET code-batches/:id/codes": async ({ params, db, shop }) => {
+    // The spreadsheet's rows: Code, Used, Order, Used on. Codes are letters, numbers and a dash, so no quoting.
+    const { csv } = await codeBatchCsv(db, shop.id, params.id!);
+    const rows = csv.trim().split("\n").slice(1).map((l) => l.split(","));
+    return { codes: rows.map(([code, used, order]) => ({ code: code!, used: used === "yes", order: order || null })), csv };
+  },
   "GET questions": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
     const rows = await listQuestions(db, shop.id);
@@ -1874,6 +1929,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("reviews")) return "reviews";
   if (path.startsWith("customers")) return "customers";
   if (path.startsWith("codes")) return "marketing";
+  if (path.startsWith("code-batches")) return "marketing";
   if (path.startsWith("disputes")) return "money";
   if (path.startsWith("questions")) return "reviews";
   if (path.startsWith("payment-links")) return "orders";

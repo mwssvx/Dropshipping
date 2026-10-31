@@ -1887,3 +1887,59 @@ test("tag rules added in the app tag the buyers who match", async ({ page, brows
   await expect(page.getByText("Removed. Customers it tagged lose “vip”, unless you gave it by hand.")).toBeVisible();
   await expect(page.getByRole("group", { name: "Spent $40.00 or more: vip" })).toHaveCount(0);
 });
+
+test("one-time codes made in the app, used once, then turned off", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `cb${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Clay Mug");
+  await web.getByLabel("Price", { exact: true }).fill("30.00");
+  await web.getByLabel("Stock", { exact: true }).fill("9");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const mug = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Discount codes" }).click();
+  await page.getByRole("link", { name: /^One-time codes/ }).click();
+  await expect(page.getByRole("heading", { name: "One-time codes", level: 1 })).toBeVisible();
+  await page.getByRole("textbox", { name: "Name" }).fill("Parcel cards");
+  await page.getByRole("textbox", { name: "Codes start with" }).fill("thanks");
+  await page.getByRole("textbox", { name: "How many codes" }).fill("3");
+  await page.getByRole("textbox", { name: "Percent off" }).fill("15");
+  await page.getByRole("button", { name: "Make the codes" }).click();
+  await expect(page.getByText("Made 3 codes. Each one works once.")).toBeVisible();
+  const batch = page.getByRole("group", { name: "Parcel cards" });
+  await expect(batch).toContainText("15% off · THANKS-…");
+  await expect(batch).toContainText("0 of 3 used");
+  await batch.getByRole("button", { name: "See the Parcel cards codes" }).click();
+  const first = batch.getByText(/^THANKS-[A-Z2-9]{8}$/).first();
+  const code = (await first.textContent())!;
+  await expect(batch.getByText("Not used")).toHaveCount(3);
+  await shot(page, "380-app-one-time-codes");
+
+  const buyer = await (await browser.newContext()).newPage();
+  await buyer.goto(mug);
+  await buyer.getByRole("button", { name: "Add to cart" }).click();
+  await buyer.getByLabel("Discount or gift card code").fill(code.toLowerCase());
+  await buyer.getByRole("button", { name: "Apply" }).click();
+  await expect(buyer.getByText(`Discount (${code})`)).toBeVisible();
+  await buyer.getByRole("link", { name: "Check out" }).click();
+  await buyer.getByRole("textbox", { name: "Email" }).first().fill(`ada-${Date.now()}@example.com`);
+  await buyer.getByLabel("Full name").fill("Ada Lovelace");
+  await buyer.getByLabel("Address", { exact: true }).fill("1 Main St");
+  await buyer.getByLabel("City").fill("Austin");
+  await buyer.getByLabel("State or region").fill("TX");
+  await buyer.getByLabel("Postal code").fill("78701");
+  await buyer.getByRole("button", { name: "Continue to payment" }).click();
+  await buyer.getByRole("button", { name: /^Pay / }).click();
+  await expect(buyer.getByRole("heading", { name: "Thank you, Ada!" })).toBeVisible();
+
+  await page.reload();
+  const again = page.getByRole("group", { name: "Parcel cards" });
+  await expect(again).toContainText("1 of 3 used");
+  await again.getByRole("button", { name: "See the Parcel cards codes" }).click();
+  await expect(again.getByText("Used on #1001")).toBeVisible();
+  await again.getByRole("button", { name: "Turn off Parcel cards" }).click();
+  await expect(page.getByText("Parcel cards codes are off. Codes already used stay used.")).toBeVisible();
+  await expect(again).toContainText("Off");
+});
