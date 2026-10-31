@@ -209,3 +209,20 @@ export function postSummary(post: Pick<Post, "excerpt" | "body">, max = 160) {
 /** Roughly how long the post takes to read, at 220 words a minute. */
 export const readingMinutes = (body: string) => Math.max(1, Math.round(body.split(/\s+/).filter(Boolean).length / 220));
 
+/**
+ * A campaign written from a post that's up on the store: its title as the subject, its summary,
+ * and a button to read it. Null for drafts and posts still waiting for their time.
+ */
+export async function postEmail(db: Db, shopId: string, postId: string, now = new Date()) {
+  const post = await db.query.blogPosts.findFirst({ where: and(eq(schema.blogPosts.id, postId), eq(schema.blogPosts.shopId, shopId), livePost(now)) });
+  if (!post) return null;
+  return {
+    subject: post.title.slice(0, 150),
+    body: `Hi {first_name},\n\nNew on our blog: ${post.title}\n\n${postSummary(post, 600)}`,
+    buttonLabel: "Read the post",
+    buttonPath: `/blog/${post.handle}`,
+    audience: "subscribers" as const,
+    audienceTag: null,
+    audienceProductId: null,
+  };
+}

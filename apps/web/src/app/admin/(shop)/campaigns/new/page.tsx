@@ -1,18 +1,19 @@
 import Link from "next/link";
-import { campaignAudienceChoices, earlyAccessEmail, saleEmail } from "@sf/core";
+import { campaignAudienceChoices, earlyAccessEmail, postEmail, saleEmail } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../../PageHeader";
 import { CampaignEditor } from "../CampaignForms";
 
 export const metadata = { title: "New campaign" };
 
-export default async function NewCampaignPage({ searchParams }: { searchParams: Promise<{ early?: string; sale?: string }> }) {
+export default async function NewCampaignPage({ searchParams }: { searchParams: Promise<{ early?: string; sale?: string; post?: string }> }) {
   const { shop, db } = await requireShop("marketing");
-  const { early, sale } = await searchParams;
+  const { early, sale, post } = await searchParams;
   const options = await campaignAudienceChoices(db, shop.id);
   // From the Sales page: the announcement of a sale's early access, or of the sale itself, written.
+  // From a blog post: the post, to send to subscribers.
   const uuid = (v?: string) => !!v && /^[0-9a-f-]{36}$/.test(v);
-  const initial = uuid(early) ? await earlyAccessEmail(db, shop, early!) : uuid(sale) ? await saleEmail(db, shop, sale!) : null;
+  const initial = uuid(early) ? await earlyAccessEmail(db, shop, early!) : uuid(sale) ? await saleEmail(db, shop, sale!) : uuid(post) ? await postEmail(db, shop.id, post!) : null;
   return (
     <main className="pb-12">
       <PageHeader title="New campaign" back={<Link href="/admin/campaigns" className="hint hover:text-ink">← Email campaigns</Link>} />

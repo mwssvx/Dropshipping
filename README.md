@@ -1552,3 +1552,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Publish on a day you pick** (`packages/core/src/blog.ts`): the post editor has "Publish on (optional)" under Published. With a time there the post is saved as published but stays off the store (the blog, its own address, home page cards, search, the RSS feed and the sitemap) until then, and the blog list says "Scheduled for Nov 3, 2026". Times are picked in the merchant's own time zone and can be up to a year ahead.
 2. **Changing your mind**: move the time, clear it to publish on save, or untick Published to take it back as a draft (it keeps no publish date, since it never went up). A live post keeps its first publish date as before. No migration: a scheduled post is a published post with a publish date still to come (`livePost`, `isScheduled`).
+
+### Email a blog post (after launch, part 275)
+
+1. **From the post** (`postEmail` in `packages/core/src/blog.ts`): a post that's up on the store has "Email to subscribers" next to View, for staff who can do marketing. It opens a new campaign already written: the post's title as the subject, "New on our blog" with its summary, and a "Read the post" button to it. Change anything before sending or scheduling, as with any campaign.
+2. Drafts and posts still waiting for their time get no button and no prefilled email. No migration.
