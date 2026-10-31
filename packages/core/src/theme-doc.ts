@@ -286,6 +286,8 @@ const themeDoc = z.object({
     paymentIcons: z.boolean().default(true),
     // Product cards show their stars and review count, once they have published reviews.
     cardRatings: z.boolean().default(true),
+    // A button to jump back to the top appears once a shopper has scrolled a long way down.
+    backToTop: z.boolean().default(false),
     logoText: text(60),
     logoUrl: imageUrl,
     // The store's pages on social networks, as icons in the footer. Empty ones don't show.

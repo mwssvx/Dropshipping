@@ -1408,3 +1408,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Ratings where shoppers choose** (`apps/web/src/theme/Sections.tsx`): product cards on the home page, collection pages and search results now show the product's stars and how many reviews it has, under its title. Only published reviews count, and a product without any shows no stars, so a new product never looks badly rated.
 2. **One quick lookup**: `productRatings` in `packages/core/src/reviews.ts` averages every card's reviews in a single grouped query, only for the cards on the page.
 3. **On by default, easy to turn off**: the theme editor's Style tab has "Show star ratings on product cards". Screen readers hear "4.5 out of 5 stars, 2 reviews". No migration: the setting lives in the theme and stores saved earlier get it on.
+
+### Back to top (after launch, part 247)
+
+1. **A way back up from long pages** (`apps/web/src/theme/BackToTop.tsx`): tick "Show a “Back to top” button on long pages" in the theme editor's Style tab and a small button appears in the bottom corner once a shopper has scrolled two screens down a store page, like a long collection or blog post.
+2. **Calm and reachable**: it slides back up smoothly, or jumps at once for shoppers who ask their device for less motion, and puts keyboard focus back in the header so keyboard users carry on from the top. It sits opposite the chat buttons and above the phone Add to cart bar. Off by default; one new store string in all six languages. No migration: it lives in the theme.
