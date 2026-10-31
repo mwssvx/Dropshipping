@@ -1,4 +1,4 @@
-import { browseProducts, compactProducts, getCollectionByHandle, gridPage, NotFoundError } from "@sf/core";
+import { browseProducts, compactProducts, getCollectionByHandle, gridPage, NotFoundError, productRatings } from "@sf/core";
 import { db } from "@/lib/server";
 import { buyerFx } from "@/lib/currency";
 import { BrowseBar, browseOptions, ShowMore, type BrowseParams } from "@/theme/Browse";
@@ -37,8 +37,10 @@ export default async function CollectionPage({ params, searchParams }: { params:
   const { products, sort, facets } = await browseProducts(await db(), shop.id, all, { ...browseOptions(query), sort: query.sort || natural, q: undefined }, fx);
   // Long collections come 24 at a time; only those are translated and drawn.
   const paged = gridPage(products.length, query.page);
-  // The grid takes the catalog's compact product shape.
-  const compact = await localProducts(param, compactProducts(products.slice(0, paged.shown)));
+  // The grid takes the catalog's compact product shape, with each card's stars.
+  const shown = products.slice(0, paged.shown);
+  const [local, ratings] = await Promise.all([localProducts(param, compactProducts(shown)), productRatings(await db(), shop.id, shown.map((p) => p.id))]);
+  const compact = local.map((p) => ({ ...p, rating: ratings.get(p.id) ?? null }));
   const t = await storeT(param);
   const data = { base, currency: shop.currency, fx, t, badges: shop.productBadges, quickAdd: shop.cardQuickAdd ? addToCartAction.bind(null, param) : undefined, catalog: { products: compact, collections: [] } };
   const filtered = !!(query.min || query.max || query.stock || query.sale || query.opt);

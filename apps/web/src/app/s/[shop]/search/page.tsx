@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { after } from "next/server";
-import { compactProducts, gridPage, recordSearch, searchPages, searchProducts, type SearchLink } from "@sf/core";
+import { compactProducts, gridPage, productRatings, recordSearch, searchPages, searchProducts, type SearchLink } from "@sf/core";
 import { db } from "@/lib/server";
 import { buyerFx } from "@/lib/currency";
 import { BrowseBar, browseOptions, ShowMore, type BrowseParams } from "@/theme/Browse";
@@ -21,7 +21,9 @@ export default async function SearchPage({ params, searchParams }: { params: Pro
   const [base, fx] = await Promise.all([storeBase(param), buyerFx(shop)]);
   const { products, sort, facets, showingFor } = await searchProducts(await db(), shop.id, browseOptions(query), fx);
   const paged = gridPage(products.length, query.page);
-  const compact = await localProducts(param, compactProducts(products.slice(0, paged.shown)));
+  const shown = products.slice(0, paged.shown);
+  const [local, ratings] = await Promise.all([localProducts(param, compactProducts(shown)), productRatings(await db(), shop.id, shown.map((p) => p.id))]);
+  const compact = local.map((p) => ({ ...p, rating: ratings.get(p.id) ?? null }));
   const t = await storeT(param);
   const q = query.q?.trim();
   // Collections, pages and posts with the words in their title, above the products.

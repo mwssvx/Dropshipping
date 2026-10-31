@@ -1402,3 +1402,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Several big pictures that take turns** (`apps/web/src/theme/Slideshow.tsx`): a new home page section in the theme editor. Add up to five slides, each with a picture, a heading, a few words and a button, and pick how many seconds each one shows, the height and where the text sits.
 2. **Shoppers stay in charge**: arrows and dots move between slides, a pause button stops it, and it holds still while a shopper points at it or tabs into it. Shoppers who ask their device for less motion get it paused from the start. Slides not on screen can't be reached by keyboard or screen reader, and the slide a shopper picks is read out.
 3. **No gaps, no jumps**: a slide with no picture and no heading yet stays hidden, and every slide shares one space, so the page doesn't move when they change. The first slide's picture loads first when the slideshow opens the page. Seven new store strings in all six languages. No migration: it lives in the theme.
+
+### Stars on product cards (after launch, part 246)
+
+1. **Ratings where shoppers choose** (`apps/web/src/theme/Sections.tsx`): product cards on the home page, collection pages and search results now show the product's stars and how many reviews it has, under its title. Only published reviews count, and a product without any shows no stars, so a new product never looks badly rated.
+2. **One quick lookup**: `productRatings` in `packages/core/src/reviews.ts` averages every card's reviews in a single grouped query, only for the cards on the page.
+3. **On by default, easy to turn off**: the theme editor's Style tab has "Show star ratings on product cards". Screen readers hear "4.5 out of 5 stars, 2 reviews". No migration: the setting lives in the theme and stores saved earlier get it on.
