@@ -8,7 +8,7 @@ import { Body, Button, EmptyState, Field, List, LoadError, Loading, Pill, Row, S
 
 export default function ProductsScreen() {
   const router = useRouter();
-  const list = useApi<{ products: Product[] }>("products");
+  const list = useApi<{ products: Product[]; priceRises?: number }>("products");
   const cur = useSession().me?.shop.currency ?? "USD";
   const [show, setShow] = useState<"all" | "low" | "sold_out" | "missing">("all");
   const all = list.data?.products ?? [];
@@ -68,6 +68,11 @@ export default function ProductsScreen() {
       <List>
         <Row href="/restock" title="Restock orders" subtitle="Stock you keep yourself, on the way from a supplier" />
         <Row href="/stock-count" title="Count stock" subtitle="Walk the shelves and set what's really there" />
+        <Row
+          href="/price-changes"
+          title={list.data?.priceRises ? `Price changes (${list.data.priceRises} to look at)` : "Price changes"}
+          subtitle="When a supplier starts charging more"
+        />
       </List>
     </Screen>
   );

@@ -1944,3 +1944,7 @@ The Products tab ends with Restock orders, for the stock you keep yourself: what
 ### Counting stock in the app (after launch, part 366)
 
 The Products tab has Count stock, for the stock you keep yourself. Walk the shelves with the phone: find each option by name, SKU, shelf or barcode (a Bluetooth scanner types it into the search box), enter what's there, and see straight away whether it matches or how many are missing. Saving sets the stock to what was counted, notes each change in the option's history, and says how many went missing and what they cost, as the website's count does. Options left empty aren't touched.
+
+### Price changes in the app (after launch, part 367)
+
+The Products tab has Price changes, with a count when a supplier has started charging more. Each rise shows the cost before and after, the price, and the margin before and after, in red when it's below the margin you want. One tap raises the price with your pricing rule (noted in the activity log), or keeps it, and the website shows it dealt with. The same screen sets the margin that sends a warning and turns automatic raises on or off, and in test mode can simulate a rise.

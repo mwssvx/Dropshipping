@@ -1290,3 +1290,40 @@ test("a stock count from the app sets what's really on the shelf", async ({ page
   await web.reload();
   await expect(web.getByLabel("Stock", { exact: true })).toHaveValue("4");
 });
+
+test("a supplier price rise raised from the app, and the price watch set there", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `pc${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/import`);
+  await web.getByRole("link", { name: /sunset projection lamp/i }).click();
+  await web.getByRole("button", { name: "Import and publish" }).click();
+  await expect(web.getByText("Imported and live on your store.")).toBeVisible();
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Price changes/ }).click();
+  await expect(page.getByRole("heading", { name: "Price changes", level: 1 })).toBeVisible();
+  await expect(page.getByText("No supplier has raised a price.")).toBeVisible();
+
+  // A margin the store can't use is turned down; a real one is saved.
+  const watch = page.getByRole("region", { name: "Price watch" });
+  await watch.getByRole("textbox", { name: "Warn me below this margin (%)" }).fill("95");
+  await watch.getByRole("button", { name: "Save price watch" }).click();
+  await expect(page.getByText("Use a margin from 0% to 90%.")).toBeVisible();
+  await watch.getByRole("textbox", { name: "Warn me below this margin (%)" }).fill("25");
+  await watch.getByRole("button", { name: "Save price watch" }).click();
+  await expect(page.getByText("Saved.", { exact: true })).toBeVisible();
+
+  // Test mode: the supplier now charges 90% of the price.
+  await page.getByRole("button", { name: /^Simulate a supplier price rise for/ }).click();
+  const rise = page.getByRole("group", { name: /sunset projection lamp/i });
+  await expect(rise.getByText(/Margin \d+% → 10%, below your 25%/)).toBeVisible();
+  await shot(page, "367-app-price-rise");
+  await rise.getByRole("button", { name: /^Raise to \$/ }).click();
+  await expect(page.getByText(/^Price raised to \$/)).toBeVisible();
+  await expect(page.getByText("No supplier has raised a price.")).toBeVisible();
+  await expect(page.getByText("Price raised", { exact: true })).toBeVisible();
+
+  // The website shows it dealt with.
+  await web.goto(`${WEB}/admin/price-changes`);
+  await expect(web.getByRole("list", { name: "Price rises dealt with" }).getByRole("listitem").first()).toContainText("Price raised");
+});
