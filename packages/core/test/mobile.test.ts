@@ -104,6 +104,26 @@ describe("push notifications", () => {
     expect((await todaySummary(f.db, shop)).attention.find((a) => a.kind === "inbox")).toMatchObject({ body: "Open the inbox to answer them.", url: "/inbox" });
   });
 
+  it("tells the merchant about a return asked for and a review waiting, to people who handle them", async () => {
+    const f = await setup();
+    await registerDevice(f.db, f.owner.id, { token: TOKEN, platform: "ios" }, new Date(Date.now() - 3_600_000));
+    const shop = await f.shop();
+    const o = await f.waitingOrder();
+    await f.db.insert(schema.returnRequests).values({ shopId: shop.id, orderId: o.id, reason: "damaged", note: "The glass is cracked.", items: [], suggestedMinor: 0 });
+    await f.db.insert(schema.reviews).values({ shopId: shop.id, productId: f.products.stand.id, name: "Grace H.", rating: 3, body: "Smaller than I thought.", status: "pending" });
+    // A review already published needs nothing.
+    await f.db.insert(schema.reviews).values({ shopId: shop.id, productId: f.products.stand.id, name: "Ada L.", rating: 5, body: "Lovely.", status: "published" });
+    await sendShopNotifications(f.pctx, shop.id);
+    const returns = f.push.sent.filter((m) => m.url === "/returns");
+    expect(returns).toEqual([expect.objectContaining({ title: `A return was asked for on order #${o.number}`, body: "It arrived damaged: The glass is cracked." })]);
+    const reviews = f.push.sent.filter((m) => m.url === "/reviews");
+    expect(reviews).toEqual([expect.objectContaining({ title: "New 3-star review from Grace H.", body: "Smaller than I thought." })]);
+    // Each once, however often the sweep runs; and a person can turn either off.
+    await sendShopNotifications(f.pctx, shop.id);
+    expect(f.push.sent.filter((m) => m.url === "/returns" || m.url === "/reviews")).toHaveLength(2);
+    expect((await getPushSettings(f.db, f.owner.id)).kinds.map((k) => k.label)).toEqual(expect.arrayContaining(["Returns buyers ask for", "Reviews waiting for your OK"]));
+  });
+
   it("forgets phones the push service says are gone", async () => {
     const f = await setup();
     await registerDevice(f.db, f.owner.id, { token: TOKEN, platform: "ios" });

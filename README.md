@@ -1900,3 +1900,7 @@ An order in the app has Block this buyer under the buyer's details. With a reaso
 ### Left at checkout, in the app (after launch, part 355)
 
 The All list on the app's Orders tab ends with Left at checkout: buyers from the last 30 days who got to checkout and didn't pay, what they left, whether the reminder (or the reminder with a code) went out, and whether they came back and paid. It shows how many were left, what they were worth and how many came back, says so when reminder emails are off, and tapping a buyer starts an email to them.
+
+### Push notifications for returns and reviews (after launch, part 356)
+
+The phone now buzzes when a buyer asks to return something (or someone returns a gift) and when a new review is waiting for your OK, each once, and only for people whose role handles returns or reviews. Tapping one opens Returns or Reviews in the app, and both can be turned off in the app's Settings, under Notifications, like the others.
