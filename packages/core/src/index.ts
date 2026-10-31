@@ -75,6 +75,7 @@ export * from "./unit-contents";
 export * from "./shipping";
 export * from "./shipping-surcharge";
 export * from "./parcels";
+export * from "./same-address";
 export * from "./returns";
 export * from "./replacements";
 export * from "./subscriptions";

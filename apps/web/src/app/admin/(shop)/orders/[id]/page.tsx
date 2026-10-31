@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { can, countryName, daysPastDelivery, formatDeliveryWindow, orderDelivery, formatHandoverDay, storeHandoverOptions, crossesBorder, disputeEvidence, disputeReason, disputesForOrder, formatMoney, getOrder, ORDER_EMAIL_LABELS, orderEditOptions, listRefunds, replaceableLines, replacementBlocked, replacementsOf, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode, formatShipsBy, preorderWaitingOn, isOrderBuyerBlocked, orderDownloads, DOWNLOADS_PER_ITEM, transferDueBy, orderParcels } from "@sf/core";
+import { can, countryName, daysPastDelivery, formatDeliveryWindow, orderDelivery, formatHandoverDay, storeHandoverOptions, crossesBorder, disputeEvidence, disputeReason, disputesForOrder, formatMoney, getOrder, ORDER_EMAIL_LABELS, orderEditOptions, listRefunds, replaceableLines, replacementBlocked, replacementsOf, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode, formatShipsBy, preorderWaitingOn, isOrderBuyerBlocked, orderDownloads, DOWNLOADS_PER_ITEM, transferDueBy, orderParcels, ordersToSameAddress } from "@sf/core";
 import { BlockBuyerForm } from "./BlockBuyerForm";
 import { fulfillment, requireShop, storeAddress, suppliers, testPayments } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
@@ -108,6 +108,11 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
   // When it should arrive, worked out the same way as the buyer's order page, even if the store hides dates from buyers.
   const arrives = refundable ? await orderDelivery(db, shop, order, { evenIfHidden: true }) : null;
   const pastDue = daysPastDelivery(arrives, order);
+  // The buyer's other orders to this door still to ship: the store's own items can share a box.
+  const sameDoor = paid && order.fulfillmentStatus !== "shipped" && order.fulfillmentStatus !== "delivered" ? await ordersToSameAddress(db, shop.id, order) : null;
+  // Orders this page already links to (added after checkout, replacements) aren't listed twice.
+  const linked = new Set([parent?.id, child?.id, original?.id, ...replacements.map((r) => r.id)].filter(Boolean));
+  const otherDoors = sameDoor?.orders.filter((o) => !linked.has(o.id)) ?? [];
 
   return (
     <main className="pb-12">
@@ -438,6 +443,23 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
               </p>
             )}
           </div>
+          {sameDoor && otherDoors.length > 0 && (
+            <section aria-labelledby="same-door-heading">
+              <h2 id="same-door-heading" className="font-semibold mb-1">Also going to this address</h2>
+              <ul className="flex flex-col gap-1">
+                {otherDoors.map((o) => (
+                  <li key={o.id}>
+                    <Link href={`/admin/orders/${o.id}`} className="underline">Order #{o.number}</Link> <span className="hint">· {when.format(o.createdAt)}{o.ownItems ? " · has items you post" : ""}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="hint mt-1">
+                {sameDoor.ownItems && otherDoors.some((o) => o.ownItems)
+                  ? "The items you post yourself can go in one box, so you pay postage once. Add the same tracking to each order."
+                  : "Suppliers send their parcels on their own, so these may still arrive on different days."}
+              </p>
+            </section>
+          )}
           {order.risk && !held && (
             <section aria-labelledby="risk-heading">
               <h2 id="risk-heading" className="font-semibold mb-1">Risk check <span className={`pill ml-1 ${order.risk.level === "low" ? "pill-success" : order.risk.level === "medium" ? "pill-warning" : "pill-critical"}`}>{RISK_LABEL[order.risk.level]}</span></h2>
