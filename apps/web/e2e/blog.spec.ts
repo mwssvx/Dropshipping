@@ -129,4 +129,11 @@ test("a post scheduled for later waits, then goes up when the time is cleared", 
   await buyer.goto(`${store}/blog`);
   await expect(buyer.getByRole("link", { name: "Winter is coming" })).toBeVisible();
   await buyer.close();
+
+  // Once it's up, it can go to subscribers as a campaign, already written.
+  await page.getByRole("link", { name: "Email to subscribers" }).click();
+  await expect(page.getByLabel("Subject")).toHaveValue("Winter is coming");
+  await expect(page.getByLabel("Email", { exact: true })).toHaveValue(/^Hi \{first_name\},\n\nNew on our blog: Winter is coming\n\nLong nights are lamp season\./);
+  await expect(page.getByLabel("Goes to")).toHaveValue("/blog/winter-is-coming");
+  await expect(page.getByLabel("Link text (optional)")).toHaveValue("Read the post");
 });
