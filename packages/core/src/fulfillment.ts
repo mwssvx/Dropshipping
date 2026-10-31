@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { schema, type Db, type PersonalizationValue } from "@sf/db";
 import { createHash } from "node:crypto";
 import { z } from "zod";
@@ -335,9 +335,10 @@ export const trackingInput = z.object({
 
 /**
  * The merchant shipped it another way. Replaces a failed supplier fulfilment if there is one,
- * otherwise records a new one, then emails the buyer.
+ * otherwise records a new one, then emails the buyer. With `own`, it's the parcel of the store's own
+ * stock in an order the suppliers send the rest of, so it never touches a supplier's parcel.
  */
-export async function addManualTracking(ctx: FulfillmentContext, shopId: string, orderId: string, input: z.input<typeof trackingInput>) {
+export async function addManualTracking(ctx: FulfillmentContext, shopId: string, orderId: string, input: z.input<typeof trackingInput> & { own?: boolean }) {
   const parsed = trackingInput.safeParse(input);
   if (!parsed.success) throw new UserError(parsed.error.issues[0]!.message);
   const { carrier, trackingNumber, url } = parsed.data;
@@ -357,7 +358,9 @@ export async function addManualTracking(ctx: FulfillmentContext, shopId: string,
     updatedAt: t,
   };
   const failedRow = await db.query.fulfillments.findFirst({
-    where: and(eq(schema.fulfillments.orderId, order.id), eq(schema.fulfillments.status, "failed")),
+    where: input.own
+      ? and(eq(schema.fulfillments.orderId, order.id), isNull(schema.fulfillments.supplierId), ne(schema.fulfillments.status, "cancelled"))
+      : and(eq(schema.fulfillments.orderId, order.id), eq(schema.fulfillments.status, "failed")),
   });
   if (failedRow) {
     // The supplier never got this one, so it stops being synced with them.

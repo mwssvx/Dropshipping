@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { can, countryName, daysPastDelivery, formatDeliveryWindow, orderDelivery, formatHandoverDay, storeHandoverOptions, crossesBorder, disputeEvidence, disputeReason, disputesForOrder, formatMoney, getOrder, ORDER_EMAIL_LABELS, orderEditOptions, listRefunds, replaceableLines, replacementBlocked, replacementsOf, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode, formatShipsBy, preorderWaitingOn, isOrderBuyerBlocked, orderDownloads, DOWNLOADS_PER_ITEM, transferDueBy } from "@sf/core";
+import { can, countryName, daysPastDelivery, formatDeliveryWindow, orderDelivery, formatHandoverDay, storeHandoverOptions, crossesBorder, disputeEvidence, disputeReason, disputesForOrder, formatMoney, getOrder, ORDER_EMAIL_LABELS, orderEditOptions, listRefunds, replaceableLines, replacementBlocked, replacementsOf, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode, formatShipsBy, preorderWaitingOn, isOrderBuyerBlocked, orderDownloads, DOWNLOADS_PER_ITEM, transferDueBy, orderParcels } from "@sf/core";
 import { BlockBuyerForm } from "./BlockBuyerForm";
 import { fulfillment, requireShop, storeAddress, suppliers, testPayments } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
@@ -54,6 +54,12 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
     db.query.returnRequests.findMany({ where: (r, { eq }) => eq(r.orderId, order.id), orderBy: (r, { desc }) => desc(r.createdAt) }),
     orderDocuments(db, order.id),
   ]);
+  // In an order from more than one supplier (or with the store's own stock), what's in each parcel.
+  const parcels = order.pickup || order.localDelivery ? [] : await orderParcels(db, order);
+  const itemsOf = (fulfillmentId: string) => parcels.find((p) => p.shipment?.id === fulfillmentId)?.items;
+  const listed = (items: { title: string; quantity: number }[]) => items.map((i) => (i.quantity > 1 ? `${i.title} × ${i.quantity}` : i.title)).join(", ");
+  // The store's own items still to post, while suppliers send the rest.
+  const ownWaiting = order.paymentStatus === "paid" ? parcels.find((p) => p.key === "own" && !p.shipment?.trackingNumber) : undefined;
   const supplierLabel = (supplierId: string | null) => {
     if (!supplierId) return "Sent by you";
     return labelFor(suppliers(), links.find((l) => l.id === supplierId));
@@ -350,9 +356,10 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
               </p>
             ) : (
               <ul className="flex flex-col gap-3">
-                {order.fulfillments.map((f) => (
+                {order.fulfillments.filter((f) => !(ownWaiting?.shipment?.id === f.id)).map((f) => (
                   <li key={f.id} className="text-sm flex flex-col gap-1">
                     <span className="font-medium">{supplierLabel(f.supplierId)}</span>
+                    {itemsOf(f.id) && <span>{listed(itemsOf(f.id)!)}</span>}
                     {f.supplierOrderRef && <span className="hint num">Supplier order {f.supplierOrderRef}</span>}
                     {f.backupNote && f.status !== "cancelled" && <span className="pill pill-info self-start">Sent to backup</span>}
                     {f.backupNote && f.status !== "cancelled" && <span className="hint">{f.backupNote}</span>}
@@ -368,6 +375,14 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
                     ) : null}
                   </li>
                 ))}
+                {ownWaiting && (
+                  <li className="text-sm flex flex-col gap-1" aria-label="Your own parcel">
+                    <span className="font-medium">Sent by you</span>
+                    <span>{listed(ownWaiting.items)}</span>
+                    <span className="hint">These are your own stock, so they go in a parcel you post. Add its tracking and we&apos;ll email the buyer about this parcel.</span>
+                    <ManualTrackingForm orderId={order.id} own primary />
+                  </li>
+                )}
               </ul>
             )}
             <div className="flex gap-2 flex-wrap">
