@@ -315,6 +315,10 @@ test("weight and cost of the store's own stock, set from the app", async ({ page
 
   await signIn(page, email);
   await tab(page, "Products");
+  // A new product lacks everything but its price: the list says what.
+  await page.getByRole("tab", { name: "Needs details (1)" }).click();
+  await expect(page.getByText("No photo · No description · No weight · No customs details · No cost")).toBeVisible();
+  await shot(page, "335-app-needs-details");
   await page.getByRole("link", { name: /Beeswax Candle/ }).click();
   await page.getByRole("textbox", { name: "What it costs you" }).fill("4.50");
   await expect(page.getByText("You keep $7.50 of each before fees.")).toBeVisible();
@@ -325,4 +329,9 @@ test("weight and cost of the store's own stock, set from the app", async ({ page
   await page.reload();
   await expect(page.getByRole("textbox", { name: "What it costs you" })).toHaveValue("4.50");
   await expect(page.getByRole("textbox", { name: "Weight packed (kg)" })).toHaveValue("0.3");
+  // Weight and cost are off its list now.
+  await page.goto("/");
+  await tab(page, "Products");
+  await page.getByRole("tab", { name: "Needs details (1)" }).click();
+  await expect(page.getByText("No photo · No description · No customs details", { exact: true })).toBeVisible();
 });

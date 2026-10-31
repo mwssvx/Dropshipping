@@ -38,6 +38,7 @@ import {
   patchProduct,
   shipsInParcel,
   isOwnStock,
+  missingDetails,
   productPhotos,
   sendPriceDrops,
   sendStockAlerts,
@@ -132,6 +133,8 @@ const productView = (p: ProductRow) => ({
   ships: shipsInParcel(p),
   /** The store's own stock: the merchant sets what it costs. */
   ownStock: isOwnStock(p),
+  /** What it still lacks, like a photo or a weight. */
+  missing: missingDetails(p),
 });
 
 const isHeld = (o: OrderRow) => o.heldAt != null && ["paid", "partially_refunded"].includes(o.paymentStatus);

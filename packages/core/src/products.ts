@@ -340,6 +340,29 @@ function gapWhere(gap: ProductGap) {
   }
 }
 
+type GapFields = {
+  imageUrl: string | null;
+  descriptionHtml: string;
+  giftCard: boolean;
+  digital: boolean;
+  hsCode: string | null;
+  originCountry: string | null;
+  variants: { weightGrams: number | null; costMinor: number | null }[];
+};
+
+/** What one product still lacks, by the same rules as the list's filter, for a product already loaded. */
+export function missingDetails(p: GapFields): ProductGap[] {
+  const ships = !p.digital && !p.giftCard;
+  const has: Record<ProductGap, boolean> = {
+    photo: p.imageUrl === null,
+    description: p.descriptionHtml.replace(/<[^>]*>/g, "").replace(/&nbsp;|\s/g, "") === "",
+    weight: ships && p.variants.some((v) => v.weightGrams === null),
+    customs: ships && (p.hsCode === null || p.originCountry === null),
+    cost: !p.giftCard && p.variants.some((v) => v.costMinor === null),
+  };
+  return PRODUCT_GAPS.filter((g) => has[g]);
+}
+
 /** How many products not archived lack each thing, for the list's filter. */
 export async function productGaps(db: Db, shopId: string) {
   const [row] = await db
