@@ -3,7 +3,7 @@ import { View } from "react-native";
 import { api, useApi } from "../../src/api";
 import { money, parseMoney, when } from "../../src/format";
 import { useSession } from "../../src/session";
-import { BackLink, Banner, Body, Button, Card, EmptyState, Field, Heading, LoadError, Loading, Pill, Screen, Section, Stat } from "../../src/ui";
+import { BackLink, Banner, Body, Button, Card, EmptyState, Field, Heading, List, LoadError, Loading, Pill, Row, Screen, Section, Stat } from "../../src/ui";
 import { space, type Tone } from "../../src/theme";
 
 type GiftCard = { id: string; last4: string; email: string | null; balanceMinor: number; initialMinor: number; status: "active" | "used" | "off" | "expired"; orderNumber: number | null; sent: boolean; createdAt: string; expiresAt: string | null };
@@ -24,9 +24,10 @@ export default function GiftCardsScreen() {
     const t = setTimeout(() => setQ(query.trim()), 300);
     return () => clearTimeout(t);
   }, [query]);
-  const list = useApi<{ outstandingMinor: number; cards: GiftCard[] }>(`gift-cards?q=${encodeURIComponent(q)}`);
+  const list = useApi<{ outstandingMinor: number; selling: { productId: string; active: boolean; amountsMinor: number[] } | null; cards: GiftCard[] }>(`gift-cards?q=${encodeURIComponent(q)}`);
   const [email, setEmail] = useState("");
   const [amount, setAmount] = useState("");
+  const [amounts, setAmounts] = useState("25, 50, 100");
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{ tone: Tone; text: string } | null>(null);
 
@@ -92,6 +93,26 @@ export default function GiftCardsScreen() {
           </Card>
         ))
       )}
+      {list.data ? (
+        <Section title="Sell gift cards">
+          {list.data.selling ? (
+            <List>
+              <Row
+                href={`/products/${list.data.selling.productId}`}
+                title={list.data.selling.active ? "On sale on your store" : "Your gift card is a draft"}
+                subtitle={list.data.selling.amountsMinor.map((a) => money(a, cur)).join(", ")}
+                right={<Pill label={list.data.selling.active ? "On sale" : "Draft"} tone={list.data.selling.active ? "success" : "warning"} />}
+              />
+            </List>
+          ) : (
+            <Card>
+              <Body muted>The last-minute gift that never ships late. Buyers get the code by email right after paying, and it never expires.</Body>
+              <Field label="Amounts" value={amounts} onChangeText={setAmounts} keyboardType="numbers-and-punctuation" hint="Up to 8, separated by commas." />
+              <Button label="Start selling gift cards" busy={busy === "sell"} disabled={!!busy || !amounts.trim()} onPress={() => void run("sell", "gift-cards/sell", { amounts })} />
+            </Card>
+          )}
+        </Section>
+      ) : null}
       <Section title="Send a gift card">
         <Card>
           <Body muted>For a thank-you, a giveaway or store credit instead of a refund. The code is emailed to them.</Body>

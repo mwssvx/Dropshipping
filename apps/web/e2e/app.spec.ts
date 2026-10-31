@@ -2309,3 +2309,23 @@ test("holiday returns kept open longer from the app", async ({ page, browser }) 
   await page.goto("/holiday-checklist");
   await expect(page.getByRole("region", { name: "Done" }).getByRole("button", { name: "Keep returns open for gifts, done" })).toBeVisible();
 });
+
+test("gift cards put on sale from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `sg${Date.now()}`);
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Gift cards" }).click();
+  const sell = page.getByRole("region", { name: "Sell gift cards" });
+  await sell.getByRole("textbox", { name: "Amounts" }).fill("20, abc");
+  await sell.getByRole("button", { name: "Start selling gift cards" }).click();
+  await expect(page.getByText("Enter amounts like 25 or 49.99.")).toBeVisible();
+  await sell.getByRole("textbox", { name: "Amounts" }).fill("40, 20");
+  await sell.getByRole("button", { name: "Start selling gift cards" }).click();
+  await expect(page.getByText("Gift cards are on sale. Buyers get the code by email right after paying.")).toBeVisible();
+  await expect(sell.getByRole("link", { name: /On sale on your store/ })).toContainText("$20.00, $40.00");
+  await shot(page, "393-app-sell-gift-cards");
+
+  await web.goto(`${WEB}/admin/gift-cards`);
+  await expect(web.getByRole("link", { name: "Gift card product" })).toBeVisible();
+  await page.goto("/holiday-checklist");
+  await expect(page.getByRole("region", { name: "Done" }).getByRole("button", { name: "Sell gift cards, done" })).toBeVisible();
+});

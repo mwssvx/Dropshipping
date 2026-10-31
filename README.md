@@ -2048,3 +2048,7 @@ The app's Discount codes screen has a New subscribers row. Set the welcome offer
 ### Holiday returns in the app (after launch, part 392)
 
 The app's Returns screen has a Holiday returns row. Keep returns open longer for orders paid in a holiday stretch (Nov 1 to Dec 24 is suggested, returnable until Jan 31), or turn it off. The holiday checklist's gift returns line opens it.
+
+### Selling gift cards from the app (after launch, part 393)
+
+The app's Gift cards screen can put gift cards on sale: type the amounts (up to 8) and they go on the store, sent by email right after paying. Once they're on sale, the screen shows the amounts and opens the gift card's product. The holiday checklist's gift cards line opens it.
