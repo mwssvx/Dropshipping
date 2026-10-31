@@ -1632,3 +1632,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Fewer Merchant Center warnings** (`productFeed` in `packages/core/src/feeds.ts`): an option's barcode goes into the Google and Meta feeds as its GTIN when it's a real UPC, EAN or ITF-14 (`validGtin` checks the length and check digit), so Google stops marking the product "limited performance" and can match it to the right listing. Options without one keep "identifier exists: no".
 2. **Shipping and weight**: each item carries the cheapest shipping to the store's country with handling and transit days (`homeShipping` in `packages/core/src/delivery.ts`, the same numbers the product page gives search engines) and its weight, so Google can show the delivery cost without the merchant typing it into Merchant Center. Downloads leave both out. No migration.
+
+### What the feeds send (after launch, part 291)
+
+1. **On Sales channels**: a "What the feeds send" card says how many options have a barcode sent as their GTIN (and when it's worth adding one), what shipping to the store's country costs from its rates (or that there's no rate yet, which Merchant Center asks for), how many options are too heavy for every rate, and how many have no weight. These are the first things Merchant Center checks, so merchants can fix them before Google complains. No migration.
