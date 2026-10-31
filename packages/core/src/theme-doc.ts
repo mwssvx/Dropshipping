@@ -229,6 +229,13 @@ const sectionSchemas = {
       .max(COLUMNS_MAX, `A columns section holds up to ${COLUMNS_MAX} columns.`)
       .default([]),
   }),
+  // One product up close, picked by hand. It isn't shown until a product is picked, or once that
+  // product is archived or deleted.
+  featured_product: z.object({
+    productId: z.string().uuid().nullable().default(null),
+    text: text(600),
+    imagePosition: z.enum(["left", "right"]).default("left"),
+  }),
 } as const;
 
 export type SectionType = keyof typeof sectionSchemas;
@@ -252,6 +259,7 @@ export const SECTION_LABELS: Record<SectionType, { name: string; about: string }
   video: { name: "Video", about: "A YouTube or Vimeo video, or a video file, with a heading. Nothing loads from YouTube or Vimeo until a shopper presses play." },
   slideshow: { name: "Slideshow", about: "Up to five big pictures, each with a heading and a button, taking turns every few seconds. Shoppers can pause it, and it starts paused for those who ask for less motion." },
   columns: { name: "Columns", about: "Two to six blocks side by side, each with a picture, a title, a few words and a link. Good for how it works, what makes you different or your main collections." },
+  featured_product: { name: "Featured product", about: "One product up close: a big photo, its stars and price, a few words of your own and an Add to cart button." },
 };
 
 const sectionId = z.string().regex(/^[a-z0-9]{4,24}$/, "Section ids are short lowercase codes.");
