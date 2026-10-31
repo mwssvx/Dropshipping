@@ -125,7 +125,7 @@ export function badgeLabel(b: Badge, t: StoreText) {
 }
 
 type CatalogProduct = Omit<StorefrontCatalog["products"][number], "sold" | "rating"> & Partial<Pick<StorefrontCatalog["products"][number], "sold" | "rating">>;
-type GridProduct = Omit<StorefrontCatalog["products"][number], "badge" | "createdAt" | "soldOut" | "swatches" | "contents" | "quickAdd" | "sold" | "hoverImageUrl" | "rating"> & BadgeFacts & Partial<Pick<StorefrontCatalog["products"][number], "swatches" | "contents" | "quickAdd" | "sold" | "hoverImageUrl" | "rating">>;
+type GridProduct = Omit<StorefrontCatalog["products"][number], "badge" | "createdAt" | "soldOut" | "swatches" | "contents" | "quickAdd" | "quickPick" | "sold" | "hoverImageUrl" | "rating"> & BadgeFacts & Partial<Pick<StorefrontCatalog["products"][number], "swatches" | "contents" | "quickAdd" | "quickPick" | "sold" | "hoverImageUrl" | "rating">>;
 
 /** Numbered grids give each card an id (item-1, item-2...), so "Show more" can land on the first new one. */
 export function ProductGrid({ products, data, numbered = false }: { products: GridProduct[]; data: SectionData; numbered?: boolean }) {
@@ -178,6 +178,23 @@ export function ProductGrid({ products, data, numbered = false }: { products: Gr
               <input type="hidden" name="variantId" value={p.quickAdd} />
               <SubmitButton className="sf-quick-add btn btn-secondary w-full text-sm" pendingText={t.adding}>
                 <span aria-hidden="true">{t.addToCart}</span>
+                <span className="sr-only">{`${t.addToCart}: ${p.title}`}</span>
+              </SubmitButton>
+            </form>
+          )}
+          {data.quickAdd && !p.quickAdd && p.quickPick && (
+            // A few options at one price: pick one right on the card. Sold out ones show but can't be picked.
+            <form action={data.quickAdd} className="sf-quick-pick flex gap-2">
+              <label className="flex-1 min-w-0">
+                <span className="sr-only">{t.pickOption(p.title)}</span>
+                <select name="variantId" className="input w-full h-9 py-0 text-sm" defaultValue={p.quickPick.find((o) => !o.soldOut)!.id}>
+                  {p.quickPick.map((o) => (
+                    <option key={o.id} value={o.id} disabled={o.soldOut}>{o.soldOut ? `${o.title} (${t.soldOut})` : o.title}</option>
+                  ))}
+                </select>
+              </label>
+              <SubmitButton className="sf-quick-add btn btn-secondary h-9 shrink-0 text-sm" pendingText={t.adding}>
+                <span aria-hidden="true">{t.add}</span>
                 <span className="sr-only">{`${t.addToCart}: ${p.title}`}</span>
               </SubmitButton>
             </form>
