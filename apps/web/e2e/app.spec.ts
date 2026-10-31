@@ -25,6 +25,12 @@ async function merchant(browser: Browser, id: string) {
   return { web, email };
 }
 
+// Each test opens its own browser windows for the merchant's web admin and for buyers. Close them
+// afterwards, or a full run keeps two dozen stores open at once and the later tests slow to a crawl.
+test.afterEach(async ({ browser, context }) => {
+  await Promise.all(browser.contexts().filter((c) => c !== context).map((c) => c.close()));
+});
+
 async function signIn(page: Page, email: string) {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /Sign in to/ })).toBeVisible();
