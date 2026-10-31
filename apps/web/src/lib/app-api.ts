@@ -56,6 +56,9 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  createCollection,
+  getCollection,
+  deleteCollection,
   listCollections,
   collectionsOfProduct,
   setProductInCollection,
@@ -1389,6 +1392,26 @@ const routes: Record<string, Handler> = {
     const day = saved ? new Date(`${saved.arriveBy}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : "";
     return { ok: true, message: saved ? `Saved. Product pages say when to order for ${saved.name}, arriving by ${day}.` : "Removed. Product pages no longer give an order-by date." };
   },
+  "GET collections": async ({ db, shop }) => {
+    const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
+    return {
+      collections: collections.map((c) => ({ id: c.id, title: c.title, auto: !!c.rules, productCount: c.productCount, url: `${store.replace(/\/$/, "")}/collections/${c.handle}` })),
+    };
+  },
+  "POST collections": async ({ req, db, shop, user }) => {
+    const b = await body<{ title?: unknown }>(req);
+    const c = await createCollection(db, shop.id, { title: str(b.title) });
+    await logged({ shop, user, db }, `Made the collection ${c.title} in the app`, { href: `/admin/collections/${c.id}` });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, id: c.id, message: `Made ${c.title}. To fill it, open a product and switch it on under Collections.` };
+  },
+  "DELETE collections/:id": async ({ params, db, shop, user }) => {
+    const c = await getCollection(db, shop.id, params.id!);
+    await deleteCollection(db, shop.id, c.id);
+    await logged({ shop, user, db }, `Deleted the collection ${c.title} in the app`, { href: "/admin/collections" });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: `Deleted ${c.title}. Its products are still on sale.` };
+  },
   "GET questions": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
     const rows = await listQuestions(db, shop.id);
@@ -2014,6 +2037,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("subscriptions")) return "orders";
   if (path.startsWith("blocked")) return "customers";
   if (path.startsWith("tag-rules")) return "customers";
+  if (path.startsWith("collections")) return "collections";
   if (path.startsWith("restock") || path.startsWith("stock-count")) return "products";
   if (path.startsWith("price-changes")) return "products";
   if (path.startsWith("suppliers")) return "suppliers";
