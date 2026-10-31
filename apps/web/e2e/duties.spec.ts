@@ -44,4 +44,18 @@ test("buyers abroad are told who pays import duties", async ({ page, browser }, 
   await buyer.reload();
   await buyer.getByLabel("Country").selectOption("GB");
   await expect(buyer.locator("#duties-note")).toHaveText("Import duties and taxes for United Kingdom are included. There's nothing more to pay when it arrives.");
+
+  // Product pages say it too, for shoppers abroad.
+  const uk = await (await browser.newContext({ ...info.project.use, extraHTTPHeaders: { "x-vercel-ip-country": "GB" } })).newPage();
+  await uk.goto(store);
+  await expect(uk.locator("#duties-line")).toHaveText("Import duties and taxes for United Kingdom included.");
+  await duties.getByLabel(/Buyers pay them on delivery/).check();
+  await duties.getByRole("button", { name: "Save import duties" }).click();
+  await expect(duties.getByRole("status")).toBeVisible();
+  await uk.reload();
+  await expect(uk.locator("#duties-line")).toHaveText("Import duties and taxes for United Kingdom may be charged on delivery.");
+  const home = await (await browser.newContext({ ...info.project.use, extraHTTPHeaders: { "x-vercel-ip-country": "US" } })).newPage();
+  await home.goto(store);
+  await expect(home.locator("#shipping-cost")).toBeVisible();
+  await expect(home.locator("#duties-line")).toHaveCount(0);
 });
