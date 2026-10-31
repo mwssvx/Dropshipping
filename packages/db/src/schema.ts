@@ -518,7 +518,8 @@ export type ProductDetail = { label: string; value: string };
 export type Preorder = { shipsBy: string; limit: number | null };
 
 /** Ad platform tags the store loads (after the buyer agrees, where the law asks for it). */
-export type AdPixels = { meta: string | null; tiktok: string | null; google: string | null };
+// Pinterest came later, so older stores have no key for it.
+export type AdPixels = { meta: string | null; tiktok: string | null; google: string | null; pinterest?: string | null };
 
 /**
  * The store closed to buyers for a while. "password": only visitors with the password get in

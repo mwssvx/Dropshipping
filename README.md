@@ -1644,3 +1644,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Pinterest and TikTok (after launch, part 293)
 
 1. **Two more channels, no new feed**: Sales channels now gives Pinterest and TikTok their feed link and the steps to add it (Pinterest: Ads, Catalogs, "Create data source"; TikTok Ads Manager: Assets, Catalogs, "Data feed"). Both read the same file as Google, so prices, sales, stock, barcodes and shipping follow by themselves, and the per-language links work there too. No migration.
+
+### Pinterest tag (after launch, part 294)
+
+1. **Measure Pinterest ads** (`setAdPixels` in `packages/core/src/pixels.ts`): Ad tracking on Sales channels takes a Pinterest tag ID next to Meta, TikTok and Google. The store loads Pinterest's tag after the same cookie question and reports page visits, product views, adds to cart and purchases (as "checkout", with the order's value and items), with the same IDs as the feeds, so Pinterest can match sales to shoppable Pins.
+2. The ID is checked (13 digits) before it reaches a page, a purchase is reported once, and it comes along in the store file; older store files without it still import. No migration.

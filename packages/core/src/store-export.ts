@@ -150,7 +150,7 @@ export async function exportStore(db: Db, shopId: string, now = new Date()) {
       sold_out_products: shop.soldOutProducts,
       lowest_price_note: shop.lowestPriceNote,
       search_fixes: shop.searchFixes,
-      ad_tracking: { meta_pixel: shop.adPixels?.meta ?? null, tiktok_pixel: shop.adPixels?.tiktok ?? null, google_tag: shop.adPixels?.google ?? null, ask_consent: shop.cookieConsent },
+      ad_tracking: { meta_pixel: shop.adPixels?.meta ?? null, tiktok_pixel: shop.adPixels?.tiktok ?? null, google_tag: shop.adPixels?.google ?? null, pinterest_tag: shop.adPixels?.pinterest ?? null, ask_consent: shop.cookieConsent },
       hold_risky_orders: shop.holdRiskyOrders,
       refer_a_friend: shop.referralProgram ? { friend_percent_off: shop.referralProgram.friendPercentOff, reward: shop.referralProgram.rewardMinor, min_subtotal: shop.referralProgram.minSubtotalMinor } : null,
       // Missing means the built-in default rate.
@@ -352,7 +352,7 @@ const importSchema = z.object({
       lowest_price_note: z.enum(["eu", "everyone", "off"]).optional(),
       search_fixes: z.array(z.object({ from: str(80).min(2), to: str(80).min(1) })).max(100).optional(),
       ad_tracking: z
-        .object({ meta_pixel: str(40).nullable(), tiktok_pixel: str(40).nullable(), google_tag: str(40).nullable(), ask_consent: z.enum(["everyone", "eu_uk"]) })
+        .object({ meta_pixel: str(40).nullable(), tiktok_pixel: str(40).nullable(), google_tag: str(40).nullable(), pinterest_tag: str(40).nullable().optional(), ask_consent: z.enum(["everyone", "eu_uk"]) })
         .optional(),
       hold_risky_orders: z.enum(["off", "medium", "high"]).optional(),
       refer_a_friend: z.object({ friend_percent_off: z.number().int().min(5).max(50), reward: z.number().int().min(100).max(10_000), min_subtotal: z.number().int().min(0) }).nullable().optional(),
@@ -870,7 +870,7 @@ export async function importStore(db: Db, shopId: string, input: unknown) {
     if (data.store.ad_tracking) {
       // Only IDs in the platforms' formats come in; anything else is left off.
       const a = data.store.ad_tracking;
-      settings.adPixels = storePixels({ adPixels: { meta: a.meta_pixel, tiktok: a.tiktok_pixel, google: a.google_tag } });
+      settings.adPixels = storePixels({ adPixels: { meta: a.meta_pixel, tiktok: a.tiktok_pixel, google: a.google_tag, pinterest: a.pinterest_tag ?? null } });
       settings.cookieConsent = a.ask_consent;
     }
     if (data.store.subscribe_and_save !== undefined) {

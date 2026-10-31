@@ -82,7 +82,7 @@ async function shippingPolicy(db: Db, shop: Shop) {
 }
 
 function privacyPolicy(shop: Shop) {
-  const pixels = shop.adPixels && (shop.adPixels.meta || shop.adPixels.tiktok || shop.adPixels.google);
+  const pixels = shop.adPixels && (shop.adPixels.meta || shop.adPixels.tiktok || shop.adPixels.google || shop.adPixels.pinterest);
   const parts = [
     `This page explains what ${shop.name} collects about you and why.`,
     "What we collect: your name, email, delivery address and phone number (if you give one) when you order, what you bought, and messages you send us. Card details go straight to our payment provider; we never see or store your card number.",

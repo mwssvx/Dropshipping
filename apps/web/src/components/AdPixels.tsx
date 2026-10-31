@@ -1,5 +1,5 @@
 "use client";
-// Loads the store's ad tags (Meta, TikTok, Google) once the buyer agrees, or straight away where
+// Loads the store's ad tags (Meta, TikTok, Google, Pinterest) once the buyer agrees, or straight away where
 // no agreement is needed, and passes on what buyers do. Pages report events with `pixelEvent`;
 // they wait in a queue until the tags are allowed to load, and are dropped if the buyer says no.
 import { usePathname } from "next/navigation";
@@ -9,10 +9,10 @@ export const CONSENT_COOKIE = "sf_consent";
 
 export type PixelEventName = "view_item" | "add_to_cart" | "begin_checkout" | "purchase";
 export type PixelEventData = { ids: string[]; value: number; currency: string; orderId?: string };
-type Ids = { meta: string | null; tiktok: string | null; google: string | null };
+type Ids = { meta: string | null; tiktok: string | null; google: string | null; pinterest?: string | null };
 
 type Fn = ((...args: unknown[]) => void) & Record<string, unknown>;
-type PixelWindow = Window & { __sfPixelQueue?: [PixelEventName, PixelEventData][]; fbq?: Fn; _fbq?: Fn; ttq?: unknown[] & Record<string, unknown>; dataLayer?: unknown[]; gtag?: Fn };
+type PixelWindow = Window & { __sfPixelQueue?: [PixelEventName, PixelEventData][]; fbq?: Fn; _fbq?: Fn; ttq?: unknown[] & Record<string, unknown>; dataLayer?: unknown[]; gtag?: Fn; pintrk?: Fn };
 const w = () => window as PixelWindow;
 
 /** Reports something a buyer did to the store's ad tags. Safe to call when there are none. */
@@ -82,8 +82,22 @@ function loadGoogle(id: string) {
   win.gtag("config", id);
 }
 
+function loadPinterest(id: string) {
+  const win = w();
+  if (win.pintrk) return;
+  const pintrk = function (...args: unknown[]) {
+    (pintrk.queue as unknown[]).push(args);
+  } as Fn;
+  Object.assign(pintrk, { queue: [], version: "3.0" });
+  win.pintrk = pintrk;
+  addScript("https://s.pinimg.com/ct/core.js");
+  pintrk("load", id);
+}
+
 const META_NAMES: Record<PixelEventName, string> = { view_item: "ViewContent", add_to_cart: "AddToCart", begin_checkout: "InitiateCheckout", purchase: "Purchase" };
 const TIKTOK_NAMES: Record<PixelEventName, string> = { view_item: "ViewContent", add_to_cart: "AddToCart", begin_checkout: "InitiateCheckout", purchase: "CompletePayment" };
+// Pinterest has no "started checkout"; a product view is a page visit with the product on it.
+const PINTEREST_NAMES: Record<PixelEventName, string | null> = { view_item: "pagevisit", add_to_cart: "addtocart", begin_checkout: null, purchase: "checkout" };
 
 function send(ids: Ids, name: PixelEventName, d: PixelEventData) {
   const win = w();
@@ -99,6 +113,8 @@ function send(ids: Ids, name: PixelEventName, d: PixelEventData) {
   if (ids.meta) win.fbq?.("track", META_NAMES[name], { content_ids: d.ids, content_type: "product", value, currency: d.currency });
   if (ids.tiktok) (win.ttq?.track as Fn | undefined)?.(TIKTOK_NAMES[name], { contents: d.ids.map((id) => ({ content_id: id, content_type: "product" })), value, currency: d.currency });
   if (ids.google) win.gtag?.("event", name, { currency: d.currency, value, transaction_id: d.orderId, items: d.ids.map((id) => ({ item_id: id })) });
+  const pin = PINTEREST_NAMES[name];
+  if (ids.pinterest && pin) win.pintrk?.("track", pin, { value, currency: d.currency, order_id: d.orderId, line_items: d.ids.map((id) => ({ product_id: id })) });
 }
 
 function readConsent(): "yes" | "no" | null {
@@ -117,16 +133,18 @@ export function AdPixels({ ids, ask, text }: { ids: Ids; ask: boolean; text: { m
   useEffect(() => {
     if (!allowed) return;
     try {
-      const first = !w().fbq && !w().ttq && !w().gtag;
+      const first = !w().fbq && !w().ttq && !w().gtag && !w().pintrk;
       if (ids.meta) loadMeta(ids.meta);
       if (ids.tiktok) loadTikTok(ids.tiktok);
       if (ids.google) loadGoogle(ids.google);
+      if (ids.pinterest) loadPinterest(ids.pinterest);
       if (ids.meta) w().fbq?.("track", "PageView");
       if (ids.tiktok) (w().ttq?.page as Fn | undefined)?.();
+      if (ids.pinterest) w().pintrk?.("page");
       // Google counts the first page itself when it's set up.
       if (ids.google && !first) w().gtag?.("event", "page_view", { page_location: location.href });
     } catch {}
-  }, [allowed, ids.meta, ids.tiktok, ids.google, path]);
+  }, [allowed, ids.meta, ids.tiktok, ids.google, ids.pinterest, path]);
 
   // Pass on what buyers do: events from pages, and add-to-cart forms as they're sent.
   useEffect(() => {
