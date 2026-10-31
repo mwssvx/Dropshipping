@@ -21,7 +21,7 @@ export const metadata = { title: "Products" };
 const STATUSES = [["active", "On sale"], ["draft", "Drafts"], ["archived", "Archived"]] as const;
 const STOCK: (readonly [ProductStockFilter, string])[] = [["in_stock", "In stock"], ["low", "Running low"], ["sold_out", "Sold out"]];
 const SOURCES: (readonly [ProductSource, string])[] = [["supplier", "From suppliers"], ["own", "Your own stock"], ["digital", "Downloads"], ["gift_card", "Gift cards"]];
-const GAPS: (readonly [ProductGap, string])[] = [["photo", "No photo"], ["description", "No description"], ["weight", "No weight"], ["customs", "No customs details"]];
+const GAPS: (readonly [ProductGap, string])[] = [["photo", "No photo"], ["description", "No description"], ["weight", "No weight"], ["customs", "No customs details"], ["cost", "No cost"]];
 const MARGINS: (readonly [ProductMargin, string])[] = [["low", "Under 20%"], ["loss", "Below cost"]];
 const UNSOLD: (readonly [ProductUnsold, string])[] = [["30", "30 days"], ["90", "90 days"]];
 const SORTS = [
@@ -212,6 +212,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
             {unsold && <p className="hint text-sm">Products on sale for more than {unsold} days with no paid order in that time. Try a sale, a better photo or description, or archive them to keep the store tidy.</p>}
             {margin && <p className="hint text-sm">Products with an option that keeps {margin === "loss" ? "less than nothing: it sells for less than it costs" : "under 20% of its price after its cost"}. Options with no cost entered aren&apos;t counted. Fees and shipping aren&apos;t taken off.</p>}
             {missing === "weight" && <p className="hint text-sm">Products that ship with an option that has no weight. Shipping rates by weight can&apos;t price those options.</p>}
+            {missing === "cost" && <p className="hint text-sm">Products with an option that has no cost, so the profit report counts it as free. For your own stock, pick them all and choose &ldquo;Set what your own stock costs&rdquo;.</p>}
             {missing === "customs" && <p className="hint text-sm">Products that ship with no HS code or no country it was made in. Customs can hold a parcel that crosses a border without them.</p>}
             {stock === "low" && <p className="hint text-sm">Still for sale, with an option at {shop.restockAlertAt} or fewer left. Change the number under Running-low email below.</p>}
             {tags.length > 0 && (
