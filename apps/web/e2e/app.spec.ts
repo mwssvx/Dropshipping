@@ -105,6 +105,8 @@ test("a problem order: the order fixer proposes a refund, approved from Today", 
   await page.getByRole("link", { name: /1 order needs you/ }).click();
   await page.getByRole("link", { name: "Order #1001" }).click();
   await expect(page.getByText("What went wrong")).toBeVisible();
+  // When it should have arrived, as on the web order page, even before it ships.
+  await expect(page.getByText(/^Expected to arrive [A-Z][a-z]{2} \d{1,2}( – [A-Z][a-z]{2} \d{1,2})?$/)).toBeVisible();
   await page.getByRole("button", { name: "Ask AI to sort it out" }).click();
   await expect(page.getByText(/proposed a full refund/)).toBeVisible();
   await shot(page, "60-app-order-problem");

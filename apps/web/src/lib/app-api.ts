@@ -13,6 +13,8 @@ import {
   deleteSession,
   fixProblemOrder,
   getOrder,
+  orderDelivery,
+  daysPastDelivery,
   getPushSettings,
   getProduct,
   getSessionUser,
@@ -207,7 +209,11 @@ const routes: Record<string, Handler> = {
   },
   "GET orders/:id": async ({ params, db, shop }) => {
     const o = await getOrder(db, shop.id, params.id!);
+    // When it should arrive, as on the web order page, and how late a shipped parcel is.
+    const arrives = ["paid", "partially_refunded"].includes(o.paymentStatus) ? await orderDelivery(db, shop, o, { evenIfHidden: true }) : null;
     return {
+      expectedDelivery: arrives ? { from: arrives.from, to: arrives.to } : null,
+      daysLate: daysPastDelivery(arrives, o),
       ...orderSummary(o),
       shippingAddress: o.shippingAddress,
       subtotalMinor: o.subtotalMinor,
