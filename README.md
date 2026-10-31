@@ -1636,3 +1636,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### What the feeds send (after launch, part 291)
 
 1. **On Sales channels**: a "What the feeds send" card says how many options have a barcode sent as their GTIN (and when it's worth adding one), what shipping to the store's country costs from its rates (or that there's no rate yet, which Merchant Center asks for), how many options are too heavy for every rate, and how many have no weight. These are the first things Merchant Center checks, so merchants can fix them before Google complains. No migration.
+
+### Store details for search engines (after launch, part 292)
+
+1. **Always on** (`merchantReturnPolicy` in `packages/core/src/delivery.ts`): the store's home page now always tells search engines who the store is (name, web address and logo), not only once it has social links, and adds its return window with a link to the Returns policy page when there is one. Google shows a store's return policy in its store details and uses it when a product's own data leaves it out. No migration.
