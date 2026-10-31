@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseKg, parseMoney, setCheckoutPhone, setDeliveryEstimates, setDeliveryProtection, setGiftWrap, setHolidayDeadline, setLateOrderNotice, setLocalDelivery, setLocalPickup, setHandoverDays, setMinOrder, setShipCutoff, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
+import { addShippingRate, createShippingZone, deleteShippingRate, deleteShippingZone, parseKg, parseMoney, setCheckoutPhone, setDeliveryEstimates, setDeliveryProtection, setGiftWrap, setHolidayDeadline, setLateOrderNotice, setLocalDelivery, setLocalPickup, setHandoverDays, setShipPause, setMinOrder, setShipCutoff, setUpStarterZones, updateShippingZone, UserError } from "@sf/core";
 import { logged, requireShop } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -277,6 +277,24 @@ export async function setHolidayDeadlineAction(_: HolidayDeadlineState, form: Fo
     throw e;
   }
   await logged({ shop, user, db }, saved ? `Set an order-by date for ${saved.name}` : "Removed the holiday order-by date", { href: "/admin/shipping#holiday-heading" });
+  revalidatePath("/admin/shipping");
+  revalidatePath(`/s/${shop.handle}`, "layout");
+  return { saved };
+}
+
+export type ShipPauseState = { error?: string; saved?: { from: string | null; resumesOn: string; message: string | null } | null };
+
+/** Pauses shipping for a while (orders still come in), or ends the pause. */
+export async function setShipPauseAction(_: ShipPauseState, form: FormData): Promise<ShipPauseState> {
+  const { shop, db, user } = await requireShop("shipping");
+  let saved: ShipPauseState["saved"] = null;
+  try {
+    saved = await setShipPause(db, shop.id, form.get("enabled") === "on" ? { from: String(form.get("from") ?? ""), resumesOn: String(form.get("resumesOn") ?? ""), message: String(form.get("message") ?? "") } : null);
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  await logged({ shop, user, db }, saved ? `Paused shipping until ${saved.resumesOn}` : "Ended the shipping pause", { href: "/admin/shipping#pause-heading" });
   revalidatePath("/admin/shipping");
   revalidatePath(`/s/${shop.handle}`, "layout");
   return { saved };

@@ -1,4 +1,4 @@
-import { countryName, describeRate, EVERYWHERE_ELSE, formatDeliveryWindow, formatMoney, listShippingZones, sampleProduct, productDelivery, rateDays, rateWeight, SHIPPING_COUNTRIES, CUTOFF_TIME_ZONES, defaultCutoffZone, HOLIDAY_DAYS_AHEAD, LATE_ORDER_DAYS, LATE_ORDER_MESSAGE_MAX, HANDOVER_DAYS_AHEAD, HANDOVER_LEAD_MAX } from "@sf/core";
+import { countryName, describeRate, EVERYWHERE_ELSE, formatDeliveryWindow, formatMoney, listShippingZones, sampleProduct, productDelivery, rateDays, rateWeight, SHIPPING_COUNTRIES, CUTOFF_TIME_ZONES, defaultCutoffZone, HOLIDAY_DAYS_AHEAD, LATE_ORDER_DAYS, LATE_ORDER_MESSAGE_MAX, HANDOVER_DAYS_AHEAD, HANDOVER_LEAD_MAX, SHIP_PAUSE_MAX_DAYS } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { setCheckoutPhoneAction } from "../../shipping-actions";
@@ -6,6 +6,7 @@ import { DeliveryEstimatesForm } from "./DeliveryEstimatesForm";
 import { DeliveryProtectionForm } from "./DeliveryProtectionForm";
 import { ShipCutoffForm } from "./ShipCutoffForm";
 import { HolidayDeadlineForm } from "./HolidayDeadlineForm";
+import { ShipPauseForm } from "./ShipPauseForm";
 import { LateOrderForm } from "./LateOrderForm";
 import { GiftWrapForm } from "./GiftWrapForm";
 import { LocalDeliveryForm } from "./LocalDeliveryForm";
@@ -123,6 +124,15 @@ export default async function ShippingPage() {
               holiday has passed the line goes away by itself.
             </p>
             <HolidayDeadlineForm deadline={shop.holidayDeadline} days={holidayDays} />
+          </div>
+          <div className="border-t border-border pt-3 flex flex-col gap-2">
+            <h3 id="pause-heading" className="font-medium">Shipping pause</h3>
+            <p className="text-sm hint">
+              Your supplier is closed for New Year, or you&apos;re away with your own stock, but you&apos;d rather keep selling. Every store page
+              says when orders ship again, delivery dates count from that day, and running late emails wait. It ends by itself. To stop
+              taking orders instead, put the store on a break under Store status.
+            </p>
+            <ShipPauseForm pause={shop.shipPause} today={new Date().toISOString().slice(0, 10)} max={SHIP_PAUSE_MAX_DAYS} />
           </div>
           <div className="border-t border-border pt-3 flex flex-col gap-2">
             <h3 id="late-heading" className="font-medium">Orders running late</h3>

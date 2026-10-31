@@ -3,7 +3,7 @@ import { AddedToCart } from "@/theme/AddedToCart";
 import { readCart } from "@/lib/cart";
 import { Track } from "@/components/Track";
 import { StoreShell } from "@/theme/StoreShell";
-import { activeClosure, LANGUAGES, needsConsent, paymentMethods, shopCurrencies, shopLanguages, SIGNUP_POPUP_QUIET, SIGNUP_POPUP_LEAVE_FALLBACK, CHAT_BUTTON_QUIET, chatLinks, storePixels, storeWideCountdown } from "@sf/core";
+import { activeClosure, activeShipPause, LANGUAGES, needsConsent, paymentMethods, shopCurrencies, shopLanguages, SIGNUP_POPUP_QUIET, SIGNUP_POPUP_LEAVE_FALLBACK, CHAT_BUTTON_QUIET, chatLinks, storePixels, storeWideCountdown } from "@sf/core";
 import { SignupPopup } from "@/components/SignupPopup";
 import { ChatButtons } from "@/components/ChatButtons";
 import { BackToTop } from "@/theme/BackToTop";
@@ -54,11 +54,18 @@ export default async function StoreLayout({ children, params }: { children: Reac
     );
   }
   // A store-wide sale counting down gets the banner, unless the store is on a break.
-  const sale = closure?.mode === "holiday" ? null : await storeWideCountdown(await db(), shop.id);
+  // A pause in shipping says when orders go out again, ahead of a sale's banner.
+  const pause = closure?.mode === "holiday" ? null : activeShipPause(shop);
+  const sale = closure?.mode === "holiday" || pause ? null : await storeWideCountdown(await db(), shop.id);
   const notice = closure?.mode === "holiday" ? (
     <>
       <p className="font-medium">{t.holidayBanner(closureDate(closure.until, lang))}</p>
       {closure.message && <p className="text-sm whitespace-pre-line">{closure.message}</p>}
+    </>
+  ) : pause ? (
+    <>
+      <p className="font-medium" id="ship-pause">{t.shipPauseBanner(closureDate(pause.resumesOn, lang)!)}</p>
+      {pause.message && <p className="text-sm whitespace-pre-line">{pause.message}</p>}
     </>
   ) : sale ? (
     <p className="font-medium">

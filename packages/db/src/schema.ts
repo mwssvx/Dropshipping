@@ -176,6 +176,8 @@ export const shops = pgTable(
     // Import duties on orders to other countries: not mentioned, paid by the buyer to customs on
     // delivery (said at checkout), or included in the store's prices (said at checkout too).
     duties: text("duties", { enum: ["off", "buyer_pays", "included"] }).notNull().default("off"),
+    // A break in shipping (a supplier's New Year, the merchant away) while orders still come in.
+    shipPause: jsonb("ship_pause").$type<ShipPause | null>(),
     // Gift wrapping buyers can add to a gift at checkout, or null when the store doesn't wrap.
     giftWrap: jsonb("gift_wrap").$type<GiftWrap | null>(),
     // The smallest order the store takes, in goods after discounts; 0 means any amount.
@@ -1800,6 +1802,9 @@ export type HolidayReturns = { from: string; to: string; until: string };
 export type ProductQuiz = { title: string; intro: string | null; on: boolean; questions: { text: string; answers: { label: string; tag: string }[] }[] };
 export type GiftCardBonus = { everyMinor: number; bonusMinor: number; from: string; to: string; usableFrom: string | null; usableUntil: string | null };
 /** "Running late" emails: after `days` without shipping, with the merchant's own words added when set. */
+/** Orders keep coming in, but nothing ships from `from` (the day it was set, unless set ahead) until `resumesOn` (YYYY-MM-DD). */
+export type ShipPause = { from: string | null; resumesOn: string; message: string | null };
+
 export type LateOrderNotice = {
   days: number;
   message: string | null;

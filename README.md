@@ -1683,3 +1683,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Import duties on product pages and receipts (after launch, part 301)
 
 1. **Said before the cart and kept after paying** (`dutiesFor` in `packages/core/src/duties.ts`): with import duties set on the Taxes page, product pages add a line under the shipping cost for shoppers abroad ("Import duties and taxes for United Kingdom may be charged on delivery.", or "…included."), in their language, and the order confirmation email repeats what checkout said. Buyers decide knowing the full cost, and have it in writing when the courier asks. No migration.
+
+### Shipping pause (after launch, part 302)
+
+1. **Keep selling while nothing ships** (`setShipPause` and `shippingStart` in `packages/core/src/ship-pause.ts`): the Shipping page has "Pause shipping for a while", with the day orders ship again, an optional start day (to set Chinese New Year up ahead) and a few words for buyers. While it's on, every store page says "Shipping is paused for a few days. Orders placed now ship from February 18…", and delivery dates on product pages, the cart, checkout, order pages and receipts count from that day, so nobody is promised a parcel that can't leave yet. Unlike a break under Store status, buyers can still order.
+2. Running late emails wait while it's on and count from the day shipping resumes, the "order in the next hour" cutoff hides, a sale's banner steps aside for it, and it ends by itself. A pause lasts up to 45 days and comes along in the store file. Migration `0157_ship_pause` (`shops.ship_pause`).
