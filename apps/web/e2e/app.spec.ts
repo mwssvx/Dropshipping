@@ -1836,3 +1836,54 @@ test("a bundle made in the app shows on the store, then switched off", async ({ 
   await expect(buyer.getByRole("heading", { name: "Desk Lamp" })).toBeVisible();
   await expect(buyer.getByRole("region", { name: "Buy together, save 20%" })).toHaveCount(0);
 });
+
+test("tag rules added in the app tag the buyers who match", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `tr${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Wool Scarf");
+  await web.getByLabel("Price", { exact: true }).fill("45.00");
+  await web.getByLabel("Stock", { exact: true }).fill("9");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const scarf = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+
+  const buyer = await (await browser.newContext()).newPage();
+  await buyer.goto(scarf);
+  await buyer.getByRole("button", { name: "Add to cart" }).click();
+  await buyer.getByRole("link", { name: "Check out" }).click();
+  await buyer.getByRole("textbox", { name: "Email" }).first().fill(`grace-${Date.now()}@example.com`);
+  await buyer.getByLabel("Full name").fill("Grace Hopper");
+  await buyer.getByLabel("Address", { exact: true }).fill("1 Main St");
+  await buyer.getByLabel("City").fill("Austin");
+  await buyer.getByLabel("State or region").fill("TX");
+  await buyer.getByLabel("Postal code").fill("78701");
+  await buyer.getByRole("button", { name: "Continue to payment" }).click();
+  await buyer.getByRole("button", { name: /^Pay / }).click();
+  await expect(buyer.getByRole("heading", { name: "Thank you, Grace!" })).toBeVisible();
+
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Customers" }).click();
+  await page.getByRole("link", { name: /^Tag customers automatically/ }).click();
+  await expect(page.getByRole("heading", { name: "Tag customers automatically", level: 1 })).toBeVisible();
+  await expect(page.getByText("No rules yet")).toBeVisible();
+
+  await page.getByRole("textbox", { name: "Spent at least" }).fill("40.00");
+  await page.getByRole("textbox", { name: "Get the tag" }).fill("VIP");
+  await page.getByRole("button", { name: "Add rule" }).click();
+  await expect(page.getByText("Added. 1 customer now has the tag “vip”.")).toBeVisible();
+  await expect(page.getByRole("group", { name: "Spent $40.00 or more: vip" })).toContainText("1 customer has the tag now");
+
+  await page.getByRole("tab", { name: "Bought" }).click();
+  await page.getByRole("textbox", { name: "Find a product" }).fill("scarf");
+  await page.getByRole("button", { name: "Pick Wool Scarf" }).click();
+  await page.getByRole("textbox", { name: "Get the tag" }).fill("scarves");
+  await page.getByRole("button", { name: "Add rule" }).click();
+  await expect(page.getByText("Added. 1 customer now has the tag “scarves”.")).toBeVisible();
+  await expect(page.getByText("Your rules (2 of 20)")).toBeVisible();
+  await shot(page, "379-app-tag-rules");
+
+  await page.getByRole("button", { name: "Remove the vip rule…" }).click();
+  await page.getByRole("button", { name: "Remove the vip rule", exact: true }).click();
+  await expect(page.getByText("Removed. Customers it tagged lose “vip”, unless you gave it by hand.")).toBeVisible();
+  await expect(page.getByRole("group", { name: "Spent $40.00 or more: vip" })).toHaveCount(0);
+});

@@ -48,6 +48,7 @@ export default function CustomersScreen() {
       {!q ? (
         <List>
           <Row href="/blocked" title="Blocked buyers" subtitle="Emails and addresses checkout turns away" />
+          <Row href="/tag-rules" title="Tag customers automatically" subtitle="Tags that come and go by what buyers spend, order or buy" />
           {can("wholesale") ? <Row href="/wholesale" title="Wholesale" subtitle="Business buyers, their applications and the discount they get" /> : null}
         </List>
       ) : null}

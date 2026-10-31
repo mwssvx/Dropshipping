@@ -1992,3 +1992,7 @@ The app's inbox has a Saved replies row. Add the answers buyers ask for most, ch
 ### Bundles in the app (after launch, part 378)
 
 The Products tab has a Bundles row for people who look after marketing. Name a set of 2 to 4 products and the discount for buying them together, see whether each bundle is on your store (it waits while one of its products is a draft), and switch one off or delete it.
+
+### Tag customers automatically, in the app (after launch, part 379)
+
+The app's Customers screen has a "Tag customers automatically" row. Add a rule (spent at least an amount, placed at least so many orders, bought a product, or haven't ordered in so many days) with the tag it gives, see how many customers have each tag now, and remove a rule. Customers who already match get the tag straight away, and lose it when they stop matching.
