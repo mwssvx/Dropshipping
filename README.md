@@ -1547,3 +1547,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **A Reviews card** (`apps/web/src/app/admin/(shop)/products/[id]/page.tsx`, `productReviewSummary` in `packages/core/src/reviews.ts`): each product's admin page shows its average stars, how many reviews gave each rating (a tap opens just those), the three newest, and links to the ones waiting to be published, reported by shoppers or with no reply yet. Only for staff who can see reviews.
 2. **Reviews of one product**: the Reviews page takes `?product=` from those links, says which product it's showing, keeps it when changing tab, and "Clear" lets go of it. The CSV download follows it too. No migration.
+
+### Scheduled blog posts (after launch, part 274)
+
+1. **Publish on a day you pick** (`packages/core/src/blog.ts`): the post editor has "Publish on (optional)" under Published. With a time there the post is saved as published but stays off the store (the blog, its own address, home page cards, search, the RSS feed and the sitemap) until then, and the blog list says "Scheduled for Nov 3, 2026". Times are picked in the merchant's own time zone and can be up to a year ahead.
+2. **Changing your mind**: move the time, clear it to publish on save, or untick Published to take it back as a draft (it keeps no publish date, since it never went up). A live post keeps its first publish date as before. No migration: a scheduled post is a published post with a publish date still to come (`livePost`, `isScheduled`).

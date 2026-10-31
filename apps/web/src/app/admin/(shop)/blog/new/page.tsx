@@ -15,7 +15,7 @@ export default async function NewPostPage() {
       <PageHeader title="New post" back={<Link href="/admin/blog" className="hint hover:text-ink">← Blog</Link>} />
       <div className="px-4 sm:px-8">
         <PostForm action={createPostAction} submitLabel="Save post" products={products.map((p) => ({ id: p.id, title: p.title }))}
-          initial={{ title: "", handle: "", excerpt: "", body: "", imageUrl: "", productIds: [], published: false }} />
+          initial={{ title: "", handle: "", excerpt: "", body: "", imageUrl: "", productIds: [], published: false, publishAt: "" }} />
       </div>
     </main>
   );

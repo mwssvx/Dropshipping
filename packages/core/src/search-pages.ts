@@ -5,6 +5,7 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { translationsFor } from "./languages";
 import { plainSearchText, searchWords } from "./search";
+import { livePost } from "./blog";
 
 export type SearchLink = { kind: "collection" | "page" | "post"; title: string; path: string; imageUrl: string | null };
 
@@ -38,7 +39,7 @@ export async function searchPages(db: Db, shopId: string, q: string, language: s
   const [collections, pages, posts] = await Promise.all([
     db.query.collections.findMany({ where: eq(schema.collections.shopId, shopId), columns: { id: true, title: true, handle: true, imageUrl: true }, orderBy: asc(schema.collections.createdAt) }),
     db.query.pages.findMany({ where: and(eq(schema.pages.shopId, shopId), eq(schema.pages.published, true)), columns: { id: true, title: true, handle: true }, orderBy: asc(schema.pages.createdAt) }),
-    db.query.blogPosts.findMany({ where: and(eq(schema.blogPosts.shopId, shopId), eq(schema.blogPosts.status, "published")), columns: { title: true, handle: true, imageUrl: true }, orderBy: desc(schema.blogPosts.publishedAt) }),
+    db.query.blogPosts.findMany({ where: and(eq(schema.blogPosts.shopId, shopId), livePost()), columns: { title: true, handle: true, imageUrl: true }, orderBy: desc(schema.blogPosts.publishedAt) }),
   ]);
   const [collectionNames, pageNames] = await Promise.all([
     translationsFor(db, shopId, language, "collection", collections.map((c) => c.id)),

@@ -1,11 +1,33 @@
 "use client";
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import type { FormState } from "../../actions";
 import type { PostState } from "../../blog-actions";
 
-export type PostFields = { title: string; handle: string; excerpt: string; body: string; imageUrl: string; productIds: string[]; published: boolean };
+export type PostFields = { title: string; handle: string; excerpt: string; body: string; imageUrl: string; productIds: string[]; published: boolean; publishAt: string };
+
+/** An exact time as a datetime-local value in this browser's time zone, and back. */
+const toLocal = (iso: string) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+};
+const toIso = (local: string) => (local ? new Date(local).toISOString() : "");
+
+/** "Publish on": empty means as soon as it's saved with Published ticked. */
+function PublishAt({ initial }: { initial: string }) {
+  const [local, setLocal] = useState("");
+  // The server doesn't know the merchant's time zone, so the value is filled in once in the browser.
+  useEffect(() => setLocal(initial ? toLocal(initial) : ""), [initial]);
+  return (
+    <div className="field">
+      <label className="label" htmlFor="publishAtLocal">Publish on (optional)</label>
+      <input className="input" id="publishAtLocal" type="datetime-local" value={local} onChange={(e) => setLocal(e.target.value)} aria-describedby="publish-at-hint" />
+      <span className="hint" id="publish-at-hint">With Published ticked, the post goes up on the store at this time. Leave it empty to publish when you save.</span>
+      <input type="hidden" name="publishAt" value={toIso(local)} />
+    </div>
+  );
+}
 type Product = { id: string; title: string };
 
 export function PostForm({ action, initial: saved_, products, submitLabel, saved, drafted }: {
@@ -62,6 +84,7 @@ export function PostForm({ action, initial: saved_, products, submitLabel, saved
             <input type="checkbox" name="published" defaultChecked={initial.published} />
             Published
           </label>
+          <PublishAt initial={initial.publishAt} />
           <div className="field">
             <label className="label" htmlFor="handle">Address</label>
             <div className="flex items-center gap-1">
