@@ -19,7 +19,7 @@ export type Parcel = {
   key: string;
   items: { title: string; quantity: number }[];
   /** The parcel once the supplier or the merchant has it, with its tracking when shipped. */
-  shipment: Pick<Fulfillment, "id" | "status" | "carrier" | "trackingNumber" | "trackingUrl" | "shippedAt" | "deliveredAt"> | null;
+  shipment: Pick<Fulfillment, "id" | "status" | "carrier" | "trackingNumber" | "trackingUrl" | "shippedAt" | "deliveredAt" | "createdAt"> | null;
 };
 
 /**
@@ -51,7 +51,7 @@ export async function orderParcels(
   for (const g of groups.values()) {
     // A backup supplier's parcel stands in for the main supplier's.
     const f = g.key === "own" ? live.find((x) => x.supplierId === null) : (live.find((x) => x.supplierId === g.key) ?? live.find((x) => x.backupForSupplierId === g.key));
-    g.shipment = f ? { id: f.id, status: f.status, carrier: f.carrier, trackingNumber: f.trackingNumber, trackingUrl: f.trackingUrl, shippedAt: f.shippedAt, deliveredAt: f.deliveredAt } : null;
+    g.shipment = f ? { id: f.id, status: f.status, carrier: f.carrier, trackingNumber: f.trackingNumber, trackingUrl: f.trackingUrl, shippedAt: f.shippedAt, deliveredAt: f.deliveredAt, createdAt: f.createdAt } : null;
   }
   // Shipped parcels first, so the one on its way is at the top.
   return [...groups.values()].sort((a, b) => Number(!!b.shipment?.trackingNumber) - Number(!!a.shipment?.trackingNumber));
@@ -59,7 +59,12 @@ export async function orderParcels(
 
 /** Parcels in the order they shipped, the ones still to ship last, so "parcel 1 of 2" stays the same. */
 export const byShipping = (parcels: Parcel[]) =>
-  [...parcels].sort((a, b) => (a.shipment?.shippedAt?.getTime() ?? Infinity) - (b.shipment?.shippedAt?.getTime() ?? Infinity) || (a.shipment?.id ?? "").localeCompare(b.shipment?.id ?? ""));
+  [...parcels].sort(
+    (a, b) =>
+      (a.shipment?.shippedAt?.getTime() ?? Infinity) - (b.shipment?.shippedAt?.getTime() ?? Infinity) ||
+      (a.shipment?.createdAt.getTime() ?? Infinity) - (b.shipment?.createdAt.getTime() ?? Infinity) ||
+      (a.shipment?.id ?? "").localeCompare(b.shipment?.id ?? ""),
+  );
 
 const listItems = (p: Parcel) => p.items.map((i) => `  ${i.title}${i.quantity > 1 ? ` × ${i.quantity}` : ""}`);
 
