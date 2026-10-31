@@ -554,14 +554,15 @@ const patchInput = z.object({
         stock: z.number().int().min(0, "Stock can't be negative.").nullish(),
         weightGrams: z.number().int().min(1, "Leave the weight empty, or enter more than 0.").max(MAX_WEIGHT_GRAMS, "Keep the weight under 1,000 kg.").nullish(),
         costMinor: z.number().int().min(0, "Cost can't be negative.").nullish(),
+        compareAtMinor: z.number().int().min(1, "Leave the crossed-out price empty, or enter more than 0.").nullish(),
       }),
     )
     .optional(),
 });
 
 /**
- * Quick edits from the phone: status, and price, stock, packed weight or (for the store's own
- * stock) cost per variant. Everything else stays.
+ * Quick edits from the phone: status, and price, crossed-out price, stock, packed weight or (for
+ * the store's own stock) cost per variant. Everything else stays.
  */
 export async function patchProduct(db: Db, shopId: string, productId: string, input: z.input<typeof patchInput>) {
   const parsed = patchInput.safeParse(input);
@@ -575,8 +576,18 @@ export async function patchProduct(db: Db, shopId: string, productId: string, in
   await db.transaction(async (tx) => {
     await tx.update(schema.products).set({ ...(status ? { status } : {}), ...(status && status !== "draft" ? { publishAt: null } : {}), updatedAt: new Date() }).where(eq(schema.products.id, productId));
     for (const v of variants ?? []) {
-      if (!current.variants.some((c) => c.id === v.id)) throw new NotFoundError("Variant");
+      const was = current.variants.find((c) => c.id === v.id);
+      if (!was) throw new NotFoundError("Variant");
+      // A crossed-out price only makes sense above the price. Typed too low, say so; left
+      // behind by a price rise, it goes, the same as a bulk edit does.
+      const price = v.priceMinor ?? was.priceMinor;
+      let compareAt = v.compareAtMinor !== undefined ? v.compareAtMinor : was.compareAtMinor;
+      if (compareAt != null && compareAt <= price) {
+        if (v.compareAtMinor != null) throw new UserError("The crossed-out price must be higher than the price.");
+        compareAt = null;
+      }
       const set = {
+        ...(compareAt !== was.compareAtMinor ? { compareAtMinor: compareAt ?? null } : {}),
         ...(v.priceMinor !== undefined ? { priceMinor: v.priceMinor } : {}),
         ...(v.stock !== undefined ? { stock: v.stock } : {}),
         ...(v.weightGrams !== undefined ? { weightGrams: v.weightGrams } : {}),

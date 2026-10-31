@@ -16,6 +16,7 @@ export default function ProductScreen() {
   const product = useApi<Product>(`products/${id}`);
   const cur = useSession().me?.shop.currency ?? "USD";
   const [prices, setPrices] = useState<Record<string, string>>({});
+  const [was, setWas] = useState<Record<string, string>>({});
   const [stock, setStock] = useState<Record<string, string>>({});
   const [weight, setWeight] = useState<Record<string, string>>({});
   const [cost, setCost] = useState<Record<string, string>>({});
@@ -30,6 +31,7 @@ export default function ProductScreen() {
   useEffect(() => {
     if (!p) return;
     setPrices(Object.fromEntries(p.variants.map((v) => [v.id, (v.priceMinor / 100).toFixed(2)])));
+    setWas(Object.fromEntries(p.variants.map((v) => [v.id, v.compareAtMinor === null ? "" : (v.compareAtMinor / 100).toFixed(2)])));
     setStock(Object.fromEntries(p.variants.map((v) => [v.id, v.stock === null ? "" : String(v.stock)])));
     setWeight(Object.fromEntries(p.variants.map((v) => [v.id, kg(v.weightGrams)])));
     setHs(p.hsCode ?? "");
@@ -75,6 +77,8 @@ export default function ProductScreen() {
       const grams = parseKg(weight[v.id] ?? "");
       const c = (cost[v.id] ?? "").trim();
       const costMinor = c === "" ? null : (parseMoney(c) ?? v.costMinor);
+      const w = (was[v.id] ?? "").trim();
+      const compareAtMinor = w === "" ? null : (parseMoney(w) ?? v.compareAtMinor);
       return {
         id: v.id,
         priceMinor: price ?? v.priceMinor,
@@ -82,12 +86,14 @@ export default function ProductScreen() {
         // Not a number, or 0: keep what it was.
         weightGrams: grams === null || grams > 0 ? grams : v.weightGrams,
         costMinor,
+        compareAtMinor,
         v,
       };
     })
     .filter(
       (c) =>
         c.priceMinor !== c.v.priceMinor ||
+        c.compareAtMinor !== c.v.compareAtMinor ||
         c.stock !== c.v.stock ||
         (p.ships && c.weightGrams !== c.v.weightGrams) ||
         (p.ownStock && c.costMinor !== c.v.costMinor),
@@ -98,6 +104,14 @@ export default function ProductScreen() {
     const price = parseMoney(prices[vid] ?? "");
     const c = parseMoney((cost[vid] ?? "").trim());
     return price !== null && c !== null ? `You keep ${money(price - c, cur)} of each before fees.` : null;
+  };
+
+  // How much off the crossed-out price shows, once it's above the price.
+  const off = (vid: string) => {
+    const price = parseMoney(prices[vid] ?? "");
+    const w = parseMoney((was[vid] ?? "").trim());
+    if (price === null || w === null) return null;
+    return w > price ? `Buyers see ${Math.round(((w - price) / w) * 100)}% off.` : "Make it higher than the price, or leave it empty.";
   };
 
   return (
@@ -138,6 +152,14 @@ export default function ProductScreen() {
           <Card key={v.id}>
             {many ? <Heading>{v.title}</Heading> : null}
             <Field label={many ? `Price for ${v.title}` : "Price"} value={prices[v.id] ?? ""} onChangeText={(t) => setPrices((x) => ({ ...x, [v.id]: t }))} keyboardType="decimal-pad" />
+            <Field
+              label={many ? `Crossed-out price for ${v.title}` : "Crossed-out price"}
+              value={was[v.id] ?? ""}
+              onChangeText={(t) => setWas((x) => ({ ...x, [v.id]: t }))}
+              keyboardType="decimal-pad"
+              placeholder="No sale"
+              hint={off(v.id) ?? "Shown struck through next to the price, like a sale. Leave empty for none."}
+            />
             {p.ownStock ? (
               <Field
                 label={many ? `What ${v.title} costs you` : "What it costs you"}
@@ -171,9 +193,10 @@ export default function ProductScreen() {
             onPress={() =>
               act("save", async () => {
                 const r = await send(`products/${id}`, "PATCH", {
-                    variants: changes.map(({ id, priceMinor, stock, weightGrams, costMinor }) => ({
+                    variants: changes.map(({ id, priceMinor, compareAtMinor, stock, weightGrams, costMinor }) => ({
                       id,
                       priceMinor,
+                      compareAtMinor,
                       stock,
                       ...(p.ships ? { weightGrams } : {}),
                       ...(p.ownStock ? { costMinor } : {}),
