@@ -391,6 +391,8 @@ const themeDoc = z.object({
     backToTop: z.boolean().default(false),
     // Every page's footer asks for an email for news and offers.
     footerSignup: z.boolean().default(false),
+    // Visitors confirm they're old enough before they see the store: null doesn't ask.
+    ageGate: z.union([z.literal(18), z.literal(21)]).nullable().default(null),
     logoText: text(60),
     logoUrl: imageUrl,
     // The store's pages on social networks, as icons in the footer. Empty ones don't show.

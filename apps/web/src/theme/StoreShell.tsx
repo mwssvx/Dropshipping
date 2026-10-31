@@ -9,6 +9,7 @@ import { LanguagePicker } from "./LanguagePicker";
 import { HeaderSearch } from "./HeaderSearch";
 import { MenuDropdown } from "./MenuDropdown";
 import { FooterSignup } from "./FooterSignup";
+import { AgeGate } from "./AgeGate";
 import { SocialIcons } from "./SocialIcons";
 import { storeHref, themeLayoutAttrs, themeStyle } from "./style";
 
@@ -30,6 +31,7 @@ export function StoreShell({
   languages,
   payments = [],
   signup,
+  ageGate,
   children,
 }: {
   doc: ThemeDoc;
@@ -52,6 +54,8 @@ export function StoreShell({
   languages?: { root: string; current: string; options: { code: string; name: string }[] };
   /** Signs a shopper up from the footer, when the theme asks for it; the editor preview leaves it out. */
   signup?: (s: { status?: "sent" | "invalid" }, f: FormData) => Promise<{ status?: "sent" | "invalid" }>;
+  /** Asks visitors their age first, when the theme asks for it; the editor preview leaves it out. */
+  ageGate?: { age: 18 | 21; storeKey: string };
   children: React.ReactNode;
 }) {
   const { settings, menus } = doc;
@@ -165,6 +169,12 @@ export function StoreShell({
           </div>
         </div>
       </footer>
+      {ageGate && (
+        <AgeGate age={ageGate.age} storeKey={ageGate.storeKey} text={{
+          title: logo, intro: t.ageGateIntro(shopName), question: t.ageGateQuestion(ageGate.age),
+          yes: t.ageGateYes(ageGate.age), no: t.ageGateNo, denied: t.ageGateDenied(ageGate.age),
+        }} />
+      )}
     </div>
   );
 }

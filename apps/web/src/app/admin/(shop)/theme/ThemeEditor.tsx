@@ -413,6 +413,15 @@ function StylePanel({ doc, onChange }: { doc: ThemeDoc; onChange: (d: ThemeDoc) 
           <input type="checkbox" className="mt-0.5" checked={s.footerSignup} onChange={(e) => set({ footerSignup: e.target.checked })} />
           <span>Ask for emails in the footer of every page<span className="block hint">Shoppers sign up without leaving the page and confirm by email, like the home page signup.</span></span>
         </label>
+        <div className="flex flex-col gap-1 text-sm">
+          <label htmlFor="theme-age-gate">Ask visitors their age first</label>
+          <select id="theme-age-gate" aria-describedby="theme-age-gate-hint" className="input" value={String(s.ageGate ?? "")} onChange={(e) => set({ ageGate: e.target.value === "21" ? 21 : e.target.value === "18" ? 18 : null })}>
+            <option value="">Don't ask</option>
+            <option value="18">18 or older</option>
+            <option value="21">21 or older</option>
+          </select>
+          <span id="theme-age-gate-hint" className="hint">For stores that sell only to adults, like wine or vapes. Visitors confirm once per device before they see the store. Checkout still asks for products with a minimum age. The editor preview doesn't ask.</span>
+        </div>
       </fieldset>
       <fieldset className="flex flex-col gap-2">
         <legend className="font-semibold mb-1">Corners</legend>
