@@ -113,6 +113,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
   // Orders this page already links to (added after checkout, replacements) aren't listed twice.
   const linked = new Set([parent?.id, child?.id, original?.id, ...replacements.map((r) => r.id)].filter(Boolean));
   const otherDoors = sameDoor?.orders.filter((o) => !linked.has(o.id)) ?? [];
+  const boxMates = sameDoor?.ownItems ? sameDoor.orders.filter((o) => o.ownItems).map((o) => ({ id: o.id, number: o.number })) : [];
 
   return (
     <main className="pb-12">
@@ -385,14 +386,14 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
                     <span className="font-medium">Sent by you</span>
                     <span>{listed(ownWaiting.items)}</span>
                     <span className="hint">These are your own stock, so they go in a parcel you post. Add its tracking and we&apos;ll email the buyer about this parcel.</span>
-                    <ManualTrackingForm orderId={order.id} own primary />
+                    <ManualTrackingForm orderId={order.id} own primary also={boxMates} />
                   </li>
                 )}
               </ul>
             )}
             <div className="flex gap-2 flex-wrap">
               {open && <CheckTrackingButton orderId={order.id} />}
-              {paid && order.fulfillments.length === 0 && <ManualTrackingForm orderId={order.id} />}
+              {paid && order.fulfillments.length === 0 && <ManualTrackingForm orderId={order.id} also={boxMates} />}
             </div>
           </section>
           )}
@@ -455,7 +456,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
               </ul>
               <p className="hint mt-1">
                 {sameDoor.ownItems && otherDoors.some((o) => o.ownItems)
-                  ? "The items you post yourself can go in one box, so you pay postage once. Add the same tracking to each order."
+                  ? "The items you post yourself can go in one box, so you pay postage once. When you add tracking, tick the other orders and they get it too."
                   : "Suppliers send their parcels on their own, so these may still arrive on different days."}
               </p>
             </section>

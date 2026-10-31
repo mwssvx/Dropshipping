@@ -25,7 +25,14 @@ export function CheckTrackingButton({ orderId }: { orderId: string }) {
   );
 }
 
-export function ManualTrackingForm({ orderId, primary, own }: { orderId: string; primary?: boolean; /** For the parcel of the store's own stock. */ own?: boolean }) {
+export function ManualTrackingForm({ orderId, primary, own, also = [] }: {
+  orderId: string;
+  primary?: boolean;
+  /** For the parcel of the store's own stock. */
+  own?: boolean;
+  /** Other orders to the same door with the store's own items, which can go in the same box. */
+  also?: { id: string; number: number }[];
+}) {
   const [open, setOpen] = useState(false);
   const [state, action] = useActionState(addTrackingAction.bind(null, orderId), {});
   if (!open) {
@@ -53,6 +60,16 @@ export function ManualTrackingForm({ orderId, primary, own }: { orderId: string;
         <label className="label" htmlFor="trackingUrl">Tracking link</label>
         <input className="input" id="trackingUrl" name="trackingUrl" type="url" placeholder="Optional, https://…" />
       </div>
+      {also.length > 0 && (
+        <fieldset className="flex flex-col gap-1">
+          <legend className="label">Packed in the same box</legend>
+          {also.map((o) => (
+            <label key={o.id} className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="also" value={o.id} /> Order #{o.number} gets this tracking too
+            </label>
+          ))}
+        </fieldset>
+      )}
       <p className="hint">We email the customer their tracking as soon as you save.</p>
       <div className="flex gap-2">
         <SubmitButton pendingText="Saving…">Mark as shipped</SubmitButton>

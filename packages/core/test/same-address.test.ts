@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { schema } from "@sf/db";
-import { doorKey, createProduct, DemoModel, ordersToSameAddress, packingSlips, sameAddressOnList, startCheckout } from "../src";
+import { addManualTracking, addTrackingToSameBox, doorKey, createProduct, DemoModel, ordersToSameAddress, packingSlips, sameAddressOnList, startCheckout } from "../src";
 import { makeFixture } from "../evals/fixture";
 
 const address = { name: "Ada Lovelace", line1: "1 Main St", city: "Austin", region: "TX", postalCode: "78701", country: "US" };
@@ -48,9 +48,14 @@ describe("orders to the same address", () => {
     const { slips } = await packingSlips(f.db, shop.id, { orderIds: [first.id, second.id, lampOnly.id] });
     expect(slips.map((x) => [x.number, x.sameBox])).toEqual([[first.number, [second.number]], [second.number, [first.number]], [lampOnly.number, []]]);
 
-    // Once the store has posted its own parcel for the second order, it can't share a box any more.
-    await f.db.insert(schema.fulfillments).values({ shopId: shop.id, orderId: second.id, supplierId: null, status: "shipped", carrier: "USPS", trackingNumber: "9400111", shippedAt: new Date() });
-    expect((await ordersToSameAddress(f.db, shop.id, first)).orders.map((o) => o.ownItems)).toEqual([false, false]);
+    // Posted in one box: the first order's tracking goes on the second too, never on one without own items.
+    const tracking = { carrier: "USPS", trackingNumber: "9400111" };
+    await addManualTracking(f.ctx, shop.id, first.id, tracking);
+    expect(await addTrackingToSameBox(f.ctx, shop.id, first.id, [second.id, lampOnly.id, shipped.id], tracking)).toEqual([second.number]);
+    const posted = await f.db.query.fulfillments.findMany({ where: eq(schema.fulfillments.orderId, second.id) });
+    expect(posted.filter((x) => x.supplierId === null).map((x) => x.trackingNumber)).toEqual(["9400111"]);
+    // With nothing of its own left to post (no supplier order was placed here), the second one reads shipped.
+    expect((await ordersToSameAddress(f.db, shop.id, first)).orders.map((o) => [o.number, o.ownItems])).toEqual([[lampOnly.number, false]]);
 
     // Pickups aren't posted.
     expect(await ordersToSameAddress(f.db, shop.id, { ...first, pickup: true })).toEqual({ orders: [], ownItems: false });
