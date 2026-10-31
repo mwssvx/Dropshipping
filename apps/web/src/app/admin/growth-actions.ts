@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
-import { createDiscount, moderateReview, notifyReviewReply, parseMoney, sendAbandonedCartEmails, setAbandonedCartOffer, setDiscountActive, setBirthdayOffer, setGrowthSettings, setSignupPopup, setThankYouNote, setPostPurchaseOffer, setReferralProgram, setReviewRequestDays, setSubscriptionOffer, setUpsell, setWelcomeOffer, setWinbackOffer, unfilledFields, UserError } from "@sf/core";
+import { createDiscount, moderateReview, notifyReviewReply, parseMoney, sendAbandonedCartEmails, sendBrowseReminders, setBrowseReminders, BROWSE_AFTER_HOURS, setAbandonedCartOffer, setDiscountActive, setBirthdayOffer, setGrowthSettings, setSignupPopup, setThankYouNote, setPostPurchaseOffer, setReferralProgram, setReviewRequestDays, setSubscriptionOffer, setUpsell, setWelcomeOffer, setWinbackOffer, unfilledFields, UserError } from "@sf/core";
 import { fulfillment, logged, mailer, requireShop, storeAddress, testPayments } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -294,3 +294,20 @@ export async function setSignupPopupAction(_: FormState, form: FormData): Promis
   revalidatePath("/admin/marketing");
   return { saved: true };
 }
+
+export async function setBrowseRemindersAction(form: FormData) {
+  const { shop, db, user } = await requireShop("marketing");
+  const on = form.get("browseReminders") === "on";
+  await setBrowseReminders(db, shop.id, on);
+  await logged({ shop, user, db }, `${on ? "Turned on" : "Turned off"} browse reminders`, { href: "/admin/marketing#browse-heading" });
+  revalidatePath("/admin/marketing");
+}
+
+/** Test mode only: send browse reminders as if the wait had passed, so they can be tried at once. */
+export async function sendBrowseRemindersNowAction() {
+  const { shop } = await requireShop("marketing");
+  if (!testPayments()) return;
+  await sendBrowseReminders(await fulfillment(), new Date(Date.now() + BROWSE_AFTER_HOURS * HOUR + 60_000), { shopId: shop.id });
+  revalidatePath("/admin/marketing");
+}
+

@@ -138,7 +138,7 @@ describe("second checkout reminder with a code", () => {
     await setAbandonedCartOffer(f.db, shop.id, 10);
     const { order } = await f.checkout();
     const ctx = { ...f.ctx, payUrl: (_: unknown, o: { id: string }) => `https://store.example/pay/${o.id}` };
-    expect(await sendAbandonedCartEmails(ctx, new Date(Date.now() + 2 * HOUR))).toEqual({ sent: 1, offers: 0 });
+    expect(await sendAbandonedCartEmails(ctx, new Date(Date.now() + 2 * HOUR))).toEqual({ sent: 1, offers: 0, browse: 0 });
     // Not before a day has passed since the first one.
     expect((await sendAbandonedCartEmails(ctx, new Date(Date.now() + 12 * HOUR))).offers).toBe(0);
     expect((await sendAbandonedCartEmails(ctx, new Date(Date.now() + 26 * HOUR))).offers).toBe(1);

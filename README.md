@@ -1575,3 +1575,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Reads and sales on the Blog page** (`postStats` in `packages/core/src/analytics.ts`): each published post shows how many visits read it in the last 30 days, and what was bought in visits whose last post read was this one ("$64.00 (2 orders)", after refunds). So a merchant sees which posts bring buyers, not just visitors, and what to write more of.
 2. **How it's counted**: a post's page records a read (`post_view`, with the post) next to the usual page view, with the same random visit id and no personal data. At checkout the order keeps the last post read in that visit (`orders.visit_post_id`, `visitPost`). Unpaid checkouts and replacements aren't sales. Migration `0151_blog_reads`.
+
+### Browse reminders (after launch, part 280)
+
+1. **"Still thinking about the Sunset Projection Lamp?"** (`packages/core/src/browse-reminders.ts`, Marketing → Browse reminders): when a subscriber looks at a product while signed in to their store account and doesn't buy it, they get one email about 4 hours later with a link back to the product. Off until the store turns it on. Klaviyo and similar apps charge for this on Shopify.
+2. **Kept polite**: only buyers who said yes to the store's emails and haven't unsubscribed, at most one a week, and none when they've ordered or started a checkout since (the checkout reminder has those), the product sold out or went off sale, or the look is more than 3 days old. It runs with the hourly checkout reminders (`sendAbandonedCartEmails`), so no new scheduled job.
+3. **What it sold**: the link carries `utm_source=browse-reminder`, so its orders show under Sales by source, and the card shows buyers reminded, orders and sales in the last 30 days. The setting goes along in the store file. Migration `0152_browse_reminders`.
