@@ -457,6 +457,22 @@ test("a customer's orders, note and tags, from the app", async ({ page, browser 
   const them = page.getByRole("link", { name: "Customer Ada Buyer" });
   await expect(them).toContainText("2 orders from them");
   await expect(them).toContainText("vip, local");
+
+  // The Orders tab finds an order by its number, or the buyer's name or email.
+  await page.goto("/");
+  await tab(page, "Orders");
+  await page.getByRole("textbox", { name: "Search orders" }).fill("#1002");
+  await expect(page.getByRole("link", { name: "Order #1002" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Order #1001" })).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "Open" })).toHaveCount(0);
+  await page.getByRole("textbox", { name: "Search orders" }).fill("ada@");
+  await expect(page.getByRole("link", { name: "Order #1001" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Order #1002" })).toBeVisible();
+  await shot(page, "348-app-order-search");
+  await page.getByRole("textbox", { name: "Search orders" }).fill("nobody");
+  await expect(page.getByText("No order matches")).toBeVisible();
+  await page.getByRole("textbox", { name: "Search orders" }).fill("");
+  await expect(page.getByRole("tab", { name: "Open" })).toBeVisible();
 });
 
 test("a discount code made, checked and turned off from the app", async ({ page, browser }) => {
