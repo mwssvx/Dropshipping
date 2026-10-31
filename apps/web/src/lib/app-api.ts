@@ -56,6 +56,11 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  cancelSubscriptionForBuyer,
+  intervalLabel,
+  listSubscriptions,
+  renewSubscription,
+  subscriptionStats,
   listActivity,
   listTeam,
   analyticsReport,
@@ -138,7 +143,7 @@ import {
 import type { Db } from "@sf/db";
 import { revalidatePath } from "next/cache";
 import { BRAND } from "./brand";
-import { agents, campaigns, db, fulfillment, logged, mailer, platformUrl, notifyLater, payments, refunds, stock, storeAddress, suppliers, tax, testPayments } from "./server";
+import { agents, campaigns, db, fulfillment, logged, mailer, platformUrl, notifyLater, payments, refunds, stock, storeAddress, subscriptions, suppliers, tax, testPayments } from "./server";
 
 type User = { id: string; email: string };
 type ShopLink = { id: string; name: string; handle: string; role: string };
@@ -515,6 +520,59 @@ const routes: Record<string, Handler> = {
       entries: entries.map((e) => ({ id: e.id, email: e.email, summary: e.summary, createdAt: e.createdAt, orderId: e.href?.match(/^\/admin\/orders\/([0-9a-f-]{36})$/)?.[1] ?? null })),
       next,
     };
+  },
+  // Subscribe and save: buyers who get their order again every few weeks.
+  "GET subscriptions": async ({ url, db, shop }) => {
+    const show = url.searchParams.get("show");
+    const status = show === "failing" || show === "paused" || show === "cancelled" ? show : show === "all" ? undefined : "active";
+    const q = url.searchParams.get("q")?.trim().slice(0, 100) || undefined;
+    const [stats, subs] = await Promise.all([subscriptionStats(db, shop.id), listSubscriptions(db, shop.id, { status, query: q, size: 30 })]);
+    const ids = [...new Set(subs.flatMap((x) => x.lines.map((l) => l.variantId)))];
+    const variants = ids.length ? await db.query.variants.findMany({ where: (v, { inArray }) => inArray(v.id, ids), columns: { id: true, title: true, productId: true } }) : [];
+    const productIds = [...new Set(variants.map((v) => v.productId))];
+    const products = new Map(
+      productIds.length ? (await db.query.products.findMany({ where: (p, { inArray }) => inArray(p.id, productIds), columns: { id: true, title: true } })).map((p) => [p.id, p.title]) : [],
+    );
+    const titles = new Map(variants.map((v) => [v.id, v.title === "Default" ? (products.get(v.productId) ?? "") : `${products.get(v.productId) ?? ""} – ${v.title}`]));
+    return {
+      stats,
+      testMode: testPayments(),
+      subscriptions: subs.map((x) => ({
+        id: x.id,
+        email: x.email,
+        name: x.shippingAddress.name,
+        status: x.status,
+        pausedBy: x.pausedBy,
+        failures: x.failures,
+        lastError: x.lastError,
+        every: intervalLabel(x.intervalDays),
+        percentOff: x.percentOff,
+        nextOrderAt: x.nextOrderAt,
+        items: x.lines.map((l) => `${l.quantity} × ${titles.get(l.variantId) ?? "A product no longer sold"}`),
+        deliveries: x.deliveries,
+        salesMinor: x.salesMinor,
+        firstOrderId: x.firstOrderId,
+        firstOrderNumber: x.firstOrderNumber,
+      })),
+    };
+  },
+  "POST subscriptions/:id": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ action?: unknown }>(req);
+    if (b.action === "cancel") {
+      const sub = await cancelSubscriptionForBuyer({ db, mailer: mailer() }, shop, params.id!);
+      await logged({ shop, user, db }, `Cancelled ${sub.email}'s subscription in the app`, { href: "/admin/subscriptions" });
+      return { ok: true, message: `Cancelled. We've emailed ${sub.email}.` };
+    }
+    if (b.action === "send_now") {
+      // Test mode only: place the next delivery now, as if its day had come.
+      if (!testPayments()) throw new HttpError(403, "Only in test mode.");
+      const sub = await db.query.subscriptions.findFirst({ where: (x, { and, eq }) => and(eq(x.id, params.id!), eq(x.shopId, shop.id)), columns: { id: true } });
+      if (!sub) throw new NotFoundError("Subscription");
+      const r = await renewSubscription(await subscriptions(), sub.id);
+      if (r.status === "ordered") return { ok: true, message: `Placed order #${r.order.number}.` };
+      throw new UserError(r.status === "failed" ? `Couldn't place it: ${r.error}` : "It isn't active.");
+    }
+    throw new HttpError(400, "Pick cancel.");
   },
   "GET questions": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
@@ -1087,6 +1145,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("payment-links")) return "orders";
   if (path.startsWith("analytics")) return "analytics";
   if (path.startsWith("activity")) return "team";
+  if (path.startsWith("subscriptions")) return "orders";
   if (path.startsWith("checkouts")) return "orders";
   if (path.startsWith("store-status")) return "theme";
   if (path.startsWith("gift-cards")) return "gift_cards";
