@@ -2,7 +2,7 @@ import { useState } from "react";
 import { send, useApi } from "../../src/api";
 import { money, parseMoney, when } from "../../src/format";
 import { useSession } from "../../src/session";
-import { BackLink, Banner, Body, Button, Card, EmptyState, Field, Heading, LoadError, Loading, Screen, Section, Segmented, Toggle } from "../../src/ui";
+import { BackLink, Banner, Body, Button, Card, EmptyState, Field, Heading, List, LoadError, Loading, Row, Screen, Section, Segmented, Toggle } from "../../src/ui";
 
 type Code = { id: string; code: string; summary: string; automatic: boolean; firstOrderOnly: boolean; active: boolean; used: number; salesMinor: number; usageLimit: number | null; endsAt: string | null };
 type Kind = "percent" | "amount" | "free_shipping";
@@ -75,6 +75,9 @@ export default function CodesScreen() {
         </Card>
       </Section>
       <LoadError error={list.error} stale={list.stale} retry={list.reload} />
+      <List>
+        <Row href="/code-batches" title="One-time codes" subtitle="A batch of codes that each work once, for parcel cards or a market stall" />
+      </List>
       {!codes ? (
         list.loading ? <Loading /> : null
       ) : codes.length === 0 ? (
