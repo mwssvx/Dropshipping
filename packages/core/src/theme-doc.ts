@@ -350,6 +350,8 @@ const themeDoc = z.object({
     cardRatings: z.boolean().default(true),
     // A button to jump back to the top appears once a shopper has scrolled a long way down.
     backToTop: z.boolean().default(false),
+    // Every page's footer asks for an email for news and offers.
+    footerSignup: z.boolean().default(false),
     logoText: text(60),
     logoUrl: imageUrl,
     // The store's pages on social networks, as icons in the footer. Empty ones don't show.

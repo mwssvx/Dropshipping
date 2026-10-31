@@ -8,6 +8,7 @@ import { CurrencyPicker } from "./CurrencyPicker";
 import { LanguagePicker } from "./LanguagePicker";
 import { HeaderSearch } from "./HeaderSearch";
 import { MenuDropdown } from "./MenuDropdown";
+import { FooterSignup } from "./FooterSignup";
 import { SocialIcons } from "./SocialIcons";
 import { storeHref, themeLayoutAttrs, themeStyle } from "./style";
 
@@ -28,6 +29,7 @@ export function StoreShell({
   t = storeText(null),
   languages,
   payments = [],
+  signup,
   children,
 }: {
   doc: ThemeDoc;
@@ -48,6 +50,8 @@ export function StoreShell({
   payments?: string[];
   /** When the store is shown in more than one language: the buyer's, and links to this page in each. */
   languages?: { root: string; current: string; options: { code: string; name: string }[] };
+  /** Signs a shopper up from the footer, when the theme asks for it; the editor preview leaves it out. */
+  signup?: (s: { status?: "sent" | "invalid" }, f: FormData) => Promise<{ status?: "sent" | "invalid" }>;
   children: React.ReactNode;
 }) {
   const { settings, menus } = doc;
@@ -128,6 +132,9 @@ export function StoreShell({
       <div className="flex-1">{children}</div>
       <footer className="border-t border-border">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col gap-6">
+          {settings.footerSignup && (
+            <FooterSignup action={signup} text={{ title: t.footerSignup, email: t.signupEmail, signUp: t.signUp, sent: t.signupSent, invalid: t.signupInvalid }} />
+          )}
           <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
             {menus.footer.map((m, i) => <Link key={i} href={storeHref(base, m.href)} className="hover:text-accent">{m.label}</Link>)}
             <Link href={`${base}/track`} className="hover:text-accent">{t.trackOrder}</Link>

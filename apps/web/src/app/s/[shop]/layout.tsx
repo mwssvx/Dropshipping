@@ -74,7 +74,7 @@ export default async function StoreLayout({ children, params }: { children: Reac
   const popup = shop.signupPopupSeconds && shop.status === "active" && !closure && !(await currentBuyer(shop.id))?.acceptsMarketing;
   const picker = currencies.length > 1 ? { currencies, current: (await buyerFx(shop)).currency, action: setCurrencyAction.bind(null, param) } : undefined;
   return (
-    <StoreShell doc={theme} shopName={shop.name} currency={shop.currency} base={base} cartCount={count} closed={shop.status !== "active"} notice={notice} verified={!!shop.verifiedAt && shop.status === "active"} picker={picker} t={t} payments={paymentMethods(shop)} languages={langs.length ? { root, current: lang ?? "en", options: [{ code: "en", name: "English" }, ...langs.map((l) => ({ code: l, name: LANGUAGES[l].name }))] } : undefined}>
+    <StoreShell doc={theme} shopName={shop.name} currency={shop.currency} base={base} cartCount={count} closed={shop.status !== "active"} notice={notice} verified={!!shop.verifiedAt && shop.status === "active"} picker={picker} t={t} payments={paymentMethods(shop)} signup={theme.settings.footerSignup && shop.status === "active" ? popupSignupAction.bind(null, param) : undefined} languages={langs.length ? { root, current: lang ?? "en", options: [{ code: "en", name: "English" }, ...langs.map((l) => ({ code: l, name: LANGUAGES[l].name }))] } : undefined}>
       <Track shopId={shop.id} kind="page_view" />
       {children}
       {shop.stayAfterAdd && (
