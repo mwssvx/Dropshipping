@@ -1369,3 +1369,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **Icons in the footer** (`packages/core/src/social-links.ts`, theme editor → Menus → Social media): a store adds its Instagram, Facebook, TikTok, YouTube, Pinterest and X pages, and each shows as an icon in the footer that opens in a new tab, read out as "Follow us on Instagram" in the shopper's language. Networks left empty don't show.
 2. **Easy to fill in, hard to get wrong**: typing @yourstore fills in the page's address, a link without https:// gets it, and a link to another site (an Instagram link in the X box, a look-alike address) is refused with what to paste instead.
 3. **Search engines know they're yours**: the home page tells them the store's social pages belong to it (`sameAs`), and store files carry the links with the theme.
+
+### Collection banners (after launch, part 240)
+
+1. **The cover image on the collection's page**: a collection with a cover image now shows it behind its title and description at the top of its page, darkened at the bottom so the words stay readable, with corners that follow the theme. Before, the cover image only showed on collection tiles.
+2. **Easy to turn off**: theme editor → Style → "Show a collection's photo behind its title". Collections without a cover image show just the title, as before.
