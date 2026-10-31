@@ -35,7 +35,21 @@ type Detail = {
   tags?: string[];
   expectedDelivery?: { from: string; to: string } | null;
   daysLate?: number;
+  /** Set when it comes in more than one parcel. */
+  parcels?: { own: boolean; items: { title: string; quantity: number }[]; status: string | null; carrier: string | null; trackingNumber: string | null; trackingUrl: string | null }[];
 };
+
+/** Where one parcel of several is: shipped with tracking, with the supplier, or still to post yourself. */
+const parcelState = (p: NonNullable<Detail["parcels"]>[number]) =>
+  p.status === "delivered"
+    ? "Delivered"
+    : p.trackingNumber
+      ? `${p.carrier ?? "Carrier"} ${p.trackingNumber}`
+      : p.own
+        ? "Sent by you · not shipped yet"
+        : p.status === "failed"
+          ? "Supplier couldn't take it"
+          : "With the supplier · not shipped yet";
 
 const longDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 /** "Oct 18 – Oct 25", or one day when both ends are the same. */
@@ -172,7 +186,20 @@ export default function OrderScreen() {
         </Card>
       ) : null}
 
-      {o.fulfillments.some((x) => x.trackingNumber) ? (
+      {o.parcels && o.parcels.length > 1 ? (
+        <Section title={`Comes in ${o.parcels.length} parcels`}>
+          <List>
+            {o.parcels.map((p, i) => (
+              <Row
+                key={i}
+                title={p.items.map((it) => (it.quantity > 1 ? `${it.title} × ${it.quantity}` : it.title)).join(", ")}
+                subtitle={parcelState(p)}
+                onPress={p.trackingUrl ? () => Linking.openURL(p.trackingUrl!) : undefined}
+              />
+            ))}
+          </List>
+        </Section>
+      ) : o.fulfillments.some((x) => x.trackingNumber) ? (
         <Section title="Delivery">
           <List>
             {o.fulfillments
