@@ -87,6 +87,7 @@ export const PUSH_LABELS: Record<PushKind, string> = {
   return_request: "Returns buyers ask for",
   review: "Reviews waiting for your OK",
   product_question: "Questions shoppers ask about products",
+  wholesale_application: "Wholesale applications",
 };
 /** Who gets each kind: staff, for example, don't hear about payouts or AI proposals. */
 const PUSH_AREA: Record<PushKind, Area> = {
@@ -101,6 +102,7 @@ const PUSH_AREA: Record<PushKind, Area> = {
   return_request: "returns",
   product_question: "reviews",
   review: "reviews",
+  wholesale_application: "wholesale",
 };
 
 /** Not a kind of its own: turning this off makes new-order notifications silent. */
@@ -149,7 +151,7 @@ const clip = (s: string, n = 140) => (s.length > n ? `${s.slice(0, n - 1)}…` :
 
 /** What happened in a store since `since`, as notifications. `url` is a path inside the app. */
 export async function collectPushEvents(db: Db, shopId: string, since: Date): Promise<PushEvent[]> {
-  const [shop, orders, failed, holds, actions, staff, disputes, asks, returns, reviews, questions] = await Promise.all([
+  const [shop, orders, failed, holds, actions, staff, disputes, asks, returns, reviews, questions, wholesale] = await Promise.all([
     db.query.shops.findFirst({ where: eq(schema.shops.id, shopId) }),
     db.query.orders.findMany({
       where: and(eq(schema.orders.shopId, shopId), inArray(schema.orders.paymentStatus, ["paid", "partially_refunded"]), gte(schema.orders.paidAt, since)),
@@ -228,6 +230,12 @@ export async function collectPushEvents(db: Db, shopId: string, since: Date): Pr
       .innerJoin(schema.products, eq(schema.products.id, schema.productQuestions.productId))
       .where(and(eq(schema.productQuestions.shopId, shopId), eq(schema.productQuestions.status, "waiting"), gte(schema.productQuestions.createdAt, since)))
       .limit(50),
+    // A business asking for wholesale prices.
+    db.query.customers.findMany({
+      where: and(eq(schema.customers.shopId, shopId), eq(schema.customers.wholesaleStatus, "pending"), gte(schema.customers.wholesaleRequestedAt, since)),
+      columns: { id: true, email: true, wholesaleCompany: true, wholesaleMessage: true, wholesaleRequestedAt: true },
+      limit: 50,
+    }),
   ]);
   if (!shop) return [];
   const events: PushEvent[] = [];
@@ -271,6 +279,10 @@ export async function collectPushEvents(db: Db, shopId: string, since: Date): Pr
   }
   for (const q of questions) {
     events.push({ kind: "product_question", ref: q.id, title: `${q.name} asked about ${q.title}`, body: clip(q.body), url: "/questions", at: q.createdAt });
+  }
+  for (const w of wholesale) {
+    const who = w.wholesaleCompany ?? w.email;
+    events.push({ kind: "wholesale_application", ref: w.id, title: `${who} wants wholesale prices`, body: clip(w.wholesaleMessage || w.email), url: "/wholesale", at: w.wholesaleRequestedAt! });
   }
   for (const { m } of staff) {
     events.push({ kind: "escalation_reply", ref: m.id, title: "Our support team replied", body: clip(m.body), url: "/assistant", at: m.createdAt });

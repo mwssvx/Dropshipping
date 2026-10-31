@@ -1407,3 +1407,65 @@ test("a cart link made in the app fills a shopper's cart", async ({ page, browse
   await expect(page.getByText("“Story bundle” deleted.", { exact: false })).toBeVisible();
   await expect(page.getByRole("group", { name: "Story bundle" })).toHaveCount(0);
 });
+
+test("a wholesale application answered from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `ws${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Brass Lamp");
+  await web.getByLabel("Price", { exact: true }).fill("40.00");
+  await web.getByLabel("Stock", { exact: true }).fill("20");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const store = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href.replace(/\/products\/.*$/, "");
+
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Customers" }).click();
+  await page.getByRole("link", { name: /^Wholesale/ }).click();
+  await expect(page.getByText("Wholesale is off", { exact: false })).toBeVisible();
+  await page.getByRole("switch", { name: "Sell wholesale" }).click();
+  await page.getByRole("textbox", { name: "Wholesale discount (%)" }).fill("25");
+  await page.getByRole("button", { name: "Save settings" }).click();
+  await expect(page.getByText("Wholesale settings saved.")).toBeVisible();
+
+  // A shop signs in on the store and applies.
+  const buyer = await (await browser.newContext()).newPage();
+  const shopEmail = `corner-${Date.now()}@example.com`;
+  await buyer.goto(`${store}/account`);
+  await buyer.getByLabel("Email").fill(shopEmail);
+  await buyer.getByRole("button", { name: "Email me a code" }).click();
+  await expect(buyer.getByRole("status")).toContainText("We sent a 6-digit code");
+  const inbox = await buyer.context().newPage();
+  await inbox.goto(`${WEB}/dev/mail`);
+  const subject = await inbox.getByRole("article").filter({ hasText: shopEmail }).first().getByRole("heading").textContent();
+  await inbox.close();
+  await buyer.getByLabel("Code").fill(subject!.match(/^(\d{6})/)![1]!);
+  await buyer.getByRole("button", { name: "Sign in" }).click();
+  const apply = buyer.getByRole("region", { name: "Buying for a business?" });
+  await apply.getByLabel("Business name").fill("Corner Shop");
+  await apply.getByLabel("What do you sell, and where? (optional)").fill("Gifts and lighting, two shops in Austin.");
+  await apply.getByRole("button", { name: "Apply for wholesale" }).click();
+  await expect(apply.getByRole("status")).toContainText("is looking at your application for Corner Shop");
+
+  await page.reload();
+  await expect(page.getByRole("region", { name: "Applications (1)" })).toBeVisible();
+  const application = page.getByRole("group", { name: "Corner Shop" });
+  await expect(application.getByText("Gifts and lighting, two shops in Austin.")).toBeVisible();
+  await shot(page, "370-app-wholesale");
+  await application.getByRole("button", { name: "Approve Corner Shop" }).click();
+  await expect(page.getByText("Corner Shop is approved. We emailed them.")).toBeVisible();
+  await expect(page.getByText("No applications waiting")).toBeVisible();
+
+  // A buyer the merchant already knows, added by hand; then wholesale taken away from the shop.
+  await page.getByRole("textbox", { name: "Buyer's email" }).fill("orders@bigstore.example");
+  await page.getByRole("textbox", { name: "Business name (optional)" }).fill("Big Store");
+  await page.getByRole("button", { name: "Add wholesale buyer" }).click();
+  await expect(page.getByText("Big Store gets wholesale prices once they sign in.")).toBeVisible();
+  await page.getByRole("button", { name: "Remove Corner Shop…" }).click();
+  await page.getByRole("button", { name: "Remove Corner Shop", exact: true }).click();
+  await expect(page.getByText("Corner Shop pays the normal prices again.")).toBeVisible();
+  await expect(page.getByRole("group", { name: "Corner Shop" })).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "Big Store" })).toBeVisible();
+
+  await web.goto(`${WEB}/admin/wholesale`);
+  await expect(web.getByRole("region", { name: "Wholesale buyers" }).getByText("Big Store")).toBeVisible();
+});

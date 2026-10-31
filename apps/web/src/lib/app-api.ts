@@ -56,6 +56,11 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  addWholesaleBuyer,
+  parseMoney,
+  decideWholesale,
+  listWholesaleBuyers,
+  setWholesaleSettings,
   CART_LINK_MAX_LINES,
   cartLinkChoices,
   createCartLink,
@@ -897,6 +902,51 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, `Deleted the cart link “${link.name}” in the app`, { href: "/admin/cart-links" });
     return { ok: true, message: `“${link.name}” deleted. Its link no longer fills a cart.` };
   },
+  // Wholesale: applications from businesses, approved buyers, and the discount they get.
+  "GET wholesale": async ({ db, shop }) => {
+    const buyers = await listWholesaleBuyers(db, shop.id);
+    const view = (b: (typeof buyers)[number]) => ({ id: b.id, email: b.email, company: b.wholesaleCompany, taxId: b.wholesaleTaxId, message: b.wholesaleMessage, requestedAt: b.wholesaleRequestedAt });
+    return {
+      enabled: shop.wholesaleEnabled,
+      percentOff: shop.wholesalePercentOff,
+      minOrderMinor: shop.wholesaleMinOrderMinor,
+      pending: buyers.filter((b) => b.wholesaleStatus === "pending").map(view),
+      buyers: buyers.filter((b) => b.wholesaleStatus === "approved").map(view),
+    };
+  },
+  "PUT wholesale": async ({ req, db, shop, user }) => {
+    const b = await body<{ enabled?: unknown; percentOff?: unknown; minOrder?: unknown }>(req);
+    const min = str(b.minOrder).trim().replace(/^[^\d]+/, "");
+    let minOrderMinor = 0;
+    if (min) {
+      try {
+        minOrderMinor = parseMoney(min);
+      } catch {
+        throw new UserError("Enter the smallest wholesale order as an amount, like 250.00, or leave it empty.");
+      }
+    }
+    await setWholesaleSettings(db, shop.id, { enabled: b.enabled === true, percentOff: Number.parseInt(str(b.percentOff), 10) || 0, minOrderMinor });
+    await logged({ shop, user, db }, "Changed the wholesale settings in the app", { href: "/admin/wholesale" });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: "Wholesale settings saved." };
+  },
+  "POST wholesale/buyers": async ({ req, db, shop, user }) => {
+    const b = await body<{ email?: unknown; company?: unknown }>(req);
+    await addWholesaleBuyer(db, shop, { email: str(b.email), company: str(b.company) });
+    await logged({ shop, user, db }, `Added ${str(b.company).trim() || str(b.email).trim()} as a wholesale buyer in the app`, { href: "/admin/wholesale" });
+    return { ok: true, message: `${str(b.company).trim() || str(b.email).trim().toLowerCase()} gets wholesale prices once they sign in.` };
+  },
+  "POST wholesale/:id": async ({ req, params, db, shop, user }) => {
+    const decision = (await body<{ decision?: unknown }>(req)).decision;
+    if (decision !== "approve" && decision !== "decline" && decision !== "remove") throw new UserError("Approve, decline or remove.");
+    const who = (await listWholesaleBuyers(db, shop.id)).find((b) => b.id === params.id);
+    if (!who) throw new NotFoundError("Wholesale buyer");
+    await decideWholesale(await campaigns(), shop, who.id, decision);
+    const name = who.wholesaleCompany ?? who.email;
+    const said = { approve: `Approved ${name} for wholesale`, decline: `Declined ${name}'s wholesale application`, remove: `Took wholesale prices away from ${name}` }[decision];
+    await logged({ shop, user, db }, `${said} in the app`, { href: "/admin/wholesale" });
+    return { ok: true, message: { approve: `${name} is approved. We emailed them.`, decline: `${name} is declined. We emailed them.`, remove: `${name} pays the normal prices again.` }[decision] };
+  },
   "GET questions": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
     const rows = await listQuestions(db, shop.id);
@@ -1478,6 +1528,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("price-changes")) return "products";
   if (path.startsWith("suppliers")) return "suppliers";
   if (path.startsWith("cart-links")) return "marketing";
+  if (path.startsWith("wholesale")) return "wholesale";
   if (path.startsWith("checkouts")) return "orders";
   if (path.startsWith("store-status")) return "theme";
   if (path.startsWith("gift-cards")) return "gift_cards";
