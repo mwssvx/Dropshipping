@@ -56,6 +56,9 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  markReadyForPickup,
+  markPickedUp,
+  markDeliveredByStore,
   listSales,
   createSale,
   endSale,
@@ -292,6 +295,11 @@ const routes: Record<string, Handler> = {
     const postYourself = o.paymentStatus === "paid" && !o.pickup && !o.localDelivery && (ownParcel ? !ownParcel.shipment?.trackingNumber : parcels.length === 0 && o.fulfillments.length === 0);
     return {
       customer: buyer,
+      // Collected by the buyer or dropped off by the store: no tracking, the merchant says when it's done.
+      handover:
+        o.pickup || o.localDelivery
+          ? { kind: o.pickup ? "pickup" : "delivery", day: o.handoverOn, readyAt: o.pickupReadyAt, done: o.fulfillmentStatus === "delivered" }
+          : null,
       postYourself: postYourself ? { own: !!ownParcel } : null,
       sameAddress: sameDoor?.orders.length
         ? { orders: sameDoor.orders.map((x) => ({ id: x.id, number: x.number, createdAt: x.createdAt, ownItems: x.ownItems })), oneBox: sameDoor.ownItems && sameDoor.orders.some((x) => x.ownItems) }
@@ -334,6 +342,20 @@ const routes: Record<string, Handler> = {
       refundableMinor: ["paid", "partially_refunded"].includes(o.paymentStatus) ? o.totalMinor - o.refundedMinor : 0,
       risk: o.risk ? { level: o.risk.level, reasons: o.risk.reasons } : null,
     };
+  },
+  "POST orders/:id/handover": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ step?: unknown }>(req);
+    const ctx = await fulfillment();
+    const steps = {
+      ready: [() => markReadyForPickup(ctx, shop.id, params.id!), "Told the buyer order {order} is ready for pickup", "The buyer was emailed that it's ready to pick up."],
+      picked_up: [() => markPickedUp(ctx, shop.id, params.id!), "Marked order {order} picked up", "Marked picked up. The buyer gets an email."],
+      delivered: [() => markDeliveredByStore(ctx, shop.id, params.id!), "Marked order {order} delivered", "Marked delivered. The buyer gets an email."],
+    } as const;
+    const step = steps[String(b.step) as keyof typeof steps];
+    if (!step) throw new HttpError(400, "Pick ready, picked up or delivered.");
+    await step[0]();
+    await logged({ shop, user, db }, `${step[1]} in the app`, { orderId: params.id! });
+    return { ok: true, message: step[2] };
   },
   "POST orders/:id/release": async ({ params, shop }) => {
     await releaseHeldOrder(await fulfillment(), shop.id, params.id!);

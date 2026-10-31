@@ -41,6 +41,8 @@ type Detail = {
   sameAddress?: { orders: { id: string; number: number; createdAt: string; ownItems: boolean }[]; oneBox: boolean } | null;
   /** The store's own items wait to be posted. `own`: only part of the order, the rest comes from a supplier. */
   postYourself?: { own: boolean } | null;
+  /** Picked up by the buyer, or delivered by the store itself. */
+  handover?: { kind: "pickup" | "delivery"; day: string | null; readyAt: string | null; done: boolean } | null;
   /** The buyer, when this person can open customers. */
   customer?: { id: string; orders: number; tags: string[] } | null;
 };
@@ -130,6 +132,34 @@ export default function OrderScreen() {
             <Button label="Ask AI to sort it out" onPress={() => run("fix", `orders/${o.id}/fix`, {})} busy={busy === "fix"} disabled={!!busy} />
             <Button label="Try the supplier again" kind="secondary" onPress={() => run("retry", `orders/${o.id}/retry`, {})} busy={busy === "retry"} disabled={!!busy} />
             <Button label="I shipped it myself" kind="secondary" onPress={() => setPanel(panel === "tracking" ? null : "tracking")} disabled={!!busy} />
+          </View>
+        </Card>
+      ) : null}
+
+      {o.handover && !o.handover.done && ["paid", "partially_refunded"].includes(o.paymentStatus) && !o.held ? (
+        <Card>
+          <Heading>{o.handover.kind === "pickup" ? "Picking up" : "You deliver this"}</Heading>
+          <Body muted>
+            {[
+              o.handover.day ? `${o.handover.kind === "pickup" ? "Collecting" : "Delivery"} on ${longDay.format(new Date(`${o.handover.day}T12:00:00Z`))}.` : null,
+              o.handover.kind === "pickup"
+                ? o.handover.readyAt
+                  ? `Ready since ${when(o.handover.readyAt)}. Press Picked up when they have it.`
+                  : "Pack it, then tell the buyer it's ready. They get an email with where to collect it."
+                : "Press Delivered once it's dropped off, and the buyer gets an email.",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          </Body>
+          <View style={{ flexDirection: "row", gap: space(2), flexWrap: "wrap" }}>
+            {o.handover.kind === "pickup" && !o.handover.readyAt ? (
+              <Button label="Ready for pickup" onPress={() => run("ready", `orders/${o.id}/handover`, { step: "ready" })} busy={busy === "ready"} disabled={!!busy} />
+            ) : null}
+            {o.handover.kind === "pickup" ? (
+              <Button label="Picked up" kind={o.handover.readyAt ? "primary" : "secondary"} onPress={() => run("picked_up", `orders/${o.id}/handover`, { step: "picked_up" })} busy={busy === "picked_up"} disabled={!!busy} />
+            ) : (
+              <Button label="Delivered" onPress={() => run("delivered", `orders/${o.id}/handover`, { step: "delivered" })} busy={busy === "delivered"} disabled={!!busy} />
+            )}
           </View>
         </Card>
       ) : null}

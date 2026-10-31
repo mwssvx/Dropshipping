@@ -1876,3 +1876,7 @@ The app's Orders tab has a search box. Type an order number (with or without #),
 ### Sales from the app (after launch, part 349)
 
 Today has a Sales button for roles that can open marketing. Start a sale on everything from the phone: a name, the percent off, and 1 day, 3 days, a week or until you end it, with a countdown on the store if it has an end. It starts at once, and buyers who saved a product hear about the lower price. Running sales can be kept on one more day or ended on the spot. Sales on a collection or chosen products, or starting later, stay on the website.
+
+### Pickups and local deliveries in the app (after launch, part 350)
+
+An order the buyer picks up, or that the store delivers itself, now shows a card in the app with its day, if one was picked. For a pickup, Ready for pickup emails the buyer where to collect it, and Picked up closes it when they have it. For a local delivery, Delivered closes it once it's dropped off. The buyer gets the same emails as from the website, and each step goes in the activity log.

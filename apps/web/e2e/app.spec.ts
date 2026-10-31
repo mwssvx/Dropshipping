@@ -679,3 +679,56 @@ test("a sale on everything started, kept on longer and ended from the app", asyn
   await web.goto(`${WEB}/admin/activity`);
   await expect(web.getByText("Started the sale Weekend sale (20% off everything) in the app")).toBeVisible();
 });
+
+test("a pickup order told ready and handed over from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `pu${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Clay Planter");
+  await web.getByLabel("Price", { exact: true }).fill("24.00");
+  await web.getByLabel("Stock", { exact: true }).fill("4");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const planter = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+  await web.goto(`${WEB}/admin/shipping`);
+  await web.getByLabel("Let buyers pick up their order").check();
+  await web.getByLabel("Pickup address").fill("Corner Studio\n12 Congress Ave, Austin");
+  await web.getByRole("button", { name: "Save pickup" }).click();
+  await expect(web.getByText("Saved. Buyers can pick up orders of your own stock.")).toBeVisible();
+
+  const buyer = await (await browser.newContext()).newPage();
+  await buyer.goto(planter);
+  await buyer.getByRole("button", { name: "Add to cart" }).click();
+  await buyer.getByRole("link", { name: "Check out" }).click();
+  await buyer.getByLabel("Email").fill("ada@example.com");
+  await buyer.getByLabel("Full name").fill("Ada Buyer");
+  await buyer.getByLabel("Address", { exact: true }).fill("1 Main St");
+  await buyer.getByLabel("City").fill("Austin");
+  await buyer.getByLabel("State or region").fill("TX");
+  await buyer.getByLabel("Postal code").fill("78701");
+  await buyer.getByRole("radio", { name: /Pick it up yourself/ }).check();
+  await buyer.getByRole("button", { name: "Continue to payment" }).click();
+  await buyer.getByRole("button", { name: /^Pay/ }).click();
+  await expect(buyer.getByRole("heading", { name: "Thank you, Ada!" })).toBeVisible();
+  const orderPage = buyer.url();
+
+  await signIn(page, email);
+  await tab(page, "Orders");
+  await page.getByRole("link", { name: "Order #1001" }).click();
+  await expect(page.getByText("Picking up", { exact: true })).toBeVisible();
+  // Nothing to post or track: it's collected.
+  await expect(page.getByText("Post it yourself")).toHaveCount(0);
+  await shot(page, "350-app-pickup");
+  await page.getByRole("button", { name: "Ready for pickup" }).click();
+  await expect(page.getByText("The buyer was emailed that it's ready to pick up.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ready for pickup" })).toHaveCount(0);
+  await buyer.goto(orderPage);
+  await expect(buyer.getByText("Your order is ready to pick up from:")).toBeVisible();
+
+  await page.getByRole("button", { name: "Picked up" }).click();
+  await expect(page.getByText("Marked picked up. The buyer gets an email.")).toBeVisible();
+  await expect(page.getByText("Picking up", { exact: true })).toHaveCount(0);
+  await buyer.goto(orderPage);
+  await expect(buyer.getByText("You picked up this order.")).toBeVisible();
+  await web.goto(`${WEB}/admin/activity`);
+  await expect(web.getByText("Marked order #1001 picked up in the app")).toBeVisible();
+});
