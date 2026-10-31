@@ -56,6 +56,7 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  recordStockCount,
   cancelRestockOrder,
   createRestockOrder,
   getRestockOrder,
@@ -721,6 +722,22 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, `Cancelled restock order #${o.number} in the app`, { href: `/admin/restock/${o.id}` });
     return { ok: true, message: "Cancelled. Anything that already arrived stays in your stock." };
   },
+  // A stock count: walk the shelves, type (or scan) what's there, and the stock is set to it.
+  "GET stock-count": async ({ db, shop }) => ({
+    options: (await restockChoices(db, shop.id)).map((c) => ({ variantId: c.variantId, title: c.title, sku: c.sku, barcode: c.barcode, location: c.location, stock: c.stock ?? 0 })),
+  }),
+  "POST stock-count": async ({ req, db, shop, user }) => {
+    const b = await body<{ counts?: unknown }>(req);
+    const counts = (Array.isArray(b.counts) ? b.counts : []).slice(0, 2000).map((c: { variantId?: unknown; counted?: unknown }) => ({ variantId: str(c?.variantId), counted: Number(c?.counted) }));
+    const r = await recordStockCount(db, shop.id, counts);
+    if (!r.changed) return { ok: true, message: "Everything matched. Nothing to change." };
+    await logged({ shop, user, db }, `Counted stock in the app: ${r.changed === 1 ? "1 option" : `${r.changed} options`} changed`, { href: "/admin/inventory" });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    const parts = [`Updated ${r.changed === 1 ? "1 option" : `${r.changed} options`}.`];
+    if (r.missing) parts.push(`${r.missing} fewer than expected${r.missingCostMinor ? `, worth ${formatMoney(r.missingCostMinor, shop.currency)} at cost` : ""}.`);
+    if (r.found) parts.push(`${r.found} more than expected.`);
+    return { ok: true, message: parts.join(" ") };
+  },
   "GET questions": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
     const rows = await listQuestions(db, shop.id);
@@ -1294,7 +1311,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("activity") || path.startsWith("team")) return "team";
   if (path.startsWith("subscriptions")) return "orders";
   if (path.startsWith("blocked")) return "customers";
-  if (path.startsWith("restock")) return "products";
+  if (path.startsWith("restock") || path.startsWith("stock-count")) return "products";
   if (path.startsWith("checkouts")) return "orders";
   if (path.startsWith("store-status")) return "theme";
   if (path.startsWith("gift-cards")) return "gift_cards";

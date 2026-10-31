@@ -1940,3 +1940,7 @@ Settings in the app has People, for the store's owner: everyone on the team with
 ### Restock orders in the app (after launch, part 365)
 
 The Products tab ends with Restock orders, for the stock you keep yourself: what's on the way from each supplier and what arrived. Make a new one on the phone (who it's from, when it should come, how many of each option and what each costs), then count the delivery in as the boxes are opened, all at once or some now and the rest later. The stock goes up as it's counted, and an order still on the way can be cancelled.
+
+### Counting stock in the app (after launch, part 366)
+
+The Products tab has Count stock, for the stock you keep yourself. Walk the shelves with the phone: find each option by name, SKU, shelf or barcode (a Bluetooth scanner types it into the search box), enter what's there, and see straight away whether it matches or how many are missing. Saving sets the stock to what was counted, notes each change in the option's history, and says how many went missing and what they cost, as the website's count does. Options left empty aren't touched.

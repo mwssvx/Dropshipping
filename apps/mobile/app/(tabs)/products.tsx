@@ -67,6 +67,7 @@ export default function ProductsScreen() {
       )}
       <List>
         <Row href="/restock" title="Restock orders" subtitle="Stock you keep yourself, on the way from a supplier" />
+        <Row href="/stock-count" title="Count stock" subtitle="Walk the shelves and set what's really there" />
       </List>
     </Screen>
   );
