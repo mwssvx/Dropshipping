@@ -2007,12 +2007,11 @@ test("running late emails turned on from the app", async ({ page, browser }) => 
 
 test("a holiday order-by date set from the app shows on product pages", async ({ page, browser }) => {
   const { web, email } = await merchant(browser, `hd${Date.now()}`);
-  await web.goto(`${WEB}/admin/products/new`);
-  await web.getByLabel("Title").fill("Knit Stocking");
-  await web.getByLabel("Price", { exact: true }).fill("18.00");
-  await web.getByLabel("Stock", { exact: true }).fill("9");
-  await web.getByRole("button", { name: "Save product" }).click();
-  await expect(web.getByText("Product added.")).toBeVisible();
+  // A supplier's product has delivery dates to count back from.
+  await web.goto(`${WEB}/admin/products/import`);
+  await web.getByRole("link", { name: /sunset projection lamp/i }).click();
+  await web.getByRole("button", { name: "Import and publish" }).click();
+  await expect(web.getByText("Imported and live on your store.")).toBeVisible();
   const stocking = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
 
   await signIn(page, email);
@@ -2036,6 +2035,6 @@ test("a holiday order-by date set from the app shows on product pages", async ({
   await page.getByRole("button", { name: "Save holiday date" }).click();
   await expect(page.getByText("Removed. Product pages no longer give an order-by date.")).toBeVisible();
   await buyer.reload();
-  await expect(buyer.getByRole("heading", { name: "Knit Stocking" })).toBeVisible();
+  await expect(buyer.getByRole("heading", { name: /Sunset Projection Lamp/ })).toBeVisible();
   await expect(buyer.locator("#holiday-deadline")).toHaveCount(0);
 });
