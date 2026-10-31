@@ -56,6 +56,9 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  preordersSold,
+  setPreorder,
+  setPurchaseLimit,
   BANK_DETAILS_MAX,
   markTransferPaid,
   setBankTransfer,
@@ -279,6 +282,10 @@ const productView = (p: ProductRow) => ({
   missing: missingDetails(p),
   hsCode: p.hsCode,
   originCountry: p.originCountry,
+  /** Sold-out options can still be ordered, promised to ship by a date. */
+  preorder: p.preorder,
+  /** The least and most a buyer can order. */
+  purchaseLimit: p.purchaseLimit,
 });
 
 const customerView = (p: Awaited<ReturnType<typeof getCustomerProfile>>) => ({
@@ -1311,7 +1318,26 @@ const routes: Record<string, Handler> = {
       priceRises: changes.filter((c) => c.status === "open").length,
     };
   },
-  "GET products/:id": async ({ params, db, shop }) => productView(await getProduct(db, shop.id, params.id!)),
+  "GET products/:id": async ({ params, db, shop }) => {
+    const p = await getProduct(db, shop.id, params.id!);
+    return { ...productView(p), preordersSold: p.preorder ? await preordersSold(db, p.id) : 0 };
+  },
+  "PUT products/:id/preorder": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ on?: unknown; shipsBy?: unknown; limit?: unknown }>(req);
+    const limit = str(b.limit).trim();
+    const p = await getProduct(db, shop.id, params.id!);
+    const saved = await setPreorder(db, shop.id, p.id, b.on === true ? { shipsBy: str(b.shipsBy).trim(), limit: limit ? Number(limit) : null } : null);
+    await logged({ shop, user, db }, saved ? `Turned on pre-orders for ${p.title} in the app` : `Turned off pre-orders for ${p.title} in the app`, { href: `/admin/products/${p.id}` });
+    return { ok: true, message: saved ? "Saved. Sold-out options can now be pre-ordered." : "Saved. Sold-out options can't be ordered." };
+  },
+  "PUT products/:id/limits": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ min?: unknown; max?: unknown; perCustomer?: unknown }>(req);
+    const num = (v: unknown) => (str(v).trim() ? Number(str(v).trim()) : null);
+    const p = await getProduct(db, shop.id, params.id!);
+    const saved = await setPurchaseLimit(db, shop.id, p.id, { min: num(b.min), max: num(b.max), perCustomer: num(b.perCustomer) });
+    await logged({ shop, user, db }, `Changed the purchase limits for ${p.title} in the app`, { href: `/admin/products/${p.id}` });
+    return { ok: true, message: saved ? "Saved. The cart and checkout now follow these limits." : "Saved. Buyers can order as many as they like." };
+  },
   "PATCH products/:id": async ({ req, params, db, shop }) => {
     const product = await patchProduct(db, shop.id, params.id!, await body(req));
     const ctx = await stock();
