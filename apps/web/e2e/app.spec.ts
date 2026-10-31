@@ -1261,3 +1261,32 @@ test("a restock order made in the app and counted in as it arrives", async ({ pa
   await web.reload();
   await expect(web.getByLabel("Stock", { exact: true })).toHaveValue("16");
 });
+
+test("a stock count from the app sets what's really on the shelf", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `ct${Date.now()}`);
+  for (const [title, stock] of [["Olive Soap", "3"], ["Lavender Soap", "6"]]) {
+    await web.goto(`${WEB}/admin/products/new`);
+    await web.getByLabel("Title").fill(title!);
+    await web.getByLabel("Price", { exact: true }).fill("7.00");
+    await web.getByLabel("Stock", { exact: true }).fill(stock!);
+    await web.getByRole("button", { name: "Save product" }).click();
+    await expect(web.getByText("Product added.")).toBeVisible();
+  }
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Count stock/ }).click();
+  await expect(page.getByRole("heading", { name: "Count stock", level: 1 })).toBeVisible();
+  await page.getByRole("textbox", { name: "Find by name, SKU, shelf or barcode" }).fill("laven");
+  await expect(page.getByRole("group", { name: "Olive Soap" })).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "Lavender Soap" }).getByText("6 expected")).toBeVisible();
+  await page.getByRole("textbox", { name: "Counted Lavender Soap" }).fill("4");
+  await expect(page.getByText("2 missing.")).toBeVisible();
+  await shot(page, "366-app-stock-count");
+  await page.getByRole("button", { name: "Save the count (1 change)" }).click();
+  await expect(page.getByText("Updated 1 option. 2 fewer than expected.")).toBeVisible();
+
+  // The website shows the counted stock; the soap left alone keeps its own.
+  await web.reload();
+  await expect(web.getByLabel("Stock", { exact: true })).toHaveValue("4");
+});
