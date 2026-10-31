@@ -18,7 +18,8 @@ export function ReplyForm({ id, reply }: { id: string; reply: string | null }) {
       className="flex flex-col gap-2"
     >
       <label className="label" htmlFor={`reply-${id}`}>Public reply</label>
-      <textarea className="input" id={`reply-${id}`} name="reply" rows={2} maxLength={1000} defaultValue={reply ?? ""} autoFocus />
+      <textarea className="input" id={`reply-${id}`} name="reply" rows={2} maxLength={1000} defaultValue={reply ?? ""} autoFocus aria-describedby={`reply-hint-${id}`} />
+      <p id={`reply-hint-${id}`} className="hint text-xs">Shown under the review. The buyer gets your first reply by email once the review is published.</p>
       <div className="flex gap-2 items-center">
         <button className="btn btn-secondary" disabled={pending}>{pending ? "Saving…" : "Save reply"}</button>
         <button type="button" className="hint" onClick={() => setOpen(false)}>Cancel</button>

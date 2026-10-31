@@ -1,7 +1,8 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { createDiscount, moderateReview, parseMoney, sendAbandonedCartEmails, setAbandonedCartOffer, setDiscountActive, setBirthdayOffer, setGrowthSettings, setSignupPopup, setThankYouNote, setPostPurchaseOffer, setReferralProgram, setReviewRequestDays, setSubscriptionOffer, setUpsell, setWelcomeOffer, setWinbackOffer, UserError } from "@sf/core";
-import { fulfillment, logged, requireShop, testPayments } from "@/lib/server";
+import { after } from "next/server";
+import { createDiscount, moderateReview, notifyReviewReply, parseMoney, sendAbandonedCartEmails, setAbandonedCartOffer, setDiscountActive, setBirthdayOffer, setGrowthSettings, setSignupPopup, setThankYouNote, setPostPurchaseOffer, setReferralProgram, setReviewRequestDays, setSubscriptionOffer, setUpsell, setWelcomeOffer, setWinbackOffer, UserError } from "@sf/core";
+import { fulfillment, logged, mailer, requireShop, storeAddress, testPayments } from "@/lib/server";
 import type { FormState } from "./actions";
 
 const HOUR = 3_600_000;
@@ -207,9 +208,17 @@ export async function setReviewRequestDaysAction(_: ReviewRequestState, form: Fo
   return { saved: days };
 }
 
+/** Emails the buyer the store's first reply once their review is live, after the page has answered. */
+function tellReviewer(shop: { id: string; name: string; handle: string }, db: Awaited<ReturnType<typeof requireShop>>["db"], id: string) {
+  after(async () => {
+    await notifyReviewReply(db, mailer(), shop, id, await storeAddress(shop)).catch((e) => console.error("review reply email failed", e));
+  });
+}
+
 export async function moderateReviewAction(id: string, status: "published" | "hidden") {
   const { shop, db } = await requireShop("reviews");
   await moderateReview(db, shop.id, id, { status });
+  if (status === "published") tellReviewer(shop, db, id);
   revalidatePath("/admin/reviews");
   revalidatePath("/admin", "layout");
 }
@@ -224,6 +233,7 @@ export async function removeReviewPhotoAction(id: string, photoId: string) {
 export async function replyToReviewAction(id: string, _: FormState, form: FormData): Promise<FormState> {
   const { shop, db } = await requireShop("reviews");
   await moderateReview(db, shop.id, id, { reply: String(form.get("reply") ?? "") });
+  tellReviewer(shop, db, id);
   revalidatePath("/admin/reviews");
   return { saved: true };
 }

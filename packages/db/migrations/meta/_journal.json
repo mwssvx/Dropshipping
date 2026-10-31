@@ -1030,6 +1030,13 @@
       "when": 1793432677163,
       "tag": "0147_product_info",
       "breakpoints": true
+    },
+    {
+      "idx": 147,
+      "version": "7",
+      "when": 1793434523438,
+      "tag": "0148_review_reply_email",
+      "breakpoints": true
     }
   ]
 }
