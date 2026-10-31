@@ -1363,3 +1363,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Long lists load fast**: collections and search results show the first 24 products with "Showing 24 of 130 products" and a **Show more** button underneath. Each press adds the next 24 on the same page and lands on the first new product, so shoppers keep their place. Before, a collection drew every product at once, which got slow for stores with big catalogs.
 2. **Nothing lost**: sorting and filters stay as they were when shoppers press Show more, changing a filter starts again from the top, and the words are translated into the six store languages.
+
+### Social media links (after launch, part 239)
+
+1. **Icons in the footer** (`packages/core/src/social-links.ts`, theme editor → Menus → Social media): a store adds its Instagram, Facebook, TikTok, YouTube, Pinterest and X pages, and each shows as an icon in the footer that opens in a new tab, read out as "Follow us on Instagram" in the shopper's language. Networks left empty don't show.
+2. **Easy to fill in, hard to get wrong**: typing @yourstore fills in the page's address, a link without https:// gets it, and a link to another site (an Instagram link in the X box, a look-alike address) is refused with what to paste instead.
+3. **Search engines know they're yours**: the home page tells them the store's social pages belong to it (`sameAs`), and store files carry the links with the theme.

@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { UserError } from "./errors";
 import { parseVideo } from "./video-link";
+import { isSocialLink, socialHref, socialLinkProblem, SOCIAL_KEYS, type SocialNetwork } from "./social-links";
+
+export { SOCIAL_KEYS, SOCIAL_NETWORKS, isSocialLink, socialHref, socialLinkProblem, socialLinks, type SocialNetwork } from "./social-links";
 
 /*
  * A store's look is one JSON document: style settings, two menus and an ordered list of
@@ -38,6 +41,13 @@ export function isSafeLink(href: string) {
   return /^(https?:\/\/|mailto:)[^\s]+$/i.test(href);
 }
 const link = z.string().trim().max(500).refine(isSafeLink, "Links must start with /, https:// or mailto:.").default("");
+const socialLink = (network: SocialNetwork) =>
+  z
+    .string()
+    .max(300, "Keep links under 300 characters.")
+    .transform((v) => socialHref(network, v))
+    .refine((v) => isSocialLink(network, v), socialLinkProblem(network))
+    .default("");
 const videoLink = z
   .string()
   .trim()
@@ -243,6 +253,8 @@ const themeDoc = z.object({
     hoverPhoto: z.boolean().default(false),
     logoText: text(60),
     logoUrl: imageUrl,
+    // The store's pages on social networks, as icons in the footer. Empty ones don't show.
+    social: z.object(Object.fromEntries(SOCIAL_KEYS.map((k) => [k, socialLink(k)])) as Record<SocialNetwork, ReturnType<typeof socialLink>>).prefault({}),
     seo: z.object({ title: text(70), description: text(320) }).prefault({}),
   }),
   menus: z.object({ header: z.array(menuItem).max(12).default([]), footer: z.array(menuItem).max(20).default([]) }),

@@ -7,6 +7,7 @@ import { SectionView } from "./Sections";
 import { CurrencyPicker } from "./CurrencyPicker";
 import { LanguagePicker } from "./LanguagePicker";
 import { MenuDropdown } from "./MenuDropdown";
+import { SocialIcons } from "./SocialIcons";
 import { storeHref, themeLayoutAttrs, themeStyle } from "./style";
 
 /** Header, announcement bar and footer around every storefront page, styled by the theme. */
@@ -124,6 +125,7 @@ export function StoreShell({
             <Link href={`${base}/track`} className="hover:text-accent">{t.trackOrder}</Link>
             <Link href={`${base}/contact`} className="hover:text-accent">{t.contactUs}</Link>
           </nav>
+          <SocialIcons social={settings.social} label={t.followUs} followOn={t.followOn} />
           <div className="flex flex-wrap justify-between gap-4 hint">
             <span className="flex items-center gap-3 flex-wrap">
               © {new Date().getFullYear()} {shopName}
