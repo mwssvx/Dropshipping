@@ -56,6 +56,9 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  listGiftCards,
+  resendGiftCard,
+  setGiftCardDisabled,
   markReadyForPickup,
   markPickedUp,
   markDeliveredByStore,
@@ -617,6 +620,50 @@ const routes: Record<string, Handler> = {
     revalidatePath(`/s/${shop.handle}`, "layout");
     return { ok: true, message };
   },
+  "GET gift-cards": async ({ url, db, shop }) => {
+    // The same search as the web list: the full code a buyer reads out, its last 4, an email or an order number.
+    const q = url.searchParams.get("q")?.trim() ?? "";
+    const { cards, outstandingMinor } = await listGiftCards(db, shop.id, { query: q, size: 30 });
+    const now = new Date();
+    return {
+      outstandingMinor,
+      cards: cards.map((c) => ({
+        id: c.id,
+        last4: c.last4,
+        email: c.email,
+        balanceMinor: c.balanceMinor,
+        initialMinor: c.initialMinor,
+        status: c.disabledAt ? "off" : c.expiresAt && c.expiresAt <= now ? "expired" : c.balanceMinor === 0 ? "used" : "active",
+        orderNumber: c.orderNumber,
+        sent: !!c.sentAt,
+        createdAt: c.createdAt,
+        expiresAt: c.expiresAt,
+      })),
+    };
+  },
+  "POST gift-cards": async ({ req, db, shop, user }) => {
+    const b = await body<{ email?: unknown; amountMinor?: unknown }>(req);
+    const email = str(b.email);
+    const amountMinor = typeof b.amountMinor === "number" ? Math.round(b.amountMinor) : 0;
+    const { sent } = await issueGiftCard(await campaigns(), shop, { email, amountMinor, userId: user.id });
+    await logged({ shop, user, db }, `Gave a ${formatMoney(amountMinor, shop.currency)} gift card to ${email} in the app`, { href: "/admin/gift-cards" });
+    if (!sent) throw new HttpError(502, "The gift card was made but the email didn't go out. Send a new code on it to try again.");
+    return { ok: true, message: `A ${formatMoney(amountMinor, shop.currency)} gift card is on its way to ${email}.` };
+  },
+  "POST gift-cards/:id": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ action?: unknown }>(req);
+    const card = await db.query.giftCards.findFirst({ where: (g, { and, eq }) => and(eq(g.id, params.id!), eq(g.shopId, shop.id)) });
+    if (!card) throw new NotFoundError("Gift card");
+    if (b.action === "resend") {
+      await resendGiftCard(await campaigns(), shop, card.id);
+      await logged({ shop, user, db }, `Sent a new code for the gift card ending ${card.last4} in the app`, { href: "/admin/gift-cards" });
+      return { ok: true, message: `A new code went to ${card.email}. The old one no longer works.` };
+    }
+    if (b.action !== "off" && b.action !== "on") throw new HttpError(400, "Pick off, on or resend.");
+    await setGiftCardDisabled(db, shop.id, card.id, b.action === "off");
+    await logged({ shop, user, db }, `${b.action === "off" ? "Turned off" : "Turned back on"} the gift card ending ${card.last4} in the app`, { href: "/admin/gift-cards" });
+    return { ok: true, message: b.action === "off" ? `The card ending ${card.last4} is off. It can't be spent until you turn it back on.` : `The card ending ${card.last4} works again.` };
+  },
   "GET customers": async ({ url, db, shop }) => {
     const q = (url.searchParams.get("q") ?? "").slice(0, 100);
     // The ones who bought most recently first; a search looks at names and emails.
@@ -760,6 +807,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("reviews")) return "reviews";
   if (path.startsWith("customers")) return "customers";
   if (path.startsWith("codes")) return "marketing";
+  if (path.startsWith("gift-cards")) return "gift_cards";
   if (path.startsWith("sales")) return "marketing";
   if (path.startsWith("returns")) return "returns";
   if (path === "today") return "home";
