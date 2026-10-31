@@ -1,5 +1,6 @@
 "use client";
 import { useActionState } from "react";
+import { useFreshKey } from "@/components/useFreshKey";
 import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import type { FormState } from "../../actions";
@@ -55,8 +56,9 @@ export function DecideButtons({ id, pending }: { id: string; pending: boolean })
 
 export function AddBuyerForm() {
   const [state, action] = useActionState(addWholesaleBuyerAction, {} as FormState);
+  const freshKey = useFreshKey(state, "add");
   return (
-    <form key={state.saved ? Date.now() : "add"} action={action} className="flex flex-col gap-3">
+    <form key={freshKey} action={action} className="flex flex-col gap-3">
       <FormError message={state.error} />
       {state.saved && <p className="banner banner-success" role="status">Buyer added. They get wholesale prices when they sign in with that email.</p>}
       <div className="grid sm:grid-cols-2 gap-3">

@@ -1,5 +1,6 @@
 "use client";
 import { useActionState, useState } from "react";
+import { useFreshKey } from "@/components/useFreshKey";
 import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import type { FormState } from "../../actions";
@@ -22,9 +23,10 @@ function Fields({ name, email }: { name?: string; email?: string }) {
 
 export function AddSupplierForm() {
   const [state, action] = useActionState(addOwnSupplierAction, {} as FormState);
+  const freshKey = useFreshKey(state, "add");
   return (
     // A fresh form after each add, so the fields clear.
-    <form key={state.saved ? Date.now() : "add"} action={action} className="flex flex-col gap-3">
+    <form key={freshKey} action={action} className="flex flex-col gap-3">
       <FormError message={state.error} />
       {state.saved && <p className="banner banner-success" role="status">Supplier added. Pick them on a product's page under "Who sends it".</p>}
       <Fields />
