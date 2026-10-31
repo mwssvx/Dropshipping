@@ -3,7 +3,7 @@ import { AddedToCart } from "@/theme/AddedToCart";
 import { readCart } from "@/lib/cart";
 import { Track } from "@/components/Track";
 import { StoreShell } from "@/theme/StoreShell";
-import { activeClosure, activeShipPause, LANGUAGES, needsConsent, paymentMethods, shopCurrencies, shopLanguages, SIGNUP_POPUP_QUIET, SIGNUP_POPUP_LEAVE_FALLBACK, CHAT_BUTTON_QUIET, chatLinks, storePixels, storeWideCountdown } from "@sf/core";
+import { activeClosure, activeShipPause, upcomingShipPause, LANGUAGES, needsConsent, paymentMethods, shopCurrencies, shopLanguages, SIGNUP_POPUP_QUIET, SIGNUP_POPUP_LEAVE_FALLBACK, CHAT_BUTTON_QUIET, chatLinks, storePixels, storeWideCountdown } from "@sf/core";
 import { SignupPopup } from "@/components/SignupPopup";
 import { ChatButtons } from "@/components/ChatButtons";
 import { BackToTop } from "@/theme/BackToTop";
@@ -56,7 +56,9 @@ export default async function StoreLayout({ children, params }: { children: Reac
   // A store-wide sale counting down gets the banner, unless the store is on a break.
   // A pause in shipping says when orders go out again, ahead of a sale's banner.
   const pause = closure?.mode === "holiday" ? null : activeShipPause(shop);
-  const sale = closure?.mode === "holiday" || pause ? null : await storeWideCountdown(await db(), shop.id);
+  // And in the week before one set ahead, the last day to order before it.
+  const soon = closure?.mode === "holiday" || pause ? null : upcomingShipPause(shop);
+  const sale = closure?.mode === "holiday" || pause || soon ? null : await storeWideCountdown(await db(), shop.id);
   const notice = closure?.mode === "holiday" ? (
     <>
       <p className="font-medium">{t.holidayBanner(closureDate(closure.until, lang))}</p>
@@ -66,6 +68,11 @@ export default async function StoreLayout({ children, params }: { children: Reac
     <>
       <p className="font-medium" id="ship-pause">{t.shipPauseBanner(closureDate(pause.resumesOn, lang)!)}</p>
       {pause.message && <p className="text-sm whitespace-pre-line">{pause.message}</p>}
+    </>
+  ) : soon ? (
+    <>
+      <p className="font-medium" id="ship-pause-soon">{t.shipPauseSoon(closureDate(soon.lastDay, lang)!, closureDate(soon.resumesOn, lang)!)}</p>
+      {soon.message && <p className="text-sm whitespace-pre-line">{soon.message}</p>}
     </>
   ) : sale ? (
     <p className="font-medium">
