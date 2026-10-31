@@ -2,8 +2,8 @@ import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { api, useApi } from "../../src/api";
-import { FULFILMENT, money, when } from "../../src/format";
-import { useSession } from "../../src/session";
+import { FULFILMENT, money, parseMoney, when } from "../../src/format";
+import { useCan, useSession } from "../../src/session";
 import { BackLink, Banner, Body, Button, Card, Field, List, LoadError, Loading, Pill, Row, Screen, Section, Stat } from "../../src/ui";
 
 type Profile = {
@@ -26,6 +26,11 @@ export default function CustomerScreen() {
   const [tags, setTags] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: "success" | "critical"; text: string } | null>(null);
+  const can = useCan();
+  const [credit, setCredit] = useState("");
+  const [why, setWhy] = useState("");
+  const [crediting, setCrediting] = useState(false);
+  const [creditMsg, setCreditMsg] = useState<{ tone: "success" | "critical"; text: string } | null>(null);
   const p = profile.data;
   useEffect(() => {
     if (!p) return;
@@ -48,6 +53,24 @@ export default function CustomerScreen() {
       setMsg({ tone: "critical", text: (e as Error).message });
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function giveCredit() {
+    const amountMinor = parseMoney(credit);
+    if (!amountMinor) return setCreditMsg({ tone: "critical", text: "Enter the amount, like 10." });
+    setCrediting(true);
+    setCreditMsg(null);
+    try {
+      const r = await api<{ message: string }>(`customers/${id}/credit`, { body: { amountMinor, note: why } });
+      setCreditMsg({ tone: "success", text: r.message });
+      setCredit("");
+      setWhy("");
+      await profile.reload();
+    } catch (e) {
+      setCreditMsg({ tone: "critical", text: (e as Error).message });
+    } finally {
+      setCrediting(false);
     }
   }
 
@@ -86,6 +109,18 @@ export default function CustomerScreen() {
           <Body muted>No paid orders yet.</Body>
         )}
       </Section>
+
+      {can("gift_cards") ? (
+        <Section title="Give store credit">
+          <Card>
+            {creditMsg ? <Banner tone={creditMsg.tone}>{creditMsg.text}</Banner> : null}
+            <Body muted>To say sorry for a late parcel, or thank a regular. They get a code by email that works at checkout.</Body>
+            <Field label="Credit to give" value={credit} onChangeText={setCredit} keyboardType="decimal-pad" placeholder="10.00" />
+            <Field label="Why" value={why} onChangeText={setWhy} placeholder="Only your team sees this" />
+            <Button label="Give store credit" busy={crediting} disabled={!credit.trim()} onPress={giveCredit} />
+          </Card>
+        </Section>
+      ) : null}
 
       <Section title="Your note and tags">
         <Card>

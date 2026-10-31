@@ -56,6 +56,7 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  issueGiftCard,
   formatMoney,
   listDiscounts,
   describeDiscount,
@@ -93,7 +94,7 @@ import {
 } from "@sf/core";
 import type { Db } from "@sf/db";
 import { BRAND } from "./brand";
-import { agents, db, fulfillment, logged, mailer, platformUrl, notifyLater, payments, refunds, stock, storeAddress, suppliers, testPayments } from "./server";
+import { agents, campaigns, db, fulfillment, logged, mailer, platformUrl, notifyLater, payments, refunds, stock, storeAddress, suppliers, testPayments } from "./server";
 
 type User = { id: string; email: string };
 type ShopLink = { id: string; name: string; handle: string; role: string };
@@ -535,6 +536,16 @@ const routes: Record<string, Handler> = {
     });
     return customerView(await getCustomerProfile(db, shop.id, params.id!));
   },
+  "POST customers/:id/credit": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ amountMinor?: unknown; note?: unknown }>(req);
+    const profile = await getCustomerProfile(db, shop.id, params.id!);
+    const amountMinor = typeof b.amountMinor === "number" ? Math.round(b.amountMinor) : 0;
+    // Store credit is a gift card in their name: it works at checkout and adds to what they have.
+    const { sent } = await issueGiftCard(await campaigns(), shop, { email: profile.customer.email, amountMinor, note: str(b.note) || "Store credit given from the app", userId: user.id });
+    await logged({ shop, user, db }, `Gave ${formatMoney(amountMinor, shop.currency)} store credit to ${profile.customer.email} in the app`, { href: "/admin/gift-cards" });
+    if (!sent) throw new HttpError(502, "The credit was made but its email didn't go out. Send a new code from Gift cards on the website.");
+    return { ok: true, message: `${formatMoney(amountMinor, shop.currency)} in store credit sent to ${profile.customer.email}.`, customer: customerView(await getCustomerProfile(db, shop.id, params.id!)) };
+  },
   "GET reviews": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show");
     // Waiting for your OK, published with no reply yet, or the latest of all.
@@ -641,6 +652,7 @@ const routes: Record<string, Handler> = {
 /** The part of the store each route belongs to; routes not listed are open to every member. */
 function routeArea(key: string): Area | null {
   if (key === "POST orders/:id/refund") return "refunds";
+  if (key === "POST customers/:id/credit") return "gift_cards";
   const path = key.split(" ")[1]!;
   if (path.startsWith("orders")) return "orders";
   if (path.startsWith("products") || path.startsWith("imports")) return "products";
