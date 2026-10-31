@@ -2197,3 +2197,33 @@ test("gift guides made from the app", async ({ page, browser }) => {
   await web.goto(`${WEB}/admin/collections`);
   await expect(web.getByRole("row", { name: /Gifts under \$100/ })).toContainText("By rules");
 });
+
+test("gift wrapping turned on from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `gw${Date.now()}`);
+  await signIn(page, email);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("link", { name: /^Gift wrapping/ }).click();
+  await expect(page.getByRole("heading", { name: "Gift wrapping", level: 1 })).toBeVisible();
+  await page.getByRole("switch", { name: "Offer gift wrapping" }).click();
+  await page.getByRole("textbox", { name: /^Wrapping price/ }).fill("abc");
+  await page.getByRole("button", { name: "Save gift wrapping" }).click();
+  await expect(page.getByText("Enter the wrapping price as an amount, like 4.00.")).toBeVisible();
+  await page.getByRole("textbox", { name: /^Wrapping price/ }).fill("3.50");
+  await page.getByRole("textbox", { name: "What they get (optional)" }).fill("Kraft paper and a ribbon");
+  await page.getByRole("button", { name: "Save gift wrapping" }).click();
+  await expect(page.getByText("Saved. Buyers sending a gift can have it wrapped.")).toBeVisible();
+  await shot(page, "389-app-gift-wrap");
+
+  await page.reload();
+  await expect(page.getByRole("textbox", { name: /^Wrapping price/ })).toHaveValue("3.50");
+  await expect(page.getByRole("textbox", { name: "What they get (optional)" })).toHaveValue("Kraft paper and a ribbon");
+  await web.goto(`${WEB}/admin/shipping`);
+  await expect(web.getByLabel(/^Wrapping price/)).toHaveValue("3.50");
+  await page.goto("/holiday-checklist");
+  await expect(page.getByRole("region", { name: "Done" }).getByRole("button", { name: "Offer gift wrapping, done" })).toBeVisible();
+
+  await page.goto("/gift-wrap");
+  await page.getByRole("switch", { name: "Offer gift wrapping" }).click();
+  await page.getByRole("button", { name: "Save gift wrapping" }).click();
+  await expect(page.getByText("Saved. Checkout doesn't offer gift wrapping.")).toBeVisible();
+});

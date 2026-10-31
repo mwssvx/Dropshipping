@@ -111,6 +111,7 @@ export default function Settings() {
           <List>
             <Row href="/ship-pause" title="Shipping pause" subtitle="Your supplier is closed for a while: keep selling, and say when orders ship" />
             <Row href="/holiday-date" title="Holiday order-by date" subtitle="“Order by Dec 15 to get it in time for Christmas” on product pages" />
+            <Row href="/gift-wrap" title="Gift wrapping" subtitle="Buyers sending a gift can have it wrapped, for a price you set" />
             <Row href="/late-emails" title="Running late emails" subtitle="One friendly email when an order hasn't shipped, or a parcel is past its date" />
           </List>
         </Section>
