@@ -1908,3 +1908,7 @@ The phone now buzzes when a buyer asks to return something (or someone returns a
 ### Disputes in the app (after launch, part 357)
 
 When a buyer's bank pulls a payment back, the order in the app shows the dispute for people who look after money: why the bank says it happened, what helps answer it, the deadline, and what the evidence we gathered has and lacks (tracking, delivery, a returns policy, emails and messages). Add a note and send the evidence, or accept it, from the phone, as on the website. Money has a Disputes screen listing them, the ones to answer first, with what's held and how many were won or lost, and a warning when disputes pass 0.75% of orders. The dispute push notification opens the order.
+
+### Product questions in the app (after launch, part 358)
+
+Questions shoppers ask on a product page now reach the phone: a push notification for each new one (it can be turned off in Settings), a Questions button on Today saying how many wait, and a Questions screen to answer them. The answer goes to the shopper by email and, unless you switch it off, shows on the product page for everyone. Answered questions can be changed, or taken off the page and put back. A suggested answer written on the website is there to start from.

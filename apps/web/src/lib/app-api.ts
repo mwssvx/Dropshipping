@@ -56,6 +56,10 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  answerQuestion,
+  listQuestions,
+  setQuestionPublished,
+  waitingQuestions,
   acceptDispute,
   countOpenDisputes,
   disputeEvidence,
@@ -308,13 +312,14 @@ const routes: Record<string, Handler> = {
   },
   "GET today": async ({ db, shop, role }) => {
     notifyLater(shop.id);
-    const [today, returns, reviews] = await Promise.all([
+    const [today, returns, reviews, questions] = await Promise.all([
       todaySummary(db, shop, new Date(), role),
       can(role, "returns") ? countReturns(db, shop.id, "open") : null,
       can(role, "reviews") ? reviewCounts(db, shop.id).then((c) => c.pending) : null,
+      can(role, "reviews") ? waitingQuestions(db, shop.id) : null,
     ]);
-    // What waits behind the Returns and Reviews buttons, so Today says it without opening them.
-    return { ...today, waiting: { returns, reviews } };
+    // What waits behind the Returns, Reviews and Questions buttons, so Today says it without opening them.
+    return { ...today, waiting: { returns, reviews, questions } };
   },
 
   "GET orders": async ({ url, db, shop }) => {
@@ -409,6 +414,48 @@ const routes: Record<string, Handler> = {
       refundableMinor: ["paid", "partially_refunded"].includes(o.paymentStatus) ? o.totalMinor - o.refundedMinor : 0,
       risk: o.risk ? { level: o.risk.level, reasons: o.risk.reasons } : null,
     };
+  },
+  "GET questions": async ({ url, db, shop }) => {
+    const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
+    const rows = await listQuestions(db, shop.id);
+    return {
+      waiting: rows.filter((q) => q.status === "waiting").length,
+      questions: rows
+        .filter((q) => show === "all" || q.status === "waiting")
+        .slice(0, 50)
+        .map((q) => ({
+          id: q.id,
+          productTitle: q.product.title,
+          name: q.name,
+          email: q.email,
+          body: q.body,
+          status: q.status,
+          answer: q.answer,
+          // A suggested answer written on the website, to start from.
+          draft: q.draft,
+          createdAt: q.createdAt,
+          answeredAt: q.answeredAt,
+        })),
+    };
+  },
+  "POST questions/:id": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ action?: unknown; answer?: unknown; publish?: unknown }>(req);
+    if (b.action === "answer") {
+      const publish = b.publish !== false;
+      const { question, emailed } = await answerQuestion(await stock(), shop, params.id!, { answer: str(b.answer), publish });
+      await logged({ shop, user, db }, `Answered ${question.name}'s question about a product in the app`, { href: "/admin/questions" });
+      revalidatePath(`/s/${shop.handle}`, "layout");
+      return {
+        ok: true,
+        message: [emailed ? `Answer sent. ${question.name} gets it by email.` : "Answer saved.", publish ? "It shows on the product page." : "Only they see it."].join(" "),
+      };
+    }
+    if (b.action === "publish" || b.action === "hide") {
+      await setQuestionPublished(db, shop.id, params.id!, b.action === "publish");
+      revalidatePath(`/s/${shop.handle}`, "layout");
+      return { ok: true, message: b.action === "publish" ? "It shows on the product page." : "Taken off the product page. They still have the answer by email." };
+    }
+    throw new HttpError(400, "Pick answer, publish or hide.");
   },
   "GET disputes": async ({ db, shop }) => {
     const [stats, rows] = await Promise.all([disputeStats(db, shop.id), listDisputes(db, shop.id)]);
@@ -935,6 +982,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("customers")) return "customers";
   if (path.startsWith("codes")) return "marketing";
   if (path.startsWith("disputes")) return "money";
+  if (path.startsWith("questions")) return "reviews";
   if (path.startsWith("checkouts")) return "orders";
   if (path.startsWith("store-status")) return "theme";
   if (path.startsWith("gift-cards")) return "gift_cards";

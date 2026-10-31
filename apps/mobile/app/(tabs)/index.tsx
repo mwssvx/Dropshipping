@@ -11,7 +11,7 @@ import { space } from "../../src/theme";
 import { Link, useRouter } from "expo-router";
 
 type Attention = { kind: string; title: string; body: string; url: string; tone: "critical" | "warning" | "info" };
-type Today = { currency: string; salesTodayMinor: number | null; ordersToday: number; sales7dMinor: number | null; orders7d: number; attention: Attention[]; pending: Proposal[]; waiting?: { returns: number | null; reviews: number | null } };
+type Today = { currency: string; salesTodayMinor: number | null; ordersToday: number; sales7dMinor: number | null; orders7d: number; attention: Attention[]; pending: Proposal[]; waiting?: { returns: number | null; reviews: number | null; questions?: number | null } };
 
 // Things the app doesn't do itself open the web admin.
 const WEB_ONLY: Record<string, string> = { "/notices": "/admin/trust", "/products#supplier-sold-out": "/admin/products#supplier-sold-out" };
@@ -86,6 +86,7 @@ export default function TodayScreen() {
           )}
           {can("inbox") && <Button label="Buyer inbox" kind="secondary" onPress={() => router.push("/inbox")} />}
           {can("reviews") && <Button label={t.waiting?.reviews ? `Reviews (${t.waiting.reviews} to check)` : "Reviews"} kind="secondary" onPress={() => router.push("/reviews")} />}
+          {can("reviews") && <Button label={t.waiting?.questions ? `Questions (${t.waiting.questions} to answer)` : "Questions"} kind="secondary" onPress={() => router.push("/questions")} />}
           {can("customers") && <Button label="Customers" kind="secondary" onPress={() => router.push("/customers")} />}
           {can("marketing") && <Button label="Discount codes" kind="secondary" onPress={() => router.push("/codes")} />}
           {can("marketing") && <Button label="Sales" kind="secondary" onPress={() => router.push("/sales")} />}

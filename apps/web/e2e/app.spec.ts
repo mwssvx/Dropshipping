@@ -938,3 +938,47 @@ test("a dispute answered from the app with the evidence and a note", async ({ pa
   await web.goto(`${WEB}/admin/activity`);
   await expect(web.getByText("ent the evidence for the dispute on order #1001 in the app")).toBeVisible();
 });
+
+test("a shopper's question about a product answered from the app shows on its page", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `pq${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Travel Kettle");
+  await web.getByLabel("Price", { exact: true }).fill("34.00");
+  await web.getByLabel("Stock", { exact: true }).fill("4");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const kettle = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+
+  const shopper = await (await browser.newContext()).newPage();
+  await shopper.goto(kettle);
+  const ask = shopper.getByRole("region", { name: "Questions" }).getByRole("form", { name: "Ask a question" });
+  await ask.getByLabel("Your question").fill("Does it work on 230 volts in Europe?");
+  await ask.getByLabel("Your name").fill("Grace");
+  await ask.getByLabel("Email").fill("grace@example.com");
+  await ask.getByRole("button", { name: "Send question" }).click();
+  await expect(shopper.getByText("Thanks! We'll email you the answer.")).toBeVisible();
+
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Questions (1 to answer)" }).click();
+  await expect(page.getByRole("heading", { name: "Questions", level: 1 })).toBeVisible();
+  const card = page.getByRole("article", { name: "Grace's question about Travel Kettle" });
+  await expect(card.getByText("Does it work on 230 volts in Europe?")).toBeVisible();
+  await card.getByRole("textbox", { name: "Answer to Grace" }).fill("Yes, it works from 100 to 240 volts.");
+  await shot(page, "358-app-question");
+  await card.getByRole("button", { name: "Send answer" }).click();
+  await expect(page.getByText("Answer sent. Grace gets it by email. It shows on the product page.")).toBeVisible();
+  await expect(page.getByText("No questions to answer")).toBeVisible();
+
+  // Everyone sees the answer on the product page; the shopper has it by email.
+  await shopper.goto(kettle);
+  await expect(shopper.getByRole("region", { name: "Questions" }).getByText("Yes, it works from 100 to 240 volts.")).toBeVisible();
+  await shopper.goto(`${WEB}/dev/mail`);
+  await expect(shopper.getByText("Your question about Travel Kettle").first()).toBeVisible();
+
+  // Taken off the page from the All list.
+  await page.getByRole("tab", { name: "All" }).click();
+  await page.getByRole("article", { name: "Grace's question about Travel Kettle" }).getByRole("button", { name: "Take off the page" }).click();
+  await expect(page.getByText("Taken off the product page. They still have the answer by email.")).toBeVisible();
+  await shopper.goto(kettle);
+  await expect(shopper.getByRole("region", { name: "Questions" }).getByText("Yes, it works from 100 to 240 volts.")).toHaveCount(0);
+});

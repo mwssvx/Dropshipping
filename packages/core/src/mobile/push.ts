@@ -86,6 +86,7 @@ export const PUSH_LABELS: Record<PushKind, string> = {
   buyer_message: "Buyer questions that need you",
   return_request: "Returns buyers ask for",
   review: "Reviews waiting for your OK",
+  product_question: "Questions shoppers ask about products",
 };
 /** Who gets each kind: staff, for example, don't hear about payouts or AI proposals. */
 const PUSH_AREA: Record<PushKind, Area> = {
@@ -98,6 +99,7 @@ const PUSH_AREA: Record<PushKind, Area> = {
   escalation_reply: "assistant",
   buyer_message: "inbox",
   return_request: "returns",
+  product_question: "reviews",
   review: "reviews",
 };
 
@@ -147,7 +149,7 @@ const clip = (s: string, n = 140) => (s.length > n ? `${s.slice(0, n - 1)}…` :
 
 /** What happened in a store since `since`, as notifications. `url` is a path inside the app. */
 export async function collectPushEvents(db: Db, shopId: string, since: Date): Promise<PushEvent[]> {
-  const [shop, orders, failed, holds, actions, staff, disputes, asks, returns, reviews] = await Promise.all([
+  const [shop, orders, failed, holds, actions, staff, disputes, asks, returns, reviews, questions] = await Promise.all([
     db.query.shops.findFirst({ where: eq(schema.shops.id, shopId) }),
     db.query.orders.findMany({
       where: and(eq(schema.orders.shopId, shopId), inArray(schema.orders.paymentStatus, ["paid", "partially_refunded"]), gte(schema.orders.paidAt, since)),
@@ -219,6 +221,13 @@ export async function collectPushEvents(db: Db, shopId: string, since: Date): Pr
       columns: { id: true, name: true, rating: true, body: true, createdAt: true },
       limit: 50,
     }),
+    // A shopper's question on a product page, waiting for an answer.
+    db
+      .select({ id: schema.productQuestions.id, name: schema.productQuestions.name, body: schema.productQuestions.body, createdAt: schema.productQuestions.createdAt, title: schema.products.title })
+      .from(schema.productQuestions)
+      .innerJoin(schema.products, eq(schema.products.id, schema.productQuestions.productId))
+      .where(and(eq(schema.productQuestions.shopId, shopId), eq(schema.productQuestions.status, "waiting"), gte(schema.productQuestions.createdAt, since)))
+      .limit(50),
   ]);
   if (!shop) return [];
   const events: PushEvent[] = [];
@@ -259,6 +268,9 @@ export async function collectPushEvents(db: Db, shopId: string, since: Date): Pr
   }
   for (const r of reviews) {
     events.push({ kind: "review", ref: r.id, title: `New ${r.rating}-star review from ${r.name}`, body: clip(r.body || "No words, just the stars."), url: "/reviews", at: r.createdAt });
+  }
+  for (const q of questions) {
+    events.push({ kind: "product_question", ref: q.id, title: `${q.name} asked about ${q.title}`, body: clip(q.body), url: "/questions", at: q.createdAt });
   }
   for (const { m } of staff) {
     events.push({ kind: "escalation_reply", ref: m.id, title: "Our support team replied", body: clip(m.body), url: "/assistant", at: m.createdAt });
