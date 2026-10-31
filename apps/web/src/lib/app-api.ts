@@ -91,6 +91,9 @@ import {
   ABANDONED_DAYS,
   isOrderBuyerBlocked,
   blockOrderBuyer,
+  blockBuyer,
+  listBlockedBuyers,
+  unblockBuyer,
   activeClosure,
   setStoreClosure,
   listGiftCards,
@@ -574,6 +577,30 @@ const routes: Record<string, Handler> = {
     }
     throw new HttpError(400, "Pick cancel.");
   },
+  // Emails and addresses checkout turns away: repeat chargebacks, stolen cards, return abuse.
+  "GET blocked": async ({ db, shop }) => {
+    const rows = await listBlockedBuyers(db, shop.id);
+    const orders = new Map(
+      rows.some((r) => r.orderId)
+        ? (await db.query.orders.findMany({ where: (o, { inArray }) => inArray(o.id, rows.flatMap((r) => (r.orderId ? [r.orderId] : []))), columns: { id: true, number: true } })).map((o) => [o.id, o.number])
+        : [],
+    );
+    return {
+      blocked: rows.map((r) => ({ id: r.id, kind: r.kind, label: r.label, note: r.note, orderId: r.orderId, orderNumber: r.orderId ? (orders.get(r.orderId) ?? null) : null, createdAt: r.createdAt })),
+    };
+  },
+  "POST blocked": async ({ req, db, shop, user }) => {
+    const b = await body<{ email?: unknown; note?: unknown }>(req);
+    const email = str(b.email).trim().toLowerCase();
+    const added = await blockBuyer(db, shop.id, { email, note: str(b.note) });
+    await logged({ shop, user, db }, `Blocked ${email} from checking out in the app`, { href: "/admin/blocked" });
+    return { ok: true, message: added.length ? `${email} can't check out at your store any more.` : `${email} was already blocked.` };
+  },
+  "DELETE blocked/:id": async ({ params, db, shop, user }) => {
+    const row = await unblockBuyer(db, shop.id, params.id!);
+    await logged({ shop, user, db }, `Unblocked ${row.label} in the app`, { href: "/admin/blocked" });
+    return { ok: true, message: `${row.label} can check out again.` };
+  },
   "GET questions": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
     const rows = await listQuestions(db, shop.id);
@@ -660,7 +687,7 @@ const routes: Record<string, Handler> = {
     const b = await body<{ note?: unknown }>(req);
     const order = await blockOrderBuyer(db, shop.id, params.id!, str(b.note));
     await logged({ shop, user, db }, `Blocked the buyer of order #${order.number} from checking out in the app`, { orderId: order.id, href: "/admin/blocked" });
-    return { ok: true, message: `${order.shippingAddress.name} can't check out at your store any more, with this email or address. Unblock them under Blocked buyers on the website.` };
+    return { ok: true, message: `${order.shippingAddress.name} can't check out at your store any more, with this email or address. Unblock them under Customers, Blocked buyers.` };
   },
   "POST orders/:id/handover": async ({ req, params, db, shop, user }) => {
     const b = await body<{ step?: unknown }>(req);
@@ -1146,6 +1173,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("analytics")) return "analytics";
   if (path.startsWith("activity")) return "team";
   if (path.startsWith("subscriptions")) return "orders";
+  if (path.startsWith("blocked")) return "customers";
   if (path.startsWith("checkouts")) return "orders";
   if (path.startsWith("store-status")) return "theme";
   if (path.startsWith("gift-cards")) return "gift_cards";

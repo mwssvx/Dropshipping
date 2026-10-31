@@ -1928,3 +1928,7 @@ The app's Settings has Activity for people who manage the team: what everyone di
 ### Subscriptions in the app (after launch, part 362)
 
 The Orders tab has Subscriptions: buyers who get their order again every few weeks (subscribe and save), with how many are active and what repeat deliveries brought in. Each one shows what they get, how often and at what discount, the next delivery, what they've spent so far, and when their card was declined. Search by email, see only card problems or paused ones, open their first order, write to them, or cancel a subscription when a buyer asks (they're emailed). In test mode the next delivery can be sent straight away.
+
+### Blocked buyers in the app (after launch, part 363)
+
+The app's Customers screen ends with Blocked buyers: every email and delivery address checkout turns away, why (a note only the team sees), and the order it came from. Block an email straight from the phone after a chargeback or a stolen card, or unblock someone so they can check out again, as on the website.
