@@ -315,7 +315,7 @@ export async function productSources(db: Db, shopId: string) {
 }
 
 /** Things a product still lacks that buyers, shipping rates or customs need. */
-export const PRODUCT_GAPS = ["photo", "description", "weight", "customs"] as const;
+export const PRODUCT_GAPS = ["photo", "description", "weight", "customs", "cost"] as const;
 export type ProductGap = (typeof PRODUCT_GAPS)[number];
 
 /**
@@ -334,6 +334,9 @@ function gapWhere(gap: ProductGap) {
       return sql`${ships} and exists (select 1 from ${schema.variants} v where v.product_id = ${p.id} and v.weight_grams is null)`;
     case "customs":
       return sql`${ships} and (${p.hsCode} is null or ${p.originCountry} is null)`;
+    // With no cost, the profit report can't take it off, so the product looks more profitable than it is.
+    case "cost":
+      return sql`not ${p.giftCard} and exists (select 1 from ${schema.variants} v where v.product_id = ${p.id} and v.cost_minor is null)`;
   }
 }
 

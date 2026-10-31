@@ -23,11 +23,14 @@ describe("products that still lack something", () => {
     expect(await titles("description")).toEqual(["Galaxy Projector", stand.title].sort());
     expect(await titles("weight")).toEqual(["Galaxy Projector"]);
     expect(await titles("customs")).toEqual(["Galaxy Projector"]);
-    expect(await productGaps(f.db, shop.id)).toEqual({ photo: 1, description: 2, weight: 1, customs: 1 });
+    expect(await productGaps(f.db, shop.id)).toEqual({ photo: 1, description: 2, weight: 1, customs: 1, cost: 0 });
+    // An option with no cost makes the profit report count it as free.
+    await f.db.update(schema.variants).set({ costMinor: null }).where(eq(schema.variants.productId, lamp.id));
+    expect(await titles("cost")).toEqual(["Sunset Projection Lamp"]);
 
     // Archived products drop out of the counts and the list, unless the archived list is asked for.
     await set(projector.id, { status: "archived" });
-    expect(await productGaps(f.db, shop.id)).toEqual({ photo: 0, description: 1, weight: 0, customs: 0 });
+    expect(await productGaps(f.db, shop.id)).toEqual({ photo: 0, description: 1, weight: 0, customs: 0, cost: 1 });
     expect(await titles("photo")).toEqual([]);
     expect(await titles("photo", "archived")).toEqual(["Galaxy Projector"]);
 

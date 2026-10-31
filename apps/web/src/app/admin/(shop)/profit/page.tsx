@@ -53,7 +53,12 @@ export default async function ProfitPage({ searchParams }: { searchParams: Promi
             </div>
           ))}
         </section>
-        {t.costMissing && <p className="banner banner-warning">Some products have no supplier cost, so their profit looks higher than it is. Add the cost on the product.</p>}
+        {t.costMissing && (
+          <p className="banner banner-warning" role="note" aria-label="Products with no cost">
+            Some products have no cost, so their profit looks higher than it is.{" "}
+            <Link href="/admin/products?missing=cost" className="underline">See the products with no cost</Link> and add it, one at a time or all at once.
+          </p>
+        )}
 
         <section className="card overflow-x-auto" aria-labelledby="by-product">
           <h2 id="by-product" className="font-semibold px-5 pt-4 pb-2">By product</h2>

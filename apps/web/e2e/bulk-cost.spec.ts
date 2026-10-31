@@ -25,6 +25,9 @@ test("a merchant sets the cost of their own products in one go", async ({ page }
   await expect(page.getByText("Imported and live on your store.")).toBeVisible();
 
   await page.goto("/admin/products");
+  // The two of the store's own have no cost yet; the lamp has the supplier's.
+  const missing = page.getByRole("navigation", { name: "Filter by what's missing" });
+  await expect(missing.getByRole("link", { name: "No cost 2" })).toBeVisible();
   await page.getByRole("checkbox", { name: "Select all products" }).check();
   await page.getByLabel("Change", { exact: true }).selectOption({ label: "Set what your own stock costs" });
   await page.getByLabel("What each costs you (% of its price)").fill("40");
@@ -37,6 +40,8 @@ test("a merchant sets the cost of their own products in one go", async ({ page }
   await page.getByRole("button", { name: "Apply to 2 products" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Set the cost to 40% of the price where it was missing on 2 products." })).toBeVisible();
 
+  await page.reload();
+  await expect(missing.getByRole("link", { name: /^No cost/ })).toHaveCount(0);
   await page.getByRole("link", { name: "Beeswax Candle" }).first().click();
   await expect(page.getByLabel("Your cost").first()).toHaveValue("8.00");
 });

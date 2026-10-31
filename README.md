@@ -1792,3 +1792,7 @@ When any shipping rate is limited by order weight, the Shipping page warns about
 ### What your own stock costs, in bulk (after launch, part 328)
 
 On the Products list, "Set what your own stock costs" gives each option of the picked products a cost equal to a percent of its price, like 40%, so the profit report has numbers to work with. Supplier products keep the cost their supplier sends, and "Only options with no cost yet" leaves costs you already typed alone. The preview now also says why products were left out of a change: gift cards and downloads don't ship, and supplier products keep their supplier's cost.
+
+### Products with no cost (after launch, part 329)
+
+The product list's "what's missing" filters gain "No cost": products with an option that has no cost, which the profit report counts as free. When the profit report finds sales with no cost, its warning links straight to that list, where "Set what your own stock costs" fills them in at once.
