@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getPublishedPostByHandle, NotFoundError, postBlocks, postSummary, readingMinutes } from "@sf/core";
+import { getPublishedPostByHandle, NotFoundError, postBlocks, postSummary, readingMinutes, relatedPosts } from "@sf/core";
 import { db } from "@/lib/server";
 import { buyerFx } from "@/lib/currency";
 import { ProductGrid } from "@/theme/Sections";
@@ -28,7 +28,7 @@ export async function generateMetadata({ params }: { params: Promise<{ shop: str
 export default async function PostPage({ params }: { params: Promise<{ shop: string; handle: string }> }) {
   const { shop: param, handle } = await params;
   const { shop, post, products } = await load(param, handle);
-  const [base, fx] = await Promise.all([storeBase(param), buyerFx(shop)]);
+  const [base, fx, more] = await Promise.all([storeBase(param), buyerFx(shop), relatedPosts(await db(), shop.id, post)]);
   const jsonLd = JSON.stringify({
     "@context": "https://schema.org",
     "@type": "BlogPosting",
@@ -76,6 +76,26 @@ export default async function PostPage({ params }: { params: Promise<{ shop: str
         <section className="flex flex-col gap-4 border-t border-border pt-8" aria-labelledby="in-this-post">
           <h2 id="in-this-post" className="text-xl font-semibold">In this post</h2>
           <ProductGrid products={products} data={{ base, currency: shop.currency, fx, badges: shop.productBadges, catalog: { products: [], collections: [] } }} />
+        </section>
+      )}
+      {more.length > 0 && (
+        <section className="flex flex-col gap-4 border-t border-border pt-8" aria-labelledby="read-next">
+          <h2 id="read-next" className="text-xl font-semibold">Read next</h2>
+          <ul className="grid gap-6 sm:grid-cols-3">
+            {more.map((p) => (
+              <li key={p.id}>
+                <article className="flex flex-col gap-2">
+                  {p.imageUrl && (
+                    <Link href={`${base}/blog/${p.handle}`} className="sf-media block aspect-[3/2] rounded-lg bg-sunken overflow-hidden" tabIndex={-1} aria-hidden>
+                      <img src={p.imageUrl} alt="" loading="lazy" className="size-full object-cover" />
+                    </Link>
+                  )}
+                  <h3 className="font-semibold leading-snug"><Link href={`${base}/blog/${p.handle}`} className="hover:underline">{p.title}</Link></h3>
+                  <p className="hint text-sm">{p.publishedAt ? date.format(new Date(p.publishedAt)) : null} · {p.minutes} min read</p>
+                </article>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
     </main>
