@@ -137,3 +137,41 @@ test("a post scheduled for later waits, then goes up when the time is cleared", 
   await expect(page.getByLabel("Goes to")).toHaveValue("/blog/winter-is-coming");
   await expect(page.getByLabel("Link text (optional)")).toHaveValue("Read the post");
 });
+
+test("posts carry topics, and buyers list the posts on one topic", async ({ page }, info) => {
+  const id = `${info.project.name}-topics-${Date.now()}`;
+  const store = await newMerchantWithLamp(page, id);
+  const write = async (title: string, topics: string) => {
+    await page.goto("/admin/blog/new");
+    await page.getByLabel("Title").fill(title);
+    await page.getByLabel("Post").fill(`${title}. A few words on lamps, light and the long evenings we spend under them.`);
+    await page.getByLabel("Topics (optional)").fill(topics);
+    await page.getByLabel("Published").check();
+    await page.getByRole("button", { name: "Save post" }).click();
+    await expect(page.getByText("Saved.")).toBeVisible();
+  };
+  await write("Picking a lamp", "Guides, News");
+  await expect(page.getByLabel("Topics (optional)")).toHaveValue("Guides, News");
+  await write("Lamps for reading", " guides ");
+
+  const buyer = await page.context().browser()!.newPage();
+  await buyer.goto(`${store}/blog`);
+  const topics = buyer.getByRole("navigation", { name: "Topics" });
+  await expect(topics.getByRole("link", { name: "Guides (2)" })).toBeVisible();
+  await expect(topics.getByRole("link", { name: "All" })).toHaveAttribute("aria-current", "page");
+  await topics.getByRole("link", { name: "News (1)" }).click();
+  await expect(buyer.getByRole("heading", { level: 1, name: "Blog: News" })).toBeVisible();
+  await expect(buyer.getByRole("link", { name: "Picking a lamp" })).toBeVisible();
+  await expect(buyer.getByRole("link", { name: "Lamps for reading" })).toHaveCount(0);
+  await shot(buyer, "287-blog-topics");
+
+  // A post's own topics lead back to the list.
+  await buyer.getByRole("link", { name: "Picking a lamp" }).click();
+  await buyer.getByRole("list", { name: "Topics" }).getByRole("link", { name: "Guides" }).click();
+  await expect(buyer.getByRole("heading", { level: 1, name: "Blog: Guides" })).toBeVisible();
+  await expect(buyer.getByRole("link", { name: "Lamps for reading" })).toBeVisible();
+  // A topic no post has shows everything.
+  await buyer.goto(`${store}/blog?tag=nothing`);
+  await expect(buyer.getByRole("heading", { level: 1, name: "Blog", exact: true })).toBeVisible();
+  await buyer.close();
+});

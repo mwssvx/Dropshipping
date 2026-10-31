@@ -5,7 +5,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import type { FormState } from "../../actions";
 import type { PostState } from "../../blog-actions";
 
-export type PostFields = { title: string; handle: string; excerpt: string; body: string; imageUrl: string; productIds: string[]; published: boolean; publishAt: string };
+export type PostFields = { title: string; handle: string; excerpt: string; body: string; imageUrl: string; productIds: string[]; tags: string; published: boolean; publishAt: string };
 
 /** An exact time as a datetime-local value in this browser's time zone, and back. */
 const toLocal = (iso: string) => {
@@ -91,6 +91,11 @@ export function PostForm({ action, initial: saved_, products, submitLabel, saved
               <span className="hint whitespace-nowrap">/blog/</span>
               <input className="input" id="handle" name="handle" maxLength={80} defaultValue={initial.handle} placeholder="made from the title" pattern="[a-z0-9](-?[a-z0-9])*" />
             </div>
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="tags">Topics (optional)</label>
+            <input className="input" id="tags" name="tags" maxLength={170} defaultValue={initial.tags} placeholder="Guides, News" aria-describedby="tags-hint" />
+            <span className="hint" id="tags-hint">Up to 5, with commas between. Shoppers can read all the posts on one topic.</span>
           </div>
           <div className="field">
             <label className="label" htmlFor="imageUrl">Image address (optional)</label>

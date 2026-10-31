@@ -1,7 +1,7 @@
 // The store's blog: posts that bring buyers in from search engines and point them at products.
 // Bodies are plain text: blank lines split paragraphs, "## " starts a subheading and "• " a
 // bullet, so nothing pasted can run in a buyer's browser. The AI writer can draft a post.
-import { and, desc, eq, inArray, lte } from "drizzle-orm";
+import { and, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
 import { NotFoundError, UserError } from "./errors";
@@ -25,13 +25,33 @@ const postInput = z.object({
     .refine((u) => u === "" || /^https:\/\/[^\s]+$/.test(u), "The image must be an https address.")
     .default(""),
   productIds: z.array(z.string().uuid()).max(8, "Feature up to 8 products.").default([]),
+  // Typed as "Guides, News" in the editor.
+  tags: z.union([z.string(), z.array(z.string())]).default([]),
 });
 export type PostInput = z.input<typeof postInput>;
+
+export const POST_TAGS_MAX = 5;
+export const POST_TAG_LENGTH = 30;
+
+/** "guides,  News, guides" → ["guides", "News"]: trimmed, one of each whatever the case. */
+export function postTags(input: string | string[]) {
+  const seen = new Set<string>();
+  const tags: string[] = [];
+  for (const raw of Array.isArray(input) ? input : input.split(",")) {
+    const tag = raw.trim().replace(/\s+/g, " ");
+    if (!tag || seen.has(tag.toLowerCase())) continue;
+    if (tag.length > POST_TAG_LENGTH) throw new UserError(`Keep each topic under ${POST_TAG_LENGTH} characters.`);
+    seen.add(tag.toLowerCase());
+    tags.push(tag);
+  }
+  if (tags.length > POST_TAGS_MAX) throw new UserError(`Give a post up to ${POST_TAGS_MAX} topics.`);
+  return tags;
+}
 
 async function parse(db: Db, shopId: string, input: PostInput, exceptId?: string) {
   const parsed = postInput.safeParse(input);
   if (!parsed.success) throw new UserError(parsed.error.issues[0]!.message);
-  const { handle, excerpt, imageUrl, productIds, ...rest } = parsed.data;
+  const { handle, excerpt, imageUrl, productIds, tags, ...rest } = parsed.data;
   if (/<[a-z/][^>]*>/i.test(rest.body)) throw new UserError("Write the post as plain text, without HTML tags.");
   const ids = [...new Set(productIds)];
   if (ids.length) {
@@ -43,7 +63,7 @@ async function parse(db: Db, shopId: string, input: PostInput, exceptId?: string
     return !!row && row.id !== exceptId;
   };
   if (handle && (await taken(handle))) throw new UserError(`Another post already uses the address /blog/${handle}.`);
-  return { ...rest, handle: handle || (await uniqueHandle(rest.title, taken)), excerpt: excerpt || null, imageUrl: imageUrl || null, productIds: ids };
+  return { ...rest, handle: handle || (await uniqueHandle(rest.title, taken)), excerpt: excerpt || null, imageUrl: imageUrl || null, productIds: ids, tags: postTags(tags) };
 }
 
 const NEARLY_EMPTY = "Write a bit more before publishing: the post is nearly empty.";
@@ -120,13 +140,27 @@ export async function getPost(db: Db, shopId: string, postId: string) {
   return row;
 }
 
-/** The store's blog page, newest first. */
-export async function listPublishedPosts(db: Db, shopId: string, limit = 50) {
+/** A post has this topic, whatever its case. */
+const hasTag = (tag: string) => sql`exists (select 1 from jsonb_array_elements_text(${schema.blogPosts.tags}) t where lower(t) = ${tag.toLowerCase()})`;
+
+/** The store's blog page, newest first; with `tag`, only that topic's posts. */
+export async function listPublishedPosts(db: Db, shopId: string, limit = 50, opts: { tag?: string | null } = {}) {
   return db.query.blogPosts.findMany({
-    where: and(eq(schema.blogPosts.shopId, shopId), livePost()),
+    where: and(eq(schema.blogPosts.shopId, shopId), livePost(), opts.tag ? hasTag(opts.tag) : undefined),
     orderBy: desc(schema.blogPosts.publishedAt),
     limit,
   });
+}
+
+/** The topics of the posts on the store, most posts first, each written as it first appeared. */
+export async function blogTopics(db: Db, shopId: string) {
+  const posts = await db.query.blogPosts.findMany({ where: and(eq(schema.blogPosts.shopId, shopId), livePost()), columns: { tags: true }, orderBy: desc(schema.blogPosts.publishedAt) });
+  const topics = new Map<string, { tag: string; count: number }>();
+  for (const p of posts) for (const tag of p.tags) {
+    const key = tag.toLowerCase();
+    topics.set(key, { tag: topics.get(key)?.tag ?? tag, count: (topics.get(key)?.count ?? 0) + 1 });
+  }
+  return [...topics.values()].sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
 }
 
 /** The newest published posts as home page cards: plain data the editor preview can show too. */

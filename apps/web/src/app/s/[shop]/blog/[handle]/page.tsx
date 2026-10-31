@@ -47,6 +47,13 @@ export default async function PostPage({ params }: { params: Promise<{ shop: str
           <Link href={`${base}/blog`} className="hint hover:text-accent">← Blog</Link>
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">{post.title}</h1>
           <p className="hint">{post.publishedAt ? date.format(post.publishedAt) : null} · {readingMinutes(post.body)} min read</p>
+          {post.tags.length > 0 && (
+            <ul className="flex flex-wrap gap-2 text-sm" aria-label="Topics">
+              {post.tags.map((tag) => (
+                <li key={tag}><Link href={`${base}/blog?tag=${encodeURIComponent(tag)}`} className="chip hover:underline">{tag}</Link></li>
+              ))}
+            </ul>
+          )}
         </header>
         {post.imageUrl && (
           <div className="sf-media aspect-[2/1] rounded-xl bg-sunken overflow-hidden">

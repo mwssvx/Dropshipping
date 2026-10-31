@@ -1557,3 +1557,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **From the post** (`postEmail` in `packages/core/src/blog.ts`): a post that's up on the store has "Email to subscribers" next to View, for staff who can do marketing. It opens a new campaign already written: the post's title as the subject, "New on our blog" with its summary, and a "Read the post" button to it. Change anything before sending or scheduling, as with any campaign.
 2. Drafts and posts still waiting for their time get no button and no prefilled email. No migration.
+
+### Blog topics (after launch, part 276)
+
+1. **Topics on a post** (`postTags` in `packages/core/src/blog.ts`): the post editor has "Topics (optional)", up to five, with commas between, like "Guides, News". Spaces are tidied and the same topic typed twice in another case is kept once.
+2. **On the store**: the blog shows a "Topics" row with how many posts each has once there are two or more, and `/blog?tag=Guides` lists only those posts under "Blog: Guides" (a topic no post has shows everything). A post shows its own topics as links back to that list. Drafts and scheduled posts don't count. Topics go along in the store file. Migration `0150_blog_topics`.

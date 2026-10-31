@@ -6,9 +6,9 @@ import { agents, requireShop } from "@/lib/server";
 import type { FormState } from "./actions";
 
 /** On an error the form shows what was typed again, instead of the saved version. */
-export type PostState = FormState & { values?: { title: string; handle: string; excerpt: string; body: string; imageUrl: string; productIds: string[]; published: boolean; publishAt: string } };
+export type PostState = FormState & { values?: { title: string; handle: string; excerpt: string; body: string; imageUrl: string; productIds: string[]; tags: string; published: boolean; publishAt: string } };
 
-const typed = (form: FormData) => ({ ...(readPost(form) as Required<Omit<PostInput, "productIds">>), productIds: form.getAll("productIds").map(String), published: form.get("published") === "on", publishAt: String(form.get("publishAt") ?? "") });
+const typed = (form: FormData) => ({ ...(readPost(form) as Required<Omit<PostInput, "productIds" | "tags">>), productIds: form.getAll("productIds").map(String), tags: String(form.get("tags") ?? ""), published: form.get("published") === "on", publishAt: String(form.get("publishAt") ?? "") });
 
 /** "Publish on": an exact time from the browser, which read it in the merchant's own time zone. */
 const publishAt = (form: FormData) => {
@@ -23,6 +23,7 @@ const readPost = (form: FormData): PostInput => ({
   body: String(form.get("body") ?? ""),
   imageUrl: String(form.get("imageUrl") ?? ""),
   productIds: form.getAll("productIds").map(String),
+  tags: String(form.get("tags") ?? ""),
 });
 
 function refresh(handle: string) {
