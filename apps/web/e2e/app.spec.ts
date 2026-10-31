@@ -713,6 +713,9 @@ test("a pickup order told ready and handed over from the app", async ({ page, br
 
   await signIn(page, email);
   await tab(page, "Orders");
+  // The Hand over list has what's waiting to be collected or dropped off.
+  await page.getByRole("tab", { name: "Hand over" }).click();
+  await expect(page.getByRole("link", { name: "Order #1001" })).toContainText("Pickup · no day picked");
   await page.getByRole("link", { name: "Order #1001" }).click();
   await expect(page.getByText("Picking up", { exact: true })).toBeVisible();
   // Nothing to post or track: it's collected.
@@ -731,4 +734,6 @@ test("a pickup order told ready and handed over from the app", async ({ page, br
   await expect(buyer.getByText("You picked up this order.")).toBeVisible();
   await web.goto(`${WEB}/admin/activity`);
   await expect(web.getByText("Marked order #1001 picked up in the app")).toBeVisible();
+  await page.goto("/orders?show=handover");
+  await expect(page.getByText("Nothing to hand over")).toBeVisible();
 });
