@@ -1507,3 +1507,61 @@ test("a partner added from the app gets their code, and is paused and brought ba
   await web.goto(`${WEB}/admin/partners`);
   await expect(web.getByRole("article", { name: "Maya Lamps" })).toContainText("MAYA15");
 });
+
+test("an email campaign written, tested and sent from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `ec${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/import`);
+  await web.getByRole("link", { name: /sunset projection lamp/i }).click();
+  await web.getByRole("button", { name: "Import and publish" }).click();
+  await expect(web.getByText("Imported and live on your store.")).toBeVisible();
+  const lamp = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+
+  // A buyer who says yes to emails at checkout.
+  const buyer = await (await browser.newContext()).newPage();
+  const fan = `fan-${Date.now()}@example.com`;
+  await buyer.goto(lamp);
+  await buyer.getByRole("button", { name: "Add to cart" }).click();
+  await buyer.getByRole("link", { name: "Check out" }).click();
+  await buyer.getByRole("textbox", { name: "Email" }).fill(fan);
+  await buyer.getByLabel("Send me news and offers").check();
+  await buyer.getByLabel("Full name").fill("Ada Fan");
+  await buyer.getByLabel("Address", { exact: true }).fill("1 Main St");
+  await buyer.getByLabel("City").fill("Austin");
+  await buyer.getByLabel("State or region").fill("TX");
+  await buyer.getByLabel("Postal code").fill("78701");
+  await buyer.getByRole("button", { name: "Continue to payment" }).click();
+  await buyer.getByRole("button", { name: /^Pay/ }).click();
+  await expect(buyer.getByRole("heading", { name: "Thank you, Ada!" })).toBeVisible();
+
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Email campaigns" }).click();
+  await expect(page.getByRole("heading", { name: "Email campaigns", level: 1 })).toBeVisible();
+  await expect(page.getByText("1 subscriber ·", { exact: false })).toBeVisible();
+  await page.getByRole("textbox", { name: "Mailing address" }).fill("PO Box 12, Austin, TX 78701, USA");
+  await page.getByRole("button", { name: "Save address" }).click();
+  await expect(page.getByText("Mailing address saved.", { exact: false })).toBeVisible();
+
+  await page.getByRole("textbox", { name: "Subject" }).fill("Lamp news");
+  await page.getByRole("textbox", { name: "Email", exact: true }).fill("Our sunset lamps are back in stock.");
+  await page.getByRole("textbox", { name: "Button text (optional)" }).fill("See the lamps");
+  await page.getByRole("textbox", { name: "Button goes to (optional)" }).fill("/products");
+  await page.getByRole("button", { name: "Save draft" }).click();
+  await expect(page.getByText("Draft saved. Send yourself a test, then send it.")).toBeVisible();
+  const draft = page.getByRole("group", { name: "Lamp news" });
+  await draft.getByRole("button", { name: "Send me a test of Lamp news" }).click();
+  await expect(page.getByText(`Test sent to ${email}.`)).toBeVisible();
+  await shot(page, "372-app-campaigns");
+
+  await draft.getByRole("button", { name: "Send Lamp news…" }).click();
+  await draft.getByRole("button", { name: "Send to 1 person" }).click();
+  await expect(page.getByText("Sending to 1 person.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Lamp news" }).getByText(/^(Sending|Sent)$/)).toBeVisible();
+
+  const mail = await web.context().newPage();
+  await mail.goto(`${WEB}/dev/mail`);
+  await expect(async () => {
+    await mail.reload();
+    await expect(mail.getByRole("article").filter({ hasText: fan }).filter({ hasText: "Lamp news" }).first()).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 20_000 });
+  await mail.close();
+});

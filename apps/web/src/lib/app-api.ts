@@ -56,6 +56,16 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  audienceSizes,
+  AUDIENCE_LABELS,
+  campaignAllowance,
+  createCampaign,
+  deleteCampaign,
+  listCampaigns,
+  sendCampaignBatches,
+  sendTestCampaign,
+  setMailingAddress,
+  startCampaign,
   createPartner,
   formatRate,
   listPartners,
@@ -188,6 +198,7 @@ import {
 } from "@sf/core";
 import type { Db } from "@sf/db";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { BRAND } from "./brand";
 import { agents, campaigns, db, fulfillment, logged, mailer, platformUrl, notifyLater, payments, refunds, stock, storeAddress, partnerPortalUrl, subscriptions, supplierPortalUrl, suppliers, tax, testPayments } from "./server";
 
@@ -1015,6 +1026,53 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, `${action === "resume" ? "Brought back" : "Paused"} partner ${partner.name} in the app`, { href: "/admin/partners" });
     return { ok: true, message: action === "resume" ? `${partner.name}'s code works again.` : `${partner.name} is paused, so their code stops working. What they earned stays.` };
   },
+  // Email campaigns: a short note to the people who said yes to emails, with how each one did.
+  "GET campaigns": async ({ db, shop }) => {
+    const [rows, sizes, allowance] = await Promise.all([listCampaigns(db, shop.id), audienceSizes(db, shop.id), campaignAllowance(db, shop.id)]);
+    return {
+      left: allowance.left,
+      limit: allowance.limit,
+      hasAddress: !!shop.mailingAddress?.trim(),
+      // Audiences that need a tag or a product picked stay on the website.
+      audiences: (["subscribers", "customers", "not_bought", "lapsed"] as const).map((a) => ({ value: a, label: AUDIENCE_LABELS[a], size: sizes[a] })),
+      campaigns: rows.map((c) => ({
+        id: c.id,
+        subject: c.subject,
+        body: c.body,
+        status: c.status,
+        audience: c.audience,
+        audienceLabel: AUDIENCE_LABELS[c.audience],
+        scheduledFor: c.scheduledFor,
+        stats: { sent: c.stats.sent, clicks: c.stats.clicks, orders: c.stats.orders, salesMinor: c.stats.salesMinor },
+      })),
+    };
+  },
+  "PUT campaigns/address": async ({ req, db, shop }) => {
+    await setMailingAddress(db, shop.id, str((await body<{ mailingAddress?: unknown }>(req)).mailingAddress));
+    return { ok: true, message: "Mailing address saved. It goes at the foot of every campaign." };
+  },
+  "POST campaigns": async ({ req, db, shop, user }) => {
+    const b = await body<Record<string, unknown>>(req);
+    const audience = (["subscribers", "customers", "not_bought", "lapsed"] as const).find((a) => a === b.audience) ?? "subscribers";
+    const c = await createCampaign(db, shop.id, user.id, { subject: str(b.subject), body: str(b.body), buttonLabel: str(b.buttonLabel), buttonPath: str(b.buttonPath), audience });
+    return { ok: true, id: c.id, message: "Draft saved. Send yourself a test, then send it." };
+  },
+  "POST campaigns/:id/test": async ({ req, params, shop, user }) => {
+    const to = str((await body<{ to?: unknown }>(req)).to).trim() || user.email;
+    await sendTestCampaign(await campaigns(), shop, params.id!, to);
+    return { ok: true, message: `Test sent to ${to.toLowerCase()}.` };
+  },
+  "POST campaigns/:id/send": async ({ params, shop, user, db }) => {
+    const ctx = await campaigns();
+    const c = await startCampaign(ctx, shop, params.id!);
+    after(() => sendCampaignBatches(ctx).then(() => {}));
+    await logged({ shop, user, db }, `Sent the campaign “${c.subject}” from the app`, { href: `/admin/campaigns/${c.id}` });
+    return { ok: true, message: `Sending to ${c.recipients === 1 ? "1 person" : `${c.recipients} people`}. Results show here as they open and buy.` };
+  },
+  "DELETE campaigns/:id": async ({ params, db, shop }) => {
+    await deleteCampaign(db, shop.id, params.id!);
+    return { ok: true, message: "Draft deleted." };
+  },
   "GET questions": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
     const rows = await listQuestions(db, shop.id);
@@ -1598,6 +1656,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("cart-links")) return "marketing";
   if (path.startsWith("wholesale")) return "wholesale";
   if (path.startsWith("partners")) return "marketing";
+  if (path.startsWith("campaigns")) return "marketing";
   if (path.startsWith("checkouts")) return "orders";
   if (path.startsWith("store-status")) return "theme";
   if (path.startsWith("gift-cards")) return "gift_cards";

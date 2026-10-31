@@ -1964,3 +1964,7 @@ Customers in the app has Wholesale for people who look after it, and a push noti
 ### Partners in the app (after launch, part 371)
 
 Today has a Partners button for people who look after marketing. Add a creator with their code, the discount buyers get and their share (we email them their code and private page), see each partner's orders and, for people who see the money, what they sold, what they're owed and what's waiting to count. Record a payment to them, pause them (their code stops working) or bring them back, make them a new private link, and share their code link or private page from the phone.
+
+### Email campaigns in the app (after launch, part 372)
+
+Today has an Email campaigns button for people who look after marketing. It shows how many people said yes to emails and how many free emails are left this month, asks for the mailing address the law wants at the foot of every campaign if it's missing, and lists each campaign with how many it went to, clicked and bought. Write a new one (subject, a few lines, an optional button to a page on your store) for everyone who said yes, those who bought, those who haven't, or those who haven't bought in 90 days; send yourself a test; then send it, or delete the draft. Audiences by tag or product stay on the website.
