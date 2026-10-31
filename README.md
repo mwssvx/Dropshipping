@@ -2024,3 +2024,7 @@ A product's screen in the app has a Collections section. Switch a hand-picked co
 ### Collections in the app (after launch, part 386)
 
 The Products tab in the app has a Collections row. It lists the store's collections with how many products each holds and whether it's hand-picked or fills by itself, with Share and Delete for each. Make a new hand-picked collection by name, then put products in it from their screens.
+
+### Holiday checklist in the app (after launch, part 387)
+
+From October 1 to December 24, the app's Today screen has a Holiday checklist button. It shows the same checklist as the website, split into To do and Done. Lines the app can set up (the last day to order, running late emails, a sale) open that screen; the rest open the website.

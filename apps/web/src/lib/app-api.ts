@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  holidayChecklist,
+  holidaySeason,
   createCollection,
   getCollection,
   deleteCollection,
@@ -1412,6 +1414,22 @@ const routes: Record<string, Handler> = {
     revalidatePath(`/s/${shop.handle}`, "layout");
     return { ok: true, message: `Deleted ${c.title}. Its products are still on sale.` };
   },
+  "GET holiday-checklist": async ({ db, shop, role }) => {
+    const checks = await holidayChecklist(db, shop);
+    // Lines the app can set up itself open that screen; the rest open the website.
+    const inApp: Record<string, { path: string; area: Area }> = {
+      "order-by": { path: "/holiday-date", area: "shipping" },
+      late: { path: "/late-emails", area: "shipping" },
+      sale: { path: "/sales", area: "marketing" },
+    };
+    return {
+      season: holidaySeason(),
+      checks: checks.map((c) => {
+        const a = inApp[c.key];
+        return { key: c.key, title: c.title, done: c.done, detail: c.detail, app: a && can(role, a.area) ? a.path : null, web: c.href };
+      }),
+    };
+  },
   "GET questions": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
     const rows = await listQuestions(db, shop.id);
@@ -2058,6 +2076,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("sales")) return "marketing";
   if (path.startsWith("returns")) return "returns";
   if (path === "today") return "home";
+  if (path === "holiday-checklist") return "home";
   return null;
 }
 

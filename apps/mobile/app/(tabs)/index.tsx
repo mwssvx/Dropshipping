@@ -84,6 +84,7 @@ export default function TodayScreen() {
               )}
             </Section>
           )}
+          {can("home") && holidaySeason() && <Button label="Holiday checklist" kind="secondary" onPress={() => router.push("/holiday-checklist")} />}
           {can("analytics") && <Button label="Analytics" kind="secondary" onPress={() => router.push("/analytics")} />}
           {can("inbox") && <Button label="Buyer inbox" kind="secondary" onPress={() => router.push("/inbox")} />}
           {can("reviews") && <Button label={t.waiting?.reviews ? `Reviews (${t.waiting.reviews} to check)` : "Reviews"} kind="secondary" onPress={() => router.push("/reviews")} />}
@@ -102,4 +103,10 @@ export default function TodayScreen() {
       )}
     </Screen>
   );
+}
+
+/** October 1 to December 24, as on the website's home page. */
+function holidaySeason(now = new Date()) {
+  const m = now.getUTCMonth();
+  return m === 9 || m === 10 || (m === 11 && now.getUTCDate() <= 24);
 }

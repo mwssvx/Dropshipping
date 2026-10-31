@@ -2157,3 +2157,26 @@ test("collections made, filled and deleted from the app", async ({ page, browser
   await web.reload();
   await expect(web.getByRole("row", { name: /Summer picks/ })).toHaveCount(0);
 });
+
+test("the holiday checklist in the app, with a line set up from the app", async ({ page, browser }) => {
+  const { email } = await merchant(browser, `hc${Date.now()}`);
+  await signIn(page, email);
+  const now = new Date();
+  const season = now.getUTCMonth() === 9 || now.getUTCMonth() === 10 || (now.getUTCMonth() === 11 && now.getUTCDate() <= 24);
+  if (season) await page.getByRole("button", { name: "Holiday checklist" }).click();
+  else await page.goto("/holiday-checklist");
+  await expect(page.getByRole("heading", { name: "Holiday checklist", level: 1 })).toBeVisible();
+  await expect(page.getByText(/^\d+ of 12 done$/)).toBeVisible();
+  const todo = page.getByRole("region", { name: "To do" });
+  await expect(todo.getByRole("button", { name: "Offer gift wrapping, opens the website" })).toBeVisible();
+  await shot(page, "387-app-holiday-checklist");
+
+  await todo.getByRole("button", { name: "Email buyers when an order runs late" }).click();
+  await expect(page.getByRole("heading", { name: "Running late emails", level: 1 })).toBeVisible();
+  await page.getByRole("switch", { name: "Email buyers when an order is running late" }).click();
+  await page.getByRole("button", { name: "Save running late emails" }).click();
+  await expect(page.getByText(/^Saved\. Buyers hear from you once/)).toBeVisible();
+
+  await page.goto("/holiday-checklist");
+  await expect(page.getByRole("region", { name: "Done" }).getByRole("button", { name: "Email buyers when an order runs late, done" })).toBeVisible();
+});
