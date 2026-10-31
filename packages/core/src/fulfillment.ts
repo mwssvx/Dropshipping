@@ -20,6 +20,7 @@ import { issueInvoice } from "./invoices";
 import { checkOrderRisk } from "./risk";
 import { takeOrderStock } from "./own-stock";
 import { describePersonalization } from "./personalization";
+import { byShipping, orderParcels, parcelShippedEmail } from "./parcels";
 import { formatShipsBy, preorderWaitingOn } from "./preorders";
 import { MAX_BULK_ORDERS } from "./orders";
 
@@ -813,6 +814,34 @@ export async function sendOrderEmail(ctx: FulfillmentContext, orderId: string, k
   if (!order) throw new NotFoundError("Order");
   const shop = (await db.query.shops.findFirst({ where: eq(schema.shops.id, order.shopId) }))!;
   if (kind === "gift_shipped" && !order.gift?.recipientEmail) return { status: "not_needed" as const };
+  // An order in several parcels gets an email per parcel as each one ships (see parcels.ts).
+  const multi = (kind === "shipping_update" || kind === "delivered") && !ref && !order.pickup && !order.localDelivery;
+  const parcels = multi
+    ? byShipping(
+        await orderParcels(db, {
+          lines: await db.query.orderLines.findMany({ where: eq(schema.orderLines.orderId, order.id) }),
+          fulfillments: await db.query.fulfillments.findMany({ where: eq(schema.fulfillments.orderId, order.id) }),
+        }),
+      )
+    : [];
+  // "Your order was delivered" waits for the last parcel.
+  if (kind === "delivered" && parcels.length > 1 && !parcels.every((p) => p.shipment?.status === "delivered")) return { status: "not_needed" as const };
+  if (kind === "shipping_update") {
+    if (parcels.length > 1 && parcels.some((p) => p.shipment?.trackingNumber)) {
+      const link = await ctx.orderStatusUrl(shop, order);
+      const first = (order.gift?.from ?? order.shippingAddress.name).split(" ")[0]!;
+      let result: Awaited<ReturnType<typeof deliverOrderEmail>> | { status: "not_needed" } = { status: "not_needed" };
+      for (const [index, p] of parcels.entries()) {
+        if (!p.shipment?.trackingNumber) continue;
+        // The first parcel takes the order's one shipping email, so one sent before this counts for it.
+        const email = parcelShippedEmail({ first, shopName: shop.name, orderNumber: order.number, link, parcels, index });
+        const sent = await deliverOrderEmail(ctx, shop, order, kind, index === 0 ? "" : `parcel:${p.shipment.id}`, { to: order.email, ...email });
+        if (sent.status !== "already_sent") result = sent;
+        if (sent.status === "sent" && index === 0 && order.gift?.recipientEmail) await sendOrderEmail(ctx, order.id, "gift_shipped");
+      }
+      return result.status === "not_needed" ? { status: "already_sent" as const } : result;
+    }
+  }
   const email = await buildEmail(ctx, order, shop, kind, ref);
   const result = await deliverOrderEmail(ctx, shop, order, kind, ref, { to: ("to" in email && email.to) || order.email, subject: email.subject, text: email.text });
   // The gift's recipient hears once, when the buyer does.

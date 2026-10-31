@@ -1,8 +1,8 @@
 // Orders that come in more than one parcel. A dropshipping cart often mixes products from different
 // suppliers (and the merchant's own shelf), and each sends its own parcel on its own day. Buyers who
 // get half an order think the rest is lost and write in, or open a dispute. So the cart and checkout
-// say up front that it comes in N parcels, and the buyer's order page lists what's in each one with
-// its own tracking.
+// say up front that it comes in N parcels, the buyer's order page lists what's in each one with its
+// own tracking, and each parcel gets its own shipping email saying what's in it and what's still to come.
 import { eq, inArray } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 
@@ -55,4 +55,41 @@ export async function orderParcels(
   }
   // Shipped parcels first, so the one on its way is at the top.
   return [...groups.values()].sort((a, b) => Number(!!b.shipment?.trackingNumber) - Number(!!a.shipment?.trackingNumber));
+}
+
+/** Parcels in the order they shipped, the ones still to ship last, so "parcel 1 of 2" stays the same. */
+export const byShipping = (parcels: Parcel[]) =>
+  [...parcels].sort((a, b) => (a.shipment?.shippedAt?.getTime() ?? Infinity) - (b.shipment?.shippedAt?.getTime() ?? Infinity) || (a.shipment?.id ?? "").localeCompare(b.shipment?.id ?? ""));
+
+const listItems = (p: Parcel) => p.items.map((i) => `  ${i.title}${i.quantity > 1 ? ` × ${i.quantity}` : ""}`);
+
+/**
+ * The shipping email for one parcel of an order that comes in several: what's in it, its tracking,
+ * and what comes separately, so a buyer with half an order knows the rest isn't lost.
+ */
+export function parcelShippedEmail(input: { first: string; shopName: string; orderNumber: number; link: string; parcels: Parcel[]; index: number }) {
+  const { first, shopName, orderNumber, link, index } = input;
+  const parcels = byShipping(input.parcels);
+  const p = parcels[index]!;
+  const s = p.shipment!;
+  const rest = parcels.filter((_, i) => i !== index);
+  const waiting = rest.filter((r) => !r.shipment?.trackingNumber);
+  return {
+    subject: `Order #${orderNumber}: parcel ${index + 1} of ${parcels.length} is on its way`,
+    text: [
+      `Hi ${first},`,
+      ``,
+      `Your order from ${shopName} comes in ${parcels.length} parcels from different warehouses. Parcel ${index + 1} has shipped with:`,
+      ``,
+      ...listItems(p),
+      ``,
+      `Track it: ${s.carrier}: ${s.trackingNumber}${s.trackingUrl ? `  ${s.trackingUrl}` : ""}`,
+      ``,
+      ...(waiting.length
+        ? [`Still to come in ${waiting.length === 1 ? "a separate parcel" : "separate parcels"}:`, ...waiting.flatMap(listItems), ``, `We'll email you its tracking as soon as it ships.`]
+        : [`The rest of your order has already shipped, so this is the last parcel.`]),
+      ``,
+      `Order status: ${link}`,
+    ].join("\n"),
+  };
 }

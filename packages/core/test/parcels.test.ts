@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { schema } from "@sf/db";
-import { createGiftCardProduct, createProduct, DemoModel, getOrder, orderParcels, quoteCart, startCheckout } from "../src";
+import { addManualTracking, createGiftCardProduct, createProduct, DemoModel, getOrder, handlePaymentEvent, onOrderPaid, orderParcels, quoteCart, startCheckout, syncTracking } from "../src";
 import { makeFixture } from "../evals/fixture";
 
 const address = { name: "Ada Lovelace", line1: "1 Main St", city: "Austin", region: "TX", postalCode: "78701", country: "US" };
@@ -46,5 +46,41 @@ describe("orders in more than one parcel", () => {
     // One parcel: nothing to list.
     await f.db.delete(schema.orderLines).where(eq(schema.orderLines.variantId, coaster!.id));
     expect(await orderParcels(f.db, await getOrder(f.db, shop.id, order.id))).toEqual([]);
+  });
+
+  it("emails each parcel as it ships, and says delivered only once the last one arrives", async () => {
+    const f = await makeFixture(new DemoModel());
+    const shop = await f.shop();
+    const [lamp] = await f.variants(f.products.lamp.id);
+    const own = await createProduct(f.db, shop.id, { title: "Handmade Coaster", status: "active", variants: [{ priceMinor: 900, stock: 10 }] });
+    const [coaster] = await f.variants(own.id);
+    const { order } = await startCheckout(f.db, f.payments, shop, { email: "ada@example.com", address, lines: [{ variantId: lamp!.id, quantity: 2 }, { variantId: coaster!.id, quantity: 1 }], storefront: true });
+    const { body, signature } = f.payments.event({ id: `evt_${order.id}`, type: "payment.succeeded", paymentIntentId: order.paymentIntentId!, amountMinor: order.totalMinor });
+    await handlePaymentEvent(f.db, "fake", (await f.payments.parseWebhook(body, signature))!);
+    await onOrderPaid(f.ctx, order.id);
+    const mail = () => f.mailer.sent.filter((m) => m.to === "ada@example.com" && /on its way|delivered/.test(m.subject));
+
+    // The supplier ships the lamps first.
+    f.advance(86_400_000 + 1);
+    await syncTracking(f.ctx, { orderId: order.id });
+    expect(mail().map((m) => m.subject)).toEqual([`Order #${order.number}: parcel 1 of 2 is on its way`]);
+    const first = mail()[0]!.text;
+    expect(first).toContain("comes in 2 parcels");
+    expect(first).toMatch(/Parcel 1 has shipped with:\n\n  Sunset Projection Lamp.* × 2/);
+    expect(first).toMatch(/Still to come in a separate parcel:\n  Handmade Coaster\n/);
+    // Checking again sends nothing new.
+    await syncTracking(f.ctx, { orderId: order.id });
+    expect(mail()).toHaveLength(1);
+
+    // The merchant posts the coaster.
+    await addManualTracking(f.ctx, shop.id, order.id, { carrier: "USPS", trackingNumber: "9400111", url: "" });
+    expect(mail().map((m) => m.subject).at(-1)).toBe(`Order #${order.number}: parcel 2 of 2 is on its way`);
+    expect(mail().at(-1)!.text).toContain("USPS: 9400111");
+    expect(mail().at(-1)!.text).toContain("this is the last parcel");
+
+    // The lamps arrive, but the coaster hasn't: no "delivered" yet.
+    f.advance(6 * 86_400_000);
+    await syncTracking(f.ctx, { orderId: order.id });
+    expect(mail().some((m) => m.subject.includes("delivered"))).toBe(false);
   });
 });
