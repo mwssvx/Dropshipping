@@ -9,6 +9,7 @@ import { BadgeSettingsForm } from "./BadgeSettingsForm";
 import { SoldOutForm } from "./SoldOutForm";
 import { QuickAddForm } from "./QuickAddForm";
 import { AfterAddForm } from "./AfterAddForm";
+import { ProductInfoForm } from "./ProductInfoForm";
 import { ShareButtonsForm } from "./ShareButtonsForm";
 import { RecentSalesForm } from "./RecentSalesForm";
 import { PriceImportForm } from "./PriceImportForm";
@@ -331,6 +332,16 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
             </p>
           </div>
           <AfterAddForm stay={shop.stayAfterAdd} />
+        </section>
+        <section className="card p-5 mt-6 flex flex-col gap-3 max-w-3xl" aria-labelledby="product-info-heading">
+          <div>
+            <h2 id="product-info-heading" className="font-semibold">Notes under every product</h2>
+            <p className="hint">
+              Up to four notes that open and close under each product&apos;s description, like shipping times, returns or care.
+              Write them once here instead of in every description. Leave a row empty to leave it out.
+            </p>
+          </div>
+          <ProductInfoForm blocks={shop.productInfo} />
         </section>
         <section className="card p-5 mt-6 flex flex-col gap-3 max-w-3xl" aria-labelledby="share-heading">
           <div>

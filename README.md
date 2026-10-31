@@ -1486,3 +1486,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **A picker on product cards** (`apps/web/src/theme/Sections.tsx`): products with two to 12 options at one price (sizes of a T-shirt, colours of a mug) now get a small picker and an "Add" button on their card in collections, search, the quiz and the home page, so shoppers add the size they want without opening the product page. Sold out options are listed as "M (Sold out)" and can't be picked; the first one in stock is chosen to start.
 2. **When it's left out**: options at different prices, text to type, a minimum above one, more than 12 options, or nothing left still open the product page, so the card's price is always the price paid. It follows the same "Add to cart on product cards" switch as before. `quickPickOptions` in `packages/core/src/badges.ts`. One new store string in all six languages. No migration.
+
+### Notes under every product (after launch, part 262)
+
+1. **Write it once** (`apps/web/src/app/admin/(shop)/products/ProductInfoForm.tsx`): the Products page has "Notes under every product", up to four notes with a title and some text, like "Shipping" or "Returns". Merchants write their shipping times or return terms once instead of copying them into every description. Empty rows are left out and the rest close up in order.
+2. **On the store**: every product page shows the notes under the description and details, each closed until a shopper taps its title (a native `<details>`, so it works without JavaScript and with a keyboard). `setProductInfo` in `packages/core/src/badges.ts` checks each note has both a title (60 characters) and text (1,500). Migration `0147_product_info` adds `shops.product_info`.

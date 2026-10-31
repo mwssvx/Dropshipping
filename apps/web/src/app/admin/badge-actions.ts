@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { setBadgeSettings, setCardQuickAdd, setProductBadge, setRecentSales, setShareButtons, setSoldOutDisplay, setStayAfterAdd, UserError } from "@sf/core";
+import { setBadgeSettings, setCardQuickAdd, setProductBadge, setRecentSales, setShareButtons, setSoldOutDisplay, setStayAfterAdd, setProductInfo, PRODUCT_INFO_MAX, UserError } from "@sf/core";
 import { requireShop } from "@/lib/server";
 
 export type BadgeState = { error?: string; saved?: boolean };
@@ -80,4 +80,19 @@ export async function stayAfterAddAction(_: BadgeState, form: FormData): Promise
   await setStayAfterAdd(db, shop.id, form.get("afterAdd") === "stay");
   revalidatePath("/admin/products");
   return { saved: true };
+}
+
+/** The fold-out notes under every product's description. */
+export async function productInfoAction(_: BadgeState, form: FormData): Promise<BadgeState> {
+  const { shop, db } = await requireShop("products");
+  const rows = Array.from({ length: PRODUCT_INFO_MAX }, (_, i) => ({ title: String(form.get(`title${i}`) ?? ""), text: String(form.get(`text${i}`) ?? "") }));
+  try {
+    await setProductInfo(db, shop.id, rows);
+    revalidatePath("/admin/products");
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { saved: true };
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
 }

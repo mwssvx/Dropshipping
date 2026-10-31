@@ -459,6 +459,20 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
             </table>
           </section>
         )}
+        {shop.productInfo.length > 0 && (
+          // The store's own notes for every product: shipping, returns, care. Closed until opened.
+          <div className="sf-product-info flex flex-col border-y border-border divide-y divide-border">
+            {shop.productInfo.map((b, i) => (
+              <details key={i} className="group">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-3 font-medium [&::-webkit-details-marker]:hidden">
+                  <span>{b.title}</span>
+                  <span aria-hidden="true" className="text-muted transition-transform group-open:rotate-45">+</span>
+                </summary>
+                <p className="pb-4 text-sm text-muted whitespace-pre-line leading-relaxed">{b.text}</p>
+              </details>
+            ))}
+          </div>
+        )}
         <ul className="hint flex flex-col gap-1 border-t border-border pt-4">
           <li>{t.secureCheckout}</li>
           <li>{t.questions}</li>

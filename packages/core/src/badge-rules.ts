@@ -26,3 +26,7 @@ export function cardBadges(settings: BadgeSettings | null | undefined, p: BadgeF
   return out.slice(0, 2);
 }
 
+/** Fold-out notes a store can put under every product (shipping, returns, care). */
+export const PRODUCT_INFO_MAX = 4;
+export const PRODUCT_INFO_TITLE_MAX = 60;
+export const PRODUCT_INFO_TEXT_MAX = 1500;
