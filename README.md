@@ -1597,3 +1597,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Pick a day** (`handoverDates` in `packages/core/src/handover-days.ts`): under Shipping, "Pickup and delivery days" lets a store that hands over orders itself tick the weekdays it's open, the notice it needs (same day to a week) and its time zone. Buyers who choose local pickup or local delivery then pick a day from the next 14 open days at checkout, and the day shows on the order for the store ("Collecting on Thursday, November 5") and the buyer ("Pickup day: …"), in the buyer's language.
 2. **Checked on the server**: checkout refuses a missing day or one outside the list, shipped orders never carry a day, and follow-up or repeat orders skip it. The setting goes along in the store file. Migration `0155_pickup_days`.
+
+### A week of pickups and deliveries (after launch, part 284)
+
+1. **Who's coming** (`handoverSchedule` in `packages/core/src/handover-days.ts`): for a store whose buyers pick a pickup or delivery day, the order list opens with "Pickups and deliveries": today, then each day of the coming week with something due ("Thursday, November 5: 2 pickups, 1 delivery"), counted in the store's time zone. Paid orders count until they're marked picked up or delivered.
+2. **One click to the list**: each day links to the orders due that day (`?day=2026-11-05`), and "Still waiting from earlier days" catches anyone who didn't show. The filter works with the other filters and the spreadsheet download. No migration.

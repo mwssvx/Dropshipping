@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
+import { schema } from "@sf/db";
 import {
+  countOrders,
   createProduct,
+  handoverSchedule,
   DemoModel,
   formatHandoverDay,
   handoverDates,
@@ -68,5 +72,47 @@ describe("pickup and delivery days", () => {
     // Shipped orders don't need a day, and drop one sent anyway.
     const shipped = await checkout(day, null);
     expect(shipped.order).toMatchObject({ pickup: false, handoverOn: null });
+  });
+
+  it("sums up the week's pickups and deliveries for the order list", async () => {
+    const f = await makeFixture(new DemoModel());
+    const shopId = (await f.shop()).id;
+    const mug = await createProduct(f.db, shopId, { title: "Mug", status: "active", variants: [{ title: "Default", priceMinor: 1500, stock: 9 }] });
+    const [variant] = await f.variants(mug.id);
+    await setLocalPickup(f.db, shopId, { address: "Glow Lamps Studio\n12 Congress Ave, Austin" });
+    const days = (await setHandoverDays(f.db, shopId, { weekdays: [0, 1, 2, 3, 4, 5, 6], leadDays: 1, timeZone: "America/Chicago" }))!;
+    const [tomorrow, later] = handoverDates(days);
+    const place = async (day: string, paid = true) => {
+      const { order } = await startCheckout(f.db, f.payments, await f.shop(), {
+        email: "buyer@example.com",
+        address: austin,
+        lines: [{ variantId: variant!.id, quantity: 1 }],
+        shippingRateId: PICKUP_RATE_ID,
+        handoverOn: day,
+        storefront: true,
+      });
+      if (paid) await f.db.update(schema.orders).set({ paymentStatus: "paid" }).where(eq(schema.orders.id, order.id));
+      return order;
+    };
+    await place(tomorrow!);
+    await place(tomorrow!);
+    await place(later!);
+    await place(later!, false); // never paid
+    const done = await place(later!);
+    await f.db.update(schema.orders).set({ fulfillmentStatus: "delivered" }).where(eq(schema.orders.id, done.id));
+    const late = await place(later!);
+    await f.db.update(schema.orders).set({ handoverOn: "2020-01-01" }).where(eq(schema.orders.id, late.id));
+
+    const schedule = await handoverSchedule(f.db, shopId, days);
+    expect(schedule.overdue).toBe(1);
+    expect(schedule.days).toEqual([
+      { day: schedule.today, today: true, pickups: 0, deliveries: 0 },
+      { day: tomorrow, today: false, pickups: 2, deliveries: 0 },
+      { day: later, today: false, pickups: 1, deliveries: 0 },
+    ]);
+    expect(await countOrders(f.db, shopId, { handoverOn: tomorrow })).toBe(2);
+    expect(await countOrders(f.db, shopId, { handoverOn: later })).toBe(1);
+    expect(await countOrders(f.db, shopId, { handoverOn: "overdue", handoverToday: schedule.today })).toBe(1);
+    expect(await countOrders(f.db, shopId, { handoverOn: "not a day" })).toBe(6);
   });
 });

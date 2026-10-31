@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, lt, ne, sql } from "drizzle-orm";
 import { schema, type Address, type Db } from "@sf/db";
 import { z } from "zod";
 import { BLOCKED_MESSAGE, blockedMatch } from "./blocklist";
@@ -35,7 +35,7 @@ import { boughtBefore, describeLimitProblem, limitProblem } from "./purchase-lim
 import { onHoliday } from "./store-closure";
 import { canPickUp, ownStockOnly, PICKUP_METHOD, PICKUP_RATE_ID } from "./local-pickup";
 import { inDeliveryArea, LOCAL_DELIVERY_METHOD, LOCAL_DELIVERY_RATE_ID, localDeliveryPrice } from "./local-delivery";
-import { handoverDates } from "./handover-days";
+import { handoverDates, handoverParam } from "./handover-days";
 
 type Shop = typeof schema.shops.$inferSelect;
 type Order = typeof schema.orders.$inferSelect;
@@ -862,6 +862,10 @@ export type OrderFilter = {
   total?: OrderTotalRange;
   /** new: the buyer's first order with the store; returning: they ordered before. */
   buyer?: OrderBuyer;
+  /** Pickups and local deliveries due on this day (YYYY-MM-DD, store time) that haven't been handed over; "overdue" is every earlier one still waiting. */
+  handoverOn?: string;
+  /** With "overdue": the store's today, so earlier days count as overdue. */
+  handoverToday?: string;
   from?: Date;
   to?: Date;
 };
@@ -877,6 +881,17 @@ function buyerWhere(buyer: OrderBuyer) {
   // Plain names inside: the relational query renames every column to the orders table.
   const earlier = sql`exists (select 1 from orders e where e.shop_id = ${o.shopId} and lower(e.email) = lower(${o.email}) and e.created_at < ${o.createdAt} and e.payment_status in ('paid', 'partially_refunded', 'refunded'))`;
   return buyer === "returning" ? earlier : sql`not ${earlier}`;
+}
+
+/** Paid pickups and local deliveries due on a day (or before today, for "overdue") and not handed over yet. */
+function handoverWhere(filter: OrderFilter) {
+  const day = filter.handoverOn === "overdue" ? handoverParam(filter.handoverToday) : handoverParam(filter.handoverOn);
+  if (!day) return [];
+  return [
+    filter.handoverOn === "overdue" ? lt(schema.orders.handoverOn, day) : eq(schema.orders.handoverOn, day),
+    inArray(schema.orders.paymentStatus, ["paid", "partially_refunded"]),
+    ne(schema.orders.fulfillmentStatus, "delivered"),
+  ];
 }
 
 function orderWhere(shopId: string, filter: OrderFilter) {
@@ -905,6 +920,7 @@ function orderWhere(shopId: string, filter: OrderFilter) {
     filter.discountId && /^[0-9a-f-]{36}$/i.test(filter.discountId) ? eq(schema.orders.discountId, filter.discountId) : undefined,
     ...totalWhere(filter.total),
     filter.buyer && buyerParam(filter.buyer) ? buyerWhere(filter.buyer) : undefined,
+    ...handoverWhere(filter),
     // Placed in this range (from inclusive, to exclusive).
     filter.from ? gte(schema.orders.createdAt, filter.from) : undefined,
     filter.to ? lt(schema.orders.createdAt, filter.to) : undefined,

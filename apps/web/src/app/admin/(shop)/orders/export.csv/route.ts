@@ -1,4 +1,4 @@
-import { fulfillmentParam, ordersCsv, paymentParam, placedSince, totalParam, buyerParam } from "@sf/core";
+import { fulfillmentParam, handoverParam, handoverSchedule, ordersCsv, paymentParam, placedSince, totalParam, buyerParam } from "@sf/core";
 import { requireShop } from "@/lib/server";
 
 const day = (s: string | null) => (s && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s)) ? new Date(`${s}T00:00:00Z`) : undefined);
@@ -14,6 +14,7 @@ export async function GET(request: Request) {
   const until = day(p.get("to"));
   const to = until ? new Date(until.getTime() + 86_400_000) : undefined;
   const show = p.get("show");
+  const overdue = p.get("day") === "overdue" && shop.handoverDays ? (await handoverSchedule(db, shop.id, shop.handoverDays)).today : undefined;
   const csv = await ordersCsv(db, shop.id, {
     ...(show === "problems" ? { fulfillmentStatus: "problem" as const } : show === "held" ? { held: true } : show === "transfers" ? { transfer: true } : {}),
     ...(show !== "problems" && fulfillmentParam(p.get("status")) ? { fulfillmentStatus: fulfillmentParam(p.get("status")) } : {}),
@@ -25,6 +26,7 @@ export async function GET(request: Request) {
     discountId: p.get("code") ?? undefined,
     total: totalParam(p.get("total")),
     buyer: buyerParam(p.get("buyer")),
+    ...(overdue ? { handoverOn: "overdue", handoverToday: overdue } : { handoverOn: handoverParam(p.get("day")) }),
     from,
     to,
   });

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BANK_DETAILS_MAX, BUYER_EDIT_HOURS, can, countOrders, countryName, formatMoney, listSavedViews, orderCountries, orderPage, orderTags, ORDER_PLACED_DAYS, placedSince, fulfillmentParam, paymentParam, RISK_HOLD_LABELS, TRANSFER_DAYS, ORDER_TOTALS, totalParam, type OrderTotalRange, buyerParam } from "@sf/core";
+import { BANK_DETAILS_MAX, BUYER_EDIT_HOURS, can, countOrders, countryName, formatMoney, listSavedViews, orderCountries, orderPage, orderTags, ORDER_PLACED_DAYS, placedSince, fulfillmentParam, paymentParam, RISK_HOLD_LABELS, TRANSFER_DAYS, ORDER_TOTALS, totalParam, type OrderTotalRange, buyerParam, formatHandoverDay, handoverParam, handoverSchedule } from "@sf/core";
 import { AutoSubmitSelect } from "@/components/AutoSubmitSelect";
 import { SavedViews } from "@/components/SavedViews";
 import { requireShop } from "@/lib/server";
@@ -22,10 +22,16 @@ function totalLabel(range: OrderTotalRange, currency: string) {
   return from && to ? `${from} to ${to}` : to ? `Under ${to}` : `${from} or more`;
 }
 
+/** "2 pickups, 1 delivery", or "nothing due". */
+function dueLabel(pickups: number, deliveries: number) {
+  const parts = [pickups && (pickups === 1 ? "1 pickup" : `${pickups} pickups`), deliveries && (deliveries === 1 ? "1 delivery" : `${deliveries} deliveries`)].filter(Boolean);
+  return parts.length ? parts.join(", ") : "nothing due";
+}
+
 const dateFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
-export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ show?: string; q?: string; tag?: string; product?: string; country?: string; code?: string; total?: string; buyer?: string; placed?: string; status?: string; payment?: string; bulk?: string; before?: string }> }) {
-  const { show, q, tag, product: productParam, country: countryParam, code: codeParam, total: totalValue, buyer: buyerValue, placed: placedParam, status: statusParam, payment: paymentParamValue, bulk, before: beforeParam } = await searchParams;
+export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ show?: string; q?: string; tag?: string; product?: string; country?: string; code?: string; total?: string; buyer?: string; placed?: string; status?: string; payment?: string; day?: string; bulk?: string; before?: string }> }) {
+  const { show, q, tag, product: productParam, country: countryParam, code: codeParam, total: totalValue, buyer: buyerValue, placed: placedParam, status: statusParam, payment: paymentParamValue, day: dayParam, bulk, before: beforeParam } = await searchParams;
   const productId = /^[0-9a-f-]{36}$/i.test(productParam ?? "") ? productParam : undefined;
   const country = /^[A-Z]{2}$/.test(countryParam ?? "") ? countryParam : undefined;
   const discountId = /^[0-9a-f-]{36}$/i.test(codeParam ?? "") ? codeParam : undefined;
@@ -41,8 +47,11 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const heldOnly = show === "held";
   const transfersOnly = show === "transfers";
   const { shop, db, role } = await requireShop("orders");
+  // Pickups and local deliveries due over the coming week, where buyers pick a day.
+  const schedule = shop.handoverDays ? await handoverSchedule(db, shop.id, shop.handoverDays) : null;
+  const day = dayParam === "overdue" && schedule ? "overdue" : handoverParam(dayParam);
   const [{ orders, older }, problems, held, transfers, tags, countries, product, views, discount] = await Promise.all([
-    orderPage(db, shop.id, { ...(problemsOnly ? { fulfillmentStatus: "problem" as const } : heldOnly ? { held: true } : transfersOnly ? { transfer: true } : {}), ...(status && !problemsOnly ? { fulfillmentStatus: status } : {}), paymentStatus: payment, query: q, tag, productId, country, discountId, total, buyer, from }, { before }),
+    orderPage(db, shop.id, { ...(problemsOnly ? { fulfillmentStatus: "problem" as const } : heldOnly ? { held: true } : transfersOnly ? { transfer: true } : {}), ...(status && !problemsOnly ? { fulfillmentStatus: status } : {}), paymentStatus: payment, query: q, tag, productId, country, discountId, total, buyer, from, handoverOn: day, handoverToday: schedule?.today }, { before }),
     countOrders(db, shop.id, { fulfillmentStatus: "problem" }),
     countOrders(db, shop.id, { held: true }),
     countOrders(db, shop.id, { transfer: true }),
@@ -54,10 +63,10 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   ]);
   // On hold the same way the On hold tab counts it: held for the risk check and not refunded.
   const onHold = (o: (typeof orders)[number]) => !!o.heldAt && (o.paymentStatus === "paid" || o.paymentStatus === "partially_refunded");
-  const filtered = !!(q || tag || productId || country || discountId || total || buyer || placed || status || payment);
+  const filtered = !!(q || tag || productId || country || discountId || total || buyer || placed || status || payment || day);
   // Keeps the other filters when one changes.
-  const href = (next: { show?: string; q?: string; tag?: string; product?: string; country?: string; code?: string; total?: string; buyer?: string; placed?: string; status?: string; payment?: string; before?: string }) => {
-    const params = new URLSearchParams(Object.entries({ show, q, tag, product: productId, country, code: discountId, total, buyer, placed, status, payment, ...next }).filter((e): e is [string, string] => !!e[1]));
+  const href = (next: { show?: string; q?: string; tag?: string; product?: string; country?: string; code?: string; total?: string; buyer?: string; placed?: string; status?: string; payment?: string; day?: string; before?: string }) => {
+    const params = new URLSearchParams(Object.entries({ show, q, tag, product: productId, country, code: discountId, total, buyer, placed, status, payment, day, ...next }).filter((e): e is [string, string] => !!e[1]));
     return params.size ? `/admin/orders?${params}` : "/admin/orders";
   };
   return (
@@ -76,6 +85,27 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             Bank transfers {transfers > 0 && <span className="pill pill-info">{transfers}</span>}
           </Link>
         </nav>
+        {schedule && (
+          <section className="card p-4 flex flex-col gap-2 max-w-4xl" aria-labelledby="handover-schedule">
+            <h2 id="handover-schedule" className="font-semibold text-sm">Pickups and deliveries</h2>
+            <ul className="flex flex-wrap gap-2 text-sm">
+              {schedule.overdue > 0 && (
+                <li>
+                  <Link href={href({ day: "overdue", before: undefined })} className={`chip ${day === "overdue" ? "font-semibold border-accent" : ""}`} aria-current={day === "overdue" ? "page" : undefined}>
+                    Still waiting from earlier days: <span className="pill pill-warning">{schedule.overdue}</span>
+                  </Link>
+                </li>
+              )}
+              {schedule.days.map((d) => (
+                <li key={d.day}>
+                  <Link href={href({ day: d.day, before: undefined })} className={`chip ${day === d.day ? "font-semibold border-accent" : ""}`} aria-current={day === d.day ? "page" : undefined}>
+                    {d.today ? "Today" : formatHandoverDay(d.day)}: {dueLabel(d.pickups, d.deliveries)}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         <SavedViews list="orders" views={views} params={{ show: problemsOnly || heldOnly || transfersOnly ? show : undefined, q, tag, product: productId, country, code: discountId, total, buyer, placed, status, payment }} />
         <form className="flex flex-wrap gap-2 max-w-4xl" role="search">
           <label className="sr-only" htmlFor="q">Search orders</label>
@@ -84,6 +114,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           {tag && <input type="hidden" name="tag" value={tag} />}
           {productId && <input type="hidden" name="product" value={productId} />}
           {discountId && <input type="hidden" name="code" value={discountId} />}
+          {day && <input type="hidden" name="day" value={day} />}
           {countries.length > 1 && <AutoSubmitSelect id="order-country" name="country" label="Ship-to country" value={country ?? ""} options={[["", "Every country"], ...countries.map((c) => [c.country, `${countryName(c.country)} (${c.count.toLocaleString("en-US")})`] as const)]} />}
           {!problemsOnly && <AutoSubmitSelect id="order-status" name="status" label="Delivery status" value={status ?? ""} options={[["", "Any delivery status"], ...Object.entries(FULFILMENT).filter(([k]) => k !== "problem").map(([k, [label]]) => [k, label] as const)]} />}
           <AutoSubmitSelect id="order-payment" name="payment" label="Payment status" value={payment ?? ""} options={[["", "Any payment status"], ...Object.entries(PAYMENT).map(([k, [label]]) => [k, label] as const)]} />
@@ -96,6 +127,14 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           <p className="text-sm flex flex-wrap items-center gap-2">
             <span>Orders with <strong>{product?.title ?? "a deleted product"}</strong></span>
             <Link href={href({ product: undefined })} className="underline">Show all orders</Link>
+          </p>
+        )}
+        {day && (
+          <p className="text-sm flex flex-wrap items-center gap-2">
+            <span>
+              {day === "overdue" ? <>Pickups and deliveries <strong>from earlier days</strong> not handed over yet</> : <>Pickups and deliveries due <strong>{day === schedule?.today ? "today" : formatHandoverDay(day)}</strong> not handed over yet</>}
+            </span>
+            <Link href={href({ day: undefined })} className="underline">Show all orders</Link>
           </p>
         )}
         {discountId && (
@@ -136,6 +175,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             {placed && <input type="hidden" name="placed" value={placed} />}
             {status && <input type="hidden" name="status" value={status} />}
             {payment && <input type="hidden" name="payment" value={payment} />}
+            {day && <input type="hidden" name="day" value={day} />}
             <button className="btn btn-secondary">Download CSV</button>
             <p className="hint w-full">One row per item, for every order on the list (not just this page){filtered || show ? " with your filters" : ""}. Leave the dates empty for all of them.</p>
           </form>
