@@ -127,7 +127,12 @@ test("a buyer picks the day they'll collect their order", async ({ page, browser
   await expect(buyer.getByRole("heading", { name: "Thank you, Linus!" })).toBeVisible();
   await expect(buyer.getByText(`Pickup day: ${label}`)).toBeVisible();
 
+  // The order list sums up who's coming over the week.
   await page.goto("/admin/orders");
+  const week = page.getByRole("region", { name: "Pickups and deliveries" });
+  await expect(week.getByRole("link", { name: "Today: nothing due" })).toBeVisible();
+  await week.getByRole("link", { name: `${label}: 1 pickup` }).click();
+  await expect(page.getByText(`Pickups and deliveries due ${label} not handed over yet`)).toBeVisible();
   await page.getByRole("link", { name: "#1001" }).first().click();
   await expect(page.getByText(`Collecting on ${label}`)).toBeVisible();
 });
