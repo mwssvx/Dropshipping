@@ -1501,3 +1501,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Your reply reaches the buyer** (`notifyReviewReply` in `packages/core/src/reviews.ts`): when you reply to a review on the Reviews page, the buyer who wrote it gets one email with what they wrote, your reply and a link to the review on the product page. A reply to a review still waiting for approval goes out when you publish it. Buyers who answered a complaint this way often update their opinion of the store, and they come back to see the page.
 2. **Once per review**: editing the reply later doesn't email again, reviews brought over from another app never email (there's no order to write to), and buyers who unsubscribed from the store aren't emailed. The reply form says so. The email goes out after the page has answered, so saving stays quick. Migration `0148_review_reply_email` adds `reviews.reply_notified_at`.
+
+### Reviews with photos (after launch, part 265)
+
+1. **"With photos"** (`apps/web/src/app/s/[shop]/products/[handle]/page.tsx`): when some of a product's reviews have buyer photos, a "With photos (3)" button sits next to the review order and lists only those reviews. Tapping it again shows them all. It works together with the star rows, "Most helpful" and "Show all", and the stars at the top still count every review.
+2. **One count, not a page of reviews**: `productReviews` in core counts the reviews with photos and the reviews the current list holds in two small queries, so "Show all" is right whatever the filter. Two new store strings in all six languages. No migration.

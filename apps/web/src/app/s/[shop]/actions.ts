@@ -656,7 +656,7 @@ const VOTER_COOKIE = "sf_voter";
  * Marks a review helpful, or takes the mark back, then returns to the same review in the same list.
  * The list (stars, order, all) comes from the page, so it's checked again here.
  */
-export async function helpfulAction(handle: string, productHandle: string, reviewId: string, view: { stars?: unknown; sort?: unknown; all?: unknown }) {
+export async function helpfulAction(handle: string, productHandle: string, reviewId: string, view: { stars?: unknown; photos?: unknown; sort?: unknown; all?: unknown }) {
   const shop = await loadShop(handle);
   const jar = await cookies();
   let voter = jar.get(VOTER_COOKIE)?.value;
@@ -671,7 +671,7 @@ export async function helpfulAction(handle: string, productHandle: string, revie
       throw e;
     },
   );
-  const list = reviewsQuery({ stars: starsFilter(String(view?.stars ?? "")), sort: reviewSort(String(view?.sort ?? "")), all: view?.all === true });
+  const list = reviewsQuery({ stars: starsFilter(String(view?.stars ?? "")), photos: view?.photos === true, sort: reviewSort(String(view?.sort ?? "")), all: view?.all === true });
   redirect(`${await storeBase(handle)}/products/${encodeURIComponent(productHandle)}${list}#${found ? `review-${reviewId}` : "reviews"}`);
 }
 
