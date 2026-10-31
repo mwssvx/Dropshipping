@@ -33,6 +33,15 @@ type Detail = {
   buyerNote?: string | null;
   staffNote?: string | null;
   tags?: string[];
+  expectedDelivery?: { from: string; to: string } | null;
+  daysLate?: number;
+};
+
+const longDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+/** "Oct 18 – Oct 25", or one day when both ends are the same. */
+const span = (w: { from: string; to: string }) => {
+  const [a, b] = [longDay.format(new Date(w.from)), longDay.format(new Date(w.to))];
+  return a === b ? a : `${a} – ${b}`;
 };
 
 export default function OrderScreen() {
@@ -154,6 +163,13 @@ export default function OrderScreen() {
 
       {o.fulfillments.some((x) => x.backupNote && x.status !== "cancelled") ? (
         <Banner tone="info">{o.fulfillments.find((x) => x.backupNote && x.status !== "cancelled")!.backupNote}</Banner>
+      ) : null}
+
+      {o.expectedDelivery ? (
+        <Card>
+          <Body>{o.fulfillmentStatus === "shipped" ? "Should arrive" : "Expected to arrive"} {span(o.expectedDelivery)}</Body>
+          {o.daysLate ? <Pill tone="warning" label={`${o.daysLate === 1 ? "1 day" : `${o.daysLate} days`} past its delivery date`} /> : null}
+        </Card>
       ) : null}
 
       {o.fulfillments.some((x) => x.trackingNumber) ? (

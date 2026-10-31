@@ -1724,3 +1724,7 @@ A print-on-demand line usually has dozens of products with the same production t
 ### Deliver to (after launch, part 311)
 
 Shipping costs, delivery dates and the duties note on product pages follow where the shopper is, which is wrong when they're buying a gift for someone abroad, travelling, or on a VPN. Product pages now say "Delivering to United States · Change" (in the shopper's language) when the store ships to more than one country. Picking another country keeps it in a cookie, and the product page's shipping cost, delivery date, duties note and "can't ship there" warning, the cart's shipping estimate and the checkout's starting country all follow it. Cookie consent and the EU lowest-price note still follow where the shopper is, since those laws do. `deliveryCountry()` and `chosenCountry()` in `apps/web/src/lib/currency.ts`, `components/DeliverTo.tsx`. No migration.
+
+### Expected delivery in the app (after launch, part 312)
+
+The merchant app's order screen now says when the order should arrive ("Expected to arrive Oct 18 – Oct 25", or "Should arrive" once shipped), worked out the same way as the web order page, with a "3 days past its delivery date" pill when a shipped parcel is late. So a merchant answering a buyer from their phone sees it without opening the computer. `GET /api/app/orders/:id` returns `expectedDelivery` and `daysLate`. No migration.
