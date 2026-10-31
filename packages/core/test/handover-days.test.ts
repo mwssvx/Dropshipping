@@ -5,6 +5,7 @@ import {
   countOrders,
   createProduct,
   handoverSchedule,
+  handoverSheet,
   DemoModel,
   formatHandoverDay,
   handoverDates,
@@ -114,5 +115,34 @@ describe("pickup and delivery days", () => {
     expect(await countOrders(f.db, shopId, { handoverOn: later })).toBe(1);
     expect(await countOrders(f.db, shopId, { handoverOn: "overdue", handoverToday: schedule.today })).toBe(1);
     expect(await countOrders(f.db, shopId, { handoverOn: "not a day" })).toBe(6);
+  });
+
+  it("puts the day's pickups and deliveries on one sheet", async () => {
+    const f = await makeFixture(new DemoModel());
+    const shopId = (await f.shop()).id;
+    const days = (await setHandoverDays(f.db, shopId, { weekdays: [0, 1, 2, 3, 4, 5, 6], leadDays: 1, timeZone: "America/Chicago" }))!;
+    const { today } = await handoverSchedule(f.db, shopId, days);
+    const [tomorrow] = handoverDates(days);
+    const order = async (set: Partial<typeof schema.orders.$inferInsert>, name: string, postalCode: string) => {
+      const o = await f.waitingOrder();
+      await f.db.update(schema.orders).set({ ...set, shippingAddress: { ...o.shippingAddress, name, postalCode, phone: "+1 512 555 0100" }, buyerNote: name === "Zed Ray" ? "Side door" : null }).where(eq(schema.orders.id, o.id));
+      return o;
+    };
+    const zed = await order({ pickup: true, handoverOn: today }, "Zed Ray", "78701");
+    const amy = await order({ pickup: true, handoverOn: "2020-01-01" }, "Amy Lee", "78701");
+    await order({ localDelivery: true, handoverOn: today }, "Bo Kim", "78704");
+    await order({ localDelivery: true, handoverOn: today }, "Cy Fox", "78702");
+    await order({ pickup: true, handoverOn: tomorrow }, "Di Wu", "78701");
+    await order({ pickup: true, handoverOn: today, fulfillmentStatus: "delivered" }, "Ed Po", "78701");
+
+    const sheet = await handoverSheet(f.db, shopId, today, today);
+    expect(sheet.pickups.map((r) => [r.name, r.late])).toEqual([["Amy Lee", true], ["Zed Ray", false]]);
+    expect(sheet.pickups[1]).toMatchObject({ id: zed.id, phone: "+1 512 555 0100", note: "Side door", address: null });
+    expect(sheet.pickups[1]!.items.length).toBeGreaterThan(0);
+    expect(sheet.deliveries.map((r) => r.name)).toEqual(["Cy Fox", "Bo Kim"]);
+    expect(sheet.deliveries[0]!.address).toContain("78702");
+    // Another day lists only its own.
+    expect((await handoverSheet(f.db, shopId, tomorrow!, today)).pickups.map((r) => r.name)).toEqual(["Di Wu"]);
+    expect(amy.id).toBeTruthy();
   });
 });
