@@ -1820,3 +1820,7 @@ The app's product screen now has "Weight packed (kg)" for anything that ships, s
 ### Products that need details, in the app (after launch, part 335)
 
 The app's Products tab now has "Needs details" next to "All" when a product on your store still lacks a photo, a description, a weight, customs details or a cost. Each product there says what it lacks, like "No weight · No cost", so you can fill it in from the product screen. The rules are the same as the website's "Missing" filter.
+
+### Customs details from the app (after launch, part 336)
+
+The app's product screen now has a Customs section for anything that ships: the HS code and the country it was made in, as printed on customs forms for orders abroad. Where it ships from is still set on the website.

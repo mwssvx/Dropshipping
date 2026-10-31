@@ -19,6 +19,8 @@ export default function ProductScreen() {
   const [stock, setStock] = useState<Record<string, string>>({});
   const [weight, setWeight] = useState<Record<string, string>>({});
   const [cost, setCost] = useState<Record<string, string>>({});
+  const [hs, setHs] = useState("");
+  const [origin, setOrigin] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{ tone: "success" | "critical" | "info"; text: string } | null>(
     imported ? { tone: "success", text: "Imported as a draft. Next: let AI write the listing, then put it on sale." } : null,
@@ -30,6 +32,8 @@ export default function ProductScreen() {
     setPrices(Object.fromEntries(p.variants.map((v) => [v.id, (v.priceMinor / 100).toFixed(2)])));
     setStock(Object.fromEntries(p.variants.map((v) => [v.id, v.stock === null ? "" : String(v.stock)])));
     setWeight(Object.fromEntries(p.variants.map((v) => [v.id, kg(v.weightGrams)])));
+    setHs(p.hsCode ?? "");
+    setOrigin(p.originCountry ?? "");
     setCost(Object.fromEntries(p.variants.map((v) => [v.id, v.costMinor === null ? "" : (v.costMinor / 100).toFixed(2)])));
   }, [p]);
 
@@ -183,6 +187,23 @@ export default function ProductScreen() {
           />
         ) : null}
       </Section>
+
+      {p.ships ? (
+        <Section title="Customs">
+          <Card>
+            <Body muted>Printed on customs forms for orders abroad, and used for duty notes.</Body>
+            <Field label="HS code" value={hs} onChangeText={setHs} keyboardType="numbers-and-punctuation" hint="6 to 10 digits, like 6912.00." />
+            <Field label="Made in (country code)" value={origin} onChangeText={(t) => setOrigin(t.toUpperCase().slice(0, 2))} autoCapitalize="none" hint="Two letters, like CN or US." />
+            {hs.trim() !== (p.hsCode ?? "") || origin.trim() !== (p.originCountry ?? "") ? (
+              <Button
+                label="Save customs details"
+                busy={busy === "customs"}
+                onPress={() => act("customs", async () => (await api(`products/${id}/customs`, { method: "PUT", body: { hsCode: hs, originCountry: origin } }), "Customs details saved."))}
+              />
+            ) : null}
+          </Card>
+        </Section>
+      ) : null}
 
       <Section title="On your store">
         {p.status === "active" ? (
