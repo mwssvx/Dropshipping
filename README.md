@@ -1627,3 +1627,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **What Google reads** (`searchOfferExtras` in `packages/core/src/delivery.ts`): each option in a product page's search data now says what shipping costs to the store's own country (the cheapest rate that fits its weight, free over the threshold) and how long it takes (handling days plus the transit time), and how many days buyers have to return it. Google uses these for "Free delivery" and "30-day returns" beside the product, and Merchant Center asks for them.
 2. A store with returns off says so, and gift cards and downloads leave both out. Everything comes from the store's existing shipping rates and return window; nothing new to set. No migration.
+
+### Barcodes and shipping in product feeds (after launch, part 290)
+
+1. **Fewer Merchant Center warnings** (`productFeed` in `packages/core/src/feeds.ts`): an option's barcode goes into the Google and Meta feeds as its GTIN when it's a real UPC, EAN or ITF-14 (`validGtin` checks the length and check digit), so Google stops marking the product "limited performance" and can match it to the right listing. Options without one keep "identifier exists: no".
+2. **Shipping and weight**: each item carries the cheapest shipping to the store's country with handling and transit days (`homeShipping` in `packages/core/src/delivery.ts`, the same numbers the product page gives search engines) and its weight, so Google can show the delivery cost without the merchant typing it into Merchant Center. Downloads leave both out. No migration.
