@@ -22,7 +22,7 @@ export type SameAddressOrder = {
 };
 
 /** Which of these orders still have own-shelf items to post. */
-async function withOwnItems(db: Db, orderIds: string[]) {
+export async function ownItemsWaiting(db: Db, orderIds: string[]) {
   if (!orderIds.length) return new Set<string>();
   const rows = await db
     .selectDistinct({ orderId: schema.orderLines.orderId })
@@ -114,7 +114,7 @@ export async function ordersToSameAddress(
     .limit(200);
   const key = doorKey(a);
   const same = candidates.filter((c) => doorKey(c.shippingAddress) === key);
-  const own = await withOwnItems(db, [order.id, ...same.map((c) => c.id)]);
+  const own = await ownItemsWaiting(db, [order.id, ...same.map((c) => c.id)]);
   return {
     orders: same.map(({ shippingAddress: _, ...c }) => ({ ...c, ownItems: own.has(c.id) })),
     ownItems: own.has(order.id),

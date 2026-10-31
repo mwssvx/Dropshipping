@@ -12,6 +12,7 @@ import { giftReturnCode } from "./gift-returns";
 import { describePersonalization } from "./personalization";
 import { ordersWaitingForTracking } from "./tracking-import";
 import { groupBy } from "./group";
+import { ownItemsWaiting, sameAddressOnList } from "./same-address";
 import { z } from "zod";
 
 export const MAX_PACKING_SLIP_NOTE = 500;
@@ -31,6 +32,8 @@ export type PackingSlip = {
   /** The buyer paid to have it gift wrapped. */
   giftWrap: boolean;
   buyerNote: string | null;
+  /** Other orders to the same door that also have items the store posts: they can share this box. Not printed. */
+  sameBox: number[];
 };
 
 /** The store's name, address and note, and a slip for each order, in order number order. */
@@ -75,6 +78,10 @@ export async function packingSlips(db: Db, shopId: string, scope: { orderId: str
   const linesOf = groupBy(lines, (l) => l.orderId);
   const codes = new Map<string, string | null>();
   if (shop.returnWindowDays) for (const o of orders) if (o.gift) codes.set(o.id, await giftReturnCode(db, o));
+  // Orders to the same door that also wait on the store's own items, to pack together.
+  const doors = await sameAddressOnList(db, shopId, orders);
+  const others = [...new Set([...doors.values()].flat().map((x) => x.id))];
+  const waiting = doors.size ? await ownItemsWaiting(db, [...doors.keys(), ...others]) : new Set<string>();
   const slips: PackingSlip[] = orders.map((o) => {
     const all = linesOf.get(o.id) ?? [];
     const mixed = all.some(fromSupplier) && all.some((l) => !fromSupplier(l));
@@ -96,6 +103,7 @@ export async function packingSlips(db: Db, shopId: string, scope: { orderId: str
       gift: o.gift ? { from: o.gift.from, message: o.gift.message, returnCode: codes.get(o.id) ?? null } : null,
       giftWrap: o.giftWrapMinor > 0,
       buyerNote: o.buyerNote,
+      sameBox: waiting.has(o.id) ? (doors.get(o.id) ?? []).filter((x) => waiting.has(x.id)).map((x) => x.number) : [],
     };
   });
   return {

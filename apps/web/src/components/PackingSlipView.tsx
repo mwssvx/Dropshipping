@@ -73,6 +73,11 @@ export function PackingSlipView({ slip, store }: { slip: PackingSlip; store: Sto
           )}
         </section>
       )}
+      {slip.sameBox.length > 0 && (
+        <p className="no-print font-semibold" aria-label="Same box">
+          {slip.sameBox.length === 1 ? `Order #${slip.sameBox[0]} goes` : `Orders ${slip.sameBox.map((n) => `#${n}`).join(", ")} go`} to the same address and also {slip.sameBox.length === 1 ? "has" : "have"} items you post. Pack them in this box (not printed).
+        </p>
+      )}
       {slip.giftWrap && <p className="no-print font-semibold">Gift wrap this order. The buyer paid for wrapping (not printed).</p>}
       {slip.buyerNote && (
         <p className="no-print text-muted"><span className="font-semibold text-ink">Buyer&apos;s note (not printed):</span> {slip.buyerNote}</p>

@@ -1796,3 +1796,7 @@ On the Products list, "Set what your own stock costs" gives each option of the p
 ### Products with no cost (after launch, part 329)
 
 The product list's "what's missing" filters gain "No cost": products with an option that has no cost, which the profit report counts as free. When the profit report finds sales with no cost, its warning links straight to that list, where "Set what your own stock costs" fills them in at once.
+
+### Same box on packing slips (after launch, part 330)
+
+When an order's packing slip goes to the same address as another unshipped order that also has items you post, the slip says "Order #1001 goes to the same address and also has items you post. Pack them in this box." The note shows on screen only and isn't printed, on single slips and on slips printed for many orders.
