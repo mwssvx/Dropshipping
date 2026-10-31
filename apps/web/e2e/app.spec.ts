@@ -1123,3 +1123,49 @@ test("a buyer's subscription seen, sent early in test mode and cancelled from th
   await page.getByRole("tab", { name: "All" }).click();
   await expect(page.getByRole("article", { name: "Ada Buyer's subscription" }).getByText("Cancelled", { exact: true })).toBeVisible();
 });
+
+test("an email blocked and unblocked from the app's Blocked buyers", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `bl${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Clay Mug");
+  await web.getByLabel("Price", { exact: true }).fill("14.00");
+  await web.getByLabel("Stock", { exact: true }).fill("6");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const mug = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Customers" }).click();
+  await page.getByRole("link", { name: /^Blocked buyers/ }).click();
+  await expect(page.getByText("Nobody is blocked")).toBeVisible();
+  await page.getByRole("textbox", { name: "Email to block" }).fill("Ada@Example.com");
+  await page.getByRole("textbox", { name: "Why (only your team sees this)" }).fill("Two chargebacks");
+  await page.getByRole("button", { name: "Block this email" }).click();
+  await expect(page.getByText("ada@example.com can't check out at your store any more.")).toBeVisible();
+  const row = page.getByRole("article", { name: "Blocked ada@example.com" });
+  await expect(row.getByText(/Two chargebacks/)).toBeVisible();
+  await shot(page, "363-app-blocked");
+
+  // Turned away at checkout.
+  const buyer = await (await browser.newContext()).newPage();
+  await buyer.goto(mug);
+  await buyer.getByRole("button", { name: "Add to cart" }).click();
+  await buyer.getByRole("link", { name: "Check out" }).click();
+  await buyer.getByLabel("Email").fill("ada@example.com");
+  await buyer.getByLabel("Full name").fill("Ada Buyer");
+  await buyer.getByLabel("Address", { exact: true }).fill("1 Main St");
+  await buyer.getByLabel("City").fill("Austin");
+  await buyer.getByLabel("State or region").fill("TX");
+  await buyer.getByLabel("Postal code").fill("78701");
+  await buyer.getByRole("button", { name: "Continue to payment" }).click();
+  await expect(buyer.getByRole("main").getByRole("alert")).toHaveText(/We can't take this order\./);
+
+  // Unblocked, and the same buyer can pay.
+  await row.getByRole("button", { name: "Unblock ada@example.com…" }).click();
+  await row.getByRole("button", { name: "Unblock ada@example.com", exact: true }).click();
+  await expect(page.getByText("ada@example.com can check out again.")).toBeVisible();
+  await expect(page.getByText("Nobody is blocked")).toBeVisible();
+  await buyer.getByRole("button", { name: "Continue to payment" }).click();
+  await buyer.getByRole("button", { name: /^Pay/ }).click();
+  await expect(buyer.getByRole("heading", { name: "Thank you, Ada!" })).toBeVisible();
+});

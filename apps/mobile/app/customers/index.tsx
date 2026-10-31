@@ -44,6 +44,11 @@ export default function CustomersScreen() {
           ))}
         </List>
       )}
+      {!q ? (
+        <List>
+          <Row href="/blocked" title="Blocked buyers" subtitle="Emails and addresses checkout turns away" />
+        </List>
+      ) : null}
     </Screen>
   );
 }
