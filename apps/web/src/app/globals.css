@@ -99,6 +99,12 @@
 .store[data-sticky="on"] { --sticky-offset: 4rem; }
 /* A product card's second photo stays out of the page (and unloaded) unless the theme asks for it,
    then fades in while a shopper points at the card. */
+/* Scrolling text: two copies of the row slide left by one copy's width, so the loop is seamless. */
+@keyframes sf-marquee { to { transform: translateX(-50%); } }
+.sf-marquee-track { animation: sf-marquee 25s linear infinite; }
+.sf-marquee[data-paused] .sf-marquee-track { animation-play-state: paused; }
+@media (hover: hover) { .sf-marquee:hover .sf-marquee-track { animation-play-state: paused; } }
+@media (prefers-reduced-motion: reduce) { .sf-marquee-track { animation: none; } }
 .sf-hover-photo { display: none; }
 @media (hover: hover) {
   .store[data-hover-photo="on"] .sf-hover-photo { display: block; opacity: 0; transition: opacity 0.3s; }
