@@ -1728,3 +1728,7 @@ Shipping costs, delivery dates and the duties note on product pages follow where
 ### Expected delivery in the app (after launch, part 312)
 
 The merchant app's order screen now says when the order should arrive ("Expected to arrive Oct 18 – Oct 25", or "Should arrive" once shipped), worked out the same way as the web order page, with a "3 days past its delivery date" pill when a shipped parcel is late. So a merchant answering a buyer from their phone sees it without opening the computer. `GET /api/app/orders/:id` returns `expectedDelivery` and `daysLate`. No migration.
+
+### Late parcels in the app (after launch, part 313)
+
+The merchant app's Orders tab gets a **Late** view: shipped orders past their delivery date (the same list as the web Orders page's "Past their delivery date"), the latest first, each with "3 days late". A merchant can check on them from their phone before the buyer writes. `GET /api/app/orders?show=late` uses `ordersPastDelivery`. No migration.
