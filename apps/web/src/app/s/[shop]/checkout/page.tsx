@@ -1,7 +1,7 @@
 import { PixelEvent } from "@/components/PixelEvent";
 import { redirect } from "next/navigation";
 import { addonOffer, formatDeliveryWindow, rateDeliveryWindows, formatHandoverDay, handoverDates, convertAmount, convertPrice, protectionFee, countryName, fitsWeight, formatMoney, GIFT_CARD_SEND_DAYS, lastCheckoutDetails, savedAddresses, dutiesFor, shipsFromOf, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, onHoliday, LOCAL_DELIVERY_RATE_ID, localDeliveryPrice, PICKUP_RATE_ID, storePixels, taxExemptionFor, tipAmount, UserError } from "@sf/core";
-import { buyerFx } from "@/lib/currency";
+import { buyerFx, chosenCountry } from "@/lib/currency";
 import { currentBuyer } from "@/lib/buyer";
 import { readCart, readDiscountCode, readGiftCardCode } from "@/lib/cart";
 import { db } from "@/lib/server";
@@ -108,6 +108,9 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
   const nameOf = countryNames(lang);
   const shipped = hasGoods ? shipsTo(zones) : [...SHIPPING_COUNTRIES];
   if ((quote.canPickUp || (quote.ownStock && shop.localDeliveryArea)) && !shipped.includes(shop.country)) shipped.push(shop.country);
+  // The country picked under "Deliver to" on a product page starts the address.
+  const picked = await chosenCountry();
+  const startCountry = picked && shipped.includes(picked) ? picked : shop.country;
   const countries = shipped.map((c) => [c, nameOf(c, countryName(c))] as [string, string]).sort((a, b) => a[1].localeCompare(b[1], lang ?? "en"));
   // Who pays import duties, said for the countries an order would cross customs to.
   // Products shipping from a warehouse abroad cross customs even to the store's own country.
@@ -123,7 +126,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
       {storePixels(shop) && <PixelEvent name="begin_checkout" data={{ ids: quote.items.map((i) => i.variantId), value: (quote.goodsMinor - quote.discountMinor) / 100, currency: shop.currency }} />}
       <Checkout
         handle={handle}
-        defaultCountry={shop.country}
+        defaultCountry={startCountry}
         initial={initial}
         addresses={addresses}
         duties={duties}
