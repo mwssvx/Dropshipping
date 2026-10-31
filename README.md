@@ -1804,3 +1804,7 @@ When an order's packing slip goes to the same address as another unshipped order
 ### One tracking number for a shared box (after launch, part 331)
 
 When you add tracking for your own items and other orders to the same address also have items you post, the tracking form lists them with "Order #1001 gets this tracking too". Tick them and each order gets the same tracking, and each buyer gets the shipping email. Only orders that really go to that door and still wait on your own items can get it.
+
+### Box weight for buying postage (after launch, part 332)
+
+When you post your own items, the order page says what the box weighs packed ("Weighs about 300 g packed"), from each option's weight, so you can buy the right postage label. The packing slip shows it too, on screen only. When an item has no weight, nothing is shown rather than a wrong number.
