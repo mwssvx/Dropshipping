@@ -87,6 +87,12 @@ export function suppliers(): Suppliers {
 
 type OutboxItem = { to: string; subject: string; text: string; at: Date };
 const outbox = ((globalThis as { __sfOutbox?: OutboxItem[] }).__sfOutbox ??= []);
+/**
+ * How many emails the outbox keeps. End-to-end tests run side by side and some send dozens at
+ * once (gift cards for a whole team, a campaign), so a short outbox can drop another test's email
+ * before it's checked.
+ */
+const OUTBOX_SIZE = 400;
 
 /** Development and tests (EMAIL_PREVIEW=on with no real mailer): the last emails "sent", newest first. */
 export function previewOutbox() {
@@ -98,7 +104,7 @@ export function mailer(): Mailer {
     const real = mailerFromEnv(process.env);
     local.mailer =
       process.env.EMAIL_PREVIEW === "on" && real.name === "log"
-        ? { name: real.name, send: async (e) => (outbox.push({ ...e, at: new Date() }), outbox.splice(0, outbox.length - 50), real.send(e)) }
+        ? { name: real.name, send: async (e) => (outbox.push({ ...e, at: new Date() }), outbox.splice(0, outbox.length - OUTBOX_SIZE), real.send(e)) }
         : real;
   }
   return local.mailer;
