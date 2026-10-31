@@ -1,4 +1,5 @@
-import { countryName, describeRate, EVERYWHERE_ELSE, formatDeliveryWindow, formatMoney, listShippingZones, sampleProduct, productDelivery, rateDays, rateWeight, SHIPPING_COUNTRIES, CUTOFF_TIME_ZONES, defaultCutoffZone, HOLIDAY_DAYS_AHEAD, LATE_ORDER_DAYS, LATE_ORDER_MESSAGE_MAX, HANDOVER_DAYS_AHEAD, HANDOVER_LEAD_MAX, SHIP_PAUSE_MAX_DAYS } from "@sf/core";
+import { countryName, describeRate, productGaps, EVERYWHERE_ELSE, formatDeliveryWindow, formatMoney, listShippingZones, sampleProduct, productDelivery, rateDays, rateWeight, SHIPPING_COUNTRIES, CUTOFF_TIME_ZONES, defaultCutoffZone, HOLIDAY_DAYS_AHEAD, LATE_ORDER_DAYS, LATE_ORDER_MESSAGE_MAX, HANDOVER_DAYS_AHEAD, HANDOVER_LEAD_MAX, SHIP_PAUSE_MAX_DAYS } from "@sf/core";
+import Link from "next/link";
 import { requireShop } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { setCheckoutPhoneAction } from "../../shipping-actions";
@@ -29,6 +30,9 @@ export default async function ShippingPage() {
   // An example from the store's own catalog, so the merchant sees what buyers see.
   const example = await sampleProduct(db, shop.id);
   const preview = example ? await productDelivery(db, shop, example.id) : null;
+  // Rates by weight count an option with no weight as weighing nothing, so a heavy one ships cheap.
+  const byWeight = !isDefault && zones.some((z) => z.rates.some((r) => r.minWeightGrams != null || r.maxWeightGrams != null));
+  const noWeight = byWeight ? (await productGaps(db, shop.id)).weight : 0;
   const dayAfter = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
   const holidayDays = { min: dayAfter(1), max: dayAfter(HOLIDAY_DAYS_AHEAD) };
   const money = (m: number) => formatMoney(m, shop.currency);
@@ -45,6 +49,12 @@ export default async function ShippingPage() {
           Group countries into zones and give each zone one or more rates. Buyers pick a rate at checkout, and countries in no zone can&apos;t check out.
           Gift cards never pay shipping.
         </p>
+        {noWeight > 0 && (
+          <p className="banner banner-warning text-sm" role="note" aria-label="Products with no weight">
+            {noWeight === 1 ? "1 product has" : `${noWeight.toLocaleString("en-US")} products have`} an option with no weight. Your rates by weight count those as weighing nothing, so a heavy order could ship for the lightest rate.{" "}
+            <Link href="/admin/products?missing=weight" className="underline">Give them a weight</Link>
+          </p>
+        )}
         {isDefault ? (
           <section className="card p-5 flex flex-col gap-3" aria-labelledby="default-heading">
             <h2 id="default-heading" className="font-semibold">You use the standard rate</h2>
