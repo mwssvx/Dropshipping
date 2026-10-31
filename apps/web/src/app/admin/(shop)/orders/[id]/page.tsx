@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { can, countryName, formatHandoverDay, storeHandoverOptions, crossesBorder, disputeEvidence, disputeReason, disputesForOrder, formatMoney, getOrder, ORDER_EMAIL_LABELS, orderEditOptions, listRefunds, replaceableLines, replacementBlocked, replacementsOf, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode, formatShipsBy, preorderWaitingOn, isOrderBuyerBlocked, orderDownloads, DOWNLOADS_PER_ITEM, transferDueBy } from "@sf/core";
+import { can, countryName, daysPastDelivery, formatDeliveryWindow, orderDelivery, formatHandoverDay, storeHandoverOptions, crossesBorder, disputeEvidence, disputeReason, disputesForOrder, formatMoney, getOrder, ORDER_EMAIL_LABELS, orderEditOptions, listRefunds, replaceableLines, replacementBlocked, replacementsOf, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode, formatShipsBy, preorderWaitingOn, isOrderBuyerBlocked, orderDownloads, DOWNLOADS_PER_ITEM, transferDueBy } from "@sf/core";
 import { BlockBuyerForm } from "./BlockBuyerForm";
 import { fulfillment, requireShop, storeAddress, suppliers, testPayments } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
@@ -99,6 +99,9 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
   const evidence = dispute?.status === "needs_response" && dispute.orderId ? await disputeEvidence(db, shop, dispute.id) : null;
   const DISPUTE_STATUS = { needs_response: "Needs your answer", under_review: "Bank reviewing", won: "Won", lost: "Lost", closed: "Closed" } as const;
   const longDay = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+  // When it should arrive, worked out the same way as the buyer's order page, even if the store hides dates from buyers.
+  const arrives = refundable ? await orderDelivery(db, shop, order, { evenIfHidden: true }) : null;
+  const pastDue = daysPastDelivery(arrives, order);
 
   return (
     <main className="pb-12">
@@ -332,6 +335,13 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
           ) : (
           <section className="card p-5 flex flex-col gap-4">
             <h2 className="font-semibold">Delivery</h2>
+            {arrives && (
+              <p id="expected-delivery" className="text-sm">
+                {order.fulfillmentStatus === "shipped" ? "Should arrive" : "Expected to arrive"} <strong className="num">{formatDeliveryWindow(arrives, (d) => longDay.format(d))}</strong>
+                {pastDue > 0 && <span className="pill pill-warning ml-2">{pastDue === 1 ? "1 day" : `${pastDue} days`} past its delivery date</span>}
+                {!shop.deliveryEstimates && <span className="hint block">Buyers don&apos;t see this date because delivery dates are off in Shipping settings.</span>}
+              </p>
+            )}
             {order.fulfillments.length === 0 ? (
               <p className="text-sm hint">
                 {!paid

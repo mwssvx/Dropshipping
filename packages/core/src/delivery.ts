@@ -163,9 +163,10 @@ export async function rateDeliveryWindows(
 /**
  * When a paid order should arrive, with the rate the buyer picked. Once it has shipped, the window
  * counts from the latest shipment instead. Null when it's delivered, refunded, picked up in person, delivered by the store itself or has nothing to ship.
+ * The admin passes `evenIfHidden` to see the date when the store doesn't show dates to buyers.
  */
-export async function orderDelivery(db: Db, shop: Shop, order: Order) {
-  if (!shop.deliveryEstimates || !order.paidAt || order.pickup || order.localDelivery || order.paymentStatus === "refunded" || order.fulfillmentStatus === "delivered") return null;
+export async function orderDelivery(db: Db, shop: Shop, order: Order, opts: { evenIfHidden?: boolean } = {}) {
+  if ((!shop.deliveryEstimates && !opts.evenIfHidden) || !order.paidAt || order.pickup || order.localDelivery || order.paymentStatus === "refunded" || order.fulfillmentStatus === "delivered") return null;
   const lines = await db
     .select({ shipDaysMin: schema.variants.shipDaysMin, shipDaysMax: schema.variants.shipDaysMax, giftCard: schema.products.giftCard, digital: schema.products.digital })
     .from(schema.orderLines)
@@ -189,6 +190,15 @@ export async function orderDelivery(db: Db, shop: Shop, order: Order) {
 }
 
 const short = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+/**
+ * Whole days a parcel is past the last day of its window, for the admin order page. Zero until a
+ * full day has gone by, and only once it has shipped, since before that it's the late-order emails' job.
+ */
+export function daysPastDelivery(window: Pick<DeliveryWindow, "to"> | null, order: Pick<Order, "fulfillmentStatus">, now = new Date()) {
+  if (!window || order.fulfillmentStatus !== "shipped") return 0;
+  return Math.max(0, Math.floor((now.getTime() - window.to.getTime()) / DAY));
+}
+
 /** "Oct 18 – Oct 25", in English, for emails. */
 export const formatDeliveryWindow = (w: Pick<DeliveryWindow, "from" | "to">, format: (d: Date) => string = (d) => short.format(d)) =>
   w.from.getTime() === w.to.getTime() ? format(w.from) : `${format(w.from)} – ${format(w.to)}`;

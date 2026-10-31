@@ -63,6 +63,14 @@ test("buyers see when their order will arrive", async ({ page, browser }, info) 
     await expect(buyer.getByText(new RegExp(`^Expected delivery: ${WINDOW.source}$`))).toBeVisible({ timeout: 1000 });
   }).toPass({ timeout: 20_000 });
 
+  // The merchant sees the same date on the order.
+  await page.goto("/admin/orders");
+  await page.getByRole("link", { name: "#1001" }).first().click();
+  const expected = page.locator("#expected-delivery");
+  await expect(expected).toContainText(/^Expected to arrive [A-Z][a-z]+ \d{1,2}, \d{4}( – [A-Z][a-z]+ \d{1,2}, \d{4})?$/);
+  const orderPage = page.url();
+  await page.goto("/admin/shipping");
+
   // Turned off: no dates.
   await settings.getByLabel("Show delivery dates to buyers").uncheck();
   await settings.getByRole("button", { name: "Save delivery dates" }).click();
@@ -70,4 +78,8 @@ test("buyers see when their order will arrive", async ({ page, browser }, info) 
   await buyer.goto(store);
   await expect(buyer.getByRole("button", { name: "Add to cart" })).toBeVisible();
   await expect(buyer.locator("#delivery-estimate")).toHaveCount(0);
+
+  // The merchant still sees it, with a note that buyers don't.
+  await page.goto(orderPage);
+  await expect(expected).toContainText("Buyers don't see this date because delivery dates are off in Shipping settings.");
 });
