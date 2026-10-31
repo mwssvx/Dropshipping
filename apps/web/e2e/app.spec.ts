@@ -2038,3 +2038,39 @@ test("a holiday order-by date set from the app shows on product pages", async ({
   await expect(buyer.getByRole("heading", { name: /Sunset Projection Lamp/ })).toBeVisible();
   await expect(buyer.locator("#holiday-deadline")).toHaveCount(0);
 });
+
+test("product tags set in the app, picked from the store's other tags", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `pt${Date.now()}`);
+  for (const title of ["Straw Hat", "Beach Towel", "Wool Gloves"]) {
+    await web.goto(`${WEB}/admin/products/new`);
+    await web.getByLabel("Title").fill(title);
+    await web.getByLabel("Price", { exact: true }).fill("20.00");
+    await web.getByLabel("Stock", { exact: true }).fill("9");
+    await web.getByRole("button", { name: "Save product" }).click();
+    await expect(web.getByText("Product added.")).toBeVisible();
+  }
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Straw Hat/ }).click();
+  const tags = page.getByRole("region", { name: "Tags" });
+  await tags.getByRole("textbox", { name: "Tags" }).fill("Summer, Gift idea");
+  await tags.getByRole("button", { name: "Save tags" }).click();
+  await expect(page.getByText("Tags saved.")).toBeVisible();
+  await expect(tags.getByRole("textbox", { name: "Tags" })).toHaveValue("gift idea, summer");
+
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Beach Towel/ }).filter({ visible: true }).click();
+  const towel = page.getByRole("region", { name: "Tags" }).filter({ visible: true });
+  await towel.getByRole("button", { name: "Add the tag summer" }).click();
+  await expect(towel.getByRole("textbox", { name: "Tags" })).toHaveValue("summer");
+  await towel.getByRole("button", { name: "Save tags" }).click();
+  await expect(page.getByText("Tags saved.").filter({ visible: true })).toBeVisible();
+  await shot(page, "384-app-product-tags");
+
+  // The website's product list filters by them.
+  await web.goto(`${WEB}/admin/products?tag=summer`);
+  await expect(web.getByRole("link", { name: "Straw Hat" })).toBeVisible();
+  await expect(web.getByRole("link", { name: "Beach Towel" })).toBeVisible();
+  await expect(web.getByRole("link", { name: "Wool Gloves" })).toHaveCount(0);
+});

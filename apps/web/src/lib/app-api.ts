@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  MAX_PRODUCT_TAGS,
+  productTags,
   HOLIDAY_NAME_MAX,
   setHolidayDeadline,
   LATE_ORDER_DAYS,
@@ -320,6 +322,7 @@ const productView = (p: ProductRow) => ({
   preorder: p.preorder,
   /** The least and most a buyer can order. */
   purchaseLimit: p.purchaseLimit,
+  tags: p.tags,
 });
 
 const customerView = (p: Awaited<ReturnType<typeof getCustomerProfile>>) => ({
@@ -1525,7 +1528,9 @@ const routes: Record<string, Handler> = {
   },
   "GET products/:id": async ({ params, db, shop }) => {
     const p = await getProduct(db, shop.id, params.id!);
-    return { ...productView(p), preordersSold: p.preorder ? await preordersSold(db, p.id) : 0 };
+    const [sold, storeTags] = await Promise.all([p.preorder ? preordersSold(db, p.id) : 0, productTags(db, shop.id)]);
+    // The store's other tags, most used first, to tap instead of typing.
+    return { ...productView(p), preordersSold: sold, storeTags: storeTags.map((t) => t.tag).slice(0, 30), maxTags: MAX_PRODUCT_TAGS };
   },
   "PUT products/:id/preorder": async ({ req, params, db, shop, user }) => {
     const b = await body<{ on?: unknown; shipsBy?: unknown; limit?: unknown }>(req);

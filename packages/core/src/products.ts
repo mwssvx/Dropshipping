@@ -558,23 +558,29 @@ const patchInput = z.object({
       }),
     )
     .optional(),
+  /** "summer, gift idea" or a list; left out, the tags stay as they are. */
+  tags: z.union([z.string(), z.array(z.string())]).optional(),
 });
 
 /**
- * Quick edits from the phone: status, and price, crossed-out price, stock, packed weight or (for
- * the store's own stock) cost per variant. Everything else stays.
+ * Quick edits from the phone: status, tags, and price, crossed-out price, stock, packed weight or
+ * (for the store's own stock) cost per variant. Everything else stays.
  */
 export async function patchProduct(db: Db, shopId: string, productId: string, input: z.input<typeof patchInput>) {
   const parsed = patchInput.safeParse(input);
   if (!parsed.success) throw new UserError(parsed.error.issues[0]!.message);
   const { status, variants } = parsed.data;
+  const tags = parsed.data.tags === undefined ? undefined : normalizeTags(parsed.data.tags, "A product", MAX_PRODUCT_TAGS);
   const current = await getProduct(db, shopId, productId);
   if (status === "active" && current.variants.every((v) => v.priceMinor === 0)) throw new UserError("Set a price before making it active.");
   if (variants?.some((v) => v.weightGrams !== undefined) && !shipsInParcel(current)) throw new UserError("Gift cards and downloads don't ship, so they have no weight.");
   if (variants?.some((v) => v.costMinor !== undefined) && !isOwnStock(current))
     throw new UserError(current.giftCard ? "Gift cards have no cost." : "Supplier products keep the supplier's cost.");
   await db.transaction(async (tx) => {
-    await tx.update(schema.products).set({ ...(status ? { status } : {}), ...(status && status !== "draft" ? { publishAt: null } : {}), updatedAt: new Date() }).where(eq(schema.products.id, productId));
+    await tx
+      .update(schema.products)
+      .set({ ...(status ? { status } : {}), ...(status && status !== "draft" ? { publishAt: null } : {}), ...(tags ? { tags } : {}), updatedAt: new Date() })
+      .where(eq(schema.products.id, productId));
     for (const v of variants ?? []) {
       const was = current.variants.find((c) => c.id === v.id);
       if (!was) throw new NotFoundError("Variant");

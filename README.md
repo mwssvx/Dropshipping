@@ -2012,3 +2012,7 @@ The app's Settings has a Running late emails row for people who look after shipp
 ### Holiday order-by date in the app (after launch, part 383)
 
 The app's Settings has a Holiday order-by date row for people who look after shipping. Name the holiday and the day orders must arrive by, and product pages and the cart say the last day to order, counted from the slowest delivery date. Turn it off to remove the line.
+
+### Product tags in the app (after launch, part 384)
+
+A product's screen in the app has a Tags section. Type tags separated by commas, or tap one the store already uses to add it. Tags are what the product list filters, collections that fill by tag, and codes for tagged products go by.

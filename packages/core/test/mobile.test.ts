@@ -185,6 +185,18 @@ describe("today and quick edits", () => {
     await expect(patchProduct(f.db, shop.id, f.products.stand.id, { variants: [{ id: v!.id, priceMinor: -1 }] })).rejects.toThrow(UserError);
   });
 
+  it("sets a product's tags from the phone, and leaves them alone when none are sent", async () => {
+    const f = await setup();
+    const shop = await f.shop();
+    const tagged = await patchProduct(f.db, shop.id, f.products.stand.id, { tags: "Gift Idea, summer, summer" });
+    expect(tagged.tags).toEqual(["gift idea", "summer"]);
+    const kept = await patchProduct(f.db, shop.id, f.products.stand.id, { status: "active" });
+    expect(kept.tags).toEqual(["gift idea", "summer"]);
+    const cleared = await patchProduct(f.db, shop.id, f.products.stand.id, { tags: [] });
+    expect(cleared.tags).toEqual([]);
+    await expect(patchProduct(f.db, shop.id, f.products.stand.id, { tags: Array.from({ length: 21 }, (_, i) => `t${i}`) })).rejects.toThrow(UserError);
+  });
+
   it("sets the packed weight of anything that ships, and the cost of the store's own stock", async () => {
     const f = await setup();
     const shop = await f.shop();
