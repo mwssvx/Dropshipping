@@ -52,4 +52,15 @@ test("a merchant lists orders by total", async ({ page, browser }, info) => {
   await page.getByLabel("Order total").selectOption({ label: "Any total" });
   await expect(page).not.toHaveURL(/total=[a-z\d]/);
   await expect(page.getByRole("checkbox", { name: /^Pick order #/ })).toHaveCount(1);
+
+  // A choice made before the page's scripts have loaded still counts once they do.
+  let release!: () => void;
+  const ready = new Promise<void>((r) => (release = r));
+  await page.route("**/_next/static/chunks/**", async (r) => { await ready; await r.continue(); });
+  await page.reload({ waitUntil: "commit" });
+  await page.getByLabel("Order total").selectOption({ label: other });
+  release();
+  await expect(page).toHaveURL(/total=[a-z\d]/);
+  await expect(page.getByRole("checkbox", { name: /^Pick order #/ })).toHaveCount(0);
+  await page.unroute("**/_next/static/chunks/**");
 });
