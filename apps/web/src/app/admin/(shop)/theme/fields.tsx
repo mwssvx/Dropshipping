@@ -1,6 +1,6 @@
 "use client";
 import { useId } from "react";
-import { ANNOUNCE_MAX, LOGOS_MAX, LOOK_MAX, MENU_CHILDREN_MAX, TRUST_ICONS, type MenuItem, type MenuLink, type SectionSettings, type SectionType, type TrustIcon } from "@sf/core/theme";
+import { ANNOUNCE_MAX, COLUMNS_MAX, LOGOS_MAX, LOOK_MAX, MENU_CHILDREN_MAX, TRUST_ICONS, type MenuItem, type MenuLink, type SectionSettings, type SectionType, type TrustIcon } from "@sf/core/theme";
 
 /*
  * Form controls for the theme editor. Every control is labelled and edits one value.
@@ -15,7 +15,7 @@ type Field =
   | { key: string; label: string; kind: "text" | "textarea" | "image" | "link"; hint?: string; max?: number }
   | { key: string; label: string; kind: "select"; options: { value: string; label: string }[] }
   | { key: string; label: string; kind: "number"; min: number; max: number }
-  | { key: string; label: string; kind: "collection" | "collections" | "faq" | "quotes" | "badges" | "products" | "logos" | "messages" };
+  | { key: string; label: string; kind: "collection" | "collections" | "faq" | "quotes" | "badges" | "products" | "logos" | "messages" | "columns" };
 
 export const TRUST_ICON_LABELS: Record<TrustIcon, string> = {
   shipping: "Delivery truck",
@@ -117,6 +117,11 @@ export const SECTION_FIELDS: Record<SectionType, Field[]> = {
     { key: "videoUrl", label: "Video link", kind: "text", max: 2000, hint: "A YouTube or Vimeo link, or the https address of an .mp4, .webm or .mov file." },
     { key: "coverUrl", label: "Cover image (optional)", kind: "image" },
   ],
+  columns: [
+    { key: "heading", label: "Heading (optional)", kind: "text", max: 120, hint: "For example “How it works” or “Why shop with us”." },
+    { key: "align", label: "Text", kind: "select", options: [{ value: "center", label: "Centered" }, { value: "left", label: "Left" }] },
+    { key: "items", label: "Columns", kind: "columns" },
+  ],
 };
 
 /** One select per piece of a look, plus an empty one to add the next until the look is full. */
@@ -176,7 +181,7 @@ export function SectionForm<T extends SectionType>({
         const v = values[f.key];
         return (
           <div key={f.key} className="field">
-            {!["faq", "collections", "quotes", "badges", "products", "logos", "messages"].includes(f.kind) && <label className="label" htmlFor={id}>{f.label}</label>}
+            {!["faq", "collections", "quotes", "badges", "products", "logos", "messages", "columns"].includes(f.kind) && <label className="label" htmlFor={id}>{f.label}</label>}
             {f.kind === "text" && <input id={id} className="input" value={String(v ?? "")} maxLength={f.max} onChange={(e) => set(f.key, e.target.value)} />}
             {f.kind === "textarea" && <textarea id={id} className="input" rows={4} value={String(v ?? "")} maxLength={f.max} onChange={(e) => set(f.key, e.target.value)} />}
             {f.kind === "image" && (
@@ -240,6 +245,16 @@ export function SectionForm<T extends SectionType>({
                   { key: "link", label: "Logo link" },
                 ]} blank={{ imageUrl: "", name: "", link: "" }} />
             )}
+            {f.kind === "columns" && (
+              <ListItems label={f.label} items={v as Record<string, string>[]} onChange={(x) => set(f.key, x)} max={COLUMNS_MAX} noun="column"
+                fields={[
+                  { key: "imageUrl", label: "Column picture", url: true },
+                  { key: "title", label: "Column title" },
+                  { key: "text", label: "Column text", textarea: true },
+                  { key: "linkLabel", label: "Column link label" },
+                  { key: "link", label: "Column link" },
+                ]} blank={{ imageUrl: "", title: "", text: "", linkLabel: "", link: "" }} />
+            )}
             {f.kind === "messages" && (
               <ListItems label={f.label} items={v as Record<string, string>[]} onChange={(x) => set(f.key, x)} max={ANNOUNCE_MAX - 1} noun="message"
                 fields={[{ key: "text", label: "Extra message" }, { key: "link", label: "Extra message link" }]} blank={{ text: "", link: "" }} />
@@ -278,7 +293,7 @@ function FaqItems({ label, items, onChange }: { label: string; items: { question
 
 type ItemField = { key: string; label: string; textarea?: boolean; url?: boolean; options?: { value: string; label: string }[] };
 
-/** A short list of small records (quotes, badges, logos), each edited with its own labelled fields. */
+/** A short list of small records (quotes, badges, logos, columns), each edited with its own labelled fields. */
 function ListItems({ label, items, onChange, fields, blank, max, noun }: {
   label: string;
   items: Record<string, string>[];

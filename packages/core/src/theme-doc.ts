@@ -97,6 +97,9 @@ export const LOGOS_MAX = 12;
 /** The most messages one announcement bar takes turns showing. */
 export const ANNOUNCE_MAX = 5;
 
+/** The most columns one "Columns" section holds. */
+export const COLUMNS_MAX = 6;
+
 /** The most links one dropdown in the header menu holds. */
 export const MENU_CHILDREN_MAX = 10;
 
@@ -202,6 +205,16 @@ const sectionSchemas = {
     videoUrl: videoLink,
     coverUrl: imageUrl,
   }),
+  // Side-by-side blocks, each with an optional picture, a title, a few words and a link.
+  // A column with nothing in it yet isn't shown.
+  columns: z.object({
+    heading: text(120),
+    align: z.enum(["left", "center"]).default("center"),
+    items: z
+      .array(z.object({ imageUrl, title: text(80), text: text(400), linkLabel: text(40), link }))
+      .max(COLUMNS_MAX, `A columns section holds up to ${COLUMNS_MAX} columns.`)
+      .default([]),
+  }),
 } as const;
 
 export type SectionType = keyof typeof sectionSchemas;
@@ -223,6 +236,7 @@ export const SECTION_LABELS: Record<SectionType, { name: string; about: string }
   shop_the_look: { name: "Shop the look", about: "One photo beside the products in it, like a styled room or an outfit, with a button that adds them all to the cart." },
   logo_list: { name: "Logo row", about: "A row of logos, like magazines that wrote about you or brands you carry. Use only logos you may show." },
   video: { name: "Video", about: "A YouTube or Vimeo video, or a video file, with a heading. Nothing loads from YouTube or Vimeo until a shopper presses play." },
+  columns: { name: "Columns", about: "Two to six blocks side by side, each with a picture, a title, a few words and a link. Good for how it works, what makes you different or your main collections." },
 };
 
 const sectionId = z.string().regex(/^[a-z0-9]{4,24}$/, "Section ids are short lowercase codes.");
