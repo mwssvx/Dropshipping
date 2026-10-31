@@ -364,6 +364,8 @@ export const products = pgTable(
     originCountry: text("origin_country"),
     // Where the parcel leaves from, when that isn't the store's own country (a supplier's warehouse abroad).
     shipsFrom: text("ships_from"),
+    // Days to get this product ready before it ships (made to order, print on demand), instead of the store's processing days.
+    processingDays: integer("processing_days"),
     // Buyers must say they're at least this old to check out with it (alcohol, vapes, knives).
     minAge: integer("min_age"),
     // Countries it can't be shipped to (batteries, knives, a supplier that doesn't go there).

@@ -16,6 +16,7 @@ import { PurchaseLimitForm } from "./PurchaseLimitForm";
 import { CustomsForm } from "./CustomsForm";
 import { MinAgeForm } from "./MinAgeForm";
 import { ReorderDaysForm } from "./ReorderDaysForm";
+import { ProcessingDaysForm } from "./ProcessingDaysForm";
 import { BlockedCountriesForm } from "./BlockedCountriesForm";
 import { SwatchesForm } from "./SwatchesForm";
 import { VideoForm } from "./VideoForm";
@@ -447,6 +448,22 @@ export default async function EditProductPage({ params, searchParams }: { params
             </div>
             {product.minAge && <p className="text-sm" role="note">Buyers must confirm they're {product.minAge} or older.</p>}
             <MinAgeForm productId={product.id} minAge={product.minAge} />
+          </section>
+        )}
+        {!product.giftCard && !product.digital && (
+          <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="processing-heading">
+            <div>
+              <h2 id="processing-heading" className="font-semibold">Preparing time</h2>
+              <p className="hint">
+                For things made to order, printed on demand or engraved, that take longer than your usual {shop.processingDays}{" "}
+                {shop.processingDays === 1 ? "day" : "days"} before they ship. The product page, cart, checkout and receipt count it in the delivery date,
+                and an order with this product waits for its slowest item.
+              </p>
+            </div>
+            {product.processingDays !== null && (
+              <p className="text-sm" role="note">Ready to ship {product.processingDays === 0 ? "the same day" : `in ${product.processingDays} ${product.processingDays === 1 ? "day" : "days"}`}, then the supplier&apos;s shipping time.</p>
+            )}
+            <ProcessingDaysForm productId={product.id} days={product.processingDays} storeDays={shop.processingDays} />
           </section>
         )}
         {!product.giftCard && (
