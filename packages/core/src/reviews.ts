@@ -1,4 +1,4 @@
-import { and, avg, count, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, avg, count, desc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
 import type { Mailer } from "./email";
@@ -106,7 +106,7 @@ export type ReviewStatus = "pending" | "published" | "hidden";
 export async function reviewPage(
   db: Db,
   shopId: string,
-  opts: { status?: ReviewStatus; rating?: number; query?: string; page?: number; size?: number; noReply?: boolean; photos?: boolean } = {},
+  opts: { status?: ReviewStatus; rating?: number; query?: string; page?: number; size?: number; noReply?: boolean; photos?: boolean; reported?: boolean } = {},
 ) {
   const size = opts.size ?? REVIEW_PAGE_SIZE;
   const page = Math.max(1, Math.floor(opts.page ?? 1));
@@ -119,6 +119,7 @@ export async function reviewPage(
     opts.rating ? eq(r.rating, opts.rating) : undefined,
     opts.noReply ? isNull(r.reply) : undefined,
     opts.photos ? sql`jsonb_array_length(${r.photoIds}) > 0` : undefined,
+    opts.reported ? gt(r.reportCount, 0) : undefined,
     like
       ? or(
           sql`lower(${r.name}) like ${like}`,
@@ -158,7 +159,7 @@ export async function moderateReview(
   db: Db,
   shopId: string,
   reviewId: string,
-  input: { status?: "published" | "hidden"; reply?: string | null; removePhotoId?: string },
+  input: { status?: "published" | "hidden"; reply?: string | null; removePhotoId?: string; clearReports?: boolean },
 ) {
   const reply = input.reply === undefined ? undefined : input.reply?.trim().slice(0, 1000) || null;
   const current = await db.query.reviews.findFirst({ where: and(eq(schema.reviews.id, reviewId), eq(schema.reviews.shopId, shopId)) });
@@ -169,6 +170,8 @@ export async function moderateReview(
     ...(input.status ? { status: input.status } : {}),
     ...(reply !== undefined ? { reply } : {}),
     ...(removed ? { photoIds: current.photoIds.filter((p) => p !== removed) } : {}),
+    // Hiding a review, or keeping it ("Keep it"), deals with its reports.
+    ...((input.clearReports || input.status === "hidden") && current.reportCount ? { reportCount: 0 } : {}),
   };
   if (!Object.keys(changes).length) return current;
   const [row] = await db.update(schema.reviews).set(changes).where(eq(schema.reviews.id, current.id)).returning();
@@ -331,6 +334,41 @@ export async function helpfulVotes(db: Db, voter: string | undefined, reviewIds:
     .from(schema.reviewVotes)
     .where(and(eq(schema.reviewVotes.voter, voter), inArray(schema.reviewVotes.reviewId, reviewIds)));
   return new Set(rows.map((r) => r.reviewId));
+}
+
+/**
+ * A shopper reports a published review to the merchant (fake, rude, not about the product). Once
+ * per review and device; the review stays up until the merchant hides it. Returns whether this
+ * report was new.
+ */
+export async function reportReview(db: Db, shopId: string, reviewId: string, voter: string) {
+  if (!VOTER_PATTERN.test(voter) || !z.string().uuid().safeParse(reviewId).success) throw new NotFoundError("Review");
+  const review = await db.query.reviews.findFirst({
+    where: and(eq(schema.reviews.id, reviewId), eq(schema.reviews.shopId, shopId), eq(schema.reviews.status, "published")),
+    columns: { id: true },
+  });
+  if (!review) throw new NotFoundError("Review");
+  return db.transaction(async (tx) => {
+    const [added] = await tx.insert(schema.reviewReports).values({ reviewId, voter }).onConflictDoNothing().returning();
+    if (added) await tx.update(schema.reviews).set({ reportCount: sql`${schema.reviews.reportCount} + 1` }).where(eq(schema.reviews.id, reviewId));
+    return !!added;
+  });
+}
+
+/** Which of these reviews this device has reported. */
+export async function reportedReviews(db: Db, voter: string | undefined, reviewIds: string[]): Promise<Set<string>> {
+  if (!voter || !VOTER_PATTERN.test(voter) || !reviewIds.length) return new Set();
+  const rows = await db
+    .select({ reviewId: schema.reviewReports.reviewId })
+    .from(schema.reviewReports)
+    .where(and(eq(schema.reviewReports.voter, voter), inArray(schema.reviewReports.reviewId, reviewIds)));
+  return new Set(rows.map((r) => r.reviewId));
+}
+
+/** How many reviews shoppers have reported that the merchant hasn't dealt with yet. */
+export async function reportedReviewCount(db: Db, shopId: string) {
+  const [row] = await db.select({ n: count() }).from(schema.reviews).where(and(eq(schema.reviews.shopId, shopId), gt(schema.reviews.reportCount, 0)));
+  return Number(row?.n ?? 0);
 }
 
 /** A product card's stars: the average of its published reviews and how many there are. */

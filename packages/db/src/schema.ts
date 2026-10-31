@@ -1340,6 +1340,8 @@ export const reviews = pgTable(
     importKey: text("import_key"),
     // How many shoppers marked it helpful, kept with the review so a page can sort by it.
     helpfulCount: integer("helpful_count").notNull().default(0),
+    // Shoppers who reported the review since the merchant last looked. Kept at 0 after "Keep it".
+    reportCount: integer("report_count").notNull().default(0),
     createdAt: createdAt(),
   },
   (t) => [
@@ -1353,6 +1355,18 @@ export const reviews = pgTable(
 // "Helpful" votes on reviews: one per review and device, the device being a random id in a cookie.
 export const reviewVotes = pgTable(
   "review_votes",
+  {
+    reviewId: uuid("review_id").notNull().references(() => reviews.id, { onDelete: "cascade" }),
+    voter: text("voter").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.reviewId, t.voter] })],
+);
+
+// Shoppers reporting a review to the merchant: one per review and device (the same cookie id as
+// helpful votes). Rows stay after the merchant keeps the review, so a device can't report it twice.
+export const reviewReports = pgTable(
+  "review_reports",
   {
     reviewId: uuid("review_id").notNull().references(() => reviews.id, { onDelete: "cascade" }),
     voter: text("voter").notNull(),

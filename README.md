@@ -1511,3 +1511,9 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **"No reply yet" and "With photos"** (Admin → Reviews): two filters next to the star buttons. "No reply yet" lists the reviews you haven't answered, so you can work through them; a review drops off the list as soon as you save a reply. "With photos" lists the ones buyers added photos to. Both work with the status tabs, the stars and the search, stay on while you page through, and "Clear" turns everything off.
 2. **Core**: `reviewPage` takes `noReply` and `photos`. No migration.
+
+### Report a review (after launch, part 267)
+
+1. **On the store** (`reportReview` in `packages/core/src/reviews.ts`, `review_reports`): every review has a small "Report" link next to Helpful. One report per review and device (the same cookie as Helpful votes); afterwards it reads "Reported. The store will take a look." in the store's language. The review stays up: only the merchant decides.
+2. **For the merchant** (Admin → Reviews): when shoppers have reported something, a red "Reported (2)" filter appears next to "No reply yet". Each reported review says how many shoppers reported it and has "Keep it", which leaves it up and takes it off the list; hiding it deals with it too. A device can't report the same review again after it's kept.
+3. **Also fixed**: tapping Helpful (or Report) on a second review now updates the page straight away; before, the page only scrolled until a reload. MIGRATION `0149_review_reports` (`review_reports`, `reviews.report_count`).
