@@ -38,6 +38,50 @@ async function withOwnItems(db: Db, orderIds: string[]) {
   return new Set(rows.map((r) => r.orderId).filter((id) => !gone.has(id)));
 }
 
+const OPEN = ["unfulfilled", "sent_to_supplier", "partially_shipped"] as const;
+type ListOrder = { id: string; number: number; createdAt: Date; shippingAddress: Address; pickup: boolean; localDelivery: boolean; paymentStatus: string; fulfillmentStatus: string };
+const open = (o: ListOrder) => o.paymentStatus === "paid" && (OPEN as readonly string[]).includes(o.fulfillmentStatus) && !o.pickup && !o.localDelivery && !!addressKey(o.shippingAddress);
+
+/**
+ * For a page of the order list: the numbers of other unshipped orders going to the same door as
+ * each one, so the list can say "Same address as #1001" while they can still share a box.
+ */
+export async function sameAddressOnList(db: Db, shopId: string, orders: ListOrder[]): Promise<Map<string, { id: string; number: number }[]>> {
+  const shown = orders.filter(open);
+  const result = new Map<string, { id: string; number: number }[]>();
+  if (!shown.length) return result;
+  const o = schema.orders;
+  const times = shown.map((x) => x.createdAt.getTime());
+  const countries = [...new Set(shown.map((x) => x.shippingAddress.country.toUpperCase()))];
+  const candidates = await db
+    .select({ id: o.id, number: o.number, createdAt: o.createdAt, shippingAddress: o.shippingAddress })
+    .from(o)
+    .where(
+      and(
+        eq(o.shopId, shopId),
+        eq(o.paymentStatus, "paid"),
+        inArray(o.fulfillmentStatus, [...OPEN]),
+        eq(o.pickup, false),
+        eq(o.localDelivery, false),
+        gte(o.createdAt, new Date(Math.min(...times) - DAYS * DAY)),
+        lte(o.createdAt, new Date(Math.max(...times) + DAYS * DAY)),
+        inArray(sql`upper(${o.shippingAddress}->>'country')`, countries),
+      ),
+    )
+    .orderBy(o.number)
+    .limit(5000);
+  const byDoor = new Map<string, typeof candidates>();
+  for (const c of candidates) {
+    const key = doorKey(c.shippingAddress);
+    byDoor.set(key, [...(byDoor.get(key) ?? []), c]);
+  }
+  for (const x of shown) {
+    const others = (byDoor.get(doorKey(x.shippingAddress)) ?? []).filter((c) => c.id !== x.id && Math.abs(c.createdAt.getTime() - x.createdAt.getTime()) <= DAYS * DAY);
+    if (others.length) result.set(x.id, others.map((c) => ({ id: c.id, number: c.number })));
+  }
+  return result;
+}
+
 /**
  * The store's other paid orders to the same address, placed within 30 days either side of this
  * one, that haven't all shipped. Pickups and local deliveries don't count: nothing is posted.
@@ -58,7 +102,7 @@ export async function ordersToSameAddress(
         eq(o.shopId, shopId),
         ne(o.id, order.id),
         eq(o.paymentStatus, "paid"),
-        inArray(o.fulfillmentStatus, ["unfulfilled", "sent_to_supplier", "partially_shipped"]),
+        inArray(o.fulfillmentStatus, [...OPEN]),
         eq(o.pickup, false),
         eq(o.localDelivery, false),
         gte(o.createdAt, new Date(order.createdAt.getTime() - DAYS * DAY)),

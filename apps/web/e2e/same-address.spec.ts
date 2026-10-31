@@ -46,7 +46,11 @@ test("the merchant sees two orders going to the same address", async ({ page, br
   await buy("1 Main St");
   await buy("1 main st.");
 
+  // The order list marks both, each pointing at the other.
   await page.goto("/admin/orders");
+  await expect(page.getByRole("link", { name: "Same address as #1001" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Same address as #1002" })).toBeVisible();
+  await shot(page, "325-list-same-address");
   await page.getByRole("link", { name: "#1002" }).first().click();
   await page.waitForURL(/\/admin\/orders\/[0-9a-f-]{36}$/);
   const same = page.getByRole("region", { name: "Also going to this address" });

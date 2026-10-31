@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { schema } from "@sf/db";
-import { doorKey, createProduct, DemoModel, ordersToSameAddress, startCheckout } from "../src";
+import { doorKey, createProduct, DemoModel, ordersToSameAddress, sameAddressOnList, startCheckout } from "../src";
 import { makeFixture } from "../evals/fixture";
 
 const address = { name: "Ada Lovelace", line1: "1 Main St", city: "Austin", region: "TX", postalCode: "78701", country: "US" };
@@ -32,6 +32,13 @@ describe("orders to the same address", () => {
     await f.db.update(schema.orders).set({ fulfillmentStatus: "shipped" }).where(eq(schema.orders.id, shipped.id));
     const old = await place([{ variantId: coaster!.id, quantity: 1 }]);
     await f.db.update(schema.orders).set({ createdAt: new Date(first.createdAt.getTime() - 40 * 86_400_000) }).where(eq(schema.orders.id, old.id));
+
+    // The order list marks each one with the others going there.
+    const page = await f.db.query.orders.findMany({ where: eq(schema.orders.shopId, shop.id) });
+    const marks = await sameAddressOnList(f.db, shop.id, page);
+    expect(marks.get(first.id)?.map((x) => x.number)).toEqual([second.number, lampOnly.number]);
+    expect(marks.get(second.id)?.map((x) => x.number)).toEqual([first.number, lampOnly.number]);
+    expect([marks.has(shipped.id), marks.has(old.id), marks.size]).toEqual([false, false, 3]);
 
     const found = await ordersToSameAddress(f.db, shop.id, first);
     expect(found.ownItems).toBe(true);

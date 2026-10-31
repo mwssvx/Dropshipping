@@ -1776,3 +1776,7 @@ A buyer who comes back the next day for one more thing has two orders going to o
 ### Same address in the app (after launch, part 324)
 
 The app's order screen shows the same "Also going to this address" list as the web order page: the buyer's other paid orders to that door that haven't shipped, which ones hold items you post yourself, and a tap to open each one.
+
+### Same address on the order list (after launch, part 325)
+
+On the Orders page, an order going to the same door as another unshipped order shows a "Same address as #1001" tag that links to the other order. You can spot the boxes to combine before you start packing.
