@@ -106,6 +106,21 @@ export async function listPublishedPosts(db: Db, shopId: string, limit = 50) {
   });
 }
 
+/** The newest published posts as home page cards: plain data the editor preview can show too. */
+export async function latestPosts(db: Db, shopId: string, limit = 6) {
+  const posts = await listPublishedPosts(db, shopId, limit);
+  return posts.map((p) => ({
+    id: p.id,
+    handle: p.handle,
+    title: p.title,
+    imageUrl: p.imageUrl,
+    summary: postSummary(p),
+    publishedAt: p.publishedAt?.toISOString() ?? null,
+    minutes: readingMinutes(p.body),
+  }));
+}
+export type PostCard = Awaited<ReturnType<typeof latestPosts>>[number];
+
 /** One published post with the featured products that are still on sale, in the merchant's order. */
 export async function getPublishedPostByHandle(db: Db, shopId: string, handle: string) {
   const post = await db.query.blogPosts.findFirst({
