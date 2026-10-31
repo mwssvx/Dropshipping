@@ -319,6 +319,8 @@ const sectionSchemas = {
     text: text(400),
     imageUrl,
   }),
+  // The contact form right on the home page. Messages land in the same inbox as the Contact page.
+  contact_form: z.object({ heading: text(120), text: text(400) }),
 } as const;
 
 export type SectionType = keyof typeof sectionSchemas;
@@ -350,6 +352,7 @@ export const SECTION_LABELS: Record<SectionType, { name: string; about: string }
   before_after: { name: "Before and after", about: "Two photos of the same thing, before and after using your product, with a handle shoppers drag to compare them. Use real photos only." },
   collection_tabs: { name: "Collection tabs", about: "Up to five collections as tabs over one product grid, so shoppers switch between “New in”, “Best sellers” and “Gifts” without leaving the page." },
   store_location: { name: "Visit us", about: "Your shop's address, opening hours and a photo, with a button that opens directions in the shopper's map. For stores with a front door or a pickup point." },
+  contact_form: { name: "Contact form", about: "Shoppers send you a message without leaving the home page. Messages arrive in your inbox, just like those from the Contact page." },
 };
 
 const sectionId = z.string().regex(/^[a-z0-9]{4,24}$/, "Section ids are short lowercase codes.");

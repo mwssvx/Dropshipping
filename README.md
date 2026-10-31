@@ -1461,3 +1461,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Where to find your shop** (`apps/web/src/theme/Sections.tsx`): a new home page section in the theme editor for stores with a front door or a pickup point. Type the address, up to seven rows of opening hours ("Mon–Fri", "9:00–17:30"), a line on where to park and an optional photo of the shop, and shoppers get a "Get directions" button that opens a map search for the address in a new tab.
 2. **No map until asked**: the page loads nothing from a map service, so it stays fast and nobody is tracked just for looking; the map opens only when a shopper presses the button. The heading defaults to "Visit us" in the shopper's language, rows with no days are skipped, and the section stays hidden until the address is filled in. Four new store strings in all six languages. No migration: it lives in the theme.
+
+### Contact form on the home page (after launch, part 257)
+
+1. **Questions without leaving the page** (`apps/web/src/theme/Sections.tsx`): a new home page section in the theme editor with the same form as the Contact page (name, email, an optional order number and the message). Messages arrive under Inbox like any other, and a message with an order number still gets the Assistant's help.
+2. **Ready as it is**: the heading defaults to "Contact us" and the line under it to "we'll reply by email", in the shopper's language, or say your own ("We answer within a day"). In the editor's preview the Send button is greyed out, so test messages never reach your inbox. The form's fields now get their own ids, so it can sit on a page next to another form. No new strings and no migration: it lives in the theme.

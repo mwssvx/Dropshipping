@@ -176,6 +176,10 @@ export const SECTION_FIELDS: Record<SectionType, Field[]> = {
     { key: "text", label: "Text (optional)", kind: "textarea", max: 400, hint: "For example where to park or which door to use." },
     { key: "imageUrl", label: "Photo of the shop (optional)", kind: "image" },
   ],
+  contact_form: [
+    { key: "heading", label: "Heading", kind: "text", max: 120, hint: "Leave empty for “Contact us” in the shopper's language." },
+    { key: "text", label: "Text", kind: "textarea", max: 400, hint: "Leave empty for a line saying you reply by email. Messages arrive under Inbox." },
+  ],
 };
 
 /** A saved moment as the editor's computer shows it, for a datetime-local input. */
