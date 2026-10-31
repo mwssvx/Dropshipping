@@ -1784,3 +1784,7 @@ On the Orders page, an order going to the same door as another unshipped order s
 ### Weight in bulk (after launch, part 326)
 
 On the Products list, "Set the weight" gives every option of the picked products the same packed weight, for shipping rates that go by weight. "Only options with no weight yet" is ticked by default, so weights you already typed stay as they are. Pair it with the "No weight" filter to fill in a whole catalog at once. Gift cards and downloads are skipped, and you can undo it for a week like any other bulk change.
+
+### Missing weights on the Shipping page (after launch, part 327)
+
+When any shipping rate is limited by order weight, the Shipping page warns about products with an option that has no weight. Those count as weighing nothing, so a heavy order could get the lightest rate. The warning links to the product list filtered to "No weight", where "Set the weight" fills them all in at once.

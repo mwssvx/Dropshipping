@@ -32,6 +32,8 @@ test("a small-parcel rate shows for a light cart and goes away for a heavy one",
   await us.getByLabel("Up to (kg)").fill("2");
   await us.getByRole("button", { name: "Add rate" }).click();
   await expect(us.getByRole("listitem", { name: "United States: Small parcel" })).toContainText("orders up to 2 kg");
+  // The bowl has a weight, so there's nothing to warn about.
+  await expect(page.getByRole("note", { name: "Products with no weight" })).toHaveCount(0);
 
   const buyer = await (await browser.newContext({ ...info.project.use })).newPage();
   await buyer.goto(bowl);
@@ -49,4 +51,18 @@ test("a small-parcel rate shows for a light cart and goes away for a heavy one",
   await expect(buyer.getByRole("radio", { name: /Standard/ })).toBeVisible();
   await expect(small).toHaveCount(0);
   await expect(buyer.locator("aside")).toContainText("Shipping (Standard)");
+
+  // A vase saved without a weight would ship for the small-parcel price: the Shipping page says so.
+  await page.goto("/admin/products/new");
+  await page.getByLabel("Title").fill("Clay Vase");
+  await page.getByLabel("Price", { exact: true }).fill("30.00");
+  await page.getByRole("button", { name: "Save product" }).click();
+  await expect(page.getByText("Product added.")).toBeVisible();
+  await page.goto("/admin/shipping");
+  const note = page.getByRole("note", { name: "Products with no weight" });
+  await expect(note).toContainText("1 product has an option with no weight");
+  await note.getByRole("link", { name: "Give them a weight" }).click();
+  await expect(page).toHaveURL(/missing=weight/);
+  await expect(page.getByRole("link", { name: "Clay Vase" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Stoneware Bowl" })).toHaveCount(0);
 });
