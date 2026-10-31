@@ -195,7 +195,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const delivery = buyable.length && !cantShipHere ? await productDelivery(await db(), shop, product.id, { country: here }) : null;
   const shipsToList = product.giftCard || product.digital ? [] : shipsTo((await listShippingZones(await db(), shop.id)).zones);
   // "Shipping to United States: $4.99 · Free on orders of $50 or more", so it isn't a surprise at checkout.
-  const shipping = v && orderable.length && !cantShipHere ? await productShipping(await db(), shop, { priceMinor: v.priceMinor, weightGrams: v.weightGrams, giftCard: product.giftCard || product.digital }, here) : null;
+  const shipping = v && orderable.length && !cantShipHere ? await productShipping(await db(), shop, { priceMinor: v.priceMinor, weightGrams: v.weightGrams, giftCard: product.giftCard || product.digital, surchargeMinor: product.shippingSurchargeMinor }, here) : null;
   const shownMoney = (m: number) => (fx ? formatMoney(convertPrice(m, fx), fx.currency) : formatMoney(m, shop.currency));
   // A reduced price says what the lowest price was in the 30 days before (the EU's rule).
   const lowest = showsLowestPrice(shop.lowestPriceNote, await buyerCountry()) ? await lowestPricesBefore(await db(), shop.id, product, product.sale) : new Map<string, number>();

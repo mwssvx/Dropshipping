@@ -17,6 +17,7 @@ import { CustomsForm } from "./CustomsForm";
 import { MinAgeForm } from "./MinAgeForm";
 import { ReorderDaysForm } from "./ReorderDaysForm";
 import { ProcessingDaysForm } from "./ProcessingDaysForm";
+import { SurchargeForm } from "./SurchargeForm";
 import { BlockedCountriesForm } from "./BlockedCountriesForm";
 import { SwatchesForm } from "./SwatchesForm";
 import { VideoForm } from "./VideoForm";
@@ -464,6 +465,22 @@ export default async function EditProductPage({ params, searchParams }: { params
               <p className="text-sm" role="note">Ready to ship {product.processingDays === 0 ? "the same day" : `in ${product.processingDays} ${product.processingDays === 1 ? "day" : "days"}`}, then the supplier&apos;s shipping time.</p>
             )}
             <ProcessingDaysForm productId={product.id} days={product.processingDays} storeDays={shop.processingDays} />
+          </section>
+        )}
+        {!product.giftCard && !product.digital && (
+          <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="surcharge-heading">
+            <div>
+              <h2 id="surcharge-heading" className="font-semibold">Extra shipping</h2>
+              <p className="hint">
+                For bulky or heavy things, like furniture, rugs or mirrors, that cost your supplier more to send than your shipping rates cover. It&apos;s
+                added to every shipping rate for each one in the cart, even when the rate is free, so free shipping on small things doesn&apos;t sell this
+                at a loss. Pickup, your own local delivery and free-shipping codes don&apos;t add it.
+              </p>
+            </div>
+            {product.shippingSurchargeMinor > 0 && (
+              <p className="text-sm" role="note">Buyers pay {formatMoney(product.shippingSurchargeMinor, shop.currency)} more shipping for each one.</p>
+            )}
+            <SurchargeForm productId={product.id} amount={product.shippingSurchargeMinor ? (product.shippingSurchargeMinor / 100).toFixed(2) : ""} currency={shop.currency} />
           </section>
         )}
         {!product.giftCard && (

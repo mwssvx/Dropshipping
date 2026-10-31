@@ -241,19 +241,21 @@ export const formatDeliveryWindow = (w: Pick<DeliveryWindow, "from" | "to">, for
 /**
  * What shipping one of this item costs to the buyer's country, for the product page, so it isn't a
  * surprise at checkout: the cheapest rate that takes its weight (free when the item alone reaches
- * a rate's free-over amount), and the lowest amount that makes shipping free. Null when the store
- * doesn't ship there or it's a gift card.
+ * a rate's free-over amount) plus any extra shipping the product adds, and the lowest amount that
+ * makes shipping free. Null when the store doesn't ship there or it's a gift card.
  */
-export async function productShipping(db: Db, shop: Shop, item: { priceMinor: number; weightGrams: number | null; giftCard?: boolean }, country: string | null) {
+export async function productShipping(db: Db, shop: Shop, item: { priceMinor: number; weightGrams: number | null; giftCard?: boolean; surchargeMinor?: number }, country: string | null) {
   if (item.giftCard) return null;
   const { zones } = await listShippingZones(db, shop.id);
   const to = country ?? shop.country;
   const rates = (zoneFor(zones, to)?.rates ?? []).filter((r) => fitsWeight(r, item.weightGrams ?? 0));
   if (!rates.length) return null;
   const price = (r: Rate) => (r.freeOverMinor !== null && item.priceMinor >= r.freeOverMinor ? 0 : r.priceMinor);
-  const priceMinor = Math.min(...rates.map(price));
+  // A bulky product's extra shipping comes on top, and spending more doesn't take it away.
+  const extra = item.surchargeMinor ?? 0;
+  const priceMinor = Math.min(...rates.map(price)) + extra;
   const over = rates.map((r) => r.freeOverMinor).filter((m): m is number => m !== null);
-  return { country: to, priceMinor, freeOverMinor: priceMinor > 0 && over.length ? Math.min(...over) : null };
+  return { country: to, priceMinor, freeOverMinor: priceMinor > 0 && !extra && over.length ? Math.min(...over) : null };
 }
 
 /**
@@ -264,7 +266,7 @@ export async function productShipping(db: Db, shop: Shop, item: { priceMinor: nu
 export async function homeShipping(
   db: Db,
   shop: Shop,
-  variants: { id: string; priceMinor: number; weightGrams: number | null; shipDaysMin: number | null; shipDaysMax: number | null; processingDays?: number | null }[],
+  variants: { id: string; priceMinor: number; weightGrams: number | null; shipDaysMin: number | null; shipDaysMax: number | null; processingDays?: number | null; surchargeMinor?: number }[],
 ) {
   const out = new Map<string, { country: string; priceMinor: number; handlingDays: number; transit: { min: number; max: number } | null }>();
   const { zones } = await listShippingZones(db, shop.id);
@@ -273,7 +275,7 @@ export async function homeShipping(
     const rates = all.filter((r) => fitsWeight(r, v.weightGrams ?? 0));
     const price = (r: Rate) => (r.freeOverMinor !== null && v.priceMinor >= r.freeOverMinor ? 0 : r.priceMinor);
     const best = [...rates].sort((a, b) => price(a) - price(b) || (a.maxDays ?? 99) - (b.maxDays ?? 99))[0];
-    if (best) out.set(v.id, { country: shop.country, priceMinor: price(best), handlingDays: v.processingDays ?? shop.processingDays, transit: transitDays([v], best) });
+    if (best) out.set(v.id, { country: shop.country, priceMinor: price(best) + (v.surchargeMinor ?? 0), handlingDays: v.processingDays ?? shop.processingDays, transit: transitDays([v], best) });
   }
   return out;
 }
@@ -294,13 +296,13 @@ export function merchantReturnPolicy(shop: Pick<Shop, "country" | "returnWindowD
 export async function searchOfferExtras(
   db: Db,
   shop: Shop,
-  product: { id: string; giftCard: boolean; digital: boolean; processingDays?: number | null },
+  product: { id: string; giftCard: boolean; digital: boolean; processingDays?: number | null; shippingSurchargeMinor?: number },
   variants: { id: string; priceMinor: number; weightGrams: number | null; shipDaysMin: number | null; shipDaysMax: number | null }[],
 ) {
   const out = new Map<string, Record<string, unknown>>();
   if (product.giftCard || product.digital) return out;
   const returns = merchantReturnPolicy(shop);
-  const shipping = await homeShipping(db, shop, variants.map((v) => ({ ...v, processingDays: product.processingDays ?? null })));
+  const shipping = await homeShipping(db, shop, variants.map((v) => ({ ...v, processingDays: product.processingDays ?? null, surchargeMinor: product.shippingSurchargeMinor ?? 0 })));
   for (const v of variants) {
     const ship = shipping.get(v.id);
     out.set(v.id, {

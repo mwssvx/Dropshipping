@@ -1732,3 +1732,7 @@ The merchant app's order screen now says when the order should arrive ("Expected
 ### Late parcels in the app (after launch, part 313)
 
 The merchant app's Orders tab gets a **Late** view: shipped orders past their delivery date (the same list as the web Orders page's "Past their delivery date"), the latest first, each with "3 days late". A merchant can check on them from their phone before the buyer writes. `GET /api/app/orders?show=late` uses `ordersPastDelivery`. No migration.
+
+### Extra shipping for bulky products (after launch, part 314)
+
+A rug, a chair or a mirror costs the supplier far more to send than a phone case, but a store's shipping rates are one price for everything, so free shipping over $50 can mean selling a sofa at a loss. A product's **Extra shipping** card sets an amount added to every shipping rate for each one in the cart. It still applies when the rate itself is free, and the "free shipping over" nudge hides while the cart has such a product, since spending more wouldn't make shipping free. The product page's shipping cost, the cart, the checkout's rate prices, the order total, Google's shipping price in the feed and on the page, and the store export all include it. Pickup, the store's own local delivery and free-shipping codes don't add it. `products.shipping_surcharge_minor` (migration 0160), `setShippingSurcharge` and `surchargeFor` in `packages/core/src/shipping-surcharge.ts`.

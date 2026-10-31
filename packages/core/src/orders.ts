@@ -27,6 +27,7 @@ import { addonsByProduct, type CheckoutAddon } from "./addons";
 import { FREE_GIFT_NOTE, freeGiftFor } from "./free-gift";
 import { minimumOrder } from "./min-order";
 import { countryName, fitsWeight, listShippingZones, priceRate, zoneFor } from "./shipping";
+import { surchargeFor } from "./shipping-surcharge";
 import { formatWeight } from "./weight";
 import { MAX_TAGS, normalizeTags } from "./customers";
 import { cartLineKey, cleanPersonalization, missingPersonalization, personalizationValues } from "./personalization";
@@ -188,6 +189,8 @@ export async function quoteCart(
   const weightGrams = items
     .filter((i) => !i.giftCard && !i.digital)
     .reduce((s, i) => s + (rows.find((r) => r.variant.id === i.variantId)?.variant.weightGrams ?? 0) * i.quantity, 0);
+  // Bulky products add their own extra to any carrier rate (see shipping-surcharge.ts).
+  const surchargeMinor = surchargeFor(items.map((i) => ({ quantity: i.quantity, product: rows.find((r) => r.variant.id === i.variantId)!.product })));
   let shippingMinor = 0;
   let shipping: { rateId: string; name: string; minDays: number | null; maxDays: number | null } | null = null;
   let freeShippingOverMinor: number | null = null;
@@ -207,7 +210,8 @@ export async function quoteCart(
     const zoneRates = zoneFor(zones, opts.country ?? hinted ?? shop.country)?.rates ?? [];
     const rates = zoneRates.filter((r) => fitsWeight(r, weightGrams));
     // The lowest amount that makes a paid rate free, unless a rate is free anyway.
-    if (!rates.some((r) => r.priceMinor === 0)) {
+    // Reaching the free-shipping amount wouldn't make it free while bulky things still add theirs.
+    if (!surchargeMinor && !rates.some((r) => r.priceMinor === 0)) {
       const over = rates.map((r) => r.freeOverMinor).filter((m): m is number => m !== null);
       if (over.length) freeShippingOverMinor = Math.min(...over);
     }
@@ -227,7 +231,7 @@ export async function quoteCart(
     // The rate the buyer picked, or the cheapest for this cart. Picking up is only ever chosen.
     const rate = pickingUp || deliveringLocally ? undefined : (rates.find((r) => r.id === opts.shippingRateId) ?? [...rates].sort((a, b) => priceRate(a, goodsMinor) - priceRate(b, goodsMinor))[0]);
     if (rate) {
-      shippingMinor = priceRate(rate, goodsMinor);
+      shippingMinor = priceRate(rate, goodsMinor) + surchargeMinor;
       shipping = { rateId: rate.id, name: rate.name, minDays: rate.minDays, maxDays: rate.maxDays };
     }
   }
@@ -321,6 +325,8 @@ export async function quoteCart(
     minimumOrder: wholesale || !hasGoods ? null : minimumOrder(shop, goodsMinor - discountMinor),
     discountMinor,
     shippingMinor,
+    /** What bulky products add to every carrier rate, already in `shippingMinor` when one is used. */
+    surchargeMinor: ships ? surchargeMinor : 0,
     totalMinor,
     goodsMinor,
     /** What the goods weigh in grams, from their options' weights. 0 when none are set. */

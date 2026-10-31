@@ -89,7 +89,7 @@ export async function productFeed(db: Db, shop: Shop, opts: { origin: string; la
   const raw = await listActiveProducts(db, shop.id);
   const products = await localizeProducts(db, shop.id, language, raw);
   const sales = await salesFor(db, shop.id, products.map((p) => p.id), opts.now);
-  const shipping = await homeShipping(db, shop, products.filter((p) => !p.giftCard && !p.digital).flatMap((p) => p.variants.map((v) => ({ ...v, processingDays: p.processingDays }))));
+  const shipping = await homeShipping(db, shop, products.filter((p) => !p.giftCard && !p.digital).flatMap((p) => p.variants.map((v) => ({ ...v, processingDays: p.processingDays, surchargeMinor: p.shippingSurchargeMinor }))));
   const items: FeedItem[] = [];
   const issues: FeedIssue[] = [];
   for (const p of products) {
