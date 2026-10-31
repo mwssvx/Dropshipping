@@ -37,6 +37,8 @@ type Detail = {
   daysLate?: number;
   /** Set when it comes in more than one parcel. */
   parcels?: { own: boolean; items: { title: string; quantity: number }[]; status: string | null; carrier: string | null; trackingNumber: string | null; trackingUrl: string | null }[];
+  /** The buyer's other orders to the same address that haven't shipped. */
+  sameAddress?: { orders: { id: string; number: number; createdAt: string; ownItems: boolean }[]; oneBox: boolean } | null;
 };
 
 /** Where one parcel of several is: shipped with tracking, with the supplier, or still to post yourself. */
@@ -147,6 +149,21 @@ export default function OrderScreen() {
           <Row title="Total" right={<Heading>{money(o.totalMinor, o.currency)}</Heading>} />
         </List>
       </Section>
+
+      {o.sameAddress ? (
+        <Section title="Also going to this address">
+          <List>
+            {o.sameAddress.orders.map((x) => (
+              <Row key={x.id} title={`Order #${x.number}`} subtitle={`${when(x.createdAt)}${x.ownItems ? " · has items you post" : ""}`} href={`/orders/${x.id}`} />
+            ))}
+          </List>
+          <Body muted>
+            {o.sameAddress.oneBox
+              ? "The items you post yourself can go in one box, so you pay postage once. Add the same tracking to each order."
+              : "Suppliers send their parcels on their own, so these may still arrive on different days."}
+          </Body>
+        </Section>
+      ) : null}
 
       <Section title="Buyer">
         <Card>

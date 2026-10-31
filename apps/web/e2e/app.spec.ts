@@ -265,3 +265,25 @@ test("an order in two parcels shows what's in each and which one is yours to pos
   await expect(page.getByText("With the supplier · not shipped yet").or(page.getByText(/^Demo Post /))).toBeVisible();
   await shot(page, "318-app-parcels");
 });
+
+test("two orders to the same address say the store's items can share a box", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `sa${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Beeswax Candle");
+  await web.getByLabel("Price", { exact: true }).fill("12.00");
+  await web.getByLabel("Stock", { exact: true }).fill("6");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const candle = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+  await buy(browser, candle);
+  await buy(browser, candle);
+
+  await signIn(page, email);
+  await tab(page, "Orders");
+  await page.getByRole("link", { name: "Order #1002" }).click();
+  await expect(page.getByText("Also going to this address")).toBeVisible();
+  await expect(page.getByText("Order #1001", { exact: true })).toBeVisible();
+  await expect(page.getByText(/has items you post/)).toBeVisible();
+  await expect(page.getByText(/can go in one box/)).toBeVisible();
+  await shot(page, "324-app-same-address");
+});

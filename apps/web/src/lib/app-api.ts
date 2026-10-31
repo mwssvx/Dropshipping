@@ -14,7 +14,7 @@ import {
   fixProblemOrder,
   getOrder,
   orderDelivery,
-  daysPastDelivery, orderParcels,
+  daysPastDelivery, orderParcels, ordersToSameAddress,
   ordersPastDelivery,
   getPushSettings,
   getProduct,
@@ -220,7 +220,12 @@ const routes: Record<string, Handler> = {
     const arrives = ["paid", "partially_refunded"].includes(o.paymentStatus) ? await orderDelivery(db, shop, o, { evenIfHidden: true }) : null;
     // An order from more than one supplier (or with the store's own stock), parcel by parcel.
     const parcels = o.pickup || o.localDelivery ? [] : await orderParcels(db, o);
+    // The buyer's other orders to this door still to ship, as on the web order page.
+    const sameDoor = o.paymentStatus === "paid" && o.fulfillmentStatus !== "shipped" && o.fulfillmentStatus !== "delivered" ? await ordersToSameAddress(db, shop.id, o) : null;
     return {
+      sameAddress: sameDoor?.orders.length
+        ? { orders: sameDoor.orders.map((x) => ({ id: x.id, number: x.number, createdAt: x.createdAt, ownItems: x.ownItems })), oneBox: sameDoor.ownItems && sameDoor.orders.some((x) => x.ownItems) }
+        : null,
       parcels: parcels.map((p) => ({
         own: p.key === "own",
         items: p.items,
