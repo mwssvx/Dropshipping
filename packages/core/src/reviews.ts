@@ -204,6 +204,25 @@ export async function productReviews(db: Db, productId: string, limit = 20) {
   return { count: n, average: n ? Math.round(Number(stats?.avg) * 10) / 10 : null, reviews, photos };
 }
 
+/** A product card's stars: the average of its published reviews and how many there are. */
+export type CardRating = { average: number; count: number };
+
+/** The stars for each of these products that has published reviews, in one query. */
+export async function productRatings(db: Db, shopId: string, productIds: string[]): Promise<Map<string, CardRating>> {
+  const result = new Map<string, CardRating>();
+  if (!productIds.length) return result;
+  const rows = await db
+    .select({ productId: schema.reviews.productId, n: count(), avg: avg(schema.reviews.rating) })
+    .from(schema.reviews)
+    .where(and(eq(schema.reviews.shopId, shopId), eq(schema.reviews.status, "published"), inArray(schema.reviews.productId, [...new Set(productIds)])))
+    .groupBy(schema.reviews.productId);
+  for (const r of rows) {
+    const n = Number(r.n);
+    if (n) result.set(r.productId, { average: Math.round(Number(r.avg) * 10) / 10, count: n });
+  }
+  return result;
+}
+
 /** How many recent reviews the home page's reviews section can choose from. */
 export const STORE_REVIEWS_SHOWN = 24;
 

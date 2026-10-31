@@ -7,7 +7,7 @@ import { uniqueHandle } from "./handles";
 import { listActiveProducts } from "./products";
 import { placeSoldOut, productSoldOut, quickAddVariant, soldOutDisplay } from "./badges";
 import { cardSwatches } from "./swatches";
-import { storeReviews } from "./reviews";
+import { productRatings, storeReviews } from "./reviews";
 import { secondPhoto } from "./gallery";
 import { unitsSold } from "./search";
 
@@ -170,7 +170,7 @@ export async function storefrontCatalog(db: Db, shopId: string) {
   const now = new Date();
   const soldOut = new Set(all.filter((p) => productSoldOut(p, now)).map((p) => p.id));
   const active = placeSoldOut(all, mode, (p) => soldOut.has(p.id));
-  const units = await unitsSold(db, shopId, active.map((p) => p.id));
+  const [units, ratings] = await Promise.all([unitsSold(db, shopId, active.map((p) => p.id)), productRatings(db, shopId, active.map((p) => p.id))]);
   const products = active.map((p) => ({
     id: p.id,
     title: p.title,
@@ -186,6 +186,7 @@ export async function storefrontCatalog(db: Db, shopId: string) {
     swatches: cardSwatches(p),
     quickAdd: quickAddVariant(p),
     sold: units.get(p.id) ?? 0,
+    rating: ratings.get(p.id) ?? null,
   }));
   const rows = await db.query.collections.findMany({ where: eq(schema.collections.shopId, shopId), orderBy: asc(schema.collections.title) });
   const links = rows.length

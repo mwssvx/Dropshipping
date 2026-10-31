@@ -401,6 +401,10 @@ function StylePanel({ doc, onChange }: { doc: ThemeDoc; onChange: (d: ThemeDoc) 
           <input type="checkbox" className="mt-0.5" checked={s.paymentIcons} onChange={(e) => set({ paymentIcons: e.target.checked })} />
           <span>Show how buyers can pay in the footer<span className="block hint">Visa, Mastercard, American Express, Apple Pay and Google Pay, plus bank transfers when you take them. Buyers trust a store more when they see their way to pay.</span></span>
         </label>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-0.5" checked={s.cardRatings} onChange={(e) => set({ cardRatings: e.target.checked })} />
+          <span>Show star ratings on product cards<span className="block hint">The average of a product’s published reviews and how many there are. Products without reviews show no stars.</span></span>
+        </label>
       </fieldset>
       <fieldset className="flex flex-col gap-2">
         <legend className="font-semibold mb-1">Corners</legend>

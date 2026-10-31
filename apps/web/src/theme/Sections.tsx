@@ -111,8 +111,8 @@ export function badgeLabel(b: Badge, t: StoreText) {
   return b.kind === "custom" ? b.text : b.kind === "sold_out" ? t.soldOut : b.kind === "sale" ? t.badgeSale(b.percent) : t.badgeNew;
 }
 
-type CatalogProduct = Omit<StorefrontCatalog["products"][number], "sold"> & { sold?: number };
-type GridProduct = Omit<StorefrontCatalog["products"][number], "badge" | "createdAt" | "soldOut" | "swatches" | "contents" | "quickAdd" | "sold" | "hoverImageUrl"> & BadgeFacts & Partial<Pick<StorefrontCatalog["products"][number], "swatches" | "contents" | "quickAdd" | "sold" | "hoverImageUrl">>;
+type CatalogProduct = Omit<StorefrontCatalog["products"][number], "sold" | "rating"> & Partial<Pick<StorefrontCatalog["products"][number], "sold" | "rating">>;
+type GridProduct = Omit<StorefrontCatalog["products"][number], "badge" | "createdAt" | "soldOut" | "swatches" | "contents" | "quickAdd" | "sold" | "hoverImageUrl" | "rating"> & BadgeFacts & Partial<Pick<StorefrontCatalog["products"][number], "swatches" | "contents" | "quickAdd" | "sold" | "hoverImageUrl" | "rating">>;
 
 /** Numbered grids give each card an id (item-1, item-2...), so "Show more" can land on the first new one. */
 export function ProductGrid({ products, data, numbered = false }: { products: GridProduct[]; data: SectionData; numbered?: boolean }) {
@@ -142,6 +142,13 @@ export function ProductGrid({ products, data, numbered = false }: { products: Gr
               )}
             </div>
             <span className="font-medium group-hover:underline">{p.title}</span>
+            {p.rating && (
+              <span className="sf-card-rating flex items-center gap-1 text-sm">
+                <Stars value={p.rating.average} label={t.stars(p.rating.average)} />
+                <span className="text-muted" aria-hidden="true">({p.rating.count})</span>
+                <span className="sr-only">{t.reviewCount(p.rating.count)}</span>
+              </span>
+            )}
             <Price minor={p.priceMinor} compareAt={p.compareAtMinor} currency={data.currency} fx={data.fx} />
             <UnitPrice minor={p.priceMinor} contents={p.contents} currency={data.currency} fx={data.fx} itemWord={t.unitItem} />
             {p.swatches && (

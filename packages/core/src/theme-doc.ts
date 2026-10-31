@@ -284,6 +284,8 @@ const themeDoc = z.object({
     collectionBanner: z.boolean().default(true),
     // The footer shows the ways buyers can pay.
     paymentIcons: z.boolean().default(true),
+    // Product cards show their stars and review count, once they have published reviews.
+    cardRatings: z.boolean().default(true),
     logoText: text(60),
     logoUrl: imageUrl,
     // The store's pages on social networks, as icons in the footer. Empty ones don't show.
