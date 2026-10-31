@@ -397,6 +397,10 @@ function StylePanel({ doc, onChange }: { doc: ThemeDoc; onChange: (d: ThemeDoc) 
           <input type="checkbox" className="mt-0.5" checked={s.collectionBanner} onChange={(e) => set({ collectionBanner: e.target.checked })} />
           <span>Show a collection&rsquo;s photo behind its title<span className="block hint">A banner at the top of each collection&rsquo;s page, from the cover image you give the collection. Collections without one show just the title.</span></span>
         </label>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-0.5" checked={s.paymentIcons} onChange={(e) => set({ paymentIcons: e.target.checked })} />
+          <span>Show how buyers can pay in the footer<span className="block hint">Visa, Mastercard, American Express, Apple Pay and Google Pay, plus bank transfers when you take them. Buyers trust a store more when they see their way to pay.</span></span>
+        </label>
       </fieldset>
       <fieldset className="flex flex-col gap-2">
         <legend className="font-semibold mb-1">Corners</legend>

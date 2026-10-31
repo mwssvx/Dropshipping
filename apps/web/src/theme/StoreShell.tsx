@@ -11,6 +11,9 @@ import { MenuDropdown } from "./MenuDropdown";
 import { SocialIcons } from "./SocialIcons";
 import { storeHref, themeLayoutAttrs, themeStyle } from "./style";
 
+// Brand names stay as they are in every language; a bank transfer is said in the buyer's.
+const PAYMENT_NAMES: Record<string, string> = { visa: "Visa", mastercard: "Mastercard", amex: "American Express", apple_pay: "Apple Pay", google_pay: "Google Pay" };
+
 /** Header, announcement bar and footer around every storefront page, styled by the theme. */
 export function StoreShell({
   doc,
@@ -24,6 +27,7 @@ export function StoreShell({
   picker,
   t = storeText(null),
   languages,
+  payments = [],
   children,
 }: {
   doc: ThemeDoc;
@@ -40,6 +44,8 @@ export function StoreShell({
   picker?: { currencies: string[]; current: string; action: (form: FormData) => Promise<void> };
   /** The store's fixed words in the buyer's language. */
   t?: StoreText;
+  /** The ways buyers can pay, shown in the footer unless the theme turns them off. */
+  payments?: string[];
   /** When the store is shown in more than one language: the buyer's, and links to this page in each. */
   languages?: { root: string; current: string; options: { code: string; name: string }[] };
   children: React.ReactNode;
@@ -128,6 +134,13 @@ export function StoreShell({
             <Link href={`${base}/contact`} className="hover:text-accent">{t.contactUs}</Link>
           </nav>
           <SocialIcons social={settings.social} label={t.followUs} followOn={t.followOn} />
+          {settings.paymentIcons && payments.length > 0 && (
+            <ul aria-label={t.weAccept} className="sf-payments flex flex-wrap gap-1.5">
+              {payments.map((m) => (
+                <li key={m} className="rounded border border-border bg-surface px-2 py-0.5 text-xs font-semibold">{PAYMENT_NAMES[m] ?? t.bankTransferBadge}</li>
+              ))}
+            </ul>
+          )}
           <div className="flex flex-wrap justify-between gap-4 hint">
             <span className="flex items-center gap-3 flex-wrap">
               © {new Date().getFullYear()} {shopName}
