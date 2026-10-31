@@ -1912,3 +1912,7 @@ When a buyer's bank pulls a payment back, the order in the app shows the dispute
 ### Product questions in the app (after launch, part 358)
 
 Questions shoppers ask on a product page now reach the phone: a push notification for each new one (it can be turned off in Settings), a Questions button on Today saying how many wait, and a Questions screen to answer them. The answer goes to the shopper by email and, unless you switch it off, shows on the product page for everyone. Answered questions can be changed, or taken off the page and put back. A suggested answer written on the website is there to start from.
+
+### Payment links from the app (after launch, part 359)
+
+The Orders tab has Create a payment link, for a buyer who asked by message, phone or in person: pick the products and how many, add their address, a code and a note, and we email them a link to pay by card, with shipping and tax worked out as at checkout. The order then waits in the app with the link to share in a chat (or email it again), and once they pay it's an ordinary order that goes to the supplier.

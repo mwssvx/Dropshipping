@@ -982,3 +982,51 @@ test("a shopper's question about a product answered from the app shows on its pa
   await shopper.goto(kettle);
   await expect(shopper.getByRole("region", { name: "Questions" }).getByText("Yes, it works from 100 to 240 volts.")).toHaveCount(0);
 });
+
+test("a payment link made in the app is emailed, shared and paid", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `pl${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Linen Throw");
+  await web.getByLabel("Price", { exact: true }).fill("45.00");
+  await web.getByLabel("Stock", { exact: true }).fill("8");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+
+  await signIn(page, email);
+  await tab(page, "Orders");
+  await page.getByRole("link", { name: /Create a payment link/ }).click();
+  await expect(page.getByRole("heading", { name: "Payment link", level: 1 })).toBeVisible();
+  await page.getByRole("textbox", { name: "Add a product" }).fill("linen");
+  await page.getByRole("button", { name: "Add Linen Throw" }).click();
+  await page.getByRole("button", { name: "One more Linen Throw" }).click();
+  await expect(page.getByText("Items: $90.00")).toBeVisible();
+  await page.getByRole("textbox", { name: "Email", exact: true }).fill("grace@example.com");
+  await page.getByRole("textbox", { name: "Full name" }).fill("Grace Hopper");
+  await page.getByRole("textbox", { name: "Address", exact: true }).fill("1 Main St");
+  await page.getByRole("textbox", { name: "City" }).fill("Austin");
+  await page.getByRole("textbox", { name: "State or region" }).fill("TX");
+  await page.getByRole("textbox", { name: "Postal code" }).fill("78701");
+  await page.getByRole("textbox", { name: "Note to the customer" }).fill("Two throws, as we talked about on Instagram.");
+  await shot(page, "359-app-payment-link");
+  await page.getByRole("button", { name: "Email the payment link" }).click();
+
+  await expect(page.getByText("Payment link emailed to grace@example.com.")).toBeVisible();
+  const link = page.getByRole("region", { name: "Payment link" });
+  await expect(link.getByText("Waiting for Grace to pay")).toBeVisible();
+  await expect(link.getByText("Two throws, as we talked about on Instagram.")).toBeVisible();
+  const url = (await link.getByText(/\/pay\//).textContent())!.trim();
+  await link.getByRole("button", { name: "Email it again" }).click();
+  await expect(page.getByText("Emailed to grace@example.com again.")).toBeVisible();
+
+  // Grace pays from the email; the order becomes an ordinary paid order.
+  const buyer = await (await browser.newContext()).newPage();
+  await buyer.goto(`${WEB}/dev/mail`);
+  await expect(buyer.getByRole("article").filter({ hasText: "grace@example.com" }).filter({ hasText: "is ready to pay" }).first()).toContainText(url);
+  await buyer.goto(url);
+  await expect(buyer.getByText("Two throws, as we talked about on Instagram.")).toBeVisible();
+  await buyer.getByRole("button", { name: /^Pay/ }).click();
+  await expect(buyer.getByRole("heading", { name: "Thank you, Grace!" })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: /^Order #/ })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Payment link" })).toHaveCount(0);
+});
