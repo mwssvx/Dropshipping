@@ -5,6 +5,8 @@
  * settings. New skills are added here: a playbook is plain text, and any tools it names must be
  * the Assistant's.
  */
+import type { CustomSkill } from "./skill-library";
+
 export type Skill = {
   /** Shown to the merchant. */
   title: string;
@@ -89,9 +91,18 @@ export const SKILL_NAMES = Object.keys(SKILLS) as SkillName[];
 /** The skills a store has on: all of them unless the merchant switched some off. */
 export const enabledSkills = (off: readonly string[] | null | undefined) => SKILL_NAMES.filter((s) => !off?.includes(s));
 
+/** Built-in skills that are on, plus the owner's own, as the Assistant sees them. */
+export function allSkills(shop: { aiSkillsOff: readonly string[] | null; aiCustomSkills: readonly CustomSkill[] | null }) {
+  const builtIn = enabledSkills(shop.aiSkillsOff).map((name) => ({ name, title: SKILLS[name].title, when: SKILLS[name].when, custom: null as CustomSkill | null }));
+  // A custom skill with a built-in name wins: the owner chose it.
+  const custom = (shop.aiCustomSkills ?? []).map((c) => ({ name: c.name, title: c.title, when: c.when, custom: c }));
+  const taken = new Set(custom.map((c) => c.name));
+  return [...builtIn.filter((b) => !taken.has(b.name)), ...custom];
+}
+
 /** The lines for the Assistant's instructions: one per skill that's on. */
-export function skillMenu(off: readonly string[] | null | undefined) {
-  const on = enabledSkills(off);
+export function skillMenu(shop: Parameters<typeof allSkills>[0]) {
+  const on = allSkills(shop);
   if (!on.length) return "";
-  return `Skills: before answering a question in one of these areas, call use_skill with its name to read the playbook, then follow it.\n${on.map((s) => `- ${s}: ${SKILLS[s].when}`).join("\n")}`;
+  return `Skills: before answering a question in one of these areas, call use_skill with its name to read the playbook, then follow it.\n${on.map((s) => `- ${s.name}: ${s.when}`).join("\n")}`;
 }

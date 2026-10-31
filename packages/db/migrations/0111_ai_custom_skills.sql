@@ -1,0 +1,1 @@
+ALTER TABLE "shops" ADD COLUMN "ai_custom_skills" jsonb DEFAULT '[]'::jsonb NOT NULL;

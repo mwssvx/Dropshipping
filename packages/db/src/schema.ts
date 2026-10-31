@@ -145,6 +145,8 @@ export const shops = pgTable(
     aiWatchEmail: boolean("ai_watch_email").notNull().default(true),
     // Assistant skills the merchant switched off (names from core's SKILLS).
     aiSkillsOff: jsonb("ai_skills_off").$type<string[]>().notNull().default([]),
+    /** Skills the owner added (from GitHub or pasted), read by the Assistant on demand; see core's ai/skills.ts. */
+    aiCustomSkills: jsonb("ai_custom_skills").$type<{ name: string; title: string; when: string; playbook: string; sourceUrl: string | null; addedAt: string }[]>().notNull().default([]),
     /** Notes the owner asked the assistant to remember, used in every chat. */
     aiMemory: jsonb("ai_memory").$type<string[]>().notNull().default([]),
     /** Buyer replies the owner rewrote before sending, newest first, so the buyer helper writes more like them. */
