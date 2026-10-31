@@ -110,6 +110,7 @@ export default function Settings() {
         <Section title="Shipping">
           <List>
             <Row href="/ship-pause" title="Shipping pause" subtitle="Your supplier is closed for a while: keep selling, and say when orders ship" />
+            <Row href="/holiday-date" title="Holiday order-by date" subtitle="“Order by Dec 15 to get it in time for Christmas” on product pages" />
             <Row href="/late-emails" title="Running late emails" subtitle="One friendly email when an order hasn't shipped, or a parcel is past its date" />
           </List>
         </Section>

@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  HOLIDAY_NAME_MAX,
+  setHolidayDeadline,
   LATE_ORDER_DAYS,
   LATE_ORDER_MESSAGE_MAX,
   setLateOrderNotice,
@@ -1371,6 +1373,16 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, saved ? `Turned on "running late" emails after ${saved.days} days${saved.transit ? " and for parcels past their delivery date" : ""} in the app` : `Turned off "running late" emails in the app`, { href: "/admin/shipping#late-heading" });
     return { ok: true, message: saved ? `Saved. Buyers hear from you once if their order hasn't shipped after ${saved.days} days.` : "Running late emails are off." };
   },
+  // A holiday order-by date: product pages say "Order by Dec 15 to get it in time for Christmas".
+  "GET holiday-date": async ({ shop }) => ({ deadline: shop.holidayDeadline, nameMax: HOLIDAY_NAME_MAX }),
+  "PUT holiday-date": async ({ req, db, shop, user }) => {
+    const b = await body<{ on?: unknown; name?: unknown; arriveBy?: unknown }>(req);
+    const saved = await setHolidayDeadline(db, shop.id, b.on === true ? { name: str(b.name), arriveBy: str(b.arriveBy) } : null);
+    await logged({ shop, user, db }, saved ? `Set an order-by date for ${saved.name} in the app` : "Removed the holiday order-by date in the app", { href: "/admin/shipping#holiday-heading" });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    const day = saved ? new Date(`${saved.arriveBy}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : "";
+    return { ok: true, message: saved ? `Saved. Product pages say when to order for ${saved.name}, arriving by ${day}.` : "Removed. Product pages no longer give an order-by date." };
+  },
   "GET questions": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
     const rows = await listQuestions(db, shop.id);
@@ -1986,6 +1998,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("store-status")) return "theme";
   if (path.startsWith("ship-pause")) return "shipping";
   if (path.startsWith("late-emails")) return "shipping";
+  if (path.startsWith("holiday-date")) return "shipping";
   if (path.startsWith("gift-cards")) return "gift_cards";
   if (path.startsWith("sales")) return "marketing";
   if (path.startsWith("returns")) return "returns";
