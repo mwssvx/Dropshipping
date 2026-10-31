@@ -8,6 +8,7 @@ import { UserError } from "./errors";
 import { holidayOrderBy } from "./holiday-deadline";
 import { preorderDeadline } from "./preorders";
 import { nextCutoff, shipDay } from "./ship-cutoff";
+import { activeShipPause, shippingStart } from "./ship-pause";
 import { fitsWeight, listShippingZones, zoneFor, type Rate } from "./shipping";
 
 type Shop = typeof schema.shops.$inferSelect;
@@ -90,9 +91,10 @@ export async function productDelivery(db: Db, shop: Shop, productId: string, opt
   if (!transit) return null;
   const now = opts.now ?? new Date();
   // The countdown shows once the cutoff is less than a day away.
-  const next = shop.shipCutoff ? nextCutoff(now, shop.processingDays, shop.shipCutoff) : null;
+  // No "order in the next hour" while shipping is paused.
+  const next = shop.shipCutoff && !activeShipPause(shop, now) ? nextCutoff(now, shop.processingDays, shop.shipCutoff) : null;
   const cutoff = next && next.msLeft <= DAY ? next : null;
-  const window = deliveryWindow(now, shop.processingDays, transit.min, transit.max, shop.shipCutoff);
+  const window = deliveryWindow(shippingStart(shop, now), shop.processingDays, transit.min, transit.max, shop.shipCutoff);
   return { ...window, country, cutoff, holiday: holidayOrderBy(shop.holidayDeadline, window, shop.shipCutoff, now) };
 }
 
@@ -123,7 +125,7 @@ export async function cartDelivery(
     return !latest || d > latest ? d : latest;
   }, null);
   if (preorder && preorder > now) return { ...deliveryWindow(preorder, 0, transit.min, transit.max), country, holiday: null };
-  const window = deliveryWindow(now, shop.processingDays, transit.min, transit.max, shop.shipCutoff);
+  const window = deliveryWindow(shippingStart(shop, now), shop.processingDays, transit.min, transit.max, shop.shipCutoff);
   return { ...window, country, holiday: holidayOrderBy(shop.holidayDeadline, window, shop.shipCutoff, now) };
 }
 
@@ -153,7 +155,7 @@ export async function rateDeliveryWindows(
   for (const r of rates) {
     const transit = transitDays(variants, r);
     if (!transit) continue;
-    out.set(r.id, preorder && preorder > now ? deliveryWindow(preorder, 0, transit.min, transit.max) : deliveryWindow(now, shop.processingDays, transit.min, transit.max, shop.shipCutoff));
+    out.set(r.id, preorder && preorder > now ? deliveryWindow(preorder, 0, transit.min, transit.max) : deliveryWindow(shippingStart(shop, now), shop.processingDays, transit.min, transit.max, shop.shipCutoff));
   }
   return out;
 }
@@ -183,7 +185,7 @@ export async function orderDelivery(db: Db, shop: Shop, order: Order) {
   if (allShipped) return deliveryWindow(new Date(lastShipped), 0, transit.min, transit.max);
   // A pre-order waiting for stock is counted from the date it's promised to ship by.
   if (order.preorderShipsBy && order.fulfillmentStatus === "unfulfilled") return deliveryWindow(order.preorderShipsBy, 0, transit.min, transit.max);
-  return deliveryWindow(order.paidAt, shop.processingDays, transit.min, transit.max, shop.shipCutoff);
+  return deliveryWindow(shippingStart(shop, order.paidAt), shop.processingDays, transit.min, transit.max, shop.shipCutoff);
 }
 
 const short = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });

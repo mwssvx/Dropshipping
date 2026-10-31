@@ -1093,6 +1093,13 @@
       "when": 1793450125475,
       "tag": "0156_import_duties",
       "breakpoints": true
+    },
+    {
+      "idx": 156,
+      "version": "7",
+      "when": 1793451091222,
+      "tag": "0157_ship_pause",
+      "breakpoints": true
     }
   ]
 }

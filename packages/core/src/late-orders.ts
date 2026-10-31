@@ -10,6 +10,7 @@ import { UserError } from "./errors";
 import { deliverOrderEmail, type FulfillmentContext } from "./fulfillment";
 import { sendHandoverReminders } from "./handover-reminders";
 import { ordersPastDelivery } from "./past-delivery";
+import { activeShipPause, shippingStart } from "./ship-pause";
 
 export const LATE_ORDER_DAYS = [3, 5, 7, 10, 14] as const;
 export const LATE_ORDER_MESSAGE_MAX = 500;
@@ -68,6 +69,8 @@ export async function sendLateOrderEmails(ctx: FulfillmentContext, scope: { shop
     .limit(scope.limit ?? BATCH);
   let sent = 0;
   for (const { order, shop } of due) {
+    // Buyers were told shipping is paused, so the days count from when it resumes.
+    if (activeShipPause(shop, now) || now.getTime() - shippingStart(shop, order.paidAt!).getTime() < shop.lateOrderNotice!.days * 86_400_000) continue;
     const first = order.shippingAddress.name.split(" ")[0];
     const message = shop.lateOrderNotice?.message;
     const result = await deliverOrderEmail(ctx, shop, order, "order_late", "late", {

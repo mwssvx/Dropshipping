@@ -79,6 +79,7 @@ export * from "./delivery";
 export * from "./past-delivery";
 export * from "./buyer-arrived";
 export * from "./duties";
+export * from "./ship-pause";
 export * from "./disputes";
 export * from "./redirects";
 export * from "./saved";
