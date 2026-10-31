@@ -3,6 +3,7 @@
 // One item per option, grouped by product. Running sales go in as the sale price with their dates.
 // Gift cards and products without a photo or price are left out, and the Sales channels page says
 // why, so the merchant can fix them.
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { schema, type Contents, type Db } from "@sf/db";
 import { unitPrice, type UnitReference } from "./unit-price";
 import { productPhotos } from "./gallery";
@@ -10,6 +11,7 @@ import { localizeProducts, shopLanguages, type Language } from "./languages";
 import { listActiveProducts } from "./products";
 import { salePrice, salesFor } from "./sales";
 import { csvCell } from "./payouts";
+import { reviewPhotoUrl } from "./reviews";
 
 type Shop = typeof schema.shops.$inferSelect;
 
@@ -190,4 +192,69 @@ export function metaFeedCsv(items: FeedItem[]) {
     i.size,
   ]);
   return [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\n") + "\n";
+}
+
+// Product reviews --------------------------------------------------------------------------------
+
+/** The most reviews in the feed, newest first. */
+export const REVIEW_FEED_MAX = 10_000;
+
+/**
+ * The store's published reviews in Google's product review feed format (schema 2.3), for product
+ * ratings: the stars under Google Shopping ads and listings. Products are matched by the same SKUs,
+ * brand and links as the product feed. Reviews shoppers reported wait until the merchant looks.
+ */
+export async function reviewFeedXml(db: Db, shop: Pick<Shop, "id" | "name">, origin: string) {
+  const r = schema.reviews;
+  const rows = await db
+    .select({ review: r, handle: schema.products.handle, title: schema.products.title })
+    .from(r)
+    .innerJoin(schema.products, eq(schema.products.id, r.productId))
+    .where(and(eq(r.shopId, shop.id), eq(r.status, "published"), eq(r.reportCount, 0), eq(schema.products.status, "active")))
+    .orderBy(desc(r.createdAt), desc(r.id))
+    .limit(REVIEW_FEED_MAX);
+  const productIds = [...new Set(rows.map((x) => x.review.productId))];
+  const skus = new Map<string, string[]>();
+  if (productIds.length) {
+    const variants = await db.select({ productId: schema.variants.productId, sku: schema.variants.sku }).from(schema.variants).where(inArray(schema.variants.productId, productIds));
+    for (const v of variants) if (v.sku) skus.set(v.productId, [...(skus.get(v.productId) ?? []), v.sku]);
+  }
+  const tag = (name: string, value: string) => `<${name}>${xml(value)}</${name}>`;
+  const entries = rows.map(({ review: x, handle, title }) => {
+    const link = `${origin}/products/${encodeURIComponent(handle)}`;
+    const ids = skus.get(x.productId) ?? [];
+    return [
+      "<review>",
+      tag("review_id", x.id),
+      `<reviewer><name is_anonymous="false">${xml(x.name)}</name></reviewer>`,
+      tag("review_timestamp", x.createdAt.toISOString()),
+      tag("content", x.body),
+      x.photoIds.length ? `<reviewer_images>${x.photoIds.map((p) => `<reviewer_image>${tag("url", new URL(reviewPhotoUrl(p), origin).toString())}</reviewer_image>`).join("")}</reviewer_images>` : "",
+      `<review_url type="singleton">${xml(`${link}#review-${x.id}`)}</review_url>`,
+      `<ratings><overall min="1" max="5">${x.rating}</overall></ratings>`,
+      "<products><product>",
+      "<product_ids>",
+      ids.length ? `<skus>${ids.map((s) => tag("sku", s)).join("")}</skus>` : "",
+      `<brands>${tag("brand", shop.name)}</brands>`,
+      "</product_ids>",
+      tag("product_name", title),
+      tag("product_url", link),
+      "</product></products>",
+      tag("is_spam", "false"),
+      // Reviews written after an order here were asked for once it shipped; imported ones we can't tell.
+      x.orderId ? tag("collection_method", "post_fulfillment") : "",
+      "</review>",
+    ]
+      .filter(Boolean)
+      .join("");
+  });
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:vc="http://www.w3.org/2007/XMLSchema-versioning" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.google.com/shopping/reviews/schema/product/2.3/product_reviews.xsd">
+<version>2.3</version>
+<publisher>${tag("name", shop.name)}</publisher>
+<reviews>
+${entries.join("\n")}
+</reviews>
+</feed>
+`;
 }

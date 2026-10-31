@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LANGUAGES, productFeed, shopLanguages } from "@sf/core";
+import { LANGUAGES, productFeed, reviewCounts, shopLanguages } from "@sf/core";
 import { requireShop, storeAddress } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { CopyLink } from "./CopyLink";
@@ -10,7 +10,7 @@ export const metadata = { title: "Sales channels" };
 export default async function ChannelsPage() {
   const { shop, db } = await requireShop("marketing");
   const address = await storeAddress(shop);
-  const { items, issues } = await productFeed(db, shop, { origin: address });
+  const [{ items, issues }, reviews] = await Promise.all([productFeed(db, shop, { origin: address }), reviewCounts(db, shop.id)]);
   const products = new Set(items.map((i) => i.groupId)).size;
   const languages = shopLanguages(shop);
   const feeds = [
@@ -50,6 +50,18 @@ export default async function ChannelsPage() {
             <p className="hint text-sm">{f.steps}</p>
           </section>
         ))}
+        <section className="card p-5 flex flex-col gap-3" aria-labelledby="ratings-heading">
+          <h2 id="ratings-heading" className="font-semibold">Stars in Google Shopping</h2>
+          <p className="hint text-sm">
+            Your published reviews as Google&apos;s product review feed, so your ads and listings can show stars. Google asks for at least 50
+            reviews in all before it shows any; you have <span className="num">{reviews.published}</span>.
+          </p>
+          <CopyLink url={`${address}/feeds/reviews.xml`} label="Google product reviews feed link" />
+          <p className="hint text-sm">
+            In Google Merchant Center, open Growth, then Manage programs, and turn on Product ratings. Choose to send reviews by feed, paste the
+            link and pick a daily fetch. New reviews follow by themselves; ones you hide, and ones shoppers reported, stay out.
+          </p>
+        </section>
         <section className="card p-5 flex flex-col gap-3" aria-labelledby="pixels-heading">
           <div>
             <h2 id="pixels-heading" className="font-semibold">Ad tracking</h2>
