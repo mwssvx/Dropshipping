@@ -243,7 +243,13 @@ const routes: Record<string, Handler> = {
 
   "GET today": async ({ db, shop, role }) => {
     notifyLater(shop.id);
-    return todaySummary(db, shop, new Date(), role);
+    const [today, returns, reviews] = await Promise.all([
+      todaySummary(db, shop, new Date(), role),
+      can(role, "returns") ? countReturns(db, shop.id, "open") : null,
+      can(role, "reviews") ? reviewCounts(db, shop.id).then((c) => c.pending) : null,
+    ]);
+    // What waits behind the Returns and Reviews buttons, so Today says it without opening them.
+    return { ...today, waiting: { returns, reviews } };
   },
 
   "GET orders": async ({ url, db, shop }) => {

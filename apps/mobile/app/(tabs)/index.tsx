@@ -11,7 +11,7 @@ import { space } from "../../src/theme";
 import { Link, useRouter } from "expo-router";
 
 type Attention = { kind: string; title: string; body: string; url: string; tone: "critical" | "warning" | "info" };
-type Today = { currency: string; salesTodayMinor: number | null; ordersToday: number; sales7dMinor: number | null; orders7d: number; attention: Attention[]; pending: Proposal[] };
+type Today = { currency: string; salesTodayMinor: number | null; ordersToday: number; sales7dMinor: number | null; orders7d: number; attention: Attention[]; pending: Proposal[]; waiting?: { returns: number | null; reviews: number | null } };
 
 // Things the app doesn't do itself open the web admin.
 const WEB_ONLY: Record<string, string> = { "/notices": "/admin/trust", "/products#supplier-sold-out": "/admin/products#supplier-sold-out" };
@@ -85,10 +85,10 @@ export default function TodayScreen() {
             </Section>
           )}
           {can("inbox") && <Button label="Buyer inbox" kind="secondary" onPress={() => router.push("/inbox")} />}
-          {can("reviews") && <Button label="Reviews" kind="secondary" onPress={() => router.push("/reviews")} />}
+          {can("reviews") && <Button label={t.waiting?.reviews ? `Reviews (${t.waiting.reviews} to check)` : "Reviews"} kind="secondary" onPress={() => router.push("/reviews")} />}
           {can("customers") && <Button label="Customers" kind="secondary" onPress={() => router.push("/customers")} />}
           {can("marketing") && <Button label="Discount codes" kind="secondary" onPress={() => router.push("/codes")} />}
-          {can("returns") && <Button label="Returns" kind="secondary" onPress={() => router.push("/returns")} />}
+          {can("returns") && <Button label={t.waiting?.returns ? `Returns (${t.waiting.returns} open)` : "Returns"} kind="secondary" onPress={() => router.push("/returns")} />}
           <Button label="Import a product" kind="secondary" onPress={() => router.push("/import")} />
         </>
       )}
