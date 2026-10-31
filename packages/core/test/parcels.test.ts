@@ -83,4 +83,25 @@ describe("orders in more than one parcel", () => {
     await syncTracking(f.ctx, { orderId: order.id });
     expect(mail().some((m) => m.subject.includes("delivered"))).toBe(false);
   });
+
+  it("posts the store's own parcel without touching a supplier's", async () => {
+    const f = await makeFixture(new DemoModel());
+    const shop = await f.shop();
+    const [lamp] = await f.variants(f.products.lamp.id);
+    const own = await createProduct(f.db, shop.id, { title: "Handmade Coaster", status: "active", variants: [{ priceMinor: 900, stock: 10 }] });
+    const [coaster] = await f.variants(own.id);
+    const { order } = await startCheckout(f.db, f.payments, shop, { email: "ada@example.com", address, lines: [{ variantId: lamp!.id, quantity: 1 }, { variantId: coaster!.id, quantity: 1 }], storefront: true });
+    const { body, signature } = f.payments.event({ id: `evt_${order.id}`, type: "payment.succeeded", paymentIntentId: order.paymentIntentId!, amountMinor: order.totalMinor });
+    await handlePaymentEvent(f.db, "fake", (await f.payments.parseWebhook(body, signature))!);
+    await onOrderPaid(f.ctx, order.id);
+    // Even with the supplier's parcel failed, the own parcel's tracking goes on a parcel of its own.
+    await f.db.update(schema.fulfillments).set({ status: "failed", problemCode: "out_of_stock", problemMessage: "Out of stock" }).where(eq(schema.fulfillments.orderId, order.id));
+    await addManualTracking(f.ctx, shop.id, order.id, { carrier: "USPS", trackingNumber: "9400111", own: true });
+    const rows = await f.db.query.fulfillments.findMany({ where: eq(schema.fulfillments.orderId, order.id) });
+    expect(rows.map((r) => [r.supplierId === null ? "own" : "supplier", r.status, r.trackingNumber]).sort()).toEqual([["own", "shipped", "9400111"], ["supplier", "failed", null]]);
+    // Again: it updates that parcel instead of adding another.
+    await addManualTracking(f.ctx, shop.id, order.id, { carrier: "USPS", trackingNumber: "9400222", own: true });
+    const again = await f.db.query.fulfillments.findMany({ where: eq(schema.fulfillments.orderId, order.id) });
+    expect(again.filter((r) => r.supplierId === null).map((r) => r.trackingNumber)).toEqual(["9400222"]);
+  });
 });

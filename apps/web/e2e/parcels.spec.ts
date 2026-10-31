@@ -66,4 +66,22 @@ test("buyers know their order comes in two parcels", async ({ page, browser }, i
   await expect(parcels.getByRole("listitem").filter({ hasText: "Beeswax Candle" })).toContainText("Not shipped yet");
   await expect(parcels.getByRole("listitem").filter({ hasText: "Sunset Projection Lamp" })).toBeVisible();
   await shot(buyer, "316-parcels");
+
+  // The merchant sees what's in each parcel, and posts the candle themselves.
+  await page.goto("/admin/orders");
+  await page.getByRole("link", { name: "#1001" }).first().click();
+  const mine = page.getByRole("listitem", { name: "Your own parcel" });
+  await expect(mine).toContainText("Beeswax Candle");
+  await expect(page.getByRole("listitem").filter({ hasText: "Sunset Projection Lamp" }).first()).toBeVisible();
+  await mine.getByRole("button", { name: "Add tracking yourself" }).click();
+  await mine.getByLabel("Carrier").fill("USPS");
+  await mine.getByLabel("Tracking number").fill("9400111899");
+  await mine.getByRole("button", { name: "Mark as shipped" }).click();
+  await expect(page.getByRole("listitem", { name: "Your own parcel" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "9400111899" }).or(page.getByText("9400111899", { exact: true })).first()).toBeVisible();
+  await shot(page, "317-own-parcel");
+
+  await buyer.reload();
+  await expect(parcels.getByRole("listitem").filter({ hasText: "Beeswax Candle" })).toContainText("On its way");
+  await expect(parcels.getByRole("listitem").filter({ hasText: "Beeswax Candle" })).toContainText("USPS: 9400111899");
 });

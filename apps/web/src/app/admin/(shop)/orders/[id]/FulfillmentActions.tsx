@@ -25,7 +25,7 @@ export function CheckTrackingButton({ orderId }: { orderId: string }) {
   );
 }
 
-export function ManualTrackingForm({ orderId, primary }: { orderId: string; primary?: boolean }) {
+export function ManualTrackingForm({ orderId, primary, own }: { orderId: string; primary?: boolean; /** For the parcel of the store's own stock. */ own?: boolean }) {
   const [open, setOpen] = useState(false);
   const [state, action] = useActionState(addTrackingAction.bind(null, orderId), {});
   if (!open) {
@@ -37,6 +37,7 @@ export function ManualTrackingForm({ orderId, primary }: { orderId: string; prim
   }
   return (
     <form action={action} className="flex flex-col gap-3 w-full">
+      {own && <input type="hidden" name="own" value="1" />}
       <FormError message={state.error} />
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="field">

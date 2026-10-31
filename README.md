@@ -1748,3 +1748,7 @@ A cart that mixes products from different suppliers, or supplier products and th
 ### A shipping email for each parcel (after launch, part 317)
 
 An order in two parcels used to get one "has shipped" email with the first parcel's tracking, and the second parcel's tracking was never emailed. Now each parcel gets its own email as it ships: "Order #1042: parcel 1 of 2 is on its way", what's in it, its tracking, and what's still to come separately (or "this is the last parcel"). The first parcel uses the order's usual shipping email, so an order that already got one before this isn't emailed twice. "Your order was delivered" now waits until the last parcel arrives. Orders in one parcel are emailed as before. `parcelShippedEmail` and `byShipping` in `packages/core/src/parcels.ts`, used by `sendOrderEmail`. No migration.
+
+### Posting your own parcel in a mixed order (after launch, part 318)
+
+When an order had supplier products and the store's own stock, the admin order page only showed the supplier's parcel, and "Add tracking yourself" was hidden once a supplier had the order, so the merchant had no way to tell the buyer their own parcel had shipped. The Fulfillment card now lists what's in each parcel, and shows a **Sent by you** parcel with the store's own items and its own "Add tracking yourself". Saving it marks that parcel shipped and emails the buyer about it (parcel 2 of 2), without touching the supplier's parcel, even a failed one. `addManualTracking(..., { own: true })` in `packages/core/src/fulfillment.ts`. No migration.

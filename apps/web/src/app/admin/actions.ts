@@ -321,6 +321,7 @@ export async function addTrackingAction(orderId: string, _: FormState, form: For
       carrier: String(form.get("carrier") ?? ""),
       trackingNumber: String(form.get("trackingNumber") ?? ""),
       url: String(form.get("trackingUrl") ?? ""),
+      own: form.get("own") === "1",
     }),
     "Added tracking to order {order}",
   );
