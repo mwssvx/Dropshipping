@@ -165,16 +165,29 @@ export async function blogTopics(db: Db, shopId: string) {
 
 /** The newest published posts as home page cards: plain data the editor preview can show too. */
 export async function latestPosts(db: Db, shopId: string, limit = 6) {
-  const posts = await listPublishedPosts(db, shopId, limit);
-  return posts.map((p) => ({
-    id: p.id,
-    handle: p.handle,
-    title: p.title,
-    imageUrl: p.imageUrl,
-    summary: postSummary(p),
-    publishedAt: p.publishedAt?.toISOString() ?? null,
-    minutes: readingMinutes(p.body),
-  }));
+  return (await listPublishedPosts(db, shopId, limit)).map(postCard);
+}
+
+const postCard = (p: typeof schema.blogPosts.$inferSelect) => ({
+  id: p.id,
+  handle: p.handle,
+  title: p.title,
+  imageUrl: p.imageUrl,
+  summary: postSummary(p),
+  publishedAt: p.publishedAt?.toISOString() ?? null,
+  minutes: readingMinutes(p.body),
+});
+
+/**
+ * Posts to read next under a post: the ones sharing the most topics with it first, then the
+ * newest, so a store with no topics still gets its latest posts.
+ */
+export async function relatedPosts(db: Db, shopId: string, post: { id: string; tags: string[] }, limit = 3) {
+  const mine = new Set(post.tags.map((t) => t.toLowerCase()));
+  const others = (await listPublishedPosts(db, shopId, 100)).filter((p) => p.id !== post.id);
+  const shared = (p: (typeof others)[number]) => p.tags.filter((t) => mine.has(t.toLowerCase())).length;
+  // listPublishedPosts is newest first, and the sort keeps that order among equals.
+  return others.map((p) => ({ p, n: shared(p) })).sort((a, b) => b.n - a.n).slice(0, limit).map(({ p }) => postCard(p));
 }
 export type PostCard = Awaited<ReturnType<typeof latestPosts>>[number];
 

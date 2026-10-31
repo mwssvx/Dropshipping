@@ -1562,3 +1562,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Topics on a post** (`postTags` in `packages/core/src/blog.ts`): the post editor has "Topics (optional)", up to five, with commas between, like "Guides, News". Spaces are tidied and the same topic typed twice in another case is kept once.
 2. **On the store**: the blog shows a "Topics" row with how many posts each has once there are two or more, and `/blog?tag=Guides` lists only those posts under "Blog: Guides" (a topic no post has shows everything). A post shows its own topics as links back to that list. Drafts and scheduled posts don't count. Topics go along in the store file. Migration `0150_blog_topics`.
+
+### Read next (after launch, part 277)
+
+1. **Under each post** (`relatedPosts` in `packages/core/src/blog.ts`): a "Read next" row with three other posts, the ones sharing the most topics with it first, then the newest, so a store that doesn't use topics still shows its latest posts. Each has its picture, title, date and reading time. Drafts and scheduled posts stay out. No migration.

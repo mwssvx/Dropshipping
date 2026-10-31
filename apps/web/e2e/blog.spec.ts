@@ -138,7 +138,7 @@ test("a post scheduled for later waits, then goes up when the time is cleared", 
   await expect(page.getByLabel("Link text (optional)")).toHaveValue("Read the post");
 });
 
-test("posts carry topics, and buyers list the posts on one topic", async ({ page }, info) => {
+test("posts carry topics, buyers list the posts on one topic, and read the next one", async ({ page }, info) => {
   const id = `${info.project.name}-topics-${Date.now()}`;
   const store = await newMerchantWithLamp(page, id);
   const write = async (title: string, topics: string) => {
@@ -165,8 +165,9 @@ test("posts carry topics, and buyers list the posts on one topic", async ({ page
   await expect(buyer.getByRole("link", { name: "Lamps for reading" })).toHaveCount(0);
   await shot(buyer, "287-blog-topics");
 
-  // A post's own topics lead back to the list.
+  // A post's own topics lead back to the list, and the posts sharing them are there to read next.
   await buyer.getByRole("link", { name: "Picking a lamp" }).click();
+  await expect(buyer.getByRole("region", { name: "Read next" }).getByRole("link", { name: "Lamps for reading" })).toBeVisible();
   await buyer.getByRole("list", { name: "Topics" }).getByRole("link", { name: "Guides" }).click();
   await expect(buyer.getByRole("heading", { level: 1, name: "Blog: Guides" })).toBeVisible();
   await expect(buyer.getByRole("link", { name: "Lamps for reading" })).toBeVisible();
