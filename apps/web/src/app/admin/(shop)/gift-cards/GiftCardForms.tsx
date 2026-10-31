@@ -1,5 +1,6 @@
 "use client";
 import { startTransition, useActionState, useState } from "react";
+import { useFreshKey } from "@/components/useFreshKey";
 import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import type { FormState } from "../../actions";
@@ -79,8 +80,9 @@ export function BonusForm({ value, on, currencySymbol }: { value: Bonus | null; 
 
 export function IssueForm() {
   const [state, action] = useActionState(issueGiftCardAction, {} as FormState);
+  const freshKey = useFreshKey(state, "issue");
   return (
-    <form key={state.saved ? Date.now() : "issue"} action={action} className="flex flex-col gap-3">
+    <form key={freshKey} action={action} className="flex flex-col gap-3">
       <FormError message={state.error} />
       {state.saved && <p className="banner banner-success" role="status">Gift card sent.</p>}
       <div className="grid sm:grid-cols-[1fr_10rem] gap-3">

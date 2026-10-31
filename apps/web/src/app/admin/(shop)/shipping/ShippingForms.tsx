@@ -1,5 +1,6 @@
 "use client";
 import { useActionState } from "react";
+import { useFreshKey } from "@/components/useFreshKey";
 import { FormError } from "@/components/FormError";
 import { SubmitButton } from "@/components/SubmitButton";
 import type { FormState } from "../../actions";
@@ -35,8 +36,9 @@ function CountryPicker({ countries, selected }: { countries: Country[]; selected
 
 export function ZoneForm({ countries, zone }: { countries: Country[]; zone?: { id: string; name: string; countries: string[] } }) {
   const [state, action] = useActionState(zone ? updateZoneAction.bind(null, zone.id) : createZoneAction, {} as FormState);
+  const freshZone = useFreshKey(state, "zone");
   return (
-    <form key={!zone && state.saved ? Date.now() : "zone"} action={action} className="flex flex-col gap-3">
+    <form key={zone ? "zone" : freshZone} action={action} className="flex flex-col gap-3">
       <FormError message={state.error} />
       {zone && state.saved && <p className="text-sm text-success" role="status">Saved.</p>}
       <div className="field max-w-sm">
@@ -51,8 +53,9 @@ export function ZoneForm({ countries, zone }: { countries: Country[]; zone?: { i
 
 export function RateForm({ zoneId, currencySymbol }: { zoneId: string; currencySymbol: string }) {
   const [state, action] = useActionState(addRateAction.bind(null, zoneId), {} as FormState);
+  const freshKey = useFreshKey(state, "rate");
   return (
-    <form key={state.saved ? Date.now() : "rate"} action={action} className="flex flex-col gap-2">
+    <form key={freshKey} action={action} className="flex flex-col gap-2">
       <FormError message={state.error} />
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 items-end">
         <div className="field col-span-2 sm:col-span-1">
