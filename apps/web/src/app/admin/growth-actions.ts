@@ -190,7 +190,7 @@ export async function setReviewsAutoPublishAction(form: FormData) {
   revalidatePath("/admin/reviews");
 }
 
-export type ReviewRequestState = { error?: string; saved?: number };
+export type ReviewRequestState = { error?: string; saved?: number; reminder?: boolean };
 
 /** How many days after delivery buyers are asked for a review; 0 turns it off. */
 export async function setReviewRequestDaysAction(_: ReviewRequestState, form: FormData): Promise<ReviewRequestState> {
@@ -198,14 +198,14 @@ export async function setReviewRequestDaysAction(_: ReviewRequestState, form: Fo
   const on = form.get("enabled") === "on";
   const days = on ? Number.parseInt(String(form.get("days") ?? ""), 10) : 0;
   try {
-    await setReviewRequestDays(db, shop.id, Number.isNaN(days) ? -1 : days);
+    await setReviewRequestDays(db, shop.id, Number.isNaN(days) ? -1 : days, form.get("reminder") === "on");
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
     throw e;
   }
   await logged({ shop, user, db }, days ? `Set review requests to go out ${days} ${days === 1 ? "day" : "days"} after delivery` : "Turned off review requests", { href: "/admin/reviews" });
   revalidatePath("/admin/reviews");
-  return { saved: days };
+  return { saved: days, reminder: days > 0 && form.get("reminder") === "on" };
 }
 
 /** Emails the buyer the store's first reply once their review is live, after the page has answered. */

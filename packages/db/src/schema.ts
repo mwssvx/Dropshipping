@@ -155,6 +155,8 @@ export const shops = pgTable(
     reviewRequestDays: integer("review_request_days").notNull().default(7),
     // A thank-you code for a review: this percent off the buyer's next order, once per order. Null means off.
     reviewRewardPercent: integer("review_reward_percent"),
+    // One more email a week after the review request, for buyers who haven't reviewed yet.
+    reviewReminder: boolean("review_reminder").notNull().default(false),
     // Buyers whose order still hasn't shipped this many days after paying get one email saying so.
     lateOrderNotice: jsonb("late_order_notice").$type<LateOrderNotice | null>(),
     // Extra currencies buyers can shop in, converted from the store's own currency at today's rate.
@@ -737,6 +739,8 @@ export const orders = pgTable(
     surveyOther: text("survey_other"),
     // When the buyer was asked to review what they got, once per order.
     reviewRequestedAt: timestamp("review_requested_at", { withTimezone: true }),
+    // When the one review reminder went, a week after the request.
+    reviewRemindedAt: timestamp("review_reminded_at", { withTimezone: true }),
     // When the buyer was reminded to reorder, once per order.
     reorderRemindedAt: timestamp("reorder_reminded_at", { withTimezone: true }),
     // The merchant's own note and labels ("follow up", "vip"). Never shown to the buyer.

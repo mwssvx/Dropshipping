@@ -4,7 +4,7 @@ import { FormError } from "@/components/FormError";
 import { setReviewRequestDaysAction, type ReviewRequestState } from "../../growth-actions";
 
 /** The email that asks buyers for a review a few days after their order arrives. */
-export function ReviewRequestForm({ days }: { days: number }) {
+export function ReviewRequestForm({ days, reminder }: { days: number; reminder: boolean }) {
   const [state, action, pending] = useActionState(setReviewRequestDaysAction, {} as ReviewRequestState);
   return (
     // Submitted by hand so React doesn't reset the fields after an error.
@@ -19,7 +19,9 @@ export function ReviewRequestForm({ days }: { days: number }) {
       <FormError message={state.error} />
       {state.saved !== undefined && !pending && !state.error && (
         <p className="banner banner-success" role="status">
-          {state.saved ? `Saved. Buyers are asked ${state.saved} ${state.saved === 1 ? "day" : "days"} after their order arrives.` : "Saved. Buyers aren't emailed for a review."}
+          {state.saved
+            ? `Saved. Buyers are asked ${state.saved} ${state.saved === 1 ? "day" : "days"} after their order arrives${state.reminder ? ", and reminded once a week later" : ""}.`
+            : "Saved. Buyers aren't emailed for a review."}
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2">
@@ -31,7 +33,11 @@ export function ReviewRequestForm({ days }: { days: number }) {
         <span>days after their order arrives</span>
         <button type="submit" className="btn btn-secondary" disabled={pending} aria-busy={pending}>{pending ? "Saving…" : "Save"}</button>
       </div>
-      <p className="hint">Once per order, with a link to the review form. Not for gifts, or buyers who unsubscribed from your emails.</p>
+      <label className="flex items-center gap-2">
+        <input type="checkbox" name="reminder" defaultChecked={reminder} />
+        Send one reminder a week later to buyers who haven&apos;t reviewed yet
+      </label>
+      <p className="hint">Once per order (twice with the reminder), with a link to the review form. Not for gifts, or buyers who unsubscribed from your emails.</p>
     </form>
   );
 }

@@ -18,8 +18,12 @@ test("a merchant sets when buyers are asked for a review", async ({ page }, info
   await expect(section.getByLabel("Email buyers for a review")).toBeChecked();
   await expect(section.getByLabel("Days after delivery")).toHaveValue("7");
   await section.getByLabel("Days after delivery").fill("3");
+  await expect(section.getByLabel(/Send one reminder a week later/)).not.toBeChecked();
+  await section.getByLabel(/Send one reminder a week later/).check();
   await section.getByRole("button", { name: "Save" }).click();
-  await expect(section.getByText("Saved. Buyers are asked 3 days after their order arrives.")).toBeVisible();
+  await expect(section.getByText("Saved. Buyers are asked 3 days after their order arrives, and reminded once a week later.")).toBeVisible();
+  await page.reload();
+  await expect(section.getByLabel(/Send one reminder a week later/)).toBeChecked();
   await section.getByLabel("Email buyers for a review").uncheck();
   await section.getByRole("button", { name: "Save" }).click();
   await expect(section.getByText("Saved. Buyers aren't emailed for a review.")).toBeVisible();
