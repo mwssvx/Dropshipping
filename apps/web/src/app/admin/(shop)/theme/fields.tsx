@@ -1,6 +1,6 @@
 "use client";
 import { useId } from "react";
-import { ANNOUNCE_MAX, COLUMNS_MAX, GALLERY_MAX, LOGOS_MAX, MARQUEE_MAX, LOOK_MAX, SLIDES_MAX, MENU_CHILDREN_MAX, TRUST_ICONS, type MenuItem, type MenuLink, type SectionSettings, type SectionType, type TrustIcon } from "@sf/core/theme";
+import { ANNOUNCE_MAX, COLUMNS_MAX, GALLERY_MAX, HOURS_MAX, LOGOS_MAX, MARQUEE_MAX, LOOK_MAX, SLIDES_MAX, MENU_CHILDREN_MAX, TRUST_ICONS, type MenuItem, type MenuLink, type SectionSettings, type SectionType, type TrustIcon } from "@sf/core/theme";
 
 /*
  * Form controls for the theme editor. Every control is labelled and edits one value.
@@ -15,7 +15,7 @@ type Field =
   | { key: string; label: string; kind: "text" | "textarea" | "image" | "link" | "datetime"; hint?: string; max?: number }
   | { key: string; label: string; kind: "select"; options: { value: string; label: string }[] }
   | { key: string; label: string; kind: "number"; min: number; max: number }
-  | { key: string; label: string; kind: "collection" | "collections" | "faq" | "quotes" | "badges" | "product" | "products" | "logos" | "messages" | "columns" | "slides" | "marquee" | "gallery"; hint?: string };
+  | { key: string; label: string; kind: "collection" | "collections" | "faq" | "quotes" | "badges" | "product" | "products" | "logos" | "messages" | "columns" | "slides" | "marquee" | "gallery" | "hours"; hint?: string };
 
 export const TRUST_ICON_LABELS: Record<TrustIcon, string> = {
   shipping: "Delivery truck",
@@ -169,6 +169,13 @@ export const SECTION_FIELDS: Record<SectionType, Field[]> = {
     { key: "collectionIds", label: "Tabs", kind: "collections", hint: "Pick up to 5, one tab each, in the order you tick them. Pick none to use your first collections." },
     { key: "limit", label: "Products per tab", kind: "number", min: 2, max: 12 },
   ],
+  store_location: [
+    { key: "heading", label: "Heading", kind: "text", max: 120, hint: "Leave empty for “Visit us” in the shopper's language." },
+    { key: "address", label: "Address", kind: "textarea", max: 300, hint: "One line each for the street, the town and the postcode. The section shows once this is filled in." },
+    { key: "hours", label: "Opening hours", kind: "hours" },
+    { key: "text", label: "Text (optional)", kind: "textarea", max: 400, hint: "For example where to park or which door to use." },
+    { key: "imageUrl", label: "Photo of the shop (optional)", kind: "image" },
+  ],
 };
 
 /** A saved moment as the editor's computer shows it, for a datetime-local input. */
@@ -235,7 +242,7 @@ export function SectionForm<T extends SectionType>({
         const v = values[f.key];
         return (
           <div key={f.key} className="field">
-            {!["faq", "collections", "quotes", "badges", "products", "logos", "messages", "columns", "slides", "marquee", "gallery"].includes(f.kind) && <label className="label" htmlFor={id}>{f.label}</label>}
+            {!["faq", "collections", "quotes", "badges", "products", "logos", "messages", "columns", "slides", "marquee", "gallery", "hours"].includes(f.kind) && <label className="label" htmlFor={id}>{f.label}</label>}
             {f.kind === "text" && <input id={id} className="input" value={String(v ?? "")} maxLength={f.max} onChange={(e) => set(f.key, e.target.value)} />}
             {f.kind === "textarea" && <textarea id={id} className="input" rows={4} value={String(v ?? "")} maxLength={f.max} onChange={(e) => set(f.key, e.target.value)} />}
             {f.kind === "datetime" && (
@@ -339,6 +346,10 @@ export function SectionForm<T extends SectionType>({
                   { key: "alt", label: "What the photo shows" },
                   { key: "link", label: "Photo link" },
                 ]} blank={{ imageUrl: "", alt: "", link: "" }} />
+            )}
+            {f.kind === "hours" && (
+              <ListItems label={f.label} items={v as Record<string, string>[]} onChange={(x) => set(f.key, x)} max={HOURS_MAX} noun="row of hours"
+                fields={[{ key: "days", label: "Days" }, { key: "time", label: "Hours" }]} blank={{ days: "", time: "" }} />
             )}
             {f.kind === "marquee" && (
               <ListItems label={f.label} items={v as Record<string, string>[]} onChange={(x) => set(f.key, x)} max={MARQUEE_MAX} noun="message"

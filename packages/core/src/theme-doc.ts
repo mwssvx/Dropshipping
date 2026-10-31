@@ -108,6 +108,13 @@ export const MARQUEE_MAX = 8;
 export const GALLERY_MAX = 8;
 /** Collections in one "Collection tabs" section. */
 export const COLLECTION_TABS_MAX = 5;
+/** Rows of opening hours in one "Visit us" section. */
+export const HOURS_MAX = 7;
+
+/** A map search for an address, opened only when a shopper asks for directions. */
+export function directionsUrl(address: string) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address.replace(/\s+/g, " ").trim())}`;
+}
 
 /**
  * The tabs a "Collection tabs" section shows: the picked collections in the order picked, or the
@@ -303,6 +310,15 @@ const sectionSchemas = {
     collectionIds: z.array(z.string().uuid()).max(COLLECTION_TABS_MAX, `Pick up to ${COLLECTION_TABS_MAX} collections.`).default([]),
     limit: z.number().int().min(2).max(12).default(8),
   }),
+  // Where to find a shop with a front door: its address, opening hours and a directions link.
+  // Nothing loads from a map until a shopper asks for directions. Hidden until the address is set.
+  store_location: z.object({
+    heading: text(120),
+    address: text(300),
+    hours: z.array(z.object({ days: text(40), time: text(40) })).max(HOURS_MAX, `Add up to ${HOURS_MAX} rows of opening hours.`).default([]),
+    text: text(400),
+    imageUrl,
+  }),
 } as const;
 
 export type SectionType = keyof typeof sectionSchemas;
@@ -333,6 +349,7 @@ export const SECTION_LABELS: Record<SectionType, { name: string; about: string }
   gallery: { name: "Photo gallery", about: "Up to eight square photos in a grid, like your Instagram or buyers using your products, each with an optional link, and a button like “Follow us”." },
   before_after: { name: "Before and after", about: "Two photos of the same thing, before and after using your product, with a handle shoppers drag to compare them. Use real photos only." },
   collection_tabs: { name: "Collection tabs", about: "Up to five collections as tabs over one product grid, so shoppers switch between “New in”, “Best sellers” and “Gifts” without leaving the page." },
+  store_location: { name: "Visit us", about: "Your shop's address, opening hours and a photo, with a button that opens directions in the shopper's map. For stores with a front door or a pickup point." },
 };
 
 const sectionId = z.string().regex(/^[a-z0-9]{4,24}$/, "Section ids are short lowercase codes.");
