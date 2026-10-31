@@ -6,6 +6,7 @@ import { FULFILMENT, money, PAYMENT, parseMoney, when } from "../../src/format";
 import { BackLink, Banner, Body, Button, Card, Field, Heading, List, LoadError, Loading, Pill, Row, Screen, Section, Toggle } from "../../src/ui";
 import { space } from "../../src/theme";
 import { useCan } from "../../src/session";
+import { DISPUTE_STATUS } from "../../src/disputes";
 
 type Detail = {
   id: string;
@@ -45,6 +46,20 @@ type Detail = {
   blocked?: boolean;
   /** Picked up by the buyer, or delivered by the store itself. */
   handover?: { kind: "pickup" | "delivery"; day: string | null; readyAt: string | null; done: boolean } | null;
+  /** A buyer's bank pulling the money back; `checks` while it waits for an answer. */
+  disputes?: {
+    id: string;
+    status: keyof typeof DISPUTE_STATUS;
+    inquiry: boolean;
+    reason: string;
+    tip: string;
+    amountMinor: number;
+    currency: string;
+    evidenceDueBy: string | null;
+    note: string | null;
+    submittedAt: string | null;
+    checks: { label: string; ok: boolean; detail: string }[];
+  }[];
   /** The buyer, when this person can open customers. */
   customer?: { id: string; orders: number; tags: string[] } | null;
 };
@@ -72,7 +87,7 @@ export default function OrderScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const order = useApi<Detail>(`orders/${id}`);
   const can = useCan();
-  const [panel, setPanel] = useState<null | "refund" | "tracking" | "block">(null);
+  const [panel, setPanel] = useState<null | "refund" | "tracking" | "block" | "accept">(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{ tone: "success" | "critical"; text: string } | null>(null);
   const [amount, setAmount] = useState("");
@@ -81,6 +96,7 @@ export default function OrderScreen() {
   const [tracking, setTracking] = useState("");
   const [also, setAlso] = useState<string[]>([]);
   const [why, setWhy] = useState("");
+  const [evidenceNote, setEvidenceNote] = useState("");
 
   async function run(key: string, path: string, body: unknown) {
     setBusy(key);
@@ -112,6 +128,59 @@ export default function OrderScreen() {
         <Pill label={f.label} tone={f.tone} />
       </View>
       {note ? <Banner tone={note.tone}>{note.text}</Banner> : null}
+
+      {(o.disputes ?? []).map((d) => {
+        const s = DISPUTE_STATUS[d.status];
+        const open = d.status === "needs_response";
+        return (
+          <Card key={d.id}>
+            <View role="region" aria-label={d.inquiry ? "Question from the buyer's bank" : `Disputed: ${money(d.amountMinor, d.currency)}`} style={{ gap: space(2) }}>
+              <Pill label={s.label} tone={s.tone} />
+              <Heading>{d.inquiry ? "The buyer's bank has a question" : `Disputed: ${money(d.amountMinor, d.currency)}`}</Heading>
+              <Body>{d.reason}.</Body>
+              {open ? (
+                <>
+                  <Body muted>
+                    {[
+                      d.inquiry ? "Nothing has been taken back yet, but it can be if there's no answer." : "The money is held until the bank decides.",
+                      d.evidenceDueBy ? `Answer by ${longDay.format(new Date(d.evidenceDueBy))}.` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  </Body>
+                  <Body muted>What helps: {d.tip}</Body>
+                  <View role="list" aria-label="Evidence" style={{ gap: space(1) }}>
+                    {d.checks.map((c) => (
+                      <View key={c.label} role="listitem">
+                        <Body>{`${c.ok ? "✓" : "✗"} ${c.label}`}</Body>
+                        <Body muted>{c.detail}</Body>
+                      </View>
+                    ))}
+                  </View>
+                  {panel === "accept" ? (
+                    <>
+                      <Body>{d.inquiry ? "The bank closes the question and the buyer gets the money back." : "The buyer keeps the money back and the dispute counts as lost."}</Body>
+                      <Button label="Accept, they keep the money" kind="danger" busy={busy === "accept"} onPress={() => run("accept", `disputes/${d.id}`, { action: "accept" })} />
+                      <Button label="Cancel" kind="ghost" onPress={() => setPanel(null)} />
+                    </>
+                  ) : (
+                    <>
+                      <Field label="Anything to add (optional)" value={evidenceNote} onChangeText={setEvidenceNote} multiline hint="Sent with the evidence, for the bank to read." />
+                      <Button label="Send evidence" busy={busy === "submit"} disabled={!!busy} onPress={() => run("submit", `disputes/${d.id}`, { action: "submit", note: evidenceNote })} />
+                      <Button label="Accept it…" kind="ghost" disabled={!!busy} onPress={() => setPanel("accept")} />
+                    </>
+                  )}
+                </>
+              ) : d.status === "under_review" ? (
+                <Body muted>{`Evidence sent${d.submittedAt ? ` on ${longDay.format(new Date(d.submittedAt))}` : ""}. The bank is reviewing it, and the result shows here.`}</Body>
+              ) : (
+                <Body muted>{d.status === "won" ? "The bank sided with you, and the money is back." : d.status === "lost" ? "The buyer kept the money back." : "The bank closed it."}</Body>
+              )}
+              {!open && d.note ? <Body muted>Your note: {d.note}</Body> : null}
+            </View>
+          </Card>
+        );
+      })}
 
       {o.held ? (
         <Card>
