@@ -1924,3 +1924,7 @@ Today has an Analytics button for people who can see the store's numbers. It sho
 ### Team activity in the app (after launch, part 361)
 
 The app's Settings has Activity for people who manage the team: what everyone did, newest first and by day, on the website and in the app (refunds, price changes, orders sent, codes and settings), with each person's name to see only theirs and Older to look further back. An entry about an order opens that order.
+
+### Subscriptions in the app (after launch, part 362)
+
+The Orders tab has Subscriptions: buyers who get their order again every few weeks (subscribe and save), with how many are active and what repeat deliveries brought in. Each one shows what they get, how often and at what discount, the next delivery, what they've spent so far, and when their card was declined. Search by email, see only card problems or paused ones, open their first order, write to them, or cancel a subscription when a buyer asks (they're emailed). In test mode the next delivery can be sent straight away.

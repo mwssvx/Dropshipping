@@ -1074,3 +1074,52 @@ test("the team's activity, with what was done in the app, from Settings", async 
   await expect(page.getByRole("heading", { name: new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date()) })).toBeVisible();
   await shot(page, "361-app-activity");
 });
+
+test("a buyer's subscription seen, sent early in test mode and cancelled from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `sb${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Coffee Beans");
+  await web.getByLabel("Price", { exact: true }).fill("16.00");
+  await web.getByLabel("Stock", { exact: true }).fill("50");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const beans = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+  await web.goto(`${WEB}/admin/marketing`);
+  const setting = web.getByRole("region", { name: "Subscribe and save" });
+  await setting.getByLabel("Let buyers subscribe to their order").check();
+  await setting.getByLabel("Subscriber saves (%)").fill("10");
+  await setting.getByRole("button", { name: "Save subscribe and save" }).click();
+  await expect(setting.getByText("Saved. Buyers see the offer on their order page after paying.")).toBeVisible();
+
+  const buyer = await (await browser.newContext()).newPage();
+  await buy(browser, beans, buyer);
+  const offer = buyer.getByRole("region", { name: "Get this again automatically and save 10%" });
+  await expect(async () => {
+    await buyer.reload();
+    await expect(offer).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 20_000 });
+  await offer.getByLabel("How often").selectOption({ label: "Every 2 weeks" });
+  await offer.getByRole("button", { name: "Subscribe and save 10%" }).click();
+  await expect(buyer.getByText(/You're subscribed\./)).toBeVisible();
+
+  await signIn(page, email);
+  await tab(page, "Orders");
+  await page.getByRole("link", { name: /^Subscriptions/ }).click();
+  await expect(page.getByRole("heading", { name: "Subscriptions", level: 1 })).toBeVisible();
+  const sub = page.getByRole("article", { name: "Ada Buyer's subscription" });
+  await expect(sub.getByText("1 × Coffee Beans")).toBeVisible();
+  await expect(sub.getByText(/^Every 2 weeks, 10% off · next on /)).toBeVisible();
+  await expect(sub.getByText("Active", { exact: true })).toBeVisible();
+  await shot(page, "362-app-subscriptions");
+
+  await sub.getByRole("button", { name: "Test mode: send the next delivery now" }).click();
+  await expect(page.getByText("Placed order #1002.")).toBeVisible();
+  await expect(sub.getByText(/^1 delivery so far · /)).toBeVisible();
+
+  await sub.getByRole("button", { name: "Cancel Ada Buyer's subscription…" }).click();
+  await sub.getByRole("button", { name: "Cancel Ada Buyer's subscription", exact: true }).click();
+  await expect(page.getByText("Cancelled. We've emailed ada@example.com.")).toBeVisible();
+  await expect(page.getByText("No subscriptions yet")).toBeVisible();
+  await page.getByRole("tab", { name: "All" }).click();
+  await expect(page.getByRole("article", { name: "Ada Buyer's subscription" }).getByText("Cancelled", { exact: true })).toBeVisible();
+});

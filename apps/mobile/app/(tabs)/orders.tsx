@@ -83,6 +83,7 @@ export default function OrdersScreen() {
       {!q && list.data ? (
         <List>
           <Row href="/payment-link" title="Create a payment link" subtitle="For a buyer who asked by message: we email them a link to pay" right={<Pill label="New" />} />
+          <Row href="/subscriptions" title="Subscriptions" subtitle="Buyers who get their order again every few weeks" right={<Pill label="See" />} />
         </List>
       ) : null}
       {show === "all" && !q && list.data ? (
