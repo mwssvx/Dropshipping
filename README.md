@@ -1884,3 +1884,7 @@ An order the buyer picks up, or that the store delivers itself, now shows a card
 ### A Hand over list in the app (after launch, part 351)
 
 The app's Orders tab has a Hand over list: paid orders buyers pick up, or that you deliver yourself, that aren't handed over yet. The soonest day comes first and each row says pickup or local delivery, the day, and whether the buyer was told it's ready.
+
+### Gift cards in the app (after launch, part 352)
+
+Today has a Gift cards button for roles that handle gift cards. When a buyer asks what's left on a card, type the code they read out (or its last 4, their email or the order number) and the app shows the balance. From there you can send a new code if they lost the email, or turn a card off and back on. It also shows what's unspent on all your gift cards, and sends a new gift card to any email.

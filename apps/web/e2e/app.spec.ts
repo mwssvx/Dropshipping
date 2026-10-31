@@ -737,3 +737,36 @@ test("a pickup order told ready and handed over from the app", async ({ page, br
   await page.goto("/orders?show=handover");
   await expect(page.getByText("Nothing to hand over")).toBeVisible();
 });
+
+test("a gift card sent, looked up by its code and turned off from the app", async ({ page, browser }) => {
+  const id = `gc${Date.now()}`;
+  const { web, email } = await merchant(browser, id);
+  const friend = `friend-${id}@example.com`;
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Gift cards" }).click();
+  await expect(page.getByText("No gift cards yet")).toBeVisible();
+  await page.getByRole("textbox", { name: "Their email" }).fill(friend);
+  await page.getByRole("textbox", { name: "Gift card amount" }).fill("25");
+  await page.getByRole("button", { name: "Send gift card" }).click();
+  await expect(page.getByText(`A $25.00 gift card is on its way to ${friend}.`)).toBeVisible();
+  await expect(page.getByText("$25.00 left of $25.00")).toBeVisible();
+
+  // The buyer reads out the code from their email; it finds the card.
+  await web.goto(`${WEB}/dev/mail`);
+  const mail = await web.getByRole("article").filter({ hasText: friend }).first().textContent();
+  const code = mail!.match(/[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}/)![0];
+  await page.getByRole("textbox", { name: "Find a gift card" }).fill("ZZZZ");
+  await expect(page.getByText("No gift card matches")).toBeVisible();
+  await page.getByRole("textbox", { name: "Find a gift card" }).fill(code.toLowerCase());
+  await expect(page.getByText(`···· ${code.slice(-4)}`)).toBeVisible();
+  await shot(page, "352-app-gift-cards");
+
+  await page.getByRole("button", { name: `Turn off the card ending ${code.slice(-4)}` }).click();
+  await expect(page.getByText(`The card ending ${code.slice(-4)} is off. It can't be spent until you turn it back on.`)).toBeVisible();
+  await expect(page.getByText("Turned off", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: `Turn on the card ending ${code.slice(-4)}` }).click();
+  await expect(page.getByText(`The card ending ${code.slice(-4)} works again.`)).toBeVisible();
+
+  await web.goto(`${WEB}/admin/activity`);
+  await expect(web.getByText(`Gave a $25.00 gift card to ${friend} in the app`)).toBeVisible();
+});
