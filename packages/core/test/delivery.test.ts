@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { schema } from "@sf/db";
-import { DemoModel, exportStore, formatDeliveryWindow, orderDelivery, productDelivery, setDeliveryEstimates, transitDays } from "../src";
+import { daysPastDelivery, DemoModel, exportStore, formatDeliveryWindow, orderDelivery, productDelivery, setDeliveryEstimates, transitDays } from "../src";
 import { DAY, makeFixture } from "../evals/fixture";
 
 describe("delivery dates", () => {
@@ -54,6 +54,15 @@ describe("delivery dates", () => {
     expect(await productDelivery(f.db, await f.shop(), f.products.lamp.id)).toBeNull();
     const quiet = await f.waitingOrder();
     expect(f.mailer.sent.find((m) => m.subject === `Order #${quiet.number} confirmed`)?.text).not.toContain("Expected delivery");
+
+    // The admin still sees the date with it turned off, and how late a shipped parcel is.
+    const hidden = (await orderDelivery(f.db, await f.shop(), shipped, { evenIfHidden: true }))!;
+    expect(hidden.to.getTime()).toBe(onTheWay.to.getTime());
+    expect(await orderDelivery(f.db, await f.shop(), shipped)).toBeNull();
+    expect(daysPastDelivery(hidden, shipped, new Date(hidden.to.getTime() + DAY / 2))).toBe(0);
+    expect(daysPastDelivery(hidden, shipped, new Date(hidden.to.getTime() + 3 * DAY + 5))).toBe(3);
+    expect(daysPastDelivery(hidden, { fulfillmentStatus: "unfulfilled" }, new Date(hidden.to.getTime() + 3 * DAY))).toBe(0);
+    expect(daysPastDelivery(null, shipped)).toBe(0);
 
     const file = JSON.parse(JSON.stringify(await exportStore(f.db, shopId)));
     expect(file.store.delivery_estimates).toEqual({ enabled: false, processing_days: 3 });

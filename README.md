@@ -1692,3 +1692,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Last day before a shipping pause (after launch, part 303)
 
 1. **Order before the break** (`upcomingShipPause` in `packages/core/src/ship-pause.ts`): a shipping pause set ahead warns shoppers for the week before it starts. Every store page says "Order by February 9 to get it on its way before our shipping break. Orders after that ship from February 18.", in their language, with the merchant's note. That turns the break into a reason to order now, the way an order-by date does before Christmas. Delivery dates don't move until the pause starts. No migration.
+
+### Expected delivery on the admin order page (after launch, part 304)
+
+The Delivery card on an order says when it should arrive, using the same window the buyer sees on their order page (from payment, or from the latest shipment once it's shipped). When a shipped parcel is a day or more past its last day, a pill says how many days late it is, so a merchant answering "where is my order?" sees it at a glance. The date shows even when delivery dates are hidden from buyers, with a note that buyers don't see it. `orderDelivery(db, shop, order, { evenIfHidden })` and `daysPastDelivery(window, order, now)` in `packages/core/src/delivery.ts`.
