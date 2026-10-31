@@ -365,4 +365,11 @@ test("weight and cost of the store's own stock, set from the app", async ({ page
     await expect(page.getByRole("link", { name: /Beeswax Candle/ })).toBeVisible();
   }
   await shot(page, "337-app-sold-out");
+
+  // Search looks in the list that's open, by name or SKU.
+  await page.getByRole("textbox", { name: "Search products" }).fill("candle");
+  await expect(page.getByRole("link", { name: /Beeswax Candle/ })).toBeVisible();
+  await page.getByRole("textbox", { name: "Search products" }).fill("mug");
+  await expect(page.getByText('No products match "mug".')).toBeVisible();
+  await expect(page.getByRole("link", { name: /Beeswax Candle/ })).toHaveCount(0);
 });

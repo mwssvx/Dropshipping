@@ -6,7 +6,7 @@ export type Product = {
   descriptionHtml: string;
   aiGenerated: boolean;
   sourceUrl: string | null;
-  variants: { id: string; title: string; priceMinor: number; costMinor: number | null; stock: number | null; weightGrams: number | null }[];
+  variants: { id: string; title: string; priceMinor: number; costMinor: number | null; stock: number | null; weightGrams: number | null; sku: string | null }[];
   /** Goes in a parcel, so it can have a weight. */
   ships: boolean;
   /** The store's own stock: the merchant sets what it costs. */
@@ -32,3 +32,10 @@ export const STATUS: Record<Product["status"], { label: string; tone: "success" 
   draft: { label: "Draft", tone: "warning" },
   archived: { label: "Archived", tone: "neutral" },
 };
+
+/** Whether a product matches what was typed in the search box: its title, an option's name or a SKU. */
+export function matches(p: Product, query: string) {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return [p.title, ...p.variants.flatMap((v) => [v.title, v.sku ?? ""])].some((t) => t.toLowerCase().includes(q));
+}
