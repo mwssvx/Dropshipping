@@ -3,7 +3,7 @@ import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Image, View } from "react-native";
 import { api, send, useApi } from "../../src/api";
-import { money, parseMoney } from "../../src/format";
+import { kg, money, parseKg, parseMoney } from "../../src/format";
 import { useSession } from "../../src/session";
 import { BackLink, Banner, Body, Button, Card, Field, Heading, LoadError, Loading, Pill, Screen, Section } from "../../src/ui";
 import { color, radius, space } from "../../src/theme";
@@ -17,6 +17,8 @@ export default function ProductScreen() {
   const cur = useSession().me?.shop.currency ?? "USD";
   const [prices, setPrices] = useState<Record<string, string>>({});
   const [stock, setStock] = useState<Record<string, string>>({});
+  const [weight, setWeight] = useState<Record<string, string>>({});
+  const [cost, setCost] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{ tone: "success" | "critical" | "info"; text: string } | null>(
     imported ? { tone: "success", text: "Imported as a draft. Next: let AI write the listing, then put it on sale." } : null,
@@ -27,6 +29,8 @@ export default function ProductScreen() {
     if (!p) return;
     setPrices(Object.fromEntries(p.variants.map((v) => [v.id, (v.priceMinor / 100).toFixed(2)])));
     setStock(Object.fromEntries(p.variants.map((v) => [v.id, v.stock === null ? "" : String(v.stock)])));
+    setWeight(Object.fromEntries(p.variants.map((v) => [v.id, kg(v.weightGrams)])));
+    setCost(Object.fromEntries(p.variants.map((v) => [v.id, v.costMinor === null ? "" : (v.costMinor / 100).toFixed(2)])));
   }, [p]);
 
   async function act(key: string, fn: () => Promise<string>) {
@@ -64,9 +68,33 @@ export default function ProductScreen() {
       const price = parseMoney(prices[v.id] ?? "");
       const st = (stock[v.id] ?? "").trim();
       const stockN = st === "" ? null : Number.parseInt(st, 10);
-      return { id: v.id, priceMinor: price ?? v.priceMinor, stock: Number.isNaN(stockN) ? v.stock : stockN, v };
+      const grams = parseKg(weight[v.id] ?? "");
+      const c = (cost[v.id] ?? "").trim();
+      const costMinor = c === "" ? null : (parseMoney(c) ?? v.costMinor);
+      return {
+        id: v.id,
+        priceMinor: price ?? v.priceMinor,
+        stock: Number.isNaN(stockN) ? v.stock : stockN,
+        // Not a number, or 0: keep what it was.
+        weightGrams: grams === null || grams > 0 ? grams : v.weightGrams,
+        costMinor,
+        v,
+      };
     })
-    .filter((c) => c.priceMinor !== c.v.priceMinor || c.stock !== c.v.stock);
+    .filter(
+      (c) =>
+        c.priceMinor !== c.v.priceMinor ||
+        c.stock !== c.v.stock ||
+        (p.ships && c.weightGrams !== c.v.weightGrams) ||
+        (p.ownStock && c.costMinor !== c.v.costMinor),
+    );
+  const many = p.variants.length > 1;
+  // What the merchant keeps of the price they typed, once they've said what it costs them.
+  const keep = (vid: string) => {
+    const price = parseMoney(prices[vid] ?? "");
+    const c = parseMoney((cost[vid] ?? "").trim());
+    return price !== null && c !== null ? `You keep ${money(price - c, cur)} of each before fees.` : null;
+  };
 
   return (
     <Screen title={p.title} back={back} onRefresh={product.reload} refreshing={product.loading}>
@@ -104,24 +132,51 @@ export default function ProductScreen() {
       <Section title="Price and stock">
         {p.variants.map((v) => (
           <Card key={v.id}>
-            {p.variants.length > 1 ? <Heading>{v.title}</Heading> : null}
-            <Field label={p.variants.length > 1 ? `Price for ${v.title}` : "Price"} value={prices[v.id] ?? ""} onChangeText={(t) => setPrices((x) => ({ ...x, [v.id]: t }))} keyboardType="decimal-pad" />
-            {v.costMinor !== null ? (
+            {many ? <Heading>{v.title}</Heading> : null}
+            <Field label={many ? `Price for ${v.title}` : "Price"} value={prices[v.id] ?? ""} onChangeText={(t) => setPrices((x) => ({ ...x, [v.id]: t }))} keyboardType="decimal-pad" />
+            {p.ownStock ? (
+              <Field
+                label={many ? `What ${v.title} costs you` : "What it costs you"}
+                value={cost[v.id] ?? ""}
+                onChangeText={(t) => setCost((x) => ({ ...x, [v.id]: t }))}
+                keyboardType="decimal-pad"
+                hint={keep(v.id) ?? "What you paid for each, so Money can show your profit."}
+              />
+            ) : v.costMinor !== null ? (
               <Body muted>
                 Costs you {money(v.costMinor, cur)} from the supplier
                 {parseMoney(prices[v.id] ?? "") ? `, so you keep ${money((parseMoney(prices[v.id] ?? "") ?? 0) - v.costMinor, cur)} before fees.` : "."}
               </Body>
             ) : null}
             <Field label={p.variants.length > 1 ? `Stock for ${v.title}` : "Stock"} value={stock[v.id] ?? ""} onChangeText={(t) => setStock((x) => ({ ...x, [v.id]: t }))} keyboardType="number-pad" hint="Leave empty to follow the supplier's stock." />
+            {p.ships ? (
+              <Field
+                label={many ? `Weight of ${v.title} packed (kg)` : "Weight packed (kg)"}
+                value={weight[v.id] ?? ""}
+                onChangeText={(t) => setWeight((x) => ({ ...x, [v.id]: t }))}
+                keyboardType="decimal-pad"
+                hint="With its box, for shipping rates by weight."
+              />
+            ) : null}
           </Card>
         ))}
         {changes.length > 0 ? (
           <Button
-            label="Save price and stock"
+            label="Save changes"
             busy={busy === "save"}
             onPress={() =>
               act("save", async () => {
-                const r = await send(`products/${id}`, "PATCH", { variants: changes.map(({ id, priceMinor, stock }) => ({ id, priceMinor, stock })) }, `Price and stock for ${p.title}`);
+                const r = await send(`products/${id}`, "PATCH", {
+                    variants: changes.map(({ id, priceMinor, stock, weightGrams, costMinor }) => ({
+                      id,
+                      priceMinor,
+                      stock,
+                      ...(p.ships ? { weightGrams } : {}),
+                      ...(p.ownStock ? { costMinor } : {}),
+                    })),
+                  },
+                  `Changes to ${p.title}`,
+                );
                 return r === "queued" ? "Saved. It's sent when you're back online." : "Saved.";
               })
             }
