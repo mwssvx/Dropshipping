@@ -1466,3 +1466,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Questions without leaving the page** (`apps/web/src/theme/Sections.tsx`): a new home page section in the theme editor with the same form as the Contact page (name, email, an optional order number and the message). Messages arrive under Inbox like any other, and a message with an order number still gets the Assistant's help.
 2. **Ready as it is**: the heading defaults to "Contact us" and the line under it to "we'll reply by email", in the shopper's language, or say your own ("We answer within a day"). In the editor's preview the Send button is greyed out, so test messages never reach your inbox. The form's fields now get their own ids, so it can sit on a page next to another form. No new strings and no migration: it lives in the theme.
+
+### Age check on entry (after launch, part 258)
+
+1. **For adults-only stores** (`apps/web/src/theme/AgeGate.tsx`): in the theme editor's Style tab, "Ask visitors their age first" can ask for 18 or 21 and over. Visitors see the store's name, "You must be old enough to buy from …" and "Are you 21 or older?" before anything else, with Yes and No.
+2. **Once per device**: a yes is remembered in the browser, so returning shoppers aren't asked on every page; a no keeps the store hidden with a short "Sorry" and isn't remembered, so a slip is fixed by reloading. Escape doesn't skip it, and the editor preview never asks. It's a confirmation, not an ID check: checkout still asks for products with a minimum age (part 133). Five new store strings in all six languages. No migration: it lives in the theme.
