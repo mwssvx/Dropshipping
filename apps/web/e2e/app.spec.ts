@@ -536,3 +536,52 @@ test("a crossed-out price set from the app shows as a sale on the store", async 
   await web.reload();
   await expect(web.locator("s", { hasText: "$16.00" })).toHaveCount(0);
 });
+
+test("returns answered from the app: one declined with a reason, one refunded", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `rt${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Beeswax Candle");
+  await web.getByLabel("Price", { exact: true }).fill("12.00");
+  await web.getByLabel("Stock", { exact: true }).fill("6");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const candle = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+  for (const [reason, note] of [["I changed my mind", null], ["It arrived damaged", "The wax is cracked."]] as const) {
+    const buyer = await (await browser.newContext()).newPage();
+    await buy(browser, candle, buyer);
+    await buyer.getByText("Return something").click();
+    await buyer.getByLabel("Why?").selectOption({ label: reason });
+    if (note) await buyer.getByLabel(/Anything the store should know/).fill(note);
+    await buyer.getByRole("button", { name: "Ask for a return" }).click();
+    await expect(buyer.locator("#returns")).toContainText("you asked for a return");
+  }
+
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Returns" }).click();
+  await expect(page.getByRole("tab", { name: "Open (2)" })).toBeVisible();
+  await expect(page.getByText('It arrived damaged: "The wax is cracked."')).toBeVisible();
+  await shot(page, "345-app-returns");
+
+  // Declining needs a reason the buyer can act on.
+  await page.getByRole("button", { name: "Decline the return on order #1001" }).click();
+  await expect(page.getByText("Tell the buyer why, so they know what to do next.")).toBeVisible();
+  await page.getByRole("textbox", { name: "Message for order #1001" }).fill("Candles can't come back once lit.");
+  await page.getByRole("button", { name: "Decline the return on order #1001" }).click();
+  await expect(page.getByText("Declined. The buyer gets an email with your reason.")).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Open (1)" })).toBeVisible();
+
+  // The damaged one: refunded what they paid.
+  await expect(page.getByRole("textbox", { name: "Amount for order #1002" })).not.toHaveValue("");
+  await page.getByRole("button", { name: "Refund the return on order #1002" }).click();
+  await expect(page.getByText(/^Refunded \$\d+\.\d\d\. The buyer gets an email\.$/)).toBeVisible();
+  await expect(page.getByText("No returns to answer")).toBeVisible();
+
+  await page.getByRole("tab", { name: "All" }).click();
+  await expect(page.getByText("Declined", { exact: true })).toBeVisible();
+  await expect(page.getByText("Refunded", { exact: true })).toBeVisible();
+  await expect(page.getByText("You said: Candles can't come back once lit.")).toBeVisible();
+
+  // The website shows the same answers, and the activity log says they came from the app.
+  await web.goto(`${WEB}/admin/activity`);
+  await expect(web.getByText("Declined the return on order #1001 in the app")).toBeVisible();
+});

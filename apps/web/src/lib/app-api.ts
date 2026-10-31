@@ -51,6 +51,12 @@ import {
   getCustomerProfile,
   updateCustomerNotes,
   customerOfOrder,
+  countReturns,
+  listReturns,
+  decideReturn,
+  RETURN_REASON_LABELS,
+  type ReturnDecision,
+  formatMoney,
   listDiscounts,
   describeDiscount,
   createDiscount,
@@ -460,6 +466,58 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, `${row.active ? "Turned on" : "Turned off"} the discount code ${row.code} in the app`, { href: "/admin/marketing" });
     return { ok: true, message: row.active ? `${row.code} works again.` : `${row.code} is off. Buyers who try it are told it doesn't work.` };
   },
+  "GET returns": async ({ url, db, shop }) => {
+    const show = url.searchParams.get("show") === "all" ? "all" : "open";
+    const [open, rows] = await Promise.all([countReturns(db, shop.id, "open"), listReturns(db, shop.id, show, { size: 50 })]);
+    const names = new Map(
+      rows.length
+        ? (await db.query.orders.findMany({ where: (o, { inArray }) => inArray(o.id, rows.map((r) => r.orderId)), columns: { id: true, shippingAddress: true } })).map((o) => [o.id, o.shippingAddress.name])
+        : [],
+    );
+    return {
+      open,
+      returns: rows.map((r) => ({
+        id: r.id,
+        orderId: r.orderId,
+        orderNumber: r.orderNumber,
+        name: r.giftReturn?.name ?? names.get(r.orderId) ?? r.email,
+        // A gift's recipient sent it back: only store credit, so the buyer never hears of it.
+        gift: !!r.giftReturn,
+        status: r.status,
+        reason: RETURN_REASON_LABELS[r.reason],
+        note: r.note,
+        items: r.items.map((i) => ({ title: i.title, quantity: i.quantity, exchangeTitle: i.exchangeTitle ?? null })),
+        suggestedMinor: r.suggestedMinor,
+        resolvedMinor: r.resolvedMinor,
+        merchantMessage: r.merchantMessage,
+        currency: r.currency,
+        createdAt: r.createdAt,
+      })),
+    };
+  },
+  "POST returns/:id": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ action?: unknown; amountMinor?: unknown; message?: unknown }>(req);
+    const message = str(b.message);
+    const amountMinor = typeof b.amountMinor === "number" ? Math.round(b.amountMinor) : 0;
+    const action = String(b.action ?? "");
+    let decision: ReturnDecision;
+    if (action === "approve" || action === "decline" || action === "replace" || action === "exchange") decision = { action, message };
+    else if (action === "refund" || action === "credit") decision = { action, amountMinor, message };
+    else throw new HttpError(400, "Pick what to do with this return.");
+    const r = await decideReturn({ ...(await refunds()), storeAddress }, shop, params.id!, decision);
+    const money = formatMoney(amountMinor, shop.currency);
+    const said = {
+      approve: ["Approved the return on order {order}", "Approved. The buyer gets an email with what to do next."],
+      decline: ["Declined the return on order {order}", "Declined. The buyer gets an email with your reason."],
+      refund: [`Refunded ${money} for the return on order {order}`, `Refunded ${money}. The buyer gets an email.`],
+      credit: [`Gave ${money} store credit for the return on order {order}`, `${money} in store credit sent by email.`],
+      replace: ["Sent a replacement for the return on order {order}", "A free replacement order is made. The buyer gets an email."],
+      exchange: ["Sent an exchange for the return on order {order}", "The exchange goes out as a free order. The buyer gets an email with what to send back."],
+    }[decision.action];
+    await logged({ shop, user, db }, `${said[0]} in the app`, { orderId: r.orderId });
+    if (decision.action === "refund") notifyLater(shop.id);
+    return { ok: true, message: said[1] };
+  },
   "GET customers": async ({ url, db, shop }) => {
     const q = (url.searchParams.get("q") ?? "").slice(0, 100);
     // The ones who bought most recently first; a search looks at names and emails.
@@ -592,6 +650,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("reviews")) return "reviews";
   if (path.startsWith("customers")) return "customers";
   if (path.startsWith("codes")) return "marketing";
+  if (path.startsWith("returns")) return "returns";
   if (path === "today") return "home";
   return null;
 }

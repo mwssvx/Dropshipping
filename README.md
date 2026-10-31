@@ -1856,3 +1856,7 @@ Today has a Discount codes button for roles that can open marketing. It lists ev
 ### A crossed-out price from the app (after launch, part 344)
 
 A product in the app now has a crossed-out price for each variant, the "was" price buyers see struck through next to the price. While typing, the app says how much off buyers will see, or that it has to be higher than the price. Saved too low, it's refused. When a later price change goes past it, it's dropped, the same as a bulk edit does, so the store never shows a fake sale. Emptying it ends the sale.
+
+### Returns in the app (after launch, part 345)
+
+Today has a Returns button for roles that handle returns. It lists the returns waiting for an answer (and all of them under All), with the buyer's reason and note, the items and any size or colour they want instead. From the phone you can approve, refund (what they paid is filled in), give store credit, send a replacement or the exchange, or decline with a reason. A gift sent back by the person who received it only offers store credit, as on the website. Answers from the app go in the activity log.
