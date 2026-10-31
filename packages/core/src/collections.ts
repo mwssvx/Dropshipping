@@ -1,4 +1,4 @@
-import { and, asc, count, eq, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
 import { COLLECTION_SORTS, schema, type Db } from "@sf/db";
 import { z } from "zod";
 import { applyRules, collectionRulesSchema, type CollectionRules } from "./collection-rules";
@@ -245,4 +245,30 @@ export async function collectionsOfProduct(db: Db, shopId: string, productId: st
   const all = await db.query.collections.findMany({ where: eq(schema.collections.shopId, shopId), columns: { id: true } });
   const membership = await collectionMembership(db, shopId, all.map((c) => c.id), [productId]);
   return [...membership].filter(([, members]) => members.has(productId)).map(([id]) => id);
+}
+
+/**
+ * Put a product into a hand-picked collection, at the end, or take it out. An automatic collection
+ * fills itself by its rules, so it's refused. Returns whether the product is now in it.
+ */
+export async function setProductInCollection(db: Db, shopId: string, collectionId: string, productId: string, inIt: boolean) {
+  const collection = await db.query.collections.findFirst({ where: and(eq(schema.collections.id, collectionId), eq(schema.collections.shopId, shopId)) });
+  if (!collection) throw new NotFoundError("Collection");
+  if (collection.rules) throw new UserError(`"${collection.title}" fills itself by its rules. Change the rules to add or remove products.`);
+  const product = await db.query.products.findFirst({ where: and(eq(schema.products.id, productId), eq(schema.products.shopId, shopId)), columns: { id: true } });
+  if (!product) throw new NotFoundError("Product");
+  const link = and(eq(schema.collectionProducts.collectionId, collectionId), eq(schema.collectionProducts.productId, productId));
+  if (!inIt) {
+    await db.delete(schema.collectionProducts).where(link);
+    return false;
+  }
+  if (await db.query.collectionProducts.findFirst({ where: link })) return true;
+  const [last] = await db
+    .select({ position: schema.collectionProducts.position })
+    .from(schema.collectionProducts)
+    .where(eq(schema.collectionProducts.collectionId, collectionId))
+    .orderBy(desc(schema.collectionProducts.position))
+    .limit(1);
+  await db.insert(schema.collectionProducts).values({ collectionId, productId, position: (last?.position ?? -1) + 1 }).onConflictDoNothing();
+  return true;
 }

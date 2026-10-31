@@ -2016,3 +2016,7 @@ The app's Settings has a Holiday order-by date row for people who look after shi
 ### Product tags in the app (after launch, part 384)
 
 A product's screen in the app has a Tags section. Type tags separated by commas, or tap one the store already uses to add it. Tags are what the product list filters, collections that fill by tag, and codes for tagged products go by.
+
+### Collections on a product's screen in the app (after launch, part 385)
+
+A product's screen in the app has a Collections section. Switch a hand-picked collection on to put the product in it, at the end, or off to take it out. Automatic collections are listed too, with whether the product is in them now; they fill by their rules, so they're changed on the website.

@@ -26,6 +26,8 @@ export type Product = {
   /** On the product screen only: the tags the store's products use, most used first. */
   storeTags?: string[];
   maxTags?: number;
+  /** The store's collections, and whether this product is in each. */
+  collections?: { id: string; title: string; auto: boolean; in: boolean }[];
   /** On the list only: sold out, or an option at or under the store's running-low number. */
   stockLevel?: "sold_out" | "low" | null;
 };

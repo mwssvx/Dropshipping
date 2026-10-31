@@ -2074,3 +2074,45 @@ test("product tags set in the app, picked from the store's other tags", async ({
   await expect(web.getByRole("link", { name: "Beach Towel" })).toBeVisible();
   await expect(web.getByRole("link", { name: "Wool Gloves" })).toHaveCount(0);
 });
+
+test("a product put in and taken out of collections from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `pc${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Straw Hat");
+  await web.getByLabel("Price", { exact: true }).fill("20.00");
+  await web.getByLabel("Stock", { exact: true }).fill("9");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  await web.goto(`${WEB}/admin/collections/new`);
+  await web.getByLabel("Title").fill("Summer picks");
+  await web.getByRole("button", { name: "Save collection" }).click();
+  await expect(web.getByText("Saved.")).toBeVisible();
+  await web.goto(`${WEB}/admin/collections/new`);
+  await web.getByLabel("Title").fill("Hats");
+  await web.getByLabel(/By rules/).check();
+  await web.getByRole("region", { name: "Rules" }).getByLabel("Word 1").fill("hat");
+  await web.getByRole("button", { name: "Save collection" }).click();
+  await expect(web.getByText("Saved.")).toBeVisible();
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Straw Hat/ }).click();
+  const section = page.getByRole("region", { name: "Collections" });
+  await expect(section.getByRole("group", { name: "Automatic collections" })).toContainText("Hats");
+  await expect(section.getByRole("group", { name: "Automatic collections" })).toContainText("In it");
+  const summer = section.getByRole("switch", { name: "Summer picks" });
+  await expect(summer).not.toBeChecked();
+  await summer.click();
+  await expect(page.getByText("Added to Summer picks.")).toBeVisible();
+  await expect(summer).toBeChecked();
+  await shot(page, "385-app-product-collections");
+
+  await web.goto(`${WEB}/admin/collections`);
+  await expect(web.getByRole("row", { name: /Summer picks/ })).toContainText("1");
+
+  await summer.click();
+  await expect(page.getByText("Taken out of Summer picks.")).toBeVisible();
+  await expect(summer).not.toBeChecked();
+  await web.reload();
+  await expect(web.getByRole("row", { name: /Summer picks/ })).toContainText("0");
+});
