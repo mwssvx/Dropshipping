@@ -2020,3 +2020,7 @@ A product's screen in the app has a Tags section. Type tags separated by commas,
 ### Collections on a product's screen in the app (after launch, part 385)
 
 A product's screen in the app has a Collections section. Switch a hand-picked collection on to put the product in it, at the end, or off to take it out. Automatic collections are listed too, with whether the product is in them now; they fill by their rules, so they're changed on the website.
+
+### Collections in the app (after launch, part 386)
+
+The Products tab in the app has a Collections row. It lists the store's collections with how many products each holds and whether it's hand-picked or fills by itself, with Share and Delete for each. Make a new hand-picked collection by name, then put products in it from their screens.

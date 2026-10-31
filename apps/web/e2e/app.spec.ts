@@ -2116,3 +2116,44 @@ test("a product put in and taken out of collections from the app", async ({ page
   await web.reload();
   await expect(web.getByRole("row", { name: /Summer picks/ })).toContainText("0");
 });
+
+test("collections made, filled and deleted from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `cl${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Straw Hat");
+  await web.getByLabel("Price", { exact: true }).fill("20.00");
+  await web.getByLabel("Stock", { exact: true }).fill("9");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Collections/ }).click();
+  await expect(page.getByText("No collections yet")).toBeVisible();
+  await page.getByRole("textbox", { name: "Name" }).fill("Summer picks");
+  await page.getByRole("button", { name: "Make collection" }).click();
+  await expect(page.getByText("Made Summer picks. To fill it, open a product and switch it on under Collections.")).toBeVisible();
+  const card = page.getByRole("group", { name: "Summer picks" });
+  await expect(card).toContainText("0 products");
+  await expect(card).toContainText("Hand-picked");
+
+  // Fill it from the product's screen, then come back.
+  await page.getByRole("link", { name: "Products" }).filter({ visible: true }).first().click();
+  await page.getByRole("link", { name: /^Straw Hat/ }).filter({ visible: true }).click();
+  await page.getByRole("region", { name: "Collections" }).filter({ visible: true }).getByRole("switch", { name: "Summer picks" }).click();
+  await expect(page.getByText("Added to Summer picks.")).toBeVisible();
+  await page.getByRole("link", { name: "Products" }).filter({ visible: true }).first().click();
+  await page.getByRole("link", { name: /^Collections/ }).filter({ visible: true }).click();
+  const filled = page.getByRole("group", { name: "Summer picks" }).filter({ visible: true });
+  await expect(filled).toContainText("1 product");
+  await shot(page, "386-app-collections");
+
+  await web.goto(`${WEB}/admin/collections`);
+  await expect(web.getByRole("row", { name: /Summer picks/ })).toContainText("1");
+
+  await filled.getByRole("button", { name: "Delete Summer picks…" }).click();
+  await filled.getByRole("button", { name: "Delete Summer picks" }).click();
+  await expect(page.getByText("Deleted Summer picks. Its products are still on sale.")).toBeVisible();
+  await web.reload();
+  await expect(web.getByRole("row", { name: /Summer picks/ })).toHaveCount(0);
+});
