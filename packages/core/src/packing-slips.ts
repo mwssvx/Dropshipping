@@ -2,8 +2,10 @@
 // themselves or send stock from their own shelf. It says who it's for and what should be in the
 // box, with no prices, so it also works for gifts. A store can print a note at the foot, like a
 // thank-you or a code for next time. Slips come one order at a time from the order page, or all
-// the orders waiting for tracking at once, one per sheet.
-import { and, asc, eq, inArray } from "drizzle-orm";
+// the orders waiting for tracking at once, one per sheet. In an order a supplier sends part of, the
+// slip lists only what goes in the merchant's box and says the rest comes separately, so a buyer
+// opening it doesn't think the supplier's items are missing.
+import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import { schema, type Address, type Db } from "@sf/db";
 import { NotFoundError, UserError } from "./errors";
 import { giftReturnCode } from "./gift-returns";
@@ -22,6 +24,8 @@ export type PackingSlip = {
   placedAt: Date;
   shipTo: Address;
   items: { title: string; sku: string | null; quantity: number; personalization: string | null; preorder: boolean }[];
+  /** In an order the suppliers send part of: what comes in their parcels, not this box. */
+  separately: { title: string; quantity: number }[];
   /** `returnCode`: the recipient can return the gift for store credit with it (when the store takes returns). */
   gift: { from: string; message: string | null; returnCode: string | null } | null;
   /** The buyer paid to have it gift wrapped. */
@@ -55,26 +59,45 @@ export async function packingSlips(db: Db, shopId: string, scope: { orderId: str
   const skus = new Map(
     (variantIds.length ? await db.query.variants.findMany({ where: inArray(schema.variants.id, variantIds), columns: { id: true, sku: true } }) : []).map((v) => [v.id, v.sku]),
   );
+  // Which options a supplier sends: their lines leave the box when the order also has the store's own.
+  const supplied = new Set(
+    variantIds.length
+      ? (
+          await db
+            .select({ id: schema.variants.id })
+            .from(schema.variants)
+            .innerJoin(schema.products, eq(schema.products.id, schema.variants.productId))
+            .where(and(inArray(schema.variants.id, variantIds), isNotNull(schema.products.supplierId)))
+        ).map((r) => r.id)
+      : [],
+  );
+  const fromSupplier = (l: { variantId: string | null }) => !!l.variantId && supplied.has(l.variantId);
   const linesOf = groupBy(lines, (l) => l.orderId);
   const codes = new Map<string, string | null>();
   if (shop.returnWindowDays) for (const o of orders) if (o.gift) codes.set(o.id, await giftReturnCode(db, o));
-  const slips: PackingSlip[] = orders.map((o) => ({
-    orderId: o.id,
-    number: o.number,
-    placedAt: o.createdAt,
-    shipTo: o.shippingAddress,
-    items: (linesOf.get(o.id) ?? [])
-      .map((l) => ({
-        title: l.title,
-        sku: (l.variantId && skus.get(l.variantId)) || null,
-        quantity: l.quantity,
-        personalization: describePersonalization(l.personalization),
-        preorder: l.preorder,
-      })),
-    gift: o.gift ? { from: o.gift.from, message: o.gift.message, returnCode: codes.get(o.id) ?? null } : null,
-    giftWrap: o.giftWrapMinor > 0,
-    buyerNote: o.buyerNote,
-  }));
+  const slips: PackingSlip[] = orders.map((o) => {
+    const all = linesOf.get(o.id) ?? [];
+    const mixed = all.some(fromSupplier) && all.some((l) => !fromSupplier(l));
+    const boxed = mixed ? all.filter((l) => !fromSupplier(l)) : all;
+    return {
+      orderId: o.id,
+      number: o.number,
+      placedAt: o.createdAt,
+      shipTo: o.shippingAddress,
+      separately: mixed ? all.filter(fromSupplier).map((l) => ({ title: l.title, quantity: l.quantity })) : [],
+      items: boxed
+        .map((l) => ({
+          title: l.title,
+          sku: (l.variantId && skus.get(l.variantId)) || null,
+          quantity: l.quantity,
+          personalization: describePersonalization(l.personalization),
+          preorder: l.preorder,
+        })),
+      gift: o.gift ? { from: o.gift.from, message: o.gift.message, returnCode: codes.get(o.id) ?? null } : null,
+      giftWrap: o.giftWrapMinor > 0,
+      buyerNote: o.buyerNote,
+    };
+  });
   return {
     store: { name: shop.name, address: shop.mailingAddress, note: shop.packingSlipNote },
     slips,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { schema } from "@sf/db";
-import { addManualTracking, parcelDeliveries, createGiftCardProduct, createProduct, DemoModel, getOrder, handlePaymentEvent, onOrderPaid, orderParcels, quoteCart, startCheckout, syncTracking } from "../src";
+import { addManualTracking, packingSlips, parcelDeliveries, createGiftCardProduct, createProduct, DemoModel, getOrder, handlePaymentEvent, onOrderPaid, orderParcels, quoteCart, startCheckout, syncTracking } from "../src";
 import { makeFixture } from "../evals/fixture";
 
 const address = { name: "Ada Lovelace", line1: "1 Main St", city: "Austin", region: "TX", postalCode: "78701", country: "US" };
@@ -121,5 +121,23 @@ describe("orders in more than one parcel", () => {
     await addManualTracking(f.ctx, shop.id, order.id, { carrier: "USPS", trackingNumber: "9400222", own: true });
     const again = await f.db.query.fulfillments.findMany({ where: eq(schema.fulfillments.orderId, order.id) });
     expect(again.filter((r) => r.supplierId === null).map((r) => r.trackingNumber)).toEqual(["9400222"]);
+  });
+});
+
+describe("packing slips for an order in two parcels", () => {
+  it("lists only what goes in the store's box and says the rest comes separately", async () => {
+    const f = await makeFixture(new DemoModel());
+    const shop = await f.shop();
+    const [lamp] = await f.variants(f.products.lamp.id);
+    const own = await createProduct(f.db, shop.id, { title: "Handmade Coaster", status: "active", variants: [{ priceMinor: 900, stock: 10 }] });
+    const [coaster] = await f.variants(own.id);
+    const { order } = await startCheckout(f.db, f.payments, shop, { email: "ada@example.com", address, lines: [{ variantId: lamp!.id, quantity: 2 }, { variantId: coaster!.id, quantity: 1 }], storefront: true });
+    const { slips } = await packingSlips(f.db, shop.id, { orderId: order.id });
+    expect(slips[0]!.items.map((i) => i.title)).toEqual(["Handmade Coaster"]);
+    expect(slips[0]!.separately).toEqual([{ title: expect.stringMatching(/^Sunset Projection Lamp/), quantity: 2 }]);
+    // An order all from the store's shelf, or all from suppliers, lists everything.
+    const { order: lampOnly } = await startCheckout(f.db, f.payments, shop, { email: "ada@example.com", address, lines: [{ variantId: lamp!.id, quantity: 1 }], storefront: true });
+    const one = (await packingSlips(f.db, shop.id, { orderId: lampOnly.id })).slips[0]!;
+    expect([one.items.length, one.separately]).toEqual([1, []]);
   });
 });
