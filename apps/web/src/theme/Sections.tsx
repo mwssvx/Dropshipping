@@ -390,6 +390,42 @@ function ScrollingTextSection({ s, data }: Props<"scrolling_text">) {
   return <ScrollingText items={items} speed={s.speed} large={s.size === "large"} labels={{ region: t.marquee, pause: t.marqueePause, play: t.marqueePlay }} />;
 }
 
+// Two photos across on phones; wide screens fit four, or three when that fills the rows evenly.
+const GALLERY_GRID: Record<number, string> = { 1: "max-w-md mx-auto", 2: "grid-cols-2 max-w-3xl mx-auto", 3: "grid-cols-2 md:grid-cols-3", 6: "grid-cols-2 md:grid-cols-3", 9: "grid-cols-2 md:grid-cols-3" };
+
+function Gallery({ s, data }: Props<"gallery">) {
+  const t = data.t ?? storeText(null);
+  const photos = s.items.filter((p) => p.imageUrl);
+  if (!photos.length) return null;
+  return (
+    <section className="sf-gallery max-w-6xl mx-auto px-4 sm:px-6 py-12 flex flex-col gap-6" aria-label={s.heading || undefined}>
+      {(s.heading || s.text) && (
+        <div className="flex flex-col gap-2 text-center">
+          {s.heading && <h2 className="text-3xl font-bold tracking-tight">{s.heading}</h2>}
+          {s.text && <p className="text-muted leading-relaxed whitespace-pre-line">{s.text}</p>}
+        </div>
+      )}
+      <ul className={`grid gap-2 sm:gap-3 ${GALLERY_GRID[photos.length] ?? "grid-cols-2 md:grid-cols-4"}`}>
+        {photos.map((p, i) => {
+          const img = <img src={p.imageUrl} alt={p.link ? "" : p.alt} width={600} height={600} loading="lazy" decoding="async" className="size-full object-cover group-hover:scale-[1.03] transition-transform" />;
+          return (
+            <li key={i} className="group aspect-square rounded-lg bg-sunken overflow-hidden">
+              {p.link ? (
+                <a href={storeHref(data.base, p.link)} rel={p.link.startsWith("/") ? undefined : "noopener"} aria-label={p.alt || t.galleryPhoto(i + 1)} className="block size-full">{img}</a>
+              ) : img}
+            </li>
+          );
+        })}
+      </ul>
+      {s.buttonLabel && (
+        <div className="flex justify-center">
+          <a href={storeHref(data.base, s.buttonLink)} rel={s.buttonLink.startsWith("/") ? undefined : "noopener"} className="btn btn-secondary btn-lg">{s.buttonLabel}</a>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function RichText({ s }: Props<"rich_text">) {
   if (!s.heading && !s.text) return null;
   return (
@@ -656,6 +692,7 @@ export function SectionView({ section, data, first }: { section: Section; data: 
     case "countdown": return <CountdownSection s={section.settings} data={data} first={first} />;
     case "blog_posts": return <BlogPosts s={section.settings} data={data} first={first} />;
     case "scrolling_text": return <ScrollingTextSection s={section.settings} data={data} first={first} />;
+    case "gallery": return <Gallery s={section.settings} data={data} first={first} />;
   }
 }
 

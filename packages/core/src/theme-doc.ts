@@ -104,6 +104,8 @@ export const SLIDES_MAX = 5;
 export const COLUMNS_MAX = 6;
 /** Messages in one scrolling text row. */
 export const MARQUEE_MAX = 8;
+/** Photos in one gallery. */
+export const GALLERY_MAX = 8;
 
 /** The most links one dropdown in the header menu holds. */
 export const MENU_CHILDREN_MAX = 10;
@@ -261,6 +263,18 @@ const sectionSchemas = {
     speed: z.enum(["slow", "medium", "fast"]).default("medium"),
     size: z.enum(["small", "large"]).default("large"),
   }),
+  // A grid of square photos, like the store's Instagram, each with an optional link. A photo with
+  // no picture yet isn't shown.
+  gallery: z.object({
+    heading: text(120),
+    text: text(400),
+    items: z
+      .array(z.object({ imageUrl, alt: text(160), link }))
+      .max(GALLERY_MAX, `A gallery holds up to ${GALLERY_MAX} photos.`)
+      .default([]),
+    buttonLabel: text(40),
+    buttonLink: link,
+  }),
 } as const;
 
 export type SectionType = keyof typeof sectionSchemas;
@@ -288,6 +302,7 @@ export const SECTION_LABELS: Record<SectionType, { name: string; about: string }
   countdown: { name: "Countdown", about: "A clock counting down to a date, like a launch or the start of your Black Friday sale, with a button. It hides itself once the time has passed." },
   blog_posts: { name: "Blog posts", about: "Your newest blog posts with their pictures and a line from each. It fills itself as you publish." },
   scrolling_text: { name: "Scrolling text", about: "A few short messages that glide across the page in a loop, like “Free shipping · 30-day returns · Made to last”. Shoppers can pause it, and it stays still for those who ask for less motion." },
+  gallery: { name: "Photo gallery", about: "Up to eight square photos in a grid, like your Instagram or buyers using your products, each with an optional link, and a button like “Follow us”." },
 };
 
 const sectionId = z.string().regex(/^[a-z0-9]{4,24}$/, "Section ids are short lowercase codes.");

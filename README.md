@@ -1436,3 +1436,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 1. **A moving row of short messages** (`apps/web/src/theme/ScrollingText.tsx`): a new home page section in the theme editor. Add up to eight short messages ("Free shipping over $50", "30-day returns"), pick slow, medium or fast and large or small text, and they glide across the page in an endless loop with a small star between them.
 2. **Easy to stop**: it holds still while a shopper points at it, and a pause button stops it for good. Shoppers who ask their device for less motion get a still, centered row from the very first paint. Screen readers hear each message once, not the copy that makes the loop seamless.
 3. Empty messages are skipped and an empty row isn't shown. Three new store strings in all six languages. No migration: it lives in the theme.
+
+### Photo gallery (after launch, part 252)
+
+1. **A grid of square photos** (`apps/web/src/theme/Sections.tsx`): a new home page section in the theme editor. Add up to eight photos, like your Instagram or buyers using what they bought, each with a few words on what it shows and an optional link, under an optional heading and text, with a button like "Follow us".
+2. **Fits any number**: two photos across on phones; wide screens show three or four across, whichever fills the rows evenly. A photo with no picture yet stays hidden. Pictures must be https and links go to a store page or an https address. A linked photo is named by what it shows, or "Photo 2" when that's left empty, so screen readers never hear a nameless link. One new store string in all six languages. No migration: it lives in the theme.
