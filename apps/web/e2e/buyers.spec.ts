@@ -79,6 +79,28 @@ test("a shopper signs in with a code, sees their order, buys again and checks ou
   await expect(buyer.getByLabel("Email")).toHaveValue(email);
   await expect(buyer.getByLabel("Full name")).toHaveValue("Ada Buyer");
   await expect(buyer.getByLabel("Postal code")).toHaveValue("78701");
+  // One address so far, so there's nothing to pick from.
+  await expect(buyer.getByLabel("Your addresses")).toHaveCount(0);
+
+  // This one goes to work, and the next checkout offers both places.
+  await buyer.getByLabel("Address", { exact: true }).fill("500 Congress Ave");
+  await buyer.getByLabel("Apartment, suite (optional)").fill("Floor 3");
+  await buyer.getByRole("button", { name: "Continue to payment" }).click();
+  await buyer.getByRole("button", { name: /^Pay/ }).click();
+  await expect(buyer.getByRole("heading", { name: "Thank you, Ada!" })).toBeVisible();
+  await buyer.goto(product);
+  await buyer.getByRole("button", { name: "Add to cart" }).click();
+  await buyer.getByRole("link", { name: "Check out" }).click();
+  const saved = buyer.getByLabel("Your addresses");
+  await expect(saved.locator("option")).toHaveText(["Ada Buyer, 500 Congress Ave, Floor 3, Austin 78701", "Ada Buyer, 1 Main St, Austin 78701", "A new address"]);
+  await expect(buyer.getByLabel("Address", { exact: true })).toHaveValue("500 Congress Ave");
+  await saved.selectOption({ label: "Ada Buyer, 1 Main St, Austin 78701" });
+  await expect(buyer.getByLabel("Address", { exact: true })).toHaveValue("1 Main St");
+  await expect(buyer.getByLabel("Apartment, suite (optional)")).toHaveValue("");
+  await expect(buyer.getByLabel("Postal code")).toHaveValue("78701");
+  await saved.selectOption({ label: "A new address" });
+  await expect(buyer.getByLabel("Full name")).toHaveValue("");
+  await expect(buyer.getByLabel("Address", { exact: true })).toHaveValue("");
 
   // The merchant sees Ada as a customer with an account.
   await page.getByRole("link", { name: "Customers" }).first().click();
