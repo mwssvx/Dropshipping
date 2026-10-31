@@ -32,7 +32,7 @@ describe("pickup and delivery reminders", () => {
     expect(await sendHandoverReminders(ctx)).toEqual({ sent: 0 });
     await setHandoverDays(f.db, shop.id, { weekdays: [0, 1, 2, 3, 4, 5, 6], leadDays: 1, timeZone: "America/Chicago" });
     // It runs with the running-late emails.
-    expect(await sendLateOrderEmails(ctx)).toEqual({ sent: 0, handover: 2 });
+    expect(await sendLateOrderEmails(ctx)).toEqual({ sent: 0, transit: 0, handover: 2 });
     expect(await sendHandoverReminders(ctx)).toEqual({ sent: 0 });
 
     const toPickup = f.mailer.sent.find((m) => m.subject === `See you tomorrow: order #${pickup.number} from ${shop.name}`)!;
