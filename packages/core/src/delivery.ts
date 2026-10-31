@@ -128,6 +128,37 @@ export async function cartDelivery(
 }
 
 /**
+ * When the cart would arrive with each shipping rate, for the checkout's rate choices: the same
+ * count as `cartDelivery` (processing days, the cutoff, the slowest item, pre-orders), with each
+ * rate's own days. Rates with no days of their own and no supplier days are left out, and the map
+ * is empty when the store has dates off or nothing ships.
+ */
+export async function rateDeliveryWindows(
+  db: Db,
+  shop: Shop,
+  items: { variantId: string; giftCard?: boolean; digital?: boolean; preorderShipsBy?: string | null }[],
+  rates: Pick<Rate, "id" | "minDays" | "maxDays">[],
+  now = new Date(),
+) {
+  const out = new Map<string, DeliveryWindow>();
+  if (!shop.deliveryEstimates) return out;
+  const goods = items.filter((i) => !i.giftCard && !i.digital);
+  if (!goods.length) return out;
+  const variants = await db.query.variants.findMany({ where: inArray(schema.variants.id, goods.map((i) => i.variantId)), columns: { shipDaysMin: true, shipDaysMax: true } });
+  const preorder = goods.reduce<Date | null>((latest, i) => {
+    if (!i.preorderShipsBy) return latest;
+    const d = preorderDeadline({ shipsBy: i.preorderShipsBy, limit: null });
+    return !latest || d > latest ? d : latest;
+  }, null);
+  for (const r of rates) {
+    const transit = transitDays(variants, r);
+    if (!transit) continue;
+    out.set(r.id, preorder && preorder > now ? deliveryWindow(preorder, 0, transit.min, transit.max) : deliveryWindow(now, shop.processingDays, transit.min, transit.max, shop.shipCutoff));
+  }
+  return out;
+}
+
+/**
  * When a paid order should arrive, with the rate the buyer picked. Once it has shipped, the window
  * counts from the latest shipment instead. Null when it's delivered, refunded, picked up in person, delivered by the store itself or has nothing to ship.
  */

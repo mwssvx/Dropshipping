@@ -1,6 +1,6 @@
 import { PixelEvent } from "@/components/PixelEvent";
 import { redirect } from "next/navigation";
-import { addonOffer, formatHandoverDay, handoverDates, convertAmount, convertPrice, protectionFee, countryName, fitsWeight, formatMoney, GIFT_CARD_SEND_DAYS, lastCheckoutDetails, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, onHoliday, LOCAL_DELIVERY_RATE_ID, localDeliveryPrice, PICKUP_RATE_ID, storePixels, taxExemptionFor, tipAmount, UserError } from "@sf/core";
+import { addonOffer, formatDeliveryWindow, rateDeliveryWindows, formatHandoverDay, handoverDates, convertAmount, convertPrice, protectionFee, countryName, fitsWeight, formatMoney, GIFT_CARD_SEND_DAYS, lastCheckoutDetails, listShippingZones, presentQuote, priceRate, quoteCart, shipsTo, SHIPPING_COUNTRIES, onHoliday, LOCAL_DELIVERY_RATE_ID, localDeliveryPrice, PICKUP_RATE_ID, storePixels, taxExemptionFor, tipAmount, UserError } from "@sf/core";
 import { buyerFx } from "@/lib/currency";
 import { currentBuyer } from "@/lib/buyer";
 import { readCart, readDiscountCode, readGiftCardCode } from "@/lib/cart";
@@ -51,6 +51,10 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
   // Delivery protection, when the store offers it and something ships. Priced on the items after discounts.
   const protectionMinor = hasGoods && shop.deliveryProtection ? protectionFee(shop.deliveryProtection, quote.goodsMinor - quote.discountMinor) : 0;
   const { zones } = await listShippingZones(await db(), shop.id);
+  // The dates each rate would arrive on, counted like the cart's, where the store shows dates.
+  const windows = hasGoods ? await rateDeliveryWindows(await db(), shop, quote.items, zones.flatMap((z) => z.rates)) : new Map();
+  const dayLang = (await storeLang(handle)) ?? "en-US";
+  const shortDay = new Intl.DateTimeFormat(dayLang, { month: "short", day: "numeric", timeZone: "UTC" });
   const choices: ZoneChoice[] | null = hasGoods
     ? zones.map((z) => ({
         countries: z.countries,
@@ -58,7 +62,8 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
         rates: z.rates.filter((r) => fitsWeight(r, quote.weightGrams)).map((r) => {
           const price = quote.discount?.freeShipping ? 0 : priceRate(r, quote.goodsMinor);
           const p = presentQuote({ ...quote, shippingMinor: price, taxMinor: 0 }, fx);
-          const days = r.minDays !== null && r.maxDays !== null ? t.arrivesIn(r.minDays, r.maxDays) : null;
+          const window = windows.get(r.id);
+          const days = window ? t.arrivesOn(formatDeliveryWindow(window, (d) => shortDay.format(d))) : r.minDays !== null && r.maxDays !== null ? t.arrivesIn(r.minDays, r.maxDays) : null;
           return {
             id: r.id, name: r.name, days, priceMinor: p.shippingMinor, priceLabel: p.shippingMinor ? money(p.shippingMinor) : t.free, totalMinor: p.totalMinor,
           };
@@ -74,7 +79,6 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
     return made;
   };
   // Where the store lets buyers pick the day they collect it or get it delivered.
-  const dayLang = (await storeLang(handle)) ?? "en-US";
   const dates = shop.handoverDays ? handoverDates(shop.handoverDays).map((d) => [d, formatHandoverDay(d, dayLang)] as [string, string]) : undefined;
   if (choices && quote.canPickUp && shop.localPickup) {
     const pickup: RateChoice = {

@@ -1649,3 +1649,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Measure Pinterest ads** (`setAdPixels` in `packages/core/src/pixels.ts`): Ad tracking on Sales channels takes a Pinterest tag ID next to Meta, TikTok and Google. The store loads Pinterest's tag after the same cookie question and reports page visits, product views, adds to cart and purchases (as "checkout", with the order's value and items), with the same IDs as the feeds, so Pinterest can match sales to shoppable Pins.
 2. The ID is checked (13 digits) before it reaches a page, a purchase is reported once, and it comes along in the store file; older store files without it still import. No migration.
+
+### Arrival dates at checkout (after launch, part 295)
+
+1. **Dates, not just days** (`rateDeliveryWindows` in `packages/core/src/delivery.ts`): each shipping rate at checkout now says when the order would arrive with it ("Arrives Nov 4 – Nov 7", in the buyer's language), counted like the cart's dates: the store's processing days and same-day cutoff, the slowest item's supplier days, and a pre-order's ship-by date. Buyers compare Standard and Express by the day it lands, which is what they care about.
+2. Rates fall back to "Arrives in 3–5 days" when the store has dates off, and to nothing when no days are known. No migration.
