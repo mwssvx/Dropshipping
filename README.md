@@ -1441,3 +1441,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **A grid of square photos** (`apps/web/src/theme/Sections.tsx`): a new home page section in the theme editor. Add up to eight photos, like your Instagram or buyers using what they bought, each with a few words on what it shows and an optional link, under an optional heading and text, with a button like "Follow us".
 2. **Fits any number**: two photos across on phones; wide screens show three or four across, whichever fills the rows evenly. A photo with no picture yet stays hidden. Pictures must be https and links go to a store page or an https address. A linked photo is named by what it shows, or "Photo 2" when that's left empty, so screen readers never hear a nameless link. One new store string in all six languages. No migration: it lives in the theme.
+
+### Before and after (after launch, part 253)
+
+1. **Show the difference** (`apps/web/src/theme/BeforeAfter.tsx`): a new home page section in the theme editor. Add a before photo and an after photo of the same thing, like a stain before and after your cleaner, with a heading and a few words, and shoppers drag the handle across to compare them.
+2. **Works for everyone**: underneath it's a plain slider, so keyboard users move it with the arrow keys and screen readers hear "Before 40%, After 60%"; a focus ring shows around the photos. The labels default to "Before" and "After" in the shopper's language, or say your own ("Day 1", "Day 30"). The section stays hidden until both photos are set, and the editor reminds you to use real photos only. Three new store strings in all six languages. No migration: it lives in the theme.
