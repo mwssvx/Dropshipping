@@ -1696,3 +1696,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Expected delivery on the admin order page (after launch, part 304)
 
 The Delivery card on an order says when it should arrive, using the same window the buyer sees on their order page (from payment, or from the latest shipment once it's shipped). When a shipped parcel is a day or more past its last day, a pill says how many days late it is, so a merchant answering "where is my order?" sees it at a glance. The date shows even when delivery dates are hidden from buyers, with a note that buyers don't see it. `orderDelivery(db, shop, order, { evenIfHidden })` and `daysPastDelivery(window, order, now)` in `packages/core/src/delivery.ts`.
+
+### Ships from a warehouse abroad (after launch, part 305)
+
+Dropshipped products often leave from a supplier's warehouse in another country, so a buyer in the store's own country can still owe import duties. The Customs card on a product now has **Ships from** (a two-letter code; empty, or the store's own country, means it ships from home). Product pages say "Ships from China" in the shopper's language, and the import duties note on the product page, at checkout and on the receipt follows where each parcel leaves from: one item crossing a border is enough. `products.ships_from` (migration 0158), `setCustomsInfo({ shipsFrom })` and `shipsFromOf` in `packages/core/src/customs.ts`, and `dutiesFor(shop, country, from)` in `duties.ts`. Store export carries `ships_from`.

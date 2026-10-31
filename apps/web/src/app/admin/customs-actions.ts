@@ -5,11 +5,11 @@ import { requireShop } from "@/lib/server";
 
 export type CustomsState = { error?: string; saved?: boolean };
 
-/** Saves a product's HS code and the country it's made in, for customs forms on orders abroad. */
+/** Saves a product's HS code, the country it's made in and the one it ships from, for customs forms and duty notes. */
 export async function customsAction(productId: string, _: CustomsState, form: FormData): Promise<CustomsState> {
   const { shop, db } = await requireShop("products");
   try {
-    await setCustomsInfo(db, shop.id, productId, { hsCode: String(form.get("hsCode") ?? ""), originCountry: String(form.get("originCountry") ?? "") });
+    await setCustomsInfo(db, shop.id, productId, { hsCode: String(form.get("hsCode") ?? ""), originCountry: String(form.get("originCountry") ?? ""), shipsFrom: String(form.get("shipsFrom") ?? "") });
     revalidatePath(`/admin/products/${productId}`);
     return { saved: true };
   } catch (e) {

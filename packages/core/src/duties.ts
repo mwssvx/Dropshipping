@@ -23,8 +23,14 @@ export function crossesCustoms(home: string, country: string) {
   return !(home in EU_VAT && country in EU_VAT);
 }
 
-/** What to tell a buyer in `country` about duties: null when nothing needs saying. */
-export function dutiesFor(shop: Pick<Shop, "duties" | "country">, country: string): Exclude<DutiesPolicy, "off"> | null {
-  if (shop.duties === "off" || !crossesCustoms(shop.country, country)) return null;
+/**
+ * What to tell a buyer in `country` about duties: null when nothing needs saying. `from` is where
+ * the parcel leaves from, the store's country unless a product ships from a warehouse abroad.
+ * Pass several for a cart: one crossing a border is enough.
+ */
+export function dutiesFor(shop: Pick<Shop, "duties" | "country">, country: string, from: string | null | (string | null)[] = null): Exclude<DutiesPolicy, "off"> | null {
+  if (shop.duties === "off") return null;
+  const origins = (Array.isArray(from) ? from : [from]).map((c) => c ?? shop.country);
+  if (!origins.some((o) => crossesCustoms(o, country))) return null;
   return shop.duties;
 }

@@ -359,6 +359,8 @@ export const products = pgTable(
     // For customs forms on orders that cross a border: the tariff code and where it was made.
     hsCode: text("hs_code"),
     originCountry: text("origin_country"),
+    // Where the parcel leaves from, when that isn't the store's own country (a supplier's warehouse abroad).
+    shipsFrom: text("ships_from"),
     // Buyers must say they're at least this old to check out with it (alcohol, vapes, knives).
     minAge: integer("min_age"),
     // Countries it can't be shipped to (batteries, knives, a supplier that doesn't go there).

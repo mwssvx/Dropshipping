@@ -361,7 +361,10 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
             {shipping.freeOverMinor !== null && <span className="hint"> · {t.freeShippingOver(shownMoney(shipping.freeOverMinor))}</span>}
           </p>
         )}
-        {shipping && dutiesFor(shop, shipping.country) && (
+        {product.shipsFrom && !product.giftCard && !product.digital && (
+          <p id="ships-from" className="text-sm hint">{t.shipsFromCountry(new Intl.DisplayNames([lang], { type: "region" }).of(product.shipsFrom) ?? product.shipsFrom)}</p>
+        )}
+        {shipping && dutiesFor(shop, shipping.country, product.shipsFrom) && (
           <p id="duties-line" className="text-sm hint">
             {(shop.duties === "included" ? t.dutiesIncludedShort : t.dutiesOnDelivery)(new Intl.DisplayNames([lang], { type: "region" }).of(shipping.country) ?? shipping.country)}
           </p>

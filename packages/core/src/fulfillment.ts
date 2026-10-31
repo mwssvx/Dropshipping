@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { cartDelivery, formatDeliveryWindow, orderDelivery } from "./delivery";
 import { dutiesFor } from "./duties";
+import { shipsFromOf } from "./customs";
 import { NotFoundError, UserError } from "./errors";
 import type { Mailer } from "./email";
 import { formatMoney } from "./money";
@@ -714,6 +715,7 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
     const downloads = await orderDownloads(ctx.db, order.id);
     const onlyDownloads = downloads.length > 0 && (await nothingToShip(ctx.db, order.id));
     const arrives = onlyDownloads ? null : await orderDelivery(ctx.db, shop, order);
+    const origins = await shipsFromOf(ctx.db, { orderId: order.id });
     return {
       subject: `Order #${order.number} confirmed`,
       text: [
@@ -738,7 +740,7 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
           : []),
         ...(order.preorderShipsBy ? [``, `Pre-order: it ships by ${formatShipsBy(order.preorderShipsBy)}. We'll email tracking as soon as it's on its way.`] : []),
         ...(arrives ? [``, `Expected delivery: ${formatDeliveryWindow(arrives)}.`] : []),
-        ...dutiesLine(shop, order),
+        ...dutiesLine(shop, order, origins),
         ...(order.gift
           ? [
               ``,
@@ -842,9 +844,9 @@ export async function deliverOrderEmail(ctx: FulfillmentContext, shop: Shop, ord
 }
 
 /** The import duties note on a receipt for an order crossing customs, as said at checkout. */
-function dutiesLine(shop: Shop, order: Order) {
+function dutiesLine(shop: Shop, order: Order, origins: (string | null)[]) {
   if (order.pickup || order.localDelivery) return [];
-  const policy = dutiesFor(shop, order.shippingAddress.country);
+  const policy = dutiesFor(shop, order.shippingAddress.country, origins.length ? origins : null);
   if (!policy) return [];
   return [``, policy === "included" ? "Import duties and taxes are included, so there's nothing more to pay when it arrives." : "Customs may charge import duties or taxes when it arrives. They're paid to the courier and weren't part of this total."];
 }
