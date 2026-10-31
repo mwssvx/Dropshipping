@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
-import { createDiscount, moderateReview, notifyReviewReply, parseMoney, sendAbandonedCartEmails, sendBrowseReminders, setBrowseReminders, BROWSE_AFTER_HOURS, setAbandonedCartOffer, setDiscountActive, setBirthdayOffer, setGrowthSettings, setSignupPopup, setThankYouNote, setPostPurchaseOffer, setReferralProgram, setReviewRequestDays, setSubscriptionOffer, setUpsell, setWelcomeOffer, setWinbackOffer, unfilledFields, UserError } from "@sf/core";
+import { createDiscount, moderateReview, notifyReviewReply, parseMoney, setReviewReward, sendAbandonedCartEmails, sendBrowseReminders, setBrowseReminders, BROWSE_AFTER_HOURS, setAbandonedCartOffer, setDiscountActive, setBirthdayOffer, setGrowthSettings, setSignupPopup, setThankYouNote, setPostPurchaseOffer, setReferralProgram, setReviewRequestDays, setSubscriptionOffer, setUpsell, setWelcomeOffer, setWinbackOffer, unfilledFields, UserError } from "@sf/core";
 import { fulfillment, logged, mailer, requireShop, storeAddress, testPayments } from "@/lib/server";
 import type { FormState } from "./actions";
 
@@ -309,5 +309,22 @@ export async function sendBrowseRemindersNowAction() {
   if (!testPayments()) return;
   await sendBrowseReminders(await fulfillment(), new Date(Date.now() + BROWSE_AFTER_HOURS * HOUR + 60_000), { shopId: shop.id });
   revalidatePath("/admin/marketing");
+}
+
+export type ReviewRewardState = { error?: string; saved?: number | null };
+
+/** The thank-you code for a review: off, or on with a percent off the buyer's next order. */
+export async function setReviewRewardAction(_: ReviewRewardState, form: FormData): Promise<ReviewRewardState> {
+  const { shop, db, user } = await requireShop("reviews");
+  const percent = form.get("enabled") === "on" ? Number.parseInt(String(form.get("percent") ?? ""), 10) : null;
+  try {
+    await setReviewReward(db, shop.id, percent === null ? null : Number.isNaN(percent) ? -1 : percent);
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+  await logged({ shop, user, db }, percent ? `Turned on a ${percent}% thank-you code for reviews` : "Turned off thank-you codes for reviews", { href: "/admin/reviews#reward-heading" });
+  revalidatePath("/admin/reviews");
+  return { saved: percent };
 }
 

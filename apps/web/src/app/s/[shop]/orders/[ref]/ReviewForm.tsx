@@ -10,7 +10,12 @@ export function ReviewForm({ handle, orderRef, productId, title, name, rating }:
   useEffect(() => {
     if (rating !== undefined) body.current?.focus();
   }, [rating]);
-  if (state.sent) return <p className="banner banner-success" role="status">Thanks for reviewing {title}!</p>;
+  if (state.sent)
+    return (
+      <p className="banner banner-success" role="status">
+        Thanks for reviewing {title}!{state.reward ? ` We've emailed you ${state.reward}% off your next order.` : ""}
+      </p>
+    );
   const id = (k: string) => `${k}-${productId}`;
   return (
     // Sent by hand rather than through `action`, so React doesn't clear the stars and text when a

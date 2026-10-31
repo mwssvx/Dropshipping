@@ -4,9 +4,9 @@ import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, cancelOrderByBuyer, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, visitPost, visitSource, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, MAX_SAVED, saveItem, setPriceAlerts, shareSaved, stopSharingSaved, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer, answerSurvey, chooseBankTransfer, joinLaunchList, toggleCompareId, lookVariants, stayPathAfterAdd, toggleHelpful, reportReview, VOTER_PATTERN, reviewsQuery, reviewSort, starsFilter } from "@sf/core";
+import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffer, amountToCharge, changeSubscription, startSubscription, type SubscriptionChange, askQuestion, cancelOrderByBuyer, claimReferral, editOrder, getOrder, NotFoundError, pickAddonVariant, pickBundleVariants, getOrderByPaymentIntent, normalizeGiftCardCode, requestReturn, recordEvent, visitPost, visitSource, handleBuyerMessage, quoteCart, requestNewsletterSignup, requestOrderLink, requestStockAlert, MAX_SAVED, saveItem, setPriceAlerts, shareSaved, stopSharingSaved, shopCurrencies, unsaveItem, startCheckout, submitReview, FakePaymentProvider, UserError, enterStorePassword, storeAccessCookie, sendContactMessage, answerBuyer, answerSurvey, chooseBankTransfer, joinLaunchList, toggleCompareId, lookVariants, stayPathAfterAdd, toggleHelpful, reportReview, rewardReview, VOTER_PATTERN, reviewsQuery, reviewSort, starsFilter } from "@sf/core";
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
-import { agents, campaigns, db, fulfillment, payments, platformUrl, refunds, subscriptions, tax } from "@/lib/server";
+import { agents, campaigns, db, fulfillment, mailer, payments, platformUrl, refunds, storeAddress, subscriptions, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
 import { loadShop, storeBase } from "./data";
 import { buyerFx, currencyCookie } from "@/lib/currency";
@@ -300,13 +300,14 @@ export async function askAboutOrderAction(handle: string, ref: string, _: Questi
   return { sent: true };
 }
 
-export type ReviewState = { error?: string; sent?: boolean };
+export type ReviewState = { error?: string; sent?: boolean; reward?: number | null };
 
 /** A buyer reviews a product from their order status page (the link is their proof of purchase). */
 export async function reviewAction(handle: string, ref: string, productId: string, _: ReviewState, form: FormData): Promise<ReviewState> {
   const shop = await loadShop(handle);
+  let review: Awaited<ReturnType<typeof submitReview>>;
   try {
-    await submitReview(await db(), shop, ref, {
+    review = await submitReview(await db(), shop, ref, {
       productId,
       rating: Number(form.get("rating") ?? 0),
       name: String(form.get("name") ?? ""),
@@ -316,8 +317,10 @@ export async function reviewAction(handle: string, ref: string, productId: strin
     if (e instanceof UserError) return { error: e.message };
     throw e;
   }
+  // The store's thank-you code, when it gives one. A failed email never loses the review.
+  const reward = await rewardReview({ db: await db(), mailer: mailer(), storeAddress }, review.id).catch(() => null);
   revalidatePath(`/s/${shop.handle}/orders/${ref}`);
-  return { sent: true };
+  return { sent: true, reward };
 }
 
 /** The buyer picks the currency to shop in. Stays for a year on this store. */

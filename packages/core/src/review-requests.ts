@@ -73,6 +73,7 @@ export async function sendReviewRequests(ctx: FulfillmentContext, scope: { shopI
         ``,
         `Your order from ${shop.name} arrived a few days ago. How was it? A quick review, with a photo if you like, helps other buyers and means a lot to us.`,
         ``,
+        ...(shop.reviewRewardPercent ? [`As a thank you, we'll email you ${shop.reviewRewardPercent}% off your next order once you've left one, whatever you think of it.`, ``] : []),
         ...(items.length === 1
           ? [`Tap a rating to start:`, ...[5, 4, 3, 2, 1].map((n) => `${"★".repeat(n)}${"☆".repeat(5 - n)}  ${rate(n)}`)]
           : [...items.slice(0, 5).map((i) => `- ${i.title}`), ``, `Leave a review: ${link}`]),

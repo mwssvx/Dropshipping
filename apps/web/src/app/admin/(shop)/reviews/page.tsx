@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { listSavedReplies, REVIEW_PAGE_SIZE, reportedReviewCount, reviewCounts, reviewPage, reviewPhotoUrl, reviewRequestStats } from "@sf/core";
+import { formatMoney, listSavedReplies, REVIEW_PAGE_SIZE, reviewRewardStats, reportedReviewCount, reviewCounts, reviewPage, reviewPhotoUrl, reviewRequestStats } from "@sf/core";
 import { requireShop } from "@/lib/server";
 import { keepReportedReviewAction, moderateReviewAction, removeReviewPhotoAction, setReviewsAutoPublishAction } from "../../growth-actions";
 import { PageHeader } from "../PageHeader";
 import { ReplyForm } from "./ReplyForm";
 import { ReviewRequestForm } from "./ReviewRequestForm";
+import { ReviewRewardForm } from "./ReviewRewardForm";
 
 export const metadata = { title: "Reviews" };
 
@@ -30,12 +31,13 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
     ? await db.query.products.findFirst({ where: (p, { and, eq }) => and(eq(p.id, params.product!), eq(p.shopId, shop.id)), columns: { id: true, title: true } })
     : undefined;
   const filtered = Boolean(q || stars || noReply || photos || reported || product);
-  const [{ reviews: rows, total }, counts, requests, reportedCount, savedReplies] = await Promise.all([
+  const [{ reviews: rows, total }, counts, requests, reportedCount, savedReplies, reward] = await Promise.all([
     reviewPage(db, shop.id, { status, rating: stars, query: q, page, noReply, photos, reported, productId: product?.id }),
     reviewCounts(db, shop.id),
     reviewRequestStats(db, shop.id),
     reportedReviewCount(db, shop.id),
     listSavedReplies(db, shop.id),
+    reviewRewardStats(db, shop.id),
   ]);
   const saved = savedReplies.map(({ id, title, body }) => ({ id, title, body }));
   // What a saved reply's fields become for one review. A name erased to "Verified buyer" isn't one.
@@ -84,6 +86,15 @@ export default async function ReviewsPage({ searchParams }: { searchParams: Prom
           {requests.sent > 0 && (
             <p className="hint text-sm">
               Last 30 days: {requests.sent} sent, and {requests.reviewed} of those orders got a review.
+            </p>
+          )}
+        </section>
+        <section className="card p-4 flex flex-col gap-2" aria-labelledby="reward-heading">
+          <h2 id="reward-heading" className="font-semibold">Thank-you code</h2>
+          <ReviewRewardForm percent={shop.reviewRewardPercent} />
+          {reward.sent > 0 && (
+            <p className="hint text-sm">
+              {reward.sent === 1 ? "1 code sent" : `${reward.sent} codes sent`}, {reward.used} used, {formatMoney(reward.salesMinor, shop.currency)} in sales.
             </p>
           )}
         </section>
