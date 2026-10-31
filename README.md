@@ -1860,3 +1860,7 @@ A product in the app now has a crossed-out price for each variant, the "was" pri
 ### Returns in the app (after launch, part 345)
 
 Today has a Returns button for roles that handle returns. It lists the returns waiting for an answer (and all of them under All), with the buyer's reason and note, the items and any size or colour they want instead. From the phone you can approve, refund (what they paid is filled in), give store credit, send a replacement or the exchange, or decline with a reason. A gift sent back by the person who received it only offers store credit, as on the website. Answers from the app go in the activity log.
+
+### Store credit from the app (after launch, part 346)
+
+A customer's screen in the app has Give store credit for roles that handle gift cards. Type an amount and, if you like, why (only your team sees it), and the customer gets a gift card code by email that works at checkout. It adds to the Store credit they already have and shows under Gift cards on the website. Good for saying sorry for a late parcel without a refund.

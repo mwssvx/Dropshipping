@@ -585,3 +585,35 @@ test("returns answered from the app: one declined with a reason, one refunded", 
   await web.goto(`${WEB}/admin/activity`);
   await expect(web.getByText("Declined the return on order #1001 in the app")).toBeVisible();
 });
+
+test("store credit given to a customer from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `sc${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Beeswax Candle");
+  await web.getByLabel("Price", { exact: true }).fill("12.00");
+  await web.getByLabel("Stock", { exact: true }).fill("6");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  await buy(browser, new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href);
+
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Customers" }).click();
+  await page.getByRole("link", { name: /Ada Buyer/ }).click();
+  await expect(page.getByRole("button", { name: "Give store credit" })).toBeDisabled();
+  await page.getByRole("textbox", { name: "Credit to give" }).fill("abc");
+  await page.getByRole("button", { name: "Give store credit" }).click();
+  await expect(page.getByText("Enter the amount, like 10.")).toBeVisible();
+  await page.getByRole("textbox", { name: "Credit to give" }).fill("5");
+  await page.getByRole("textbox", { name: "Why", exact: true }).fill("Parcel was a week late");
+  await shot(page, "346-app-store-credit");
+  await page.getByRole("button", { name: "Give store credit" }).click();
+  await expect(page.getByText("$5.00 in store credit sent to ada@example.com.")).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Credit to give" })).toHaveValue("");
+
+  // It's a gift card in their name on the website, and the log says who gave it.
+  await web.goto(`${WEB}/admin/gift-cards`);
+  await expect(web.getByRole("listitem", { name: /Gift card ending/ })).toContainText("$5.00 left of $5.00");
+  await expect(web.getByRole("listitem", { name: /Gift card ending/ })).toContainText("ada@example.com · Given by you");
+  await web.goto(`${WEB}/admin/activity`);
+  await expect(web.getByText("Gave $5.00 store credit to ada@example.com in the app")).toBeVisible();
+});
