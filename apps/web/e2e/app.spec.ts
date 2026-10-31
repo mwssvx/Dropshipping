@@ -1789,7 +1789,7 @@ test("saved replies written in the app, and used in a conversation", async ({ pa
   await shot(page, "377-app-saved-replies");
 
   await page.getByRole("link", { name: "Inbox" }).click();
-  await page.getByText("Message from Grace Hopper").click();
+  await page.getByText("Message from Grace Hopper").filter({ visible: true }).click();
   await page.getByRole("button", { name: "UK plugs" }).click();
   await expect(page.getByRole("textbox", { name: "Your reply" })).toHaveValue(/^Hi Grace, every lamp from Pocket Shop .* comes with a UK plug\.$/);
 });
