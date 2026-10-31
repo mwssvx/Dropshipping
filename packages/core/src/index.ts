@@ -41,6 +41,7 @@ export * from "./growth";
 export * from "./browse-reminders";
 export * from "./review-rewards";
 export * from "./handover-days";
+export * from "./handover-reminders";
 export * from "./abandoned";
 export * from "./analytics";
 export * from "./api-keys";

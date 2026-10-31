@@ -226,7 +226,7 @@ export default async function ShippingPage() {
             <h2 id="handover-heading" className="font-semibold">Pickup and delivery days</h2>
             <p className="text-sm">
               Let buyers who collect their order or get it from you pick the day at checkout, from the next {HANDOVER_DAYS_AHEAD} days you&apos;re open.
-              The day shows on the order, for you and for them, so nobody waits on a closed shop.
+              The day shows on the order, for you and for them, so nobody waits on a closed shop, and buyers get a reminder email the day before.
             </p>
             <HandoverDaysForm days={shop.handoverDays} zones={CUTOFF_TIME_ZONES} defaultZone={shop.shipCutoff?.timeZone ?? defaultCutoffZone(shop.country)} maxLead={HANDOVER_LEAD_MAX} />
           </section>

@@ -481,6 +481,7 @@ export const ORDER_EMAIL_LABELS: Record<EmailKind, string> = {
   bank_transfer_lapsed: "Bank transfer didn't arrive",
   order_news: "Update from you",
   order_late: "Running late",
+  handover_reminder: "Pickup or delivery reminder (the day before)",
 };
 
 async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kind: EmailKind, ref: string) {
