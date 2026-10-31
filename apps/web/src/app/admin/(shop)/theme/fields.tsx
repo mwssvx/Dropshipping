@@ -12,7 +12,7 @@ export type CollectionOption = { id: string; title: string };
 export type ProductOption = { id: string; title: string };
 
 type Field =
-  | { key: string; label: string; kind: "text" | "textarea" | "image" | "link"; hint?: string; max?: number }
+  | { key: string; label: string; kind: "text" | "textarea" | "image" | "link" | "datetime"; hint?: string; max?: number }
   | { key: string; label: string; kind: "select"; options: { value: string; label: string }[] }
   | { key: string; label: string; kind: "number"; min: number; max: number }
   | { key: string; label: string; kind: "collection" | "collections" | "faq" | "quotes" | "badges" | "product" | "products" | "logos" | "messages" | "columns" | "slides" };
@@ -133,7 +133,21 @@ export const SECTION_FIELDS: Record<SectionType, Field[]> = {
     { key: "text", label: "A few words about it (optional)", kind: "textarea", max: 600 },
     { key: "imagePosition", label: "Photo side", kind: "select", options: [{ value: "left", label: "Left" }, { value: "right", label: "Right" }] },
   ],
+  countdown: [
+    { key: "heading", label: "Heading", kind: "text", max: 120, hint: "For example “Black Friday starts in”." },
+    { key: "text", label: "Text", kind: "textarea", max: 400 },
+    { key: "endsAt", label: "Count down to", kind: "datetime", hint: "In your computer's time zone. The section hides itself once this time has passed." },
+    { key: "buttonLabel", label: "Button label", kind: "text", max: 40 },
+    { key: "buttonLink", label: "Button link", kind: "link" },
+  ],
 };
+
+/** A saved moment as the editor's computer shows it, for a datetime-local input. */
+function localTime(iso: string) {
+  const d = new Date(iso);
+  if (!iso || Number.isNaN(d.getTime())) return "";
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
 
 /** One select per piece of a look, plus an empty one to add the next until the look is full. */
 function PieceSelects({ id, label, value, products, onChange }: { id: string; label: string; value: string[]; products: ProductOption[]; onChange: (v: string[]) => void }) {
@@ -195,6 +209,10 @@ export function SectionForm<T extends SectionType>({
             {!["faq", "collections", "quotes", "badges", "products", "logos", "messages", "columns", "slides"].includes(f.kind) && <label className="label" htmlFor={id}>{f.label}</label>}
             {f.kind === "text" && <input id={id} className="input" value={String(v ?? "")} maxLength={f.max} onChange={(e) => set(f.key, e.target.value)} />}
             {f.kind === "textarea" && <textarea id={id} className="input" rows={4} value={String(v ?? "")} maxLength={f.max} onChange={(e) => set(f.key, e.target.value)} />}
+            {f.kind === "datetime" && (
+              <input id={id} className="input" type="datetime-local" value={localTime(String(v ?? ""))} suppressHydrationWarning
+                onChange={(e) => set(f.key, e.target.value ? new Date(e.target.value).toISOString() : "")} />
+            )}
             {f.kind === "image" && (
               <>
                 <input id={id} className="input" type="url" inputMode="url" placeholder="https://…" value={String(v ?? "")} onChange={(e) => set(f.key, e.target.value)} />
