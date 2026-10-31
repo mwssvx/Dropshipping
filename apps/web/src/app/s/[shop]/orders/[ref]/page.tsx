@@ -20,9 +20,11 @@ const utc = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", h
 
 export const metadata = { title: "Order status", robots: { index: false } };
 
-export default async function OrderStatusPage({ params, searchParams }: { params: Promise<{ shop: string; ref: string }>; searchParams: Promise<{ subscribed?: string; answered?: string; download?: string }> }) {
+export default async function OrderStatusPage({ params, searchParams }: { params: Promise<{ shop: string; ref: string }>; searchParams: Promise<{ subscribed?: string; answered?: string; download?: string; rate?: string }> }) {
   const { shop: handle, ref } = await params;
-  const { subscribed: justSubscribed, answered, download } = await searchParams;
+  const { subscribed: justSubscribed, answered, download, rate } = await searchParams;
+  // The stars a buyer tapped in the review request email, picked for them on the form.
+  const tappedRating = /^[1-5]$/.test(rate ?? "") ? Number(rate) : undefined;
   const shop = await loadShop(handle);
   const order = await getOrderByPaymentIntent(await db(), shop.id, ref).catch((e) => {
     if (e instanceof NotFoundError) notFound();
@@ -320,7 +322,8 @@ export default async function OrderStatusPage({ params, searchParams }: { params
                 {item.review.status === "pending" ? "It shows on the store once the shop has had a look." : "Thank you!"}
               </p>
             ) : (
-              <ReviewForm key={item.productId} handle={handle} orderRef={ref} productId={item.productId} title={item.title} name={(order.gift?.from ?? order.shippingAddress.name).split(" ")[0] ?? ""} />
+              <ReviewForm key={item.productId} handle={handle} orderRef={ref} productId={item.productId} title={item.title} name={(order.gift?.from ?? order.shippingAddress.name).split(" ")[0] ?? ""}
+                rating={reviewable.filter((i) => !i.review).length === 1 ? tappedRating : undefined} />
             ),
           )}
         </section>

@@ -24,7 +24,10 @@ describe("review requests", () => {
     f.advance(7 * DAY + 1);
     expect(await sendReviewRequests(f.ctx)).toEqual({ sent: 1 });
     expect(mails()[0]).toMatchObject({ to: order.email, subject: "How was Sunset Projection Lamp?" });
-    expect(mails()[0]!.text).toContain(`https://glow-lamps.example/orders/${order.paymentIntentId}#review`);
+    // One product: five star links, each opening the form with that rating picked.
+    expect(mails()[0]!.text).toContain(`★★★★★  https://glow-lamps.example/orders/${order.paymentIntentId}?rate=5#review`);
+    expect(mails()[0]!.text).toContain(`★★☆☆☆  https://glow-lamps.example/orders/${order.paymentIntentId}?rate=2#review`);
+    expect(mails()[0]!.text).not.toContain("Leave a review:");
     expect(mails()[0]!.text).toContain("Hi Ada,");
     // Once per order.
     expect(await sendReviewRequests(f.ctx)).toEqual({ sent: 0 });

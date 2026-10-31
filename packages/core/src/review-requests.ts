@@ -54,7 +54,14 @@ export async function sendReviewRequests(ctx: FulfillmentContext, scope: { shopI
     if (customer?.unsubscribedAt) continue;
     const items = (await reviewableItems(db, shop.id, order.paymentIntentId)).filter((i) => !i.review);
     if (!items.length) continue;
-    const link = `${await ctx.orderStatusUrl(shop, order)}#review`;
+    const page = await ctx.orderStatusUrl(shop, order);
+    const link = `${page}#review`;
+    // With one product, a tap on a rating opens the form with those stars already picked.
+    const rate = (n: number) => {
+      const url = new URL(page);
+      url.searchParams.set("rate", String(n));
+      return `${url}#review`;
+    };
     const what = items.length === 1 ? items[0]!.title : `your order #${order.number}`;
     const base = ctx.storeAddress ? await ctx.storeAddress(shop) : new URL(link).origin;
     const unsubscribe = customer ? `${base}/unsubscribe/${customer.emailToken}` : null;
@@ -66,9 +73,9 @@ export async function sendReviewRequests(ctx: FulfillmentContext, scope: { shopI
         ``,
         `Your order from ${shop.name} arrived a few days ago. How was it? A quick review, with a photo if you like, helps other buyers and means a lot to us.`,
         ``,
-        ...items.slice(0, 5).map((i) => `- ${i.title}`),
-        ``,
-        `Leave a review: ${link}`,
+        ...(items.length === 1
+          ? [`Tap a rating to start:`, ...[5, 4, 3, 2, 1].map((n) => `${"★".repeat(n)}${"☆".repeat(5 - n)}  ${rate(n)}`)]
+          : [...items.slice(0, 5).map((i) => `- ${i.title}`), ``, `Leave a review: ${link}`]),
         ``,
         `Something wrong with it? Reply from your order page and we'll sort it out.`,
         ...(unsubscribe ? [``, "—", `${shop.name}. One email per order. Don't want these? Unsubscribe: ${unsubscribe}`] : []),
