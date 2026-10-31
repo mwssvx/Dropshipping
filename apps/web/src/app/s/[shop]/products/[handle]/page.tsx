@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { dutiesFor, searchOfferExtras, bundlesForProduct, formatDeliveryWindow, giftCardBonusNow, holidayReturnsNow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, breadcrumbCollection, collectionFromReferer, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, comingSoonProduct, COMPARE_MAX, defaultCutoffZone, countdownTo, shipsToCountry, recentSalesCount, RECENT_SALES_DAYS, starsFilter, postsFeaturing, recordProductView, REVIEWS_SHOWN, REVIEWS_SHOWN_ALL, reviewSort, reviewsQuery, helpfulVotes, reportedReviews } from "@sf/core";
+import { dutiesFor, listShippingZones, shipsTo, searchOfferExtras, bundlesForProduct, formatDeliveryWindow, giftCardBonusNow, holidayReturnsNow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, breadcrumbCollection, collectionFromReferer, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, comingSoonProduct, COMPARE_MAX, defaultCutoffZone, countdownTo, shipsToCountry, recentSalesCount, RECENT_SALES_DAYS, starsFilter, postsFeaturing, recordProductView, REVIEWS_SHOWN, REVIEWS_SHOWN_ALL, reviewSort, reviewsQuery, helpfulVotes, reportedReviews } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { ShareButtons } from "@/components/ShareButtons";
 import { SaleCountdown } from "@/components/SaleCountdown";
@@ -13,7 +13,9 @@ import type { StoreText } from "@/lib/store-text";
 import { badgeLabel } from "@/theme/Sections";
 import { currentBuyer } from "@/lib/buyer";
 import { db } from "@/lib/server";
-import { buyerCountry, buyerFx } from "@/lib/currency";
+import { buyerCountry, buyerFx, deliveryCountry } from "@/lib/currency";
+import { DeliverTo } from "@/components/DeliverTo";
+import { countryNames } from "@/lib/store-text";
 import { SubmitButton } from "@/components/SubmitButton";
 import { addBundleAction, addToCartAction, askQuestionAction, helpfulAction, launchListAction, reportReviewAction, stockAlertAction, toggleCompareAction, toggleSavedAction } from "../../actions";
 import { readCompare } from "@/lib/compare";
@@ -187,9 +189,11 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const bundleTitles = new Map((await localProducts(shopHandle, bundles.flatMap((b) => b.products))).map((p) => [p.id, p.title]));
   // "Arrives Oct 18 – Oct 25 to United States", for the visitor's country when the store ships there.
   // Some products can't go to some countries; buyers there are told before they add it.
-  const here = await buyerCountry();
+  // The shopper's "Deliver to" choice wins over where they are.
+  const here = await deliveryCountry();
   const cantShipHere = here && !product.digital && !shipsToCountry(product.blockedCountries, here) ? here : null;
-  const delivery = buyable.length && !cantShipHere ? await productDelivery(await db(), shop, product.id, { country: await buyerCountry() }) : null;
+  const delivery = buyable.length && !cantShipHere ? await productDelivery(await db(), shop, product.id, { country: here }) : null;
+  const shipsToList = product.giftCard || product.digital ? [] : shipsTo((await listShippingZones(await db(), shop.id)).zones);
   // "Shipping to United States: $4.99 · Free on orders of $50 or more", so it isn't a surprise at checkout.
   const shipping = v && orderable.length && !cantShipHere ? await productShipping(await db(), shop, { priceMinor: v.priceMinor, weightGrams: v.weightGrams, giftCard: product.giftCard || product.digital }, here) : null;
   const shownMoney = (m: number) => (fx ? formatMoney(convertPrice(m, fx), fx.currency) : formatMoney(m, shop.currency));
@@ -369,6 +373,13 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
             {(shop.duties === "included" ? t.dutiesIncludedShort : t.dutiesOnDelivery)(new Intl.DisplayNames([lang], { type: "region" }).of(shipping.country) ?? shipping.country)}
           </p>
         )}
+        {shipsToList.length > 1 && (() => {
+          const names = countryNames(lang);
+          const current = shipping?.country ?? here ?? shop.country;
+          const list = shipsToList.map((c) => [c, names(c, c)] as [string, string]).sort((a, b) => a[1].localeCompare(b[1], lang));
+          if (!shipsToList.includes(current)) list.unshift([current, names(current, current)]);
+          return <DeliverTo current={current} countries={list} text={{ deliveringTo: t.deliveringTo(names(current, current)), change: t.changeCountry, deliverTo: t.deliverTo }} />;
+        })()}
         {delivery && (
           <p id="delivery-estimate" className="text-sm flex flex-col gap-0.5">
             <span className="font-medium">{t.arrives(formatDeliveryWindow(delivery, (d) => dayFormat.format(d)), new Intl.DisplayNames([lang], { type: "region" }).of(delivery.country) ?? delivery.country)}</span>

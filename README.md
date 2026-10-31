@@ -1720,3 +1720,7 @@ Print-on-demand, engraved and made-to-order products take longer to get ready th
 ### Preparing time in bulk (after launch, part 310)
 
 A print-on-demand line usually has dozens of products with the same production time. The Products list's bulk change gets **Set preparing time**: tick products or the whole filtered list, enter the days (empty for the store's), preview ("2 days (store's)" to "5 days") and apply. Gift cards and downloads are skipped, and it can be undone for a week like every bulk change. `{ kind: "processing", days }` in `packages/core/src/bulk-edit.ts`. No migration.
+
+### Deliver to (after launch, part 311)
+
+Shipping costs, delivery dates and the duties note on product pages follow where the shopper is, which is wrong when they're buying a gift for someone abroad, travelling, or on a VPN. Product pages now say "Delivering to United States · Change" (in the shopper's language) when the store ships to more than one country. Picking another country keeps it in a cookie, and the product page's shipping cost, delivery date, duties note and "can't ship there" warning, the cart's shipping estimate and the checkout's starting country all follow it. Cookie consent and the EU lowest-price note still follow where the shopper is, since those laws do. `deliveryCountry()` and `chosenCountry()` in `apps/web/src/lib/currency.ts`, `components/DeliverTo.tsx`. No migration.

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { cartDelivery, convertAmount, convertPrice, formatDeliveryWindow, formatMoney, pointsFor, presentQuote, quoteCart, recentlyViewed, upsellsFor, boughtTogether, onHoliday, UserError } from "@sf/core";
-import { buyerCountry, buyerFx } from "@/lib/currency";
+import { deliveryCountry, buyerFx } from "@/lib/currency";
 import { readCart, readDiscountCode, readGiftCardCode } from "@/lib/cart";
 import { db } from "@/lib/server";
 import { currentBuyer } from "@/lib/buyer";
@@ -26,7 +26,7 @@ export default async function CartPage({ params, searchParams }: { params: Promi
   let codeProblem: string | null = null;
   // Signed-in wholesale buyers get their prices here and at checkout.
   const buyerEmail = (await currentBuyer(shop.id))?.email ?? null;
-  const opts = { discountCode: code, giftCardCode: await readGiftCardCode(shop.id), buyerEmail, countryHint: await buyerCountry() };
+  const opts = { discountCode: code, giftCardCode: await readGiftCardCode(shop.id), buyerEmail, countryHint: await deliveryCountry() };
   // A code that stopped working (cart below its minimum, expired, gift card used up) shouldn't
   // hide the cart: it's shown as a problem and the cart is priced without it.
   for (let tries = 0; lines.length && !quote && !problem && tries < 3; tries++) {
