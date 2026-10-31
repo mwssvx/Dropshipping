@@ -13,6 +13,7 @@ export function SignupPopupForm({ seconds, choices }: { seconds: number | null; 
         <label className="label" htmlFor="popupSeconds">Show the pop-up</label>
         <select className="input" id="popupSeconds" name="seconds" defaultValue={seconds ?? ""}>
           <option value="">Never</option>
+          <option value="0">When a visitor is about to leave (after 30 seconds on phones)</option>
           {choices.map((s) => <option key={s} value={s}>{s} seconds after a visitor arrives</option>)}
         </select>
       </div>

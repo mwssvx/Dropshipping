@@ -1491,3 +1491,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **Write it once** (`apps/web/src/app/admin/(shop)/products/ProductInfoForm.tsx`): the Products page has "Notes under every product", up to four notes with a title and some text, like "Shipping" or "Returns". Merchants write their shipping times or return terms once instead of copying them into every description. Empty rows are left out and the rest close up in order.
 2. **On the store**: every product page shows the notes under the description and details, each closed until a shopper taps its title (a native `<details>`, so it works without JavaScript and with a keyboard). `setProductInfo` in `packages/core/src/badges.ts` checks each note has both a title (60 characters) and text (1,500). Migration `0147_product_info` adds `shops.product_info`.
+
+### Pop-up when a visitor is about to leave (after launch, part 263)
+
+1. **A new choice for the sign-up pop-up** (Marketing → Sign-up pop-up): "When a visitor is about to leave" waits until the mouse heads out through the top of the window, towards the tabs or the address bar, and opens the pop-up then, so people who are reading aren't interrupted. A glance at the tabs in the first 3 seconds doesn't count. Phones have no mouse, so there it opens after 30 seconds instead.
+2. **Everything else stays the same**: once per browser, never on the cart, checkout or account pages, and not again after "No thanks". It's stored as 0 seconds (`SIGNUP_POPUP_ON_LEAVE` in `packages/core/src/signup-popup.ts`), store files carry it, and the store layout now treats 0 as on. No migration.

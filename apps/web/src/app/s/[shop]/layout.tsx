@@ -3,7 +3,7 @@ import { AddedToCart } from "@/theme/AddedToCart";
 import { readCart } from "@/lib/cart";
 import { Track } from "@/components/Track";
 import { StoreShell } from "@/theme/StoreShell";
-import { activeClosure, LANGUAGES, needsConsent, paymentMethods, shopCurrencies, shopLanguages, SIGNUP_POPUP_QUIET, CHAT_BUTTON_QUIET, chatLinks, storePixels, storeWideCountdown } from "@sf/core";
+import { activeClosure, LANGUAGES, needsConsent, paymentMethods, shopCurrencies, shopLanguages, SIGNUP_POPUP_QUIET, SIGNUP_POPUP_LEAVE_FALLBACK, CHAT_BUTTON_QUIET, chatLinks, storePixels, storeWideCountdown } from "@sf/core";
 import { SignupPopup } from "@/components/SignupPopup";
 import { ChatButtons } from "@/components/ChatButtons";
 import { BackToTop } from "@/theme/BackToTop";
@@ -71,7 +71,7 @@ export default async function StoreLayout({ children, params }: { children: Reac
   const pixels = storePixels(shop);
   const ask = pixels ? needsConsent(shop, await buyerCountry()) : false;
   // The sign-up pop-up, for visitors who aren't signed in as a subscriber already.
-  const popup = shop.signupPopupSeconds && shop.status === "active" && !closure && !(await currentBuyer(shop.id))?.acceptsMarketing;
+  const popup = shop.signupPopupSeconds !== null && shop.status === "active" && !closure && !(await currentBuyer(shop.id))?.acceptsMarketing;
   const picker = currencies.length > 1 ? { currencies, current: (await buyerFx(shop)).currency, action: setCurrencyAction.bind(null, param) } : undefined;
   return (
     <StoreShell doc={theme} shopName={shop.name} currency={shop.currency} base={base} cartCount={count} closed={shop.status !== "active"} notice={notice} verified={!!shop.verifiedAt && shop.status === "active"} picker={picker} t={t} payments={paymentMethods(shop)} signup={theme.settings.footerSignup && shop.status === "active" ? popupSignupAction.bind(null, param) : undefined} ageGate={theme.settings.ageGate ? { age: theme.settings.ageGate, storeKey: shop.id } : undefined} languages={langs.length ? { root, current: lang ?? "en", options: [{ code: "en", name: "English" }, ...langs.map((l) => ({ code: l, name: LANGUAGES[l].name }))] } : undefined}>
@@ -86,6 +86,7 @@ export default async function StoreLayout({ children, params }: { children: Reac
         <SignupPopup
           shopId={shop.id}
           seconds={shop.signupPopupSeconds!}
+          leaveFallback={SIGNUP_POPUP_LEAVE_FALLBACK}
           quiet={SIGNUP_POPUP_QUIET.source}
           action={popupSignupAction.bind(null, param)}
           text={{ title: t.popupTitle, text: t.popupText, offer: shop.welcomeOffer ? t.welcomeOfferNote(shop.welcomeOffer.percentOff) : null, email: t.signupEmail, signUp: t.signUp, noThanks: t.popupNoThanks, close: t.close, sent: t.signupSent, invalid: t.signupInvalid }}
