@@ -1836,3 +1836,7 @@ The app's Products tab has a search box at the top. Type part of a product's nam
 ### To post, in the app (after launch, part 339)
 
 The app's Orders tab has a "To post" list: paid orders with your own stock in them that don't have tracking for your parcel yet, oldest first, the same orders the packing slips print. Add tracking on an order and it leaves the list.
+
+### Reviews in the app (after launch, part 340)
+
+Today in the app now has a Reviews button for anyone whose role covers reviews. "To check" lists reviews waiting for your OK, with Publish and Hide; "No reply" lists live reviews you haven't answered; "All" shows the latest. Write a reply under any review and post it: it shows on your store, and a buyer who reviewed an order gets an email the first time.
