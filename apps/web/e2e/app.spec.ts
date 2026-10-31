@@ -1169,3 +1169,50 @@ test("an email blocked and unblocked from the app's Blocked buyers", async ({ pa
   await buyer.getByRole("button", { name: /^Pay/ }).click();
   await expect(buyer.getByRole("heading", { name: "Thank you, Ada!" })).toBeVisible();
 });
+
+test("a teammate invited from the app joins, is made an admin and removed", async ({ page, browser }) => {
+  const id = `tm${Date.now()}`;
+  const { web, email } = await merchant(browser, id);
+  await signIn(page, email);
+  await page.goto("/settings");
+  await page.getByRole("link", { name: /^People/ }).click();
+  await expect(page.getByRole("heading", { name: "Team", level: 1 })).toBeVisible();
+  await expect(page.getByText(/Staff accounts come with the Scale plan/)).toBeVisible();
+
+  await web.goto(`${WEB}/admin/plan`);
+  await web.getByRole("button", { name: "Upgrade to Scale" }).click();
+  await expect(web.getByRole("heading", { name: "You're on Scale" })).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByText(/^0 of 15 staff accounts used/)).toBeVisible();
+  const sam = `sam-${id}@example.com`;
+  await page.getByRole("textbox", { name: "Their email" }).fill(sam);
+  await page.getByRole("button", { name: "Send invite" }).click();
+  await expect(page.getByText(`Invite sent to ${sam}. The link works for a week.`)).toBeVisible();
+  await expect(page.getByRole("article", { name: `Invite for ${sam}` }).getByText(/^Invited as staff/)).toBeVisible();
+  await shot(page, "364-app-team");
+
+  // Sam joins from the email.
+  const person = await (await browser.newContext()).newPage();
+  await person.goto(`${WEB}/dev/mail`);
+  const mail = person.getByRole("article").filter({ hasText: sam }).first();
+  await expect(mail).toContainText("Join Pocket Shop");
+  await person.goto(`${WEB}${new URL((await mail.textContent())!.match(/https?:\/\/\S+\/invite\/[\w-]+/)![0]).pathname}`);
+  await person.getByRole("link", { name: "Create an account" }).click();
+  await person.getByLabel("Password").fill(PASSWORD);
+  await person.getByRole("button", { name: "Create account" }).click();
+  await person.getByRole("button", { name: /^Join Pocket Shop/ }).click();
+  await expect(person.getByRole("heading", { name: /^Welcome to Pocket Shop/ })).toBeVisible();
+
+  await page.reload();
+  const member = page.getByRole("article", { name: sam });
+  await expect(member.getByText("Staff", { exact: true })).toBeVisible();
+  await member.getByRole("button", { name: `Change ${sam}…` }).click();
+  await member.getByRole("button", { name: "Make admin" }).click();
+  await expect(page.getByText(`${sam} is an admin now.`)).toBeVisible();
+  await expect(page.getByRole("article", { name: sam }).getByText("Admin", { exact: true })).toBeVisible();
+  await page.getByRole("article", { name: sam }).getByRole("button", { name: `Change ${sam}…` }).click();
+  await page.getByRole("article", { name: sam }).getByRole("button", { name: `Remove ${sam}` }).click();
+  await expect(page.getByText(`${sam} can't open the store any more.`)).toBeVisible();
+  await expect(page.getByRole("article", { name: sam })).toHaveCount(0);
+});

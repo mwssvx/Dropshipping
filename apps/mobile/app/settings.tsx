@@ -109,6 +109,7 @@ export default function Settings() {
       {can("team") ? (
         <Section title="Team">
           <List>
+            <Row href="/team" title="People" subtitle="Invite someone, change what they can do, or remove them" />
             <Row href="/activity" title="Activity" subtitle="Who on your team did what: refunds, price changes, orders sent" />
           </List>
         </Section>
