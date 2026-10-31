@@ -153,6 +153,8 @@ export const shops = pgTable(
     reviewsAutoPublish: boolean("reviews_auto_publish").notNull().default(false),
     // Buyers are emailed asking for a review this many days after their order arrives; 0 turns it off.
     reviewRequestDays: integer("review_request_days").notNull().default(7),
+    // A thank-you code for a review: this percent off the buyer's next order, once per order. Null means off.
+    reviewRewardPercent: integer("review_reward_percent"),
     // Buyers whose order still hasn't shipped this many days after paying get one email saying so.
     lateOrderNotice: jsonb("late_order_notice").$type<LateOrderNotice | null>(),
     // Extra currencies buyers can shop in, converted from the store's own currency at today's rate.
@@ -1265,7 +1267,7 @@ export const discounts = pgTable(
     // Welcome and referral codes are made one per person, only work for that email, and stay off
     // the codes list. Partner codes are listed on the Partners page instead, and personal codes (sent
     // to one customer from their page) on that customer's page.
-    source: text("source", { enum: ["merchant", "welcome", "referral", "winback", "partner", "personal", "batch", "reminder", "birthday"] }).notNull().default("merchant"),
+    source: text("source", { enum: ["merchant", "welcome", "referral", "winback", "partner", "personal", "batch", "reminder", "birthday", "review"] }).notNull().default("merchant"),
     email: text("email"),
     // One-time codes made together (for a giveaway or a card in the parcel) belong to a batch.
     batchId: uuid("batch_id").references((): AnyPgColumn => codeBatches.id, { onDelete: "cascade" }),
@@ -1351,6 +1353,8 @@ export const reviews = pgTable(
     helpfulCount: integer("helpful_count").notNull().default(0),
     // Shoppers who reported the review since the merchant last looked. Kept at 0 after "Keep it".
     reportCount: integer("report_count").notNull().default(0),
+    // When the buyer was emailed a thank-you code for it. Shown on the review, so shoppers know.
+    rewardedAt: timestamp("rewarded_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [

@@ -315,11 +315,15 @@ export default async function OrderStatusPage({ params, searchParams }: { params
       {reviewable.length > 0 && (
         <section id="review" className="card p-5 flex flex-col gap-4" aria-labelledby="review-heading">
           <h2 id="review-heading" className="font-semibold">How was it?</h2>
+          {shop.reviewRewardPercent && reviewable.some((i) => !i.review) && (
+            <p className="text-sm">Leave a review, good or bad, and we&apos;ll email you {shop.reviewRewardPercent}% off your next order as a thank you.</p>
+          )}
           {reviewable.map((item) =>
             item.review ? (
               <p key={item.productId} className="text-sm">
                 <span className="font-medium">{item.title}:</span> you gave it {item.review.rating} of 5 stars.{" "}
                 {item.review.status === "pending" ? "It shows on the store once the shop has had a look." : "Thank you!"}
+                {item.review.rewardedAt && ` We've emailed you ${shop.reviewRewardPercent ? `${shop.reviewRewardPercent}% off` : "a thank-you code for"} your next order.`}
               </p>
             ) : (
               <ReviewForm key={item.productId} handle={handle} orderRef={ref} productId={item.productId} title={item.title} name={(order.gift?.from ?? order.shippingAddress.name).split(" ")[0] ?? ""}
