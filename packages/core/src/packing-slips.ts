@@ -34,7 +34,28 @@ export type PackingSlip = {
   buyerNote: string | null;
   /** Other orders to the same door that also have items the store posts: they can share this box. Not printed. */
   sameBox: number[];
+  /** What the box's contents weigh packed, for buying postage. Null when an item has no weight. */
+  weightGrams: number | null;
 };
+
+/** What these items weigh packed, from their options' weights. Null when one has no weight. */
+export function itemsWeight(items: { variantId: string | null; quantity: number }[], weights: Map<string, number | null>) {
+  if (!items.length) return null;
+  let total = 0;
+  for (const i of items) {
+    const w = i.variantId ? weights.get(i.variantId) : null;
+    if (w == null) return null;
+    total += w * i.quantity;
+  }
+  return total;
+}
+
+/** The same, looking the weights up. */
+export async function packedWeight(db: Db, items: { variantId: string | null; quantity: number }[]) {
+  const ids = [...new Set(items.map((i) => i.variantId).filter((v): v is string => !!v))];
+  const rows = ids.length ? await db.query.variants.findMany({ where: inArray(schema.variants.id, ids), columns: { id: true, weightGrams: true } }) : [];
+  return itemsWeight(items, new Map(rows.map((r) => [r.id, r.weightGrams])));
+}
 
 /** The store's name, address and note, and a slip for each order, in order number order. */
 export async function packingSlips(db: Db, shopId: string, scope: { orderId: string } | { orderIds: string[] } | "waiting") {
@@ -59,9 +80,9 @@ export async function packingSlips(db: Db, shopId: string, scope: { orderId: str
     ? await db.query.orderLines.findMany({ where: inArray(schema.orderLines.orderId, ids), orderBy: asc(schema.orderLines.title) })
     : [];
   const variantIds = [...new Set(lines.map((l) => l.variantId).filter((v): v is string => !!v))];
-  const skus = new Map(
-    (variantIds.length ? await db.query.variants.findMany({ where: inArray(schema.variants.id, variantIds), columns: { id: true, sku: true } }) : []).map((v) => [v.id, v.sku]),
-  );
+  const variantRows = variantIds.length ? await db.query.variants.findMany({ where: inArray(schema.variants.id, variantIds), columns: { id: true, sku: true, weightGrams: true } }) : [];
+  const skus = new Map(variantRows.map((v) => [v.id, v.sku]));
+  const weights = new Map(variantRows.map((v) => [v.id, v.weightGrams]));
   // Which options a supplier sends: their lines leave the box when the order also has the store's own.
   const supplied = new Set(
     variantIds.length
@@ -103,6 +124,7 @@ export async function packingSlips(db: Db, shopId: string, scope: { orderId: str
       gift: o.gift ? { from: o.gift.from, message: o.gift.message, returnCode: codes.get(o.id) ?? null } : null,
       giftWrap: o.giftWrapMinor > 0,
       buyerNote: o.buyerNote,
+      weightGrams: itemsWeight(boxed, weights),
       sameBox: waiting.has(o.id) ? (doors.get(o.id) ?? []).filter((x) => waiting.has(x.id)).map((x) => x.number) : [],
     };
   });

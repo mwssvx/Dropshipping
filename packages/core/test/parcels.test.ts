@@ -135,6 +135,10 @@ describe("packing slips for an order in two parcels", () => {
     const { slips } = await packingSlips(f.db, shop.id, { orderId: order.id });
     expect(slips[0]!.items.map((i) => i.title)).toEqual(["Handmade Coaster"]);
     expect(slips[0]!.separately).toEqual([{ title: expect.stringMatching(/^Sunset Projection Lamp/), quantity: 2 }]);
+    // No weight on the coaster yet: the slip can't say what the box weighs.
+    expect(slips[0]!.weightGrams).toBeNull();
+    await f.db.update(schema.variants).set({ weightGrams: 250 }).where(eq(schema.variants.id, coaster!.id));
+    expect((await packingSlips(f.db, shop.id, { orderId: order.id })).slips[0]!.weightGrams).toBe(250);
     // An order all from the store's shelf, or all from suppliers, lists everything.
     const { order: lampOnly } = await startCheckout(f.db, f.payments, shop, { email: "ada@example.com", address, lines: [{ variantId: lamp!.id, quantity: 1 }], storefront: true });
     const one = (await packingSlips(f.db, shop.id, { orderId: lampOnly.id })).slips[0]!;

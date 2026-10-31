@@ -22,6 +22,7 @@ test("the merchant sees two orders going to the same address", async ({ page, br
   await page.getByLabel("Title").fill("Beeswax Candle");
   await page.getByLabel("Price", { exact: true }).fill("12.00");
   await page.getByLabel("Stock", { exact: true }).fill("6");
+  await page.getByLabel("Weight (g)").fill("300");
   await page.getByRole("button", { name: "Save product" }).click();
   await expect(page.getByText("Product added.")).toBeVisible();
   const candle = (await page.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!;
@@ -62,8 +63,11 @@ test("the merchant sees two orders going to the same address", async ({ page, br
   const orderAdmin = page.url();
   await page.goto(`${orderAdmin}/packing-slip`);
   await expect(page.getByLabel("Same box")).toContainText("Order #1001 goes to the same address and also has items you post.");
+  await expect(page.getByRole("article", { name: "Packing slip for order #1002" })).toContainText("Weight300 g");
   await page.goto(orderAdmin);
 
+  // The candle's box weight, for buying postage.
+  await expect(page.getByLabel("Box weight")).toHaveText("Weighs about 300 g packed");
   // Both candles go in one box: the tracking goes on both orders.
   await page.getByRole("button", { name: "Add tracking yourself" }).first().click();
   await page.getByLabel("Carrier").fill("USPS");

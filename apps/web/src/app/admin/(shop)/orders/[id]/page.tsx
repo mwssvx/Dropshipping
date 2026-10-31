@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { can, countryName, daysPastDelivery, formatDeliveryWindow, orderDelivery, formatHandoverDay, storeHandoverOptions, crossesBorder, disputeEvidence, disputeReason, disputesForOrder, formatMoney, getOrder, ORDER_EMAIL_LABELS, orderEditOptions, listRefunds, replaceableLines, replacementBlocked, replacementsOf, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode, formatShipsBy, preorderWaitingOn, isOrderBuyerBlocked, orderDownloads, DOWNLOADS_PER_ITEM, transferDueBy, orderParcels, ordersToSameAddress } from "@sf/core";
+import { can, countryName, daysPastDelivery, formatDeliveryWindow, orderDelivery, formatHandoverDay, storeHandoverOptions, crossesBorder, disputeEvidence, disputeReason, disputesForOrder, formatMoney, getOrder, ORDER_EMAIL_LABELS, orderEditOptions, listRefunds, replaceableLines, replacementBlocked, replacementsOf, listSupplierLinks, NotFoundError, orderDocuments, supplierLabel as labelFor, PLANS, PROBLEM_FIXES, type ProblemCode, formatShipsBy, preorderWaitingOn, isOrderBuyerBlocked, orderDownloads, DOWNLOADS_PER_ITEM, transferDueBy, orderParcels, ordersToSameAddress, packedWeight, formatWeight } from "@sf/core";
 import { BlockBuyerForm } from "./BlockBuyerForm";
 import { fulfillment, requireShop, storeAddress, suppliers, testPayments } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
@@ -110,6 +110,8 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
   const pastDue = daysPastDelivery(arrives, order);
   // The buyer's other orders to this door still to ship: the store's own items can share a box.
   const sameDoor = paid && order.fulfillmentStatus !== "shipped" && order.fulfillmentStatus !== "delivered" ? await ordersToSameAddress(db, shop.id, order) : null;
+  // What the store's own box weighs, for buying postage: the own parcel, or the whole order when it's all the store's.
+  const boxGrams = ownWaiting ? await packedWeight(db, ownWaiting.items) : paid && order.fulfillments.length === 0 && parcels.length === 0 ? await packedWeight(db, order.lines) : null;
   const boxMates = sameDoor?.ownItems ? sameDoor.orders.filter((o) => o.ownItems).map((o) => ({ id: o.id, number: o.number })) : [];
 
   return (
@@ -382,6 +384,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
                   <li className="text-sm flex flex-col gap-1" aria-label="Your own parcel">
                     <span className="font-medium">Sent by you</span>
                     <span>{listed(ownWaiting.items)}</span>
+                    {boxGrams != null && <span className="hint" aria-label="Box weight">Weighs about {formatWeight(boxGrams)} packed</span>}
                     <span className="hint">These are your own stock, so they go in a parcel you post. Add its tracking and we&apos;ll email the buyer about this parcel.</span>
                     <ManualTrackingForm orderId={order.id} own primary also={boxMates} />
                   </li>
@@ -390,6 +393,7 @@ export default async function OrderPage({ params, searchParams }: { params: Prom
             )}
             <div className="flex gap-2 flex-wrap">
               {open && <CheckTrackingButton orderId={order.id} />}
+              {paid && order.fulfillments.length === 0 && boxGrams != null && <span className="hint text-sm self-center" aria-label="Box weight">Weighs about {formatWeight(boxGrams)} packed</span>}
               {paid && order.fulfillments.length === 0 && <ManualTrackingForm orderId={order.id} also={boxMates} />}
             </div>
           </section>

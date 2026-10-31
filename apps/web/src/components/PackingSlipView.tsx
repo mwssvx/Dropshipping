@@ -1,4 +1,5 @@
 import type { PackingSlip } from "@sf/core";
+import { formatWeight } from "@sf/core";
 import { countryNames } from "@/lib/store-text";
 
 const day = new Intl.DateTimeFormat("en-US", { dateStyle: "long", timeZone: "UTC" });
@@ -22,6 +23,7 @@ export function PackingSlipView({ slip, store }: { slip: PackingSlip; store: Sto
           <dt className="text-muted">Order</dt><dd className="num font-semibold">#{slip.number}</dd>
           <dt className="text-muted">Placed</dt><dd>{day.format(slip.placedAt)}</dd>
           <dt className="text-muted">Items</dt><dd className="num">{count}</dd>
+          {slip.weightGrams != null && <><dt className="text-muted no-print">Weight</dt><dd className="num no-print">{formatWeight(slip.weightGrams)}</dd></>}
         </dl>
       </header>
       <section aria-label="Ship to">
