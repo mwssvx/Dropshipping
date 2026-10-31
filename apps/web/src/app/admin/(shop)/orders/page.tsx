@@ -295,9 +295,10 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                       {(o.tags.length > 0 || o.buyerNote || sameDoor.has(o.id)) && (
                         <span className="flex flex-wrap gap-1 mt-1">
                           {sameDoor.has(o.id) && (
-                            <Link href={`/admin/orders/${sameDoor.get(o.id)![0]!.id}`} className="pill pill-warning text-xs" title="Not shipped yet, so your own items can go in one box">
+                            // Plain text, not a link: the order's own page lists and links the others.
+                            <span className="pill pill-warning text-xs" title="Not shipped yet, so your own items can go in one box">
                               Same address as {sameDoor.get(o.id)!.slice(0, 3).map((x) => `#${x.number}`).join(", ")}{sameDoor.get(o.id)!.length > 3 ? ` and ${sameDoor.get(o.id)!.length - 3} more` : ""}
-                            </Link>
+                            </span>
                           )}
                           {o.buyerNote && <span className="pill pill-info text-xs" title={o.buyerNote}>Has a note</span>}
                           {o.tags.map((t) => <span key={t} className="pill pill-neutral text-xs">{t}</span>)}
