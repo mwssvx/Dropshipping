@@ -4,12 +4,14 @@ import { addTask, deleteTask, parseDueDate, setTaskDone, UserError } from "@sf/c
 import { requireShop } from "@/lib/server";
 import type { FormState } from "./actions";
 
+type TaskFormState = FormState & { at?: number };
+
 const fail = (e: unknown): FormState => {
   if (e instanceof UserError) return { error: e.message };
   throw e;
 };
 
-export async function addTaskAction(_: FormState, form: FormData): Promise<FormState> {
+export async function addTaskAction(_: TaskFormState, form: FormData): Promise<TaskFormState> {
   const { shop, db, user } = await requireShop("home");
   try {
     await addTask(db, shop.id, {
@@ -23,7 +25,8 @@ export async function addTaskAction(_: FormState, form: FormData): Promise<FormS
     return fail(e);
   }
   revalidatePath("/admin", "layout");
-  return { saved: true };
+  // A new value each time, so the form clears once per save and not on every re-render.
+  return { saved: true, at: Date.now() };
 }
 
 export async function setTaskDoneAction(id: string, done: boolean) {

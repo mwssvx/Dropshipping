@@ -37,7 +37,11 @@ describe("the Google connector", () => {
     expect(google.refreshes).toBe(1);
     expect((await getConnector(f.db, shop.id))!.expiresAt!.getTime()).toBeGreaterThan(Date.now() + 20_000);
 
-    await disconnectGoogle(f.db, shop.id);
+    // A rotated secret gives the owner a way forward rather than a blank error.
+    await expect(googleToken({ ...gctx, connectorSecret: "rotated" }, shop.id)).rejects.toThrow(/connect it again/);
+
+    await disconnectGoogle(gctx, shop.id);
+    expect(google.revoked).toEqual(["fake-refresh"]);
     await expect(googleToken(gctx, shop.id)).rejects.toThrow(/isn't connected/);
   });
 
@@ -64,6 +68,13 @@ describe("the Google connector", () => {
     expect(event!.input.preview).toEqual(expect.arrayContaining([expect.stringMatching(/Dec 1.*9:00 AM.*10:00 AM/)]));
     await decideAction(f.ctx, shop.id, event!.id, { approve: true, by: "owner" });
     expect(google.events.map((e) => e.title)).toContain("Sale launch");
+
+    // A bare date is a whole day, not an hour at 9:00.
+    await askAssistant(f.ctx, shop, "Put the stocktake on my calendar on 2026-12-05");
+    const [day] = (await f.pending()).filter((a) => a.tool === "add_calendar_event");
+    expect(day!.input.preview).toEqual(expect.arrayContaining(["All day Sat, Dec 5"]));
+    await decideAction(f.ctx, shop.id, day!.id, { approve: true, by: "owner" });
+    expect(google.events.at(-1)).toMatchObject({ title: "Stocktake", allDay: true, start: "2026-12-05", end: "2026-12-06" });
   });
 
   it("says plainly when Google isn't connected, and reads event times", async () => {
@@ -73,7 +84,7 @@ describe("the Google connector", () => {
     expect(r.text).toContain("Connectors page");
     expect(parseEventTime("2026-11-15T14:00+01:00").toISOString()).toBe("2026-11-15T13:00:00.000Z");
     expect(parseEventTime("2026-11-15T14:00").toISOString()).toBe("2026-11-15T14:00:00.000Z");
-    expect(parseEventTime("2026-11-15").toISOString()).toBe("2026-11-15T09:00:00.000Z");
+    expect(parseEventTime("2026-11-15").toISOString()).toBe("2026-11-15T00:00:00.000Z");
     expect(() => parseEventTime("tomorrow at 3")).toThrow(UserError);
   });
 });
