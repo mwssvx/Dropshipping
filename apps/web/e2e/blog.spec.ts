@@ -57,6 +57,8 @@ test("the AI writer drafts a post, the merchant publishes it, and buyers read it
   const featured = buyer.getByRole("region", { name: "In this post" });
   await featured.getByRole("link", { name: /Sunset Projection Lamp/ }).click();
   await expect(buyer.getByRole("heading", { level: 1, name: "Sunset Projection Lamp" })).toBeVisible();
+  // The product's own page leads back to the post.
+  await expect(buyer.getByRole("region", { name: "From our blog" }).getByRole("link", { name: "Picking a night light for a kid's room" })).toBeVisible();
   await buyer.goBack();
   await shot(buyer, "114-blog-post");
 

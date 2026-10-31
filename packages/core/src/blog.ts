@@ -178,6 +178,16 @@ const postCard = (p: typeof schema.blogPosts.$inferSelect) => ({
   minutes: readingMinutes(p.body),
 });
 
+/** The newest posts on the store that feature a product, for "From our blog" on its page. */
+export async function postsFeaturing(db: Db, shopId: string, productId: string, limit = 3) {
+  const posts = await db.query.blogPosts.findMany({
+    where: and(eq(schema.blogPosts.shopId, shopId), livePost(), sql`${schema.blogPosts.productIds} @> ${JSON.stringify([productId])}::jsonb`),
+    orderBy: desc(schema.blogPosts.publishedAt),
+    limit,
+  });
+  return posts.map(postCard);
+}
+
 /**
  * Posts to read next under a post: the ones sharing the most topics with it first, then the
  * newest, so a store with no topics still gets its latest posts.

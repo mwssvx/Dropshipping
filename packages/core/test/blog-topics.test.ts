@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { blogTopics, createPost, DemoModel, exportStore, listPublishedPosts, postTags, relatedPosts, setPostPublished, updatePost } from "../src";
+import { blogTopics, createPost, DemoModel, exportStore, listPublishedPosts, postsFeaturing, postTags, relatedPosts, setPostPublished, updatePost } from "../src";
 import { makeFixture } from "../evals/fixture";
 
 const body = "A long enough post about lamps, with plenty of words to read before bed tonight.";
@@ -52,5 +52,21 @@ describe("blog topics", () => {
     expect(await titles({ id: draft.id, tags: [] }, 2)).toEqual(["Newest, none in common", "Older, none in common"]);
     await setPostPublished(f.db, shop.id, draft.id, true, new Date(Date.UTC(2026, 9, 6)));
     expect((await titles(post))[0]).toBe("Draft in common");
+  });
+
+  it("lists the newest posts featuring a product, for its page", async () => {
+    const f = await makeFixture(new DemoModel());
+    const shop = await f.shop();
+    const { lamp, stand } = f.products;
+    const at = (n: number) => ({ published: true, now: new Date(Date.UTC(2026, 9, n)) });
+    await createPost(f.db, shop.id, { title: "Lamp guide", body, productIds: [lamp.id] }, at(1));
+    await createPost(f.db, shop.id, { title: "Both", body, productIds: [stand.id, lamp.id] }, at(2));
+    await createPost(f.db, shop.id, { title: "Stand only", body, productIds: [stand.id] }, at(3));
+    await createPost(f.db, shop.id, { title: "Lamp draft", body, productIds: [lamp.id] });
+    await createPost(f.db, shop.id, { title: "Lamp later", body, productIds: [lamp.id] }, { published: true, publishAt: new Date(Date.now() + 86_400_000) });
+
+    expect((await postsFeaturing(f.db, shop.id, lamp.id)).map((p) => p.title)).toEqual(["Both", "Lamp guide"]);
+    expect((await postsFeaturing(f.db, shop.id, stand.id, 1)).map((p) => p.title)).toEqual(["Stand only"]);
+    expect(await postsFeaturing(f.db, "00000000-0000-4000-8000-000000000000", lamp.id)).toEqual([]);
   });
 });

@@ -1566,3 +1566,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 ### Read next (after launch, part 277)
 
 1. **Under each post** (`relatedPosts` in `packages/core/src/blog.ts`): a "Read next" row with three other posts, the ones sharing the most topics with it first, then the newest, so a store that doesn't use topics still shows its latest posts. Each has its picture, title, date and reading time. Drafts and scheduled posts stay out. No migration.
+
+### From our blog on product pages (after launch, part 278)
+
+1. **Back from the product to the post** (`postsFeaturing` in `packages/core/src/blog.ts`): a product's page lists up to three of the newest blog posts that feature it, under "From our blog", with their picture, title and a line from each. Buyers reading about a lamp find the guide that recommends it, and search engines see the two pages link both ways. Drafts and scheduled posts stay out, and the heading comes in the store's language. No migration.
