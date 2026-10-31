@@ -177,3 +177,54 @@ export async function productShipping(db: Db, shop: Shop, item: { priceMinor: nu
   const over = rates.map((r) => r.freeOverMinor).filter((m): m is number => m !== null);
   return { country: to, priceMinor, freeOverMinor: priceMinor > 0 && over.length ? Math.min(...over) : null };
 }
+
+/**
+ * Shipping and returns for search engines, per option (schema.org `OfferShippingDetails` and
+ * `MerchantReturnPolicy`), to the store's own country: the cheapest rate that fits the option's
+ * weight at its price (free over the threshold), how long it takes, and the return window. Google
+ * shows these as "Free delivery" and "30-day returns" beside the product, and Merchant Center
+ * asks for them. Gift cards and downloads have neither.
+ */
+export async function searchOfferExtras(
+  db: Db,
+  shop: Shop,
+  product: { id: string; giftCard: boolean; digital: boolean },
+  variants: { id: string; priceMinor: number; weightGrams: number | null; shipDaysMin: number | null; shipDaysMax: number | null }[],
+) {
+  const out = new Map<string, Record<string, unknown>>();
+  if (product.giftCard || product.digital) return out;
+  const returns =
+    shop.returnWindowDays > 0
+      ? { "@type": "MerchantReturnPolicy", applicableCountry: shop.country, returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow", merchantReturnDays: shop.returnWindowDays, returnMethod: "https://schema.org/ReturnByMail" }
+      : { "@type": "MerchantReturnPolicy", applicableCountry: shop.country, returnPolicyCategory: "https://schema.org/MerchantReturnNotPermitted" };
+  const { zones } = await listShippingZones(db, shop.id);
+  const all = zoneFor(zones, shop.country)?.rates ?? [];
+  for (const v of variants) {
+    const rates = all.filter((r) => fitsWeight(r, v.weightGrams ?? 0));
+    const price = (r: Rate) => (r.freeOverMinor !== null && v.priceMinor >= r.freeOverMinor ? 0 : r.priceMinor);
+    const best = [...rates].sort((a, b) => price(a) - price(b) || (a.maxDays ?? 99) - (b.maxDays ?? 99))[0];
+    const transit = best ? transitDays([v], best) : null;
+    out.set(v.id, {
+      hasMerchantReturnPolicy: returns,
+      ...(best
+        ? {
+            shippingDetails: {
+              "@type": "OfferShippingDetails",
+              shippingRate: { "@type": "MonetaryAmount", value: (price(best) / 100).toFixed(2), currency: shop.currency },
+              shippingDestination: { "@type": "DefinedRegion", addressCountry: shop.country },
+              ...(transit
+                ? {
+                    deliveryTime: {
+                      "@type": "ShippingDeliveryTime",
+                      handlingTime: { "@type": "QuantitativeValue", minValue: 0, maxValue: shop.processingDays, unitCode: "DAY" },
+                      transitTime: { "@type": "QuantitativeValue", minValue: transit.min, maxValue: transit.max, unitCode: "DAY" },
+                    },
+                  }
+                : {}),
+            },
+          }
+        : {}),
+    });
+  }
+  return out;
+}

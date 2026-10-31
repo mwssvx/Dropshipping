@@ -1622,3 +1622,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **One page to print** (`handoverSheet` in `packages/core/src/handover-days.ts`, page `/admin/orders/day-sheet`): "Print the day sheet" on the order list shows a day's pickups and local deliveries with a tick box, the buyer's name and phone, the order number, what's in it and the buyer's note. Pickups come by name, to find them on the shelf, and say whether they're packed; deliveries come by postal code with the address, in a sensible driving order.
 2. Today's sheet also lists anyone from earlier days who hasn't come yet, marked "Due earlier". Chips switch between the days of the coming week. No migration.
+
+### Shipping and returns in search results (after launch, part 289)
+
+1. **What Google reads** (`searchOfferExtras` in `packages/core/src/delivery.ts`): each option in a product page's search data now says what shipping costs to the store's own country (the cheapest rate that fits its weight, free over the threshold) and how long it takes (handling days plus the transit time), and how many days buyers have to return it. Google uses these for "Free delivery" and "30-day returns" beside the product, and Merchant Center asks for them.
+2. A store with returns off says so, and gift cards and downloads leave both out. Everything comes from the store's existing shipping rates and return window; nothing new to set. No migration.
