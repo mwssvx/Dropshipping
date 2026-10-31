@@ -1888,3 +1888,7 @@ The app's Orders tab has a Hand over list: paid orders buyers pick up, or that y
 ### Gift cards in the app (after launch, part 352)
 
 Today has a Gift cards button for roles that handle gift cards. When a buyer asks what's left on a card, type the code they read out (or its last 4, their email or the order number) and the app shows the balance. From there you can send a new code if they lost the email, or turn a card off and back on. It also shows what's unspent on all your gift cards, and sends a new gift card to any email.
+
+### A holiday break from the app (after launch, part 353)
+
+The app's Settings has Store status for roles that can change the store's look. Going away, you can put the store on a break from the phone, with the day it opens again by itself and a message for buyers. Buyers can still look around but can't order, as when it's set on the website, and Open the store now ends the break early. A store behind a password page can be opened from the phone too; the password itself is set on the website.
