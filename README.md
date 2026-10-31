@@ -2004,3 +2004,7 @@ The app's Discount codes screen has a One-time codes row. Make a batch of codes 
 ### Shipping pause in the app (after launch, part 381)
 
 The app's Settings has a Shipping pause row for people who look after shipping. When the supplier closes for a while, pause shipping from your phone with the day orders ship again (and, if you like, the day it starts and a note for buyers). Orders keep coming in, every page says when they ship, and delivery dates move to match. Turn it off to end the pause early.
+
+### Running late emails in the app (after launch, part 382)
+
+The app's Settings has a Running late emails row for people who look after shipping. Turn on one friendly email to buyers whose order hasn't shipped after 3 to 14 days, add your own words, and choose whether buyers also hear once when a shipped parcel is past its delivery date.

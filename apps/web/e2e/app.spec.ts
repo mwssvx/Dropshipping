@@ -1981,3 +1981,26 @@ test("shipping paused from the app, shown on the store, then ended", async ({ pa
   await expect(buyer.getByRole("heading", { name: "Paper Lantern" })).toBeVisible();
   await expect(buyer.locator("#ship-pause")).toHaveCount(0);
 });
+
+test("running late emails turned on from the app", async ({ page, browser }) => {
+  const { email } = await merchant(browser, `le${Date.now()}`);
+  await signIn(page, email);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("link", { name: /^Running late emails/ }).click();
+  await expect(page.getByRole("heading", { name: "Running late emails", level: 1 })).toBeVisible();
+  await page.getByRole("switch", { name: "Email buyers when an order is running late" }).click();
+  await page.getByRole("tab", { name: "7 days" }).click();
+  await page.getByRole("textbox", { name: "Your own words (optional)" }).fill("Our handmade pieces take a little longer this month.");
+  await page.getByRole("switch", { name: "Also email when a shipped parcel is past its delivery date" }).click();
+  await page.getByRole("button", { name: "Save running late emails" }).click();
+  await expect(page.getByText("Saved. Buyers hear from you once if their order hasn't shipped after 7 days.")).toBeVisible();
+  await shot(page, "382-app-late-emails");
+
+  await page.reload();
+  await expect(page.getByRole("tab", { name: "7 days" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("textbox", { name: "Your own words (optional)" })).toHaveValue("Our handmade pieces take a little longer this month.");
+  await expect(page.getByRole("switch", { name: "Also email when a shipped parcel is past its delivery date" })).toBeChecked();
+  await page.getByRole("switch", { name: "Email buyers when an order is running late" }).click();
+  await page.getByRole("button", { name: "Save running late emails" }).click();
+  await expect(page.getByText("Running late emails are off.")).toBeVisible();
+});

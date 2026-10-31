@@ -56,6 +56,9 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  LATE_ORDER_DAYS,
+  LATE_ORDER_MESSAGE_MAX,
+  setLateOrderNotice,
   activeShipPause,
   setShipPause,
   SHIP_PAUSE_MAX_DAYS,
@@ -1356,6 +1359,18 @@ const routes: Record<string, Handler> = {
     revalidatePath(`/s/${shop.handle}`, "layout");
     return { ok: true, message: saved ? "Saved. Your store says when orders ship again, and delivery dates move to match." : "Shipping pause ended. Delivery dates are back to normal." };
   },
+  // Running late: one email to a buyer whose order hasn't shipped after some days, and when a parcel is past its date.
+  "GET late-emails": async ({ shop }) => ({
+    notice: shop.lateOrderNotice,
+    days: LATE_ORDER_DAYS,
+    messageMax: LATE_ORDER_MESSAGE_MAX,
+  }),
+  "PUT late-emails": async ({ req, db, shop, user }) => {
+    const b = await body<{ on?: unknown; days?: unknown; message?: unknown; transit?: unknown }>(req);
+    const saved = await setLateOrderNotice(db, shop.id, b.on === true ? { days: Number(b.days), message: str(b.message), transit: b.transit === true } : null);
+    await logged({ shop, user, db }, saved ? `Turned on "running late" emails after ${saved.days} days${saved.transit ? " and for parcels past their delivery date" : ""} in the app` : `Turned off "running late" emails in the app`, { href: "/admin/shipping#late-heading" });
+    return { ok: true, message: saved ? `Saved. Buyers hear from you once if their order hasn't shipped after ${saved.days} days.` : "Running late emails are off." };
+  },
   "GET questions": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
     const rows = await listQuestions(db, shop.id);
@@ -1970,6 +1985,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("checkouts")) return "orders";
   if (path.startsWith("store-status")) return "theme";
   if (path.startsWith("ship-pause")) return "shipping";
+  if (path.startsWith("late-emails")) return "shipping";
   if (path.startsWith("gift-cards")) return "gift_cards";
   if (path.startsWith("sales")) return "marketing";
   if (path.startsWith("returns")) return "returns";
