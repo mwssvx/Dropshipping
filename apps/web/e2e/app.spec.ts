@@ -1793,3 +1793,46 @@ test("saved replies written in the app, and used in a conversation", async ({ pa
   await page.getByRole("button", { name: "UK plugs" }).click();
   await expect(page.getByRole("textbox", { name: "Your reply" })).toHaveValue(/^Hi Grace, every lamp from Pocket Shop .* comes with a UK plug\.$/);
 });
+
+test("a bundle made in the app shows on the store, then switched off", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `bn${Date.now()}`);
+  const add = async (title: string, price: string) => {
+    await web.goto(`${WEB}/admin/products/new`);
+    await web.getByLabel("Title").fill(title);
+    await web.getByLabel("Price", { exact: true }).fill(price);
+    await web.getByLabel("Stock", { exact: true }).fill("9");
+    await web.getByRole("button", { name: "Save product" }).click();
+    await expect(web.getByText("Product added.")).toBeVisible();
+    return new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+  };
+  const lamp = await add("Desk Lamp", "40.00");
+  await add("Warm Bulbs", "10.00");
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Bundles/ }).click();
+  await expect(page.getByRole("heading", { name: "Bundles", level: 1 })).toBeVisible();
+  await expect(page.getByText("No bundles yet")).toBeVisible();
+  await page.getByRole("textbox", { name: "Name" }).fill("Reading set");
+  await page.getByRole("textbox", { name: "Discount (%)" }).fill("20");
+  const picks = page.getByRole("group", { name: "Products in the bundle" });
+  await picks.getByRole("switch", { name: "Desk Lamp" }).click();
+  await picks.getByRole("switch", { name: "Warm Bulbs" }).click();
+  await page.getByRole("button", { name: "Add bundle" }).click();
+  await expect(page.getByText("Bundle added. It shows on each of its products' pages.")).toBeVisible();
+  const set = page.getByRole("group", { name: "Reading set" });
+  await expect(set).toContainText("20% off Desk Lamp + Warm Bulbs");
+  await expect(set).toContainText("On your store");
+  await shot(page, "378-app-bundles");
+
+  const buyer = await (await browser.newContext()).newPage();
+  await buyer.goto(lamp);
+  await expect(buyer.getByRole("region", { name: "Buy together, save 20%" })).toBeVisible();
+
+  await set.getByRole("button", { name: "Switch off Reading set" }).click();
+  await expect(page.getByText("Bundle switched off. It's hidden from your store.")).toBeVisible();
+  await expect(set).toContainText("Off");
+  await buyer.reload();
+  await expect(buyer.getByRole("heading", { name: "Desk Lamp" })).toBeVisible();
+  await expect(buyer.getByRole("region", { name: "Buy together, save 20%" })).toHaveCount(0);
+});

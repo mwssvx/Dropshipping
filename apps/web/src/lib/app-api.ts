@@ -56,6 +56,13 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  bundleProductChoices,
+  createBundle,
+  deleteBundle,
+  listBundles,
+  MAX_BUNDLE_PERCENT,
+  MAX_BUNDLES,
+  setBundleActive,
   addStarterReplies,
   deleteSavedReply,
   listSavedReplies,
@@ -1209,6 +1216,35 @@ const routes: Record<string, Handler> = {
     await deleteSavedReply(db, shop.id, params.id!);
     return { ok: true, message: "Deleted." };
   },
+  // Bundles: products sold together for less, with one button on each product's page to add them all.
+  "GET bundles": async ({ db, shop }) => {
+    const [bundles, choices] = await Promise.all([listBundles(db, shop.id), bundleProductChoices(db, shop.id)]);
+    return {
+      bundles: bundles.map((b) => ({ id: b.id, title: b.title, percentOff: b.percentOff, active: b.active, live: b.live, products: b.products.map((p) => ({ id: p.id, title: p.title })) })),
+      choices: choices.map((p) => ({ id: p.id, title: p.title, draft: p.status !== "active" })),
+      max: MAX_BUNDLES,
+      maxPercent: MAX_BUNDLE_PERCENT,
+    };
+  },
+  "POST bundles": async ({ req, db, shop, user }) => {
+    const b = await body<{ title?: unknown; productIds?: unknown; percentOff?: unknown }>(req);
+    const productIds = (Array.isArray(b.productIds) ? b.productIds : []).map(str).filter(Boolean).slice(0, 10);
+    const bundle = await createBundle(db, shop.id, { title: str(b.title), productIds, percentOff: str(b.percentOff).trim() });
+    await logged({ shop, user, db }, `Added the bundle ${bundle.title} in the app`, { href: "/admin/bundles" });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: "Bundle added. It shows on each of its products' pages." };
+  },
+  "POST bundles/:id": async ({ req, params, db, shop }) => {
+    const b = await body<{ active?: unknown }>(req);
+    await setBundleActive(db, shop.id, params.id!, b.active === true);
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: b.active === true ? "Bundle switched on." : "Bundle switched off. It's hidden from your store." };
+  },
+  "DELETE bundles/:id": async ({ params, db, shop }) => {
+    await deleteBundle(db, shop.id, params.id!);
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: "Bundle deleted." };
+  },
   "GET questions": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
     const rows = await listQuestions(db, shop.id);
@@ -1816,6 +1852,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("campaigns")) return "marketing";
   if (path.startsWith("survey")) return "marketing";
   if (path.startsWith("rewards")) return "marketing";
+  if (path.startsWith("bundles")) return "marketing";
   if (path.startsWith("bank-transfers")) return "orders";
   if (path.startsWith("checkouts")) return "orders";
   if (path.startsWith("store-status")) return "theme";

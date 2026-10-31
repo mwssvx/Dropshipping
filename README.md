@@ -1988,3 +1988,7 @@ A product's screen in the app now has Pre-orders and Purchase limits. Let buyers
 ### Saved replies in the app (after launch, part 377)
 
 The app's inbox has a Saved replies row. Add the answers buyers ask for most, change or delete them, or start from the replies most stores need. In any conversation, one tap puts a saved reply in the box with the buyer's name, order number, tracking link and store name filled in.
+
+### Bundles in the app (after launch, part 378)
+
+The Products tab has a Bundles row for people who look after marketing. Name a set of 2 to 4 products and the discount for buying them together, see whether each bundle is on your store (it waits while one of its products is a draft), and switch one off or delete it.

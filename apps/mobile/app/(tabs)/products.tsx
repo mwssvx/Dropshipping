@@ -74,6 +74,7 @@ export default function ProductsScreen() {
           title={list.data?.priceRises ? `Price changes (${list.data.priceRises} to look at)` : "Price changes"}
           subtitle="When a supplier starts charging more"
         />
+        {can("marketing") ? <Row href="/bundles" title="Bundles" subtitle="Products sold together for less" /> : null}
         {can("suppliers") ? <Row href="/suppliers" title="Suppliers" subtitle="How each is doing, and your own wholesalers and makers" /> : null}
       </List>
     </Screen>
