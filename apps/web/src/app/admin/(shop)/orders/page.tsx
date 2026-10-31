@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BANK_DETAILS_MAX, BUYER_EDIT_HOURS, can, countOrders, countryName, formatMoney, listSavedViews, orderCountries, orderPage, orderTags, ORDER_PLACED_DAYS, placedSince, fulfillmentParam, paymentParam, RISK_HOLD_LABELS, TRANSFER_DAYS, ORDER_TOTALS, totalParam, type OrderTotalRange, buyerParam, formatHandoverDay, handoverParam, handoverSchedule } from "@sf/core";
+import { BANK_DETAILS_MAX, BUYER_EDIT_HOURS, can, countOrders, countryName, formatMoney, listSavedViews, orderCountries, orderPage, orderTags, ORDER_PLACED_DAYS, placedSince, fulfillmentParam, paymentParam, RISK_HOLD_LABELS, TRANSFER_DAYS, ORDER_TOTALS, totalParam, type OrderTotalRange, buyerParam, formatHandoverDay, handoverParam, handoverSchedule, MAX_BULK_ORDERS, ordersPastDelivery } from "@sf/core";
 import { AutoSubmitSelect } from "@/components/AutoSubmitSelect";
 import { SavedViews } from "@/components/SavedViews";
 import { requireShop } from "@/lib/server";
@@ -29,6 +29,7 @@ function dueLabel(pickups: number, deliveries: number) {
 }
 
 const dateFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ show?: string; q?: string; tag?: string; product?: string; country?: string; code?: string; total?: string; buyer?: string; placed?: string; status?: string; payment?: string; day?: string; bulk?: string; before?: string }> }) {
   const { show, q, tag, product: productParam, country: countryParam, code: codeParam, total: totalValue, buyer: buyerValue, placed: placedParam, status: statusParam, payment: paymentParamValue, day: dayParam, bulk, before: beforeParam } = await searchParams;
@@ -50,7 +51,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   // Pickups and local deliveries due over the coming week, where buyers pick a day.
   const schedule = shop.handoverDays ? await handoverSchedule(db, shop.id, shop.handoverDays) : null;
   const day = dayParam === "overdue" && schedule ? "overdue" : handoverParam(dayParam);
-  const [{ orders, older }, problems, held, transfers, tags, countries, product, views, discount] = await Promise.all([
+  const [{ orders, older }, problems, held, transfers, tags, countries, product, views, discount, pastDelivery] = await Promise.all([
     orderPage(db, shop.id, { ...(problemsOnly ? { fulfillmentStatus: "problem" as const } : heldOnly ? { held: true } : transfersOnly ? { transfer: true } : {}), ...(status && !problemsOnly ? { fulfillmentStatus: status } : {}), paymentStatus: payment, query: q, tag, productId, country, discountId, total, buyer, from, handoverOn: day, handoverToday: schedule?.today }, { before }),
     countOrders(db, shop.id, { fulfillmentStatus: "problem" }),
     countOrders(db, shop.id, { held: true }),
@@ -60,6 +61,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     productId ? db.query.products.findFirst({ where: (p, { and, eq }) => and(eq(p.id, productId), eq(p.shopId, shop.id)), columns: { id: true, title: true } }) : null,
     listSavedViews(db, shop.id, "orders"),
     discountId ? db.query.discounts.findFirst({ where: (d, { and, eq }) => and(eq(d.id, discountId), eq(d.shopId, shop.id)), columns: { id: true, code: true } }) : null,
+    ordersPastDelivery(db, shop),
   ]);
   // On hold the same way the On hold tab counts it: held for the risk check and not refunded.
   const onHold = (o: (typeof orders)[number]) => !!o.heldAt && (o.paymentStatus === "paid" || o.paymentStatus === "partially_refunded");
@@ -107,6 +109,32 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                 </li>
               ))}
             </ul>
+          </section>
+        )}
+        {pastDelivery.length > 0 && (
+          <section className="card p-4 flex flex-col gap-2 max-w-4xl" aria-labelledby="past-delivery">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 id="past-delivery" className="font-semibold text-sm">
+                Past their delivery date <span className="pill pill-warning">{pastDelivery.length}</span>
+              </h2>
+              <Link href={`/admin/orders/email?ids=${pastDelivery.slice(0, MAX_BULK_ORDERS).map((o) => o.id).join(",")}`} className="btn btn-secondary text-sm">Email these buyers</Link>
+            </div>
+            <p className="hint">
+              {pastDelivery.length === 1 ? "This order has" : "These orders have"} shipped but should have arrived by now. Check the tracking, then tell the
+              buyers what&apos;s happening before they ask or open a dispute.
+            </p>
+            <ul className="flex flex-col gap-1 text-sm">
+              {pastDelivery.slice(0, 5).map((o) => (
+                <li key={o.id} className="flex flex-wrap items-center gap-x-2">
+                  <Link href={`/admin/orders/${o.id}`} className="font-medium underline">#{o.number} {o.name}</Link>
+                  <span className="hint">
+                    due by {shortDate.format(o.expected)}, {o.daysLate === 1 ? "1 day" : `${o.daysLate} days`} late, to {countryName(o.country)}
+                  </span>
+                  {o.trackingUrl && <a href={o.trackingUrl} target="_blank" rel="noreferrer" className="underline">Tracking<span className="sr-only"> for #{o.number}</span></a>}
+                </li>
+              ))}
+            </ul>
+            {pastDelivery.length > 5 && <p className="hint">And {pastDelivery.length - 5} more.</p>}
           </section>
         )}
         <SavedViews list="orders" views={views} params={{ show: problemsOnly || heldOnly || transfersOnly ? show : undefined, q, tag, product: productId, country, code: discountId, total, buyer, placed, status, payment }} />
