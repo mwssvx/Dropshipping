@@ -184,6 +184,19 @@ export async function searchProducts(db: Db, shopId: string, options: BrowseOpti
 }
 
 /** Products in the grid's compact shape, priced from the cheapest option. */
+export const GRID_PAGE_SIZE = 24;
+
+/**
+ * How much of a long product grid to show: page 1 is the first 24, and each "Show more" adds 24 to
+ * the same page, so the shopper keeps their place. Nonsense or out-of-range pages are clamped.
+ */
+export function gridPage(total: number, raw: string | undefined, size = GRID_PAGE_SIZE) {
+  const last = Math.max(1, Math.ceil(total / size));
+  const page = Math.min(last, Math.max(1, Math.floor(Number(raw)) || 1));
+  const shown = Math.min(total, page * size);
+  return { page, shown, total, more: shown < total };
+}
+
 export const compactProducts = (products: ActiveProduct[]) =>
   products.map((p) => {
     const cheapest = p.variants.reduce((a, b) => (b.priceMinor < a.priceMinor ? b : a), p.variants[0]!);

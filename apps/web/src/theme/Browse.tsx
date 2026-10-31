@@ -1,8 +1,9 @@
 import type { Facet, Sort } from "@sf/core";
 import { storeText, type StoreText } from "@/lib/store-text";
+import Link from "next/link";
 import { SearchSuggest } from "./SearchSuggest";
 
-export type BrowseParams = { q?: string; sort?: string; min?: string; max?: string; stock?: string; sale?: string; opt?: string | string[] };
+export type BrowseParams = { q?: string; sort?: string; min?: string; max?: string; stock?: string; sale?: string; opt?: string | string[]; page?: string };
 
 /** "12" or "12.50" in the buyer's currency, as minor units; anything else means no limit. */
 export const priceParam = (raw?: string) => {
@@ -103,5 +104,25 @@ export function BrowseBar({ action, params, sort, natural: naturalSort = "featur
         <span className="hint pb-2.5 ml-auto" role="status">{t.productCount(count)}</span>
       </div>
     </form>
+  );
+}
+
+/**
+ * Under a long grid: how many products are showing, and a link that shows the next lot on the same
+ * page, landing on the first new product. Filters and sorting keep their place in the address.
+ */
+export function ShowMore({ action, params, page, shown, total, t = storeText(null) }: { action: string; params: BrowseParams; page: number; shown: number; total: number; t?: StoreText }) {
+  if (page === 1 && shown >= total) return null;
+  const next = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (k === "page" || v === undefined) continue;
+    for (const one of Array.isArray(v) ? v : [v]) next.append(k, one);
+  }
+  next.set("page", String(page + 1));
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <p className="hint" role="status">{t.showingOf(shown, total)}</p>
+      {shown < total && <Link href={`${action}?${next.toString()}#item-${shown + 1}`} className="btn btn-secondary">{t.showMore}</Link>}
+    </div>
   );
 }

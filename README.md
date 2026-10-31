@@ -1358,3 +1358,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **One tick in the theme editor** (Style → Layout): while a shopper points at a product card on the home page, a collection or search, the card fades to the product's second photo, so they see another side of it without opening it. Products with one photo stay as they are.
 2. **Light on phones**: touch screens have nothing to point with, so they keep the main photo and never load the second one, and the fade is instant for shoppers who ask for less motion. It's off until the merchant turns it on.
+
+### Show more (after launch, part 238)
+
+1. **Long lists load fast**: collections and search results show the first 24 products with "Showing 24 of 130 products" and a **Show more** button underneath. Each press adds the next 24 on the same page and lands on the first new product, so shoppers keep their place. Before, a collection drew every product at once, which got slow for stores with big catalogs.
+2. **Nothing lost**: sorting and filters stay as they were when shoppers press Show more, changing a filter starts again from the top, and the words are translated into the six store languages.

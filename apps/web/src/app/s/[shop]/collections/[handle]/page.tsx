@@ -1,7 +1,7 @@
-import { browseProducts, compactProducts, getCollectionByHandle, NotFoundError } from "@sf/core";
+import { browseProducts, compactProducts, getCollectionByHandle, gridPage, NotFoundError } from "@sf/core";
 import { db } from "@/lib/server";
 import { buyerFx } from "@/lib/currency";
-import { BrowseBar, browseOptions, type BrowseParams } from "@/theme/Browse";
+import { BrowseBar, browseOptions, ShowMore, type BrowseParams } from "@/theme/Browse";
 import { ProductGrid } from "@/theme/Sections";
 import { addToCartAction } from "../../actions";
 import { loadShop, localCollections, localProducts, storeBase, storeT, missing } from "../../data";
@@ -35,8 +35,10 @@ export default async function CollectionPage({ params, searchParams }: { params:
   // The merchant's pick for this collection, until the buyer chooses another order.
   const natural = "sortOrder" in collection ? collection.sortOrder : "featured";
   const { products, sort, facets } = await browseProducts(await db(), shop.id, all, { ...browseOptions(query), sort: query.sort || natural, q: undefined }, fx);
+  // Long collections come 24 at a time; only those are translated and drawn.
+  const paged = gridPage(products.length, query.page);
   // The grid takes the catalog's compact product shape.
-  const compact = await localProducts(param, compactProducts(products));
+  const compact = await localProducts(param, compactProducts(products.slice(0, paged.shown)));
   const t = await storeT(param);
   const data = { base, currency: shop.currency, fx, t, badges: shop.productBadges, quickAdd: shop.cardQuickAdd ? addToCartAction.bind(null, param) : undefined, catalog: { products: compact, collections: [] } };
   const filtered = !!(query.min || query.max || query.stock || query.sale || query.opt);
@@ -46,8 +48,9 @@ export default async function CollectionPage({ params, searchParams }: { params:
         <h1 className="text-3xl font-bold tracking-tight">{collection.title}</h1>
         {collection.description && <p className="text-muted max-w-2xl whitespace-pre-line">{collection.description}</p>}
       </header>
-      {all.length > 1 && <BrowseBar action={`${base}/collections/${collection.handle}`} params={{ ...query, q: undefined }} sort={sort} natural={natural} currency={fx.currency} count={compact.length} facets={facets} t={t} />}
-      {compact.length ? <ProductGrid products={compact} data={data} /> : <p className="hint">{filtered ? t.nothingMatchesFilters : t.nothingYet}</p>}
+      {all.length > 1 && <BrowseBar action={`${base}/collections/${collection.handle}`} params={{ ...query, q: undefined }} sort={sort} natural={natural} currency={fx.currency} count={products.length} facets={facets} t={t} />}
+      {compact.length ? <ProductGrid products={compact} data={data} numbered /> : <p className="hint">{filtered ? t.nothingMatchesFilters : t.nothingYet}</p>}
+      <ShowMore action={`${base}/collections/${collection.handle}`} params={{ ...query, q: undefined }} {...paged} t={t} />
     </main>
   );
 }
