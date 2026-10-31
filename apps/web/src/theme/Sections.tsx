@@ -17,6 +17,8 @@ import { Countdown } from "./Countdown";
 import { ScrollingText } from "./ScrollingText";
 import { BeforeAfter } from "./BeforeAfter";
 import { CollectionTabs } from "./CollectionTabs";
+import { ContactForm } from "@/app/s/[shop]/contact/ContactForm";
+import type { ContactState } from "@/app/s/[shop]/actions";
 import { storeHref } from "./style";
 
 /*
@@ -49,6 +51,8 @@ export type SectionData = {
   posts?: PostCard[];
   /** The shopper's language, for dates; American English when left out. */
   lang?: string;
+  /** Sends a "Contact form" section's message; the button is greyed out when it's left out. */
+  contact?: (state: ContactState, form: FormData) => Promise<ContactState>;
 };
 
 type Props<T extends keyof SectionSettings> = { s: SectionSettings[T]; data: SectionData; first: boolean };
@@ -505,6 +509,23 @@ function VisitUs({ s, data, first }: Props<"store_location">) {
   );
 }
 
+function ContactSection({ s, data }: Props<"contact_form">) {
+  const t = data.t ?? storeText(null);
+  const heading = s.heading || t.contactUs;
+  return (
+    <section className="max-w-2xl mx-auto px-4 sm:px-6 py-12 flex flex-col gap-6" aria-label={heading}>
+      <div className="flex flex-col gap-2 text-center">
+        <h2 className="text-3xl font-bold tracking-tight">{heading}</h2>
+        <p className="text-muted leading-relaxed whitespace-pre-line">{s.text || t.contactIntro}</p>
+      </div>
+      <div className="card p-5">
+        <ContactForm action={data.contact}
+          text={{ name: t.contactName, email: t.contactEmail, order: t.contactOrder, message: t.contactMessage, send: t.contactSend, sending: t.contactSending, sent: t.contactSent }} />
+      </div>
+    </section>
+  );
+}
+
 function RichText({ s }: Props<"rich_text">) {
   if (!s.heading && !s.text) return null;
   return (
@@ -775,6 +796,7 @@ export function SectionView({ section, data, first }: { section: Section; data: 
     case "before_after": return <BeforeAfterSection s={section.settings} data={data} first={first} />;
     case "collection_tabs": return <CollectionTabsSection s={section.settings} data={data} first={first} />;
     case "store_location": return <VisitUs s={section.settings} data={data} first={first} />;
+    case "contact_form": return <ContactSection s={section.settings} data={data} first={first} />;
   }
 }
 
