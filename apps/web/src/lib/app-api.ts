@@ -56,6 +56,12 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  cancelRestockOrder,
+  createRestockOrder,
+  getRestockOrder,
+  listRestockOrders,
+  receiveRestock,
+  restockChoices,
   cancelInvite,
   changeRole,
   inviteMember,
@@ -652,6 +658,69 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, `Removed ${who} from the team in the app`, { href: "/admin/team" });
     return { ok: true, message: `${who} can't open the store any more.` };
   },
+  // Restock orders: stock the store keeps itself, ordered from a supplier and counted in when it arrives.
+  "GET restock": async ({ db, shop }) => ({
+    orders: (await listRestockOrders(db, shop.id)).slice(0, 50).map((o) => ({
+      id: o.id,
+      number: o.number,
+      supplierName: o.supplierName,
+      status: o.status,
+      expectedOn: o.expectedOn,
+      createdAt: o.createdAt,
+      lines: o.lines,
+      ordered: o.ordered,
+      received: o.received,
+      costMinor: o.costMinor,
+    })),
+  }),
+  "GET restock/new": async ({ db, shop }) => ({
+    choices: (await restockChoices(db, shop.id)).map((c) => ({ variantId: c.variantId, title: c.title, sku: c.sku, stock: c.stock, costMinor: c.costMinor })),
+  }),
+  "POST restock": async ({ req, db, shop, user }) => {
+    const b = await body<Record<string, unknown>>(req);
+    const lines = (Array.isArray(b.lines) ? b.lines : []).slice(0, 200).map((l: { variantId?: unknown; quantity?: unknown; unitCostMinor?: unknown }) => ({
+      variantId: str(l?.variantId),
+      quantity: Number(l?.quantity),
+      unitCostMinor: l?.unitCostMinor == null || l.unitCostMinor === "" ? null : Number(l.unitCostMinor),
+    }));
+    const order = await createRestockOrder(db, shop.id, { supplierName: str(b.supplierName), supplierEmail: str(b.supplierEmail), expectedOn: str(b.expectedOn), note: str(b.note), lines });
+    await logged({ shop, user, db }, `Made restock order #${order.number} from ${order.supplierName} in the app`, { href: `/admin/restock/${order.id}` });
+    return { ok: true, id: order.id, message: `Restock order #${order.number} is saved. Count it in here when it arrives.` };
+  },
+  "GET restock/:id": async ({ params, db, shop }) => {
+    const o = await getRestockOrder(db, shop.id, params.id!);
+    return {
+      id: o.id,
+      number: o.number,
+      supplierName: o.supplierName,
+      supplierEmail: o.supplierEmail,
+      emailedAt: o.emailedAt,
+      note: o.note,
+      expectedOn: o.expectedOn,
+      status: o.status,
+      createdAt: o.createdAt,
+      receivedAt: o.receivedAt,
+      ordered: o.ordered,
+      received: o.received,
+      costMinor: o.costMinor,
+      lines: o.lines.map((l) => ({ id: l.id, title: l.title, quantity: l.quantity, received: l.receivedQuantity, unitCostMinor: l.unitCostMinor, productId: l.productId })),
+    };
+  },
+  "POST restock/:id/receive": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ lines?: unknown }>(req);
+    const received = Array.isArray(b.lines) ? b.lines.map((l: { lineId?: unknown; quantity?: unknown }) => ({ lineId: str(l?.lineId), quantity: Number(l?.quantity) })) : undefined;
+    const r = await receiveRestock(db, shop.id, params.id!, received);
+    const o = await getRestockOrder(db, shop.id, params.id!);
+    await logged({ shop, user, db }, `Counted ${r.added} in from restock order #${o.number} in the app`, { href: `/admin/restock/${o.id}` });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: r.done ? `Added ${r.added} to your stock. Everything on this order is in.` : `Added ${r.added} to your stock. The rest is still on the way.` };
+  },
+  "POST restock/:id/cancel": async ({ params, db, shop, user }) => {
+    const o = await getRestockOrder(db, shop.id, params.id!);
+    await cancelRestockOrder(db, shop.id, o.id);
+    await logged({ shop, user, db }, `Cancelled restock order #${o.number} in the app`, { href: `/admin/restock/${o.id}` });
+    return { ok: true, message: "Cancelled. Anything that already arrived stays in your stock." };
+  },
   "GET questions": async ({ url, db, shop }) => {
     const show = url.searchParams.get("show") === "all" ? "all" : "waiting";
     const rows = await listQuestions(db, shop.id);
@@ -1225,6 +1294,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("activity") || path.startsWith("team")) return "team";
   if (path.startsWith("subscriptions")) return "orders";
   if (path.startsWith("blocked")) return "customers";
+  if (path.startsWith("restock")) return "products";
   if (path.startsWith("checkouts")) return "orders";
   if (path.startsWith("store-status")) return "theme";
   if (path.startsWith("gift-cards")) return "gift_cards";

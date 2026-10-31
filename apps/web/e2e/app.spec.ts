@@ -1222,3 +1222,42 @@ test("a teammate invited from the app joins, is made an admin and removed", asyn
   await expect(page.getByText(`${sam} can't open the store any more.`)).toBeVisible();
   await expect(page.getByRole("article", { name: sam })).toHaveCount(0);
 });
+
+test("a restock order made in the app and counted in as it arrives", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `rs${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Beeswax Wrap");
+  await web.getByLabel("Price", { exact: true }).fill("9.00");
+  await web.getByLabel("Stock", { exact: true }).fill("6");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Restock orders/ }).click();
+  await expect(page.getByText("No restock orders yet")).toBeVisible();
+  await page.getByRole("button", { name: "New restock order" }).click();
+  await page.getByRole("textbox", { name: "Supplier", exact: true }).fill("Hive Co");
+  await page.getByRole("textbox", { name: "Find an option" }).fill("beeswax");
+  await page.getByRole("textbox", { name: "How many Beeswax Wrap" }).fill("10");
+  await page.getByRole("textbox", { name: "Cost each of Beeswax Wrap" }).fill("2.50");
+  await shot(page, "365-app-restock-new");
+  await page.getByRole("button", { name: "Save restock order" }).click();
+
+  await expect(page.getByRole("heading", { name: "Restock order #1", level: 1 })).toBeVisible();
+  await expect(page.getByText("Restock order #1 is saved. Count it in here when it arrives.")).toBeVisible();
+  await expect(page.getByText(/^0 of 10 in · \$25\.00/)).toBeVisible();
+
+  // Four come first, the rest later.
+  await page.getByRole("button", { name: "Some of it arrived…" }).click();
+  await page.getByRole("textbox", { name: "Arrived of Beeswax Wrap" }).fill("4");
+  await page.getByRole("button", { name: "Add what arrived to stock" }).click();
+  await expect(page.getByText("Added 4 to your stock. The rest is still on the way.")).toBeVisible();
+  await expect(page.getByText("4 of 10 in · $2.50 each")).toBeVisible();
+  await page.getByRole("button", { name: "Everything arrived" }).click();
+  await expect(page.getByText("Added 6 to your stock. Everything on this order is in.")).toBeVisible();
+  await expect(page.getByText("Arrived", { exact: true })).toBeVisible();
+
+  await web.reload();
+  await expect(web.getByLabel("Stock", { exact: true })).toHaveValue("16");
+});
