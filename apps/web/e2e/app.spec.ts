@@ -906,6 +906,7 @@ test("a dispute answered from the app with the evidence and a note", async ({ pa
   // The buyer's bank opens a dispute (test mode stands in for the bank).
   await web.goto(`${WEB}/admin/orders`);
   await web.getByRole("link", { name: "#1001" }).click();
+  await expect(web).toHaveURL(/\/admin\/orders\/[^/]+$/);
   const simulate = web.getByText("Test mode: simulate a dispute");
   await expect(async () => {
     await web.reload();
