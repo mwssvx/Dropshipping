@@ -636,3 +636,46 @@ test("store credit given to a customer from the app", async ({ page, browser }) 
   await web.goto(`${WEB}/admin/activity`);
   await expect(web.getByText("Gave $5.00 store credit to ada@example.com in the app")).toBeVisible();
 });
+
+test("a sale on everything started, kept on longer and ended from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `sl${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Beeswax Candle");
+  await web.getByLabel("Price", { exact: true }).fill("12.00");
+  await web.getByLabel("Stock", { exact: true }).fill("6");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const candle = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Sales", exact: true }).click();
+  await expect(page.getByText("No sales yet")).toBeVisible();
+  await page.getByRole("textbox", { name: "Sale name" }).fill("Weekend sale");
+  await page.getByRole("textbox", { name: "Percent off everything" }).fill("95");
+  await page.getByRole("tab", { name: "1 day" }).click();
+  await page.getByRole("switch", { name: "Countdown on the store" }).click();
+  await page.getByRole("button", { name: "Start the sale" }).click();
+  await expect(page.getByText("A sale takes up to 90% off.")).toBeVisible();
+  await page.getByRole("textbox", { name: "Percent off everything" }).fill("20");
+  await shot(page, "349-app-sales");
+  await page.getByRole("button", { name: "Start the sale" }).click();
+  await expect(page.getByText("Weekend sale is on: 20% off everything, for 1 day.")).toBeVisible();
+  await expect(page.getByText("Weekend sale · 20% off")).toBeVisible();
+  await expect(page.getByText("On now", { exact: true })).toBeVisible();
+
+  // The store charges the sale price with the old one crossed out.
+  await web.goto(candle);
+  await expect(web.locator("s", { hasText: "$12.00" }).first()).toBeVisible();
+  await expect(web.getByText("$9.60").first()).toBeVisible();
+
+  await page.getByRole("button", { name: "Keep Weekend sale on one more day" }).click();
+  await expect(page.getByText("Weekend sale runs 1 more day.")).toBeVisible();
+  await page.getByRole("button", { name: "End Weekend sale now" }).click();
+  await expect(page.getByText("Weekend sale has ended. Prices are back to normal.")).toBeVisible();
+  await expect(page.getByText("Ended", { exact: true })).toBeVisible();
+  await web.reload();
+  await expect(web.locator("s", { hasText: "$12.00" })).toHaveCount(0);
+
+  await web.goto(`${WEB}/admin/activity`);
+  await expect(web.getByText("Started the sale Weekend sale (20% off everything) in the app")).toBeVisible();
+});

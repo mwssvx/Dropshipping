@@ -56,6 +56,11 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  listSales,
+  createSale,
+  endSale,
+  extendSale,
+  SALE_EXTEND_DAYS,
   issueGiftCard,
   formatMoney,
   listDiscounts,
@@ -93,6 +98,7 @@ import {
   savedRepliesFor,
 } from "@sf/core";
 import type { Db } from "@sf/db";
+import { revalidatePath } from "next/cache";
 import { BRAND } from "./brand";
 import { agents, campaigns, db, fulfillment, logged, mailer, platformUrl, notifyLater, payments, refunds, stock, storeAddress, suppliers, testPayments } from "./server";
 
@@ -528,6 +534,60 @@ const routes: Record<string, Handler> = {
     if (decision.action === "refund") notifyLater(shop.id);
     return { ok: true, message: said[1] };
   },
+  "GET sales": async ({ db, shop }) => {
+    const all = await listSales(db, shop.id);
+    // Running and coming ones, then the last few that ended; the website keeps the whole list.
+    const ended = all.filter((x) => x.status === "ended").slice(0, 5);
+    return {
+      sales: [...all.filter((x) => x.status !== "ended"), ...ended].map((x) => ({
+        id: x.id,
+        title: x.title,
+        percentOff: x.percentOff,
+        status: x.status,
+        covers: x.covers,
+        startsAt: x.startsAt,
+        endsAt: x.endsAt,
+        countdown: x.countdown,
+      })),
+    };
+  },
+  "POST sales": async ({ req, db, shop, user }) => {
+    const b = await body<{ title?: unknown; percentOff?: unknown; days?: unknown; countdown?: unknown }>(req);
+    // From the phone: everything, starting now, for a few days or until it's ended. Collections,
+    // chosen products and a later start are on the website.
+    const days = typeof b.days === "number" && (SALE_EXTEND_DAYS as readonly number[]).includes(b.days) ? b.days : null;
+    const now = new Date();
+    const sale = await createSale(db, shop.id, {
+      title: str(b.title),
+      percentOff: typeof b.percentOff === "number" ? b.percentOff : Number.NaN,
+      scope: "all",
+      startsAt: now,
+      endsAt: days ? new Date(now.getTime() + days * 86_400_000) : null,
+      countdown: b.countdown === true && !!days,
+    });
+    await sendPriceDrops(await stock(), { shopId: shop.id });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    await logged({ shop, user, db }, `Started the sale ${sale.title} (${sale.percentOff}% off everything) in the app`, { href: "/admin/sales" });
+    return { ok: true, message: `${sale.title} is on: ${sale.percentOff}% off everything${sale.endsAt ? `, for ${days} ${days === 1 ? "day" : "days"}` : " until you end it"}.` };
+  },
+  "POST sales/:id": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ action?: unknown; days?: unknown }>(req);
+    const sale = (await listSales(db, shop.id)).find((x) => x.id === params.id);
+    if (!sale) throw new NotFoundError("Sale");
+    let message: string;
+    if (b.action === "extend") {
+      const days = typeof b.days === "number" ? b.days : 0;
+      await extendSale(db, shop.id, sale.id, days);
+      message = `${sale.title} runs ${days} more ${days === 1 ? "day" : "days"}.`;
+      await logged({ shop, user, db }, `Kept the sale ${sale.title} on ${days} more ${days === 1 ? "day" : "days"} in the app`, { href: "/admin/sales" });
+    } else if (b.action === "end") {
+      await endSale(db, shop.id, sale.id);
+      message = sale.status === "scheduled" ? `${sale.title} won't start.` : `${sale.title} has ended. Prices are back to normal.`;
+      await logged({ shop, user, db }, `Ended the sale ${sale.title} in the app`, { href: "/admin/sales" });
+    } else throw new HttpError(400, "Pick end or extend.");
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message };
+  },
   "GET customers": async ({ url, db, shop }) => {
     const q = (url.searchParams.get("q") ?? "").slice(0, 100);
     // The ones who bought most recently first; a search looks at names and emails.
@@ -671,6 +731,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("reviews")) return "reviews";
   if (path.startsWith("customers")) return "customers";
   if (path.startsWith("codes")) return "marketing";
+  if (path.startsWith("sales")) return "marketing";
   if (path.startsWith("returns")) return "returns";
   if (path === "today") return "home";
   return null;
