@@ -98,6 +98,9 @@ test("collections, pages and menus show up on the store, with search basics", as
   // Besides the product, the page describes its breadcrumb trail.
   const ld = (await page.locator('script[type="application/ld+json"]').allTextContents()).map((t) => JSON.parse(t)).find((d) => d["@type"] === "Product");
   expect(ld).toMatchObject({ "@type": "Product", name: "Moon Lamp", offers: [{ price: "24.99" }] });
+  // Shipping to the store's country and the return window, for Google's "Free delivery" and "30-day returns".
+  expect(ld.offers[0].hasMerchantReturnPolicy).toMatchObject({ "@type": "MerchantReturnPolicy", merchantReturnDays: 30, returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow" });
+  expect(ld.offers[0].shippingDetails).toMatchObject({ "@type": "OfferShippingDetails", shippingRate: { "@type": "MonetaryAmount" }, shippingDestination: { "@type": "DefinedRegion" } });
 
   const sitemap = await page.request.get(`${store}/sitemap.xml`);
   expect(sitemap.headers()["content-type"]).toContain("xml");

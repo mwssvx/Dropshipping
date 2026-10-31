@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Track } from "@/components/Track";
-import { bundlesForProduct, formatDeliveryWindow, giftCardBonusNow, holidayReturnsNow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, breadcrumbCollection, collectionFromReferer, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, comingSoonProduct, COMPARE_MAX, defaultCutoffZone, countdownTo, shipsToCountry, recentSalesCount, RECENT_SALES_DAYS, starsFilter, postsFeaturing, recordProductView, REVIEWS_SHOWN, REVIEWS_SHOWN_ALL, reviewSort, reviewsQuery, helpfulVotes, reportedReviews } from "@sf/core";
+import { searchOfferExtras, bundlesForProduct, formatDeliveryWindow, giftCardBonusNow, holidayReturnsNow, getActiveProductByHandle, productDelivery, productOffers, NotFoundError, optionDefsOf, productSwatches, productShipping, convertPrice, formatMoney, percentOff, productPhotos, breadcrumbCollection, collectionFromReferer, productQuestions, productReviews, recentlyViewed, reviewPhotoUrl, sizeChartForProduct, sizeChartRows, upsellsFor, boughtTogether, wholesaleTermsFor, openPreorder, preordersSold, lowStockLeft, parseVideo, storePixels, cardBadges, lowestPricesBefore, showsLowestPrice, comingSoonProduct, COMPARE_MAX, defaultCutoffZone, countdownTo, shipsToCountry, recentSalesCount, RECENT_SALES_DAYS, starsFilter, postsFeaturing, recordProductView, REVIEWS_SHOWN, REVIEWS_SHOWN_ALL, reviewSort, reviewsQuery, helpfulVotes, reportedReviews } from "@sf/core";
 import { SizeChartDialog } from "@/components/SizeChartDialog";
 import { ShareButtons } from "@/components/ShareButtons";
 import { SaleCountdown } from "@/components/SaleCountdown";
@@ -70,7 +70,7 @@ function summary(text: string) {
 }
 
 /** Product data for search engines (schema.org), so results can show price and stock. */
-function productJsonLd(product: Awaited<ReturnType<typeof load>>["product"], currency: string, rating: { count: number; average: number | null }) {
+function productJsonLd(product: Awaited<ReturnType<typeof load>>["product"], currency: string, rating: { count: number; average: number | null }, extras: Map<string, Record<string, unknown>>) {
   return {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -83,6 +83,8 @@ function productJsonLd(product: Awaited<ReturnType<typeof load>>["product"], cur
       price: (x.priceMinor / 100).toFixed(2),
       priceCurrency: currency,
       availability: `https://schema.org/${x.stock === null || x.stock > 0 ? "InStock" : "OutOfStock"}`,
+      // Shipping to the store's country and the return window, for Google's "Free delivery" and "30-day returns".
+      ...extras.get(x.id),
     })),
     ...(product.details.length ? { additionalProperty: product.details.map((d) => ({ "@type": "PropertyValue", name: d.label, value: d.value })) } : {}),
     ...(rating.count && rating.average !== null ? { aggregateRating: { "@type": "AggregateRating", ratingValue: rating.average, reviewCount: rating.count } } : {}),
@@ -211,7 +213,8 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   // "Get a $10 bonus card for every $50 in gift cards", on the gift card while the offer is on.
   const bonus = product.giftCard ? giftCardBonusNow(shop) : null;
   const shipsBy = (d: string) => new Intl.DateTimeFormat(lang, { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${d}T12:00:00Z`));
-  const jsonLd = JSON.stringify(productJsonLd(product, shop.currency, reviews)).replace(/</g, "\\u003c");
+  const offerExtras = await searchOfferExtras(await db(), shop, product, product.variants);
+  const jsonLd = JSON.stringify(productJsonLd(product, shop.currency, reviews, offerExtras)).replace(/</g, "\\u003c");
   const trail = [{ title: t.breadcrumbHome, path: "" }, ...(crumb ? [{ title: crumb.title, path: `/collections/${crumb.handle}` }] : []), { title: product.title, path: `/products/${product.handle}` }];
   const trailLd = JSON.stringify({
     "@context": "https://schema.org",
