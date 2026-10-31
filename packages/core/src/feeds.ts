@@ -43,6 +43,8 @@ export type FeedItem = {
   weightGrams: number | null;
   /** A download: nothing to ship. */
   digital: boolean;
+  /** The country the parcel leaves from: the product's warehouse abroad, else the store's. Null for downloads. */
+  shipsFrom: string | null;
   /** The cheapest shipping to the store's country, with handling and transit days when known. */
   shipping: { country: string; priceMinor: number; handlingDays: number; transit: { min: number; max: number } | null } | null;
 };
@@ -132,6 +134,7 @@ export async function productFeed(db: Db, shop: Shop, opts: { origin: string; la
         gtin: validGtin(v.barcode),
         weightGrams: p.digital ? null : v.weightGrams,
         digital: p.digital,
+        shipsFrom: p.digital ? null : (p.shipsFrom ?? shop.country),
         shipping: p.digital ? null : (shipping.get(v.id) ?? null),
       });
     }
@@ -185,6 +188,7 @@ export function googleFeedXml(shop: Pick<Shop, "name">, origin: string, items: F
           }</g:shipping>`
         : "",
       i.weightGrams ? tag("g:shipping_weight", `${i.weightGrams} g`) : "",
+      tag("g:ships_from_country", i.shipsFrom),
       "</item>",
     ]
       .filter(Boolean)

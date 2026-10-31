@@ -28,6 +28,11 @@ test("a merchant gets feed links for Google and Meta, and fixes what's missing",
   await photos.getByLabel("Or paste its address").fill("https://img.example.com/projector.jpg");
   await photos.getByRole("button", { name: "Add photo" }).click();
   await expect(photos.getByText("Photo added.")).toBeVisible();
+  // It ships from the supplier's warehouse in China.
+  const customs = page.getByRole("region", { name: "Customs" });
+  await customs.getByLabel("Ships from (country code)").fill("CN");
+  await customs.getByRole("button", { name: "Save customs info" }).click();
+  await expect(customs.getByRole("status")).toBeVisible();
 
   await page.goto("/admin/channels");
   await expect(page.getByRole("heading", { name: "Sales channels" })).toBeVisible();
@@ -36,6 +41,7 @@ test("a merchant gets feed links for Google and Meta, and fixes what's missing",
   const details = page.getByRole("region", { name: "What the feeds send" });
   await expect(details).toContainText(/0 of \d options? have a barcode/);
   await expect(details).toContainText(/Shipping to United States: (free|from \$)/);
+  await expect(details.locator("#feed-ships-from")).toContainText(/^\d options? ships? from China, and the Google feed says so/);
   const toFix = page.getByRole("region", { name: "To fix" });
   await expect(toFix).toContainText("Sunset Projection Lamp: Add a photo.");
   const google = await page.getByLabel("Google Shopping feed link").inputValue();
@@ -51,6 +57,7 @@ test("a merchant gets feed links for Google and Meta, and fixes what's missing",
   expect(xml).toContain('xmlns:g="http://base.google.com/ns/1.0"');
   expect(xml).toContain("<g:image_link>https://img.example.com/projector.jpg</g:image_link>");
   expect(xml).toContain("/products/galaxy-projector-low-stock</g:link>");
+  expect(xml).toContain("<g:ships_from_country>CN</g:ships_from_country>");
   expect(xml).not.toContain("Sunset Projection Lamp");
   const csv = (await page.evaluate((u) => fetch(u).then((r) => r.text()), google.replace("google.xml", "meta.csv"))).split("\n");
   expect(csv[0]).toMatch(/^id,item_group_id,title,/);
