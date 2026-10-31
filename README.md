@@ -1522,3 +1522,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **On the buyer's account** (`apps/web/src/app/s/[shop]/account/page.tsx`): once something they bought has shipped, signed-in buyers see "Waiting for your review" with each product and its order number, and "Write a review" opens that order's review form. A product drops off the list once it's reviewed. Orders not yet shipped, refunded orders and free replacements aren't asked about, the same rules as the order page.
 2. **Core**: `awaitingReview(db, shopId, orderIds)` in `packages/core/src/reviews.ts` finds them for all the buyer's orders in two queries. No migration.
+
+### Star links in the review request (after launch, part 269)
+
+1. **One tap to start** (`sendReviewRequests` in `packages/core/src/review-requests.ts`): when an order had one product, the "How was it?" email lists five star lines (★★★★★ down to ★☆☆☆☆), each a link to the order page with `?rate=N`. Orders with several products keep the list and the one "Leave a review" link.
+2. **The form is ready** (`ReviewForm.tsx`): the order page picks the tapped stars and puts the cursor in "Your review", so the buyer only has to write a line. They can still change the stars. No migration.

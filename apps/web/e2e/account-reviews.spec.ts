@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
 // A signed-in buyer's account lists what they can review, and each link goes to the order's form.
+// A ?rate= link (from the review request email) picks the stars.
 
 test("the buyer's account lists products waiting for a review", async ({ page, browser }, info) => {
   const id = `${info.project.name}-${Date.now()}`;
@@ -66,11 +67,17 @@ test("the buyer's account lists products waiting for a review", async ({ page, b
   await section.getByRole("link", { name: "Review Sunset Projection Lamp" }).click();
   await expect(buyer).toHaveURL(/\/orders\/[^/#]+#review$/);
   const form = buyer.getByRole("form", { name: "Review Sunset Projection Lamp" });
-  await form.getByLabel("5 stars").check({ force: true });
-  await form.getByLabel("Your review").fill("Fills the whole ceiling with colour.");
+  await expect(form.getByLabel("5 stars")).not.toBeChecked();
+  // The review request email's star links open the form with that rating picked.
+  const orderUrl = new URL(buyer.url());
+  orderUrl.searchParams.set("rate", "4");
+  await buyer.goto(orderUrl.toString());
+  await expect(form.getByLabel("4 stars")).toBeChecked();
+  await expect(form.getByLabel("Your review")).toBeFocused();
+  await buyer.keyboard.type("Fills the whole ceiling with colour.");
   await form.getByLabel("Name to show").fill("Ada B.");
   await form.getByRole("button", { name: "Send review" }).click();
-  await expect(buyer.getByText(/you gave it 5 of 5 stars/)).toBeVisible();
+  await expect(buyer.getByText(/you gave it 4 of 5 stars/)).toBeVisible();
 
   await buyer.goto(`${storeRoot}/account`);
   await expect(buyer.getByRole("listitem", { name: "Order #1001" })).toBeVisible();

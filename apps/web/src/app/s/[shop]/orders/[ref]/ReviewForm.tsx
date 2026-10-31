@@ -1,10 +1,15 @@
 "use client";
-import { startTransition, useActionState } from "react";
+import { startTransition, useActionState, useEffect, useRef } from "react";
 import { FormError } from "@/components/FormError";
 import { reviewAction, type ReviewState } from "../../actions";
 
-export function ReviewForm({ handle, orderRef, productId, title, name }: { handle: string; orderRef: string; productId: string; title: string; name: string }) {
+export function ReviewForm({ handle, orderRef, productId, title, name, rating }: { handle: string; orderRef: string; productId: string; title: string; name: string; rating?: number }) {
   const [state, action, pending] = useActionState(reviewAction.bind(null, handle, orderRef, productId), {} as ReviewState);
+  // Stars tapped in the email are already picked, so the next thing to do is write.
+  const body = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (rating !== undefined) body.current?.focus();
+  }, [rating]);
   if (state.sent) return <p className="banner banner-success" role="status">Thanks for reviewing {title}!</p>;
   const id = (k: string) => `${k}-${productId}`;
   return (
@@ -24,7 +29,7 @@ export function ReviewForm({ handle, orderRef, productId, title, name }: { handl
         <div className="flex gap-1 flex-row-reverse justify-end [&_label:has(:checked)]:text-warning [&_label:has(:checked)~label]:text-warning">
           {[5, 4, 3, 2, 1].map((n) => (
             <label key={n} className="cursor-pointer text-2xl leading-none text-border has-[:focus-visible]:outline-2">
-              <input type="radio" name="rating" value={n} required className="sr-only" aria-label={`${n} ${n === 1 ? "star" : "stars"}`} />
+              <input type="radio" name="rating" value={n} required defaultChecked={n === rating} className="sr-only" aria-label={`${n} ${n === 1 ? "star" : "stars"}`} />
               ★
             </label>
           ))}
@@ -32,7 +37,7 @@ export function ReviewForm({ handle, orderRef, productId, title, name }: { handl
       </fieldset>
       <div className="field">
         <label className="label" htmlFor={id("body")}>Your review</label>
-        <textarea id={id("body")} name="body" className="input" rows={3} required minLength={10} maxLength={2000} />
+        <textarea id={id("body")} name="body" className="input" rows={3} required minLength={10} maxLength={2000} ref={body} />
       </div>
       <div className="field">
         <label className="label" htmlFor={id("photos")}>Add photos (optional)</label>
