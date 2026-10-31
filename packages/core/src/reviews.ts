@@ -185,14 +185,32 @@ export async function removeReviewPhotos(db: Db, reviewIds: string[]) {
   await deleteMedia(db, rows.flatMap((r) => r.photoIds));
 }
 
-/** Published reviews for a product page, with the average for the stars and search results. */
-export async function productReviews(db: Db, productId: string, limit = 20) {
+/** Reviews a product page lists at first, and with "Show all". */
+export const REVIEWS_SHOWN = 20;
+export const REVIEWS_SHOWN_ALL = 100;
+
+/** A star rating from a link, or null when it isn't one of 1 to 5. */
+export function starsFilter(value: string | undefined): number | null {
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 1 && n <= 5 ? n : null;
+}
+
+/**
+ * Published reviews for a product page, with the average for the stars and search results and how
+ * many there are of each star rating. `stars` lists only reviews with that rating; the count,
+ * average and breakdown always cover them all.
+ */
+export async function productReviews(db: Db, productId: string, limit = REVIEWS_SHOWN, opts: { stars?: number | null } = {}) {
   const where = and(eq(schema.reviews.productId, productId), eq(schema.reviews.status, "published"));
-  const [[stats], reviews] = await Promise.all([
-    db.select({ n: count(), avg: avg(schema.reviews.rating) }).from(schema.reviews).where(where),
-    db.query.reviews.findMany({ where, orderBy: desc(schema.reviews.createdAt), limit }),
+  const listed = opts.stars ? and(where, eq(schema.reviews.rating, opts.stars)) : where;
+  const [byRating, reviews] = await Promise.all([
+    db.select({ rating: schema.reviews.rating, n: count() }).from(schema.reviews).where(where).groupBy(schema.reviews.rating),
+    db.query.reviews.findMany({ where: listed, orderBy: desc(schema.reviews.createdAt), limit }),
   ]);
-  const n = Number(stats?.n ?? 0);
+  // breakdown[0] is one star, breakdown[4] five.
+  const breakdown = [1, 2, 3, 4, 5].map((r) => Number(byRating.find((b) => b.rating === r)?.n ?? 0));
+  const n = breakdown.reduce((a, b) => a + b, 0);
+  const total = breakdown.reduce((a, b, i) => a + b * (i + 1), 0);
   // The newest buyer photos for the strip above the reviews, from any published review.
   const withPhotos = await db.query.reviews.findMany({
     where: and(where, sql`jsonb_array_length(${schema.reviews.photoIds}) > 0`),
@@ -201,7 +219,8 @@ export async function productReviews(db: Db, productId: string, limit = 20) {
     limit: 12,
   });
   const photos = withPhotos.flatMap((r) => r.photoIds.map((id) => ({ url: reviewPhotoUrl(id), reviewId: r.id, name: r.name, rating: r.rating }))).slice(0, 12);
-  return { count: n, average: n ? Math.round(Number(stats?.avg) * 10) / 10 : null, reviews, photos };
+  const listedCount = opts.stars ? breakdown[opts.stars - 1]! : n;
+  return { count: n, average: n ? Math.round((total / n) * 10) / 10 : null, reviews, photos, breakdown, listedCount };
 }
 
 /** A product card's stars: the average of its published reviews and how many there are. */
