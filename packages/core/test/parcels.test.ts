@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { schema } from "@sf/db";
-import { addManualTracking, createGiftCardProduct, createProduct, DemoModel, getOrder, handlePaymentEvent, onOrderPaid, orderParcels, quoteCart, startCheckout, syncTracking } from "../src";
+import { addManualTracking, parcelDeliveries, createGiftCardProduct, createProduct, DemoModel, getOrder, handlePaymentEvent, onOrderPaid, orderParcels, quoteCart, startCheckout, syncTracking } from "../src";
 import { makeFixture } from "../evals/fixture";
 
 const address = { name: "Ada Lovelace", line1: "1 Main St", city: "Austin", region: "TX", postalCode: "78701", country: "US" };
@@ -68,6 +68,19 @@ describe("orders in more than one parcel", () => {
     expect(first).toContain("comes in 2 parcels");
     expect(first).toMatch(/Parcel 1 has shipped with:\n\n  Sunset Projection Lamp.* × 2/);
     expect(first).toMatch(/Still to come in a separate parcel:\n  Handmade Coaster\n/);
+    expect(first).toMatch(/Expected delivery: [A-Z][a-z]{2} \d{1,2}( – [A-Z][a-z]{2} \d{1,2})?\n/);
+    // Each parcel has its own dates: the shipped one counts from when it left.
+    const full = await getOrder(f.db, shop.id, order.id);
+    const parcels = await orderParcels(f.db, full);
+    // The store's own coaster goes by a local courier in 2 to 3 days.
+    await f.db.update(schema.variants).set({ shipDaysMin: 2, shipDaysMax: 3 }).where(eq(schema.variants.id, coaster!.id));
+    const dates = await parcelDeliveries(f.db, shop, full, parcels);
+    const shipped = parcels.find((p) => p.shipment?.trackingNumber)!;
+    const waiting = parcels.find((p) => p.key === "own")!;
+    const day = 86_400_000;
+    expect(dates.get(shipped.key)!.from.getTime()).toBeGreaterThanOrEqual(shipped.shipment!.shippedAt!.getTime() + 6 * day - day);
+    expect(dates.get(waiting.key)).toBeTruthy();
+    expect(dates.get(waiting.key)!.from.getTime()).not.toBe(dates.get(shipped.key)!.from.getTime());
     // Checking again sends nothing new.
     await syncTracking(f.ctx, { orderId: order.id });
     expect(mail()).toHaveLength(1);

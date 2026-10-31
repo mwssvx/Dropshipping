@@ -1,6 +1,6 @@
 import { PixelEvent } from "@/components/PixelEvent";
 import { notFound } from "next/navigation";
-import { canMarkArrived, buyerAmounts, formatHandoverDay, handoverDayOptions, buyerCancelOptions, buyerThread, formatDeliveryDate, formatDeliveryWindow, orderDelivery, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems, formatShipsBy, storePixels, surveyFor, orderDownloads, formatFileSize, transferDueBy, orderParcels } from "@sf/core";
+import { canMarkArrived, buyerAmounts, formatHandoverDay, handoverDayOptions, buyerCancelOptions, buyerThread, formatDeliveryDate, formatDeliveryWindow, orderDelivery, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems, formatShipsBy, storePixels, surveyFor, orderDownloads, formatFileSize, transferDueBy, orderParcels, parcelDeliveries } from "@sf/core";
 import Link from "next/link";
 import { db, fulfillment, storeAddress } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
@@ -66,6 +66,8 @@ export default async function OrderStatusPage({ params, searchParams }: { params
   const partOf = order.subscriptionId ? await (await db()).query.subscriptions.findFirst({ where: (s, { eq }) => eq(s.id, order.subscriptionId!), columns: { token: true, status: true } }) : null;
   const survey = surveyFor(shop, order);
   const arrives = paid ? await orderDelivery(await db(), shop, order) : null;
+  // Each parcel's own dates, since a parcel from a nearby warehouse comes sooner than one from abroad.
+  const parcelDates = paid && parcels.length > 1 ? await parcelDeliveries(await db(), shop, order, parcels) : new Map();
   // Shipped and not reported delivered: the buyer can say it arrived.
   const arrivedText = canMarkArrived(order) ? await storeT(handle) : null;
   // Paying by bank transfer: where to send it, or that it didn't arrive in time.
@@ -260,6 +262,7 @@ export default async function OrderStatusPage({ params, searchParams }: { params
                     </span>
                   </p>
                   <p>{p.items.map((it) => (it.quantity > 1 ? `${it.title} × ${it.quantity}` : it.title)).join(", ")}</p>
+                  {parcelDates.get(p.key) && <p>Expected delivery: <strong>{formatDeliveryWindow(parcelDates.get(p.key)!)}</strong></p>}
                   {s?.trackingNumber && (
                     <p>
                       {s.carrier}:{" "}

@@ -2,7 +2,7 @@ import { and, asc, eq, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizz
 import { schema, type Db, type PersonalizationValue } from "@sf/db";
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { cartDelivery, formatDeliveryWindow, orderDelivery } from "./delivery";
+import { cartDelivery, formatDeliveryWindow, orderDelivery, parcelDeliveries } from "./delivery";
 import { dutiesFor } from "./duties";
 import { shipsFromOf } from "./customs";
 import { NotFoundError, UserError } from "./errors";
@@ -833,11 +833,13 @@ export async function sendOrderEmail(ctx: FulfillmentContext, orderId: string, k
     if (parcels.length > 1 && parcels.some((p) => p.shipment?.trackingNumber)) {
       const link = await ctx.orderStatusUrl(shop, order);
       const first = (order.gift?.from ?? order.shippingAddress.name).split(" ")[0]!;
+      const dates = await parcelDeliveries(db, shop, order, parcels);
       let result: Awaited<ReturnType<typeof deliverOrderEmail>> | { status: "not_needed" } = { status: "not_needed" };
       for (const [index, p] of parcels.entries()) {
         if (!p.shipment?.trackingNumber) continue;
         // The first parcel takes the order's one shipping email, so one sent before this counts for it.
-        const email = parcelShippedEmail({ first, shopName: shop.name, orderNumber: order.number, link, parcels, index });
+        const window = dates.get(p.key);
+        const email = parcelShippedEmail({ first, shopName: shop.name, orderNumber: order.number, link, parcels, index, arrives: window ? formatDeliveryWindow(window) : null });
         const sent = await deliverOrderEmail(ctx, shop, order, kind, index === 0 ? "" : `parcel:${p.shipment.id}`, { to: order.email, ...email });
         if (sent.status !== "already_sent") result = sent;
         if (sent.status === "sent" && index === 0 && order.gift?.recipientEmail) await sendOrderEmail(ctx, order.id, "gift_shipped");

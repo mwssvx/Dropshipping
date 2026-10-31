@@ -1756,3 +1756,7 @@ When an order had supplier products and the store's own stock, the admin order p
 ### Parcels in the app (after launch, part 319)
 
 The merchant app's order screen now shows an order in more than one parcel as "Comes in 2 parcels", one row per parcel with what's in it and where it is ("Demo Post DS123…", "With the supplier · not shipped yet", or "Sent by you · not shipped yet"), so a merchant answering "where's the rest of my order?" from their phone sees it at once. Tapping a shipped parcel opens its tracking. `GET /api/app/orders/:id` returns `parcels`. No migration.
+
+### Delivery dates for each parcel (after launch, part 320)
+
+In an order in more than one parcel, the parcel from a warehouse nearby comes much sooner than the one from abroad, but the order page gave one date for everything. Each parcel on the buyer's order page now has its own "Expected delivery", counted from payment with its own items' preparing and transit days, or from the day it shipped once it has, and each parcel's shipping email says when that parcel should arrive. A parcel with no known shipping days (the store's own stock under a rate with no days) shows no date. `parcelDeliveries` in `packages/core/src/delivery.ts`. No migration.
