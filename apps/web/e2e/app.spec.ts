@@ -1469,3 +1469,41 @@ test("a wholesale application answered from the app", async ({ page, browser }) 
   await web.goto(`${WEB}/admin/wholesale`);
   await expect(web.getByRole("region", { name: "Wholesale buyers" }).getByText("Big Store")).toBeVisible();
 });
+
+test("a partner added from the app gets their code, and is paused and brought back", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `pt${Date.now()}`);
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Partners" }).click();
+  await expect(page.getByRole("heading", { name: "Partners", level: 1 })).toBeVisible();
+  await expect(page.getByText("No partners yet")).toBeVisible();
+
+  const maya = `maya-${Date.now()}@example.com`;
+  await page.getByRole("textbox", { name: "Their name" }).fill("Maya Lamps");
+  await page.getByRole("textbox", { name: "Their email (optional)" }).fill(maya);
+  await page.getByRole("textbox", { name: "Their code" }).fill("maya15");
+  await page.getByRole("textbox", { name: "Buyers get (% off)" }).fill("15");
+  await page.getByRole("textbox", { name: "They get (% of items sold)" }).fill("7.5");
+  await page.getByRole("button", { name: "Add partner" }).click();
+  await expect(page.getByText("Maya Lamps is a partner with the code MAYA15. We emailed them their code and private page.")).toBeVisible();
+  const card = page.getByRole("group", { name: "Maya Lamps" });
+  await expect(card.getByText(`Code MAYA15 · buyers get 15% off · they get 7.5% · ${maya}`)).toBeVisible();
+  await expect(card.getByText("Owed $0.00", { exact: false })).toBeVisible();
+  await expect(card.getByRole("button", { name: "Share Maya Lamps's code link" })).toBeVisible();
+  await shot(page, "371-app-partners");
+
+  const mail = await web.context().newPage();
+  await mail.goto(`${WEB}/dev/mail`);
+  await expect(mail.getByRole("article").filter({ hasText: maya }).filter({ hasText: "MAYA15" }).first()).toBeVisible();
+  await mail.close();
+
+  await card.getByRole("button", { name: "Pause Maya Lamps" }).click();
+  await expect(page.getByText("Maya Lamps is paused, so their code stops working. What they earned stays.")).toBeVisible();
+  await expect(card.getByText("Paused", { exact: true })).toBeVisible();
+  await card.getByRole("button", { name: "Bring back Maya Lamps" }).click();
+  await expect(page.getByText("Maya Lamps's code works again.")).toBeVisible();
+  await card.getByRole("button", { name: "Make a new private link for Maya Lamps" }).click();
+  await expect(page.getByText("Maya Lamps has a new private link.", { exact: false })).toBeVisible();
+
+  await web.goto(`${WEB}/admin/partners`);
+  await expect(web.getByRole("article", { name: "Maya Lamps" })).toContainText("MAYA15");
+});
