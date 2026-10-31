@@ -27,6 +27,8 @@ export default function QuestionsScreen() {
   const list = useApi<{ waiting: number; questions: Question[] }>(`questions?show=${show}`);
   const rows = list.data?.questions;
   const waiting = list.data?.waiting;
+  // Shown above the list: an answered question leaves the To answer list.
+  const [done, setDone] = useState<string | null>(null);
   return (
     <Screen title="Questions" back={<BackLink href="/" label="Today" />} onRefresh={list.reload} refreshing={list.loading && !!rows}>
       <Segmented
@@ -38,6 +40,7 @@ export default function QuestionsScreen() {
           ["all", "All"],
         ]}
       />
+      {done ? <Banner tone="success">{done}</Banner> : null}
       <LoadError error={list.error} stale={list.stale} retry={list.reload} />
       {!rows ? (
         list.loading ? <Loading /> : null
@@ -47,28 +50,27 @@ export default function QuestionsScreen() {
           body="Shoppers can ask about a product on its page. Their questions wait here, and the answer goes to them by email."
         />
       ) : (
-        rows.map((q) => <QuestionCard key={q.id} question={q} onChange={list.reload} />)
+        rows.map((q) => <QuestionCard key={q.id} question={q} onDone={async (text) => { setDone(text); await list.reload(); }} />)
       )}
     </Screen>
   );
 }
 
-function QuestionCard({ question: q, onChange }: { question: Question; onChange: () => Promise<unknown> }) {
+function QuestionCard({ question: q, onDone }: { question: Question; onDone: (message: string) => Promise<unknown> }) {
   const [answer, setAnswer] = useState(q.answer ?? q.draft ?? "");
   const [publish, setPublish] = useState(q.status !== "private");
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
-  const [note, setNote] = useState<{ tone: "success" | "critical"; text: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
   async function run(key: string, change: { action: "answer" | "publish" | "hide"; answer?: string; publish?: boolean }) {
     setBusy(key);
-    setNote(null);
+    setError(null);
     try {
       const res = await api<{ message: string }>(`questions/${q.id}`, { body: change });
-      setNote({ tone: "success", text: res.message });
       setEditing(false);
-      await onChange();
+      await onDone(res.message);
     } catch (e) {
-      setNote({ tone: "critical", text: (e as Error).message });
+      setError((e as Error).message);
     } finally {
       setBusy(null);
     }
@@ -84,7 +86,7 @@ function QuestionCard({ question: q, onChange }: { question: Question; onChange:
         </View>
         <Body>{q.body}</Body>
         <Body muted>{`${q.name} · ${q.email} · ${when(q.createdAt)}`}</Body>
-        {note ? <Banner tone={note.tone}>{note.text}</Banner> : null}
+        {error ? <Banner tone="critical">{error}</Banner> : null}
         {answering ? (
           <>
             <Field label={`Answer to ${q.name}`} value={answer} onChangeText={setAnswer} multiline hint={q.draft && !q.answer ? "A suggested answer to start from. Change anything." : undefined} />
