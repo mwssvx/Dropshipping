@@ -1607,3 +1607,8 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 1. **A reminder** (`sendHandoverReminders` in `packages/core/src/handover-reminders.ts`): a buyer who picked a day to collect their order gets "See you tomorrow: order #1042 from …" the day before, with the pickup address and how to collect; one getting a local delivery gets "… arrives tomorrow" with their address. Both say to reply if the day no longer works, so fewer orders sit on the shelf and fewer drivers knock on an empty house.
 2. **Once, and only when it helps**: "tomorrow" is the store's own tomorrow, orders paid in the last 12 hours (the buyer just picked the day) and orders already handed over are skipped, and each order hears once. It runs with the "running late" emails, so no new scheduled job, and shows on the order's timeline. No migration.
+
+### Change the day (after launch, part 286)
+
+1. **From the order page** (`changeHandoverDay` in `packages/core/src/handover-change.ts`): a buyer who picked a pickup or local delivery day can open "Change the day" under it and move it to another day the store hands over orders, in their language. The store's team gets an email ("Order #1042 at …: now collecting on Friday, November 6"), and the order's history says "Pickup day moved from … to …".
+2. **Until the day before**: on the day itself, once it's picked up or delivered, or for an unpaid order, it can't be moved online and the buyer messages the store instead. The day-before reminder follows the new day. No migration.

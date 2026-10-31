@@ -36,7 +36,8 @@ export async function sendHandoverReminders(ctx: FulfillmentContext, scope: { sh
         inArray(o.paymentStatus, ["paid", "partially_refunded"]),
         ne(o.fulfillmentStatus, "delivered"),
         sql`${o.paidAt} <= ${now.toISOString()}::timestamptz - make_interval(hours => ${FRESH_HOURS})`,
-        notExists(db.select({ id: schema.emails.id }).from(schema.emails).where(and(eq(schema.emails.orderId, o.id), eq(schema.emails.kind, "handover_reminder")))),
+        // Once per day picked: a buyer who moves the day hears again for the new one.
+        notExists(db.select({ id: schema.emails.id }).from(schema.emails).where(and(eq(schema.emails.orderId, o.id), eq(schema.emails.kind, "handover_reminder"), sql`${schema.emails.ref} = ${o.handoverOn}::text`))),
       ),
     )
     .orderBy(o.handoverOn)

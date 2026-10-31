@@ -120,12 +120,22 @@ test("a buyer picks the day they'll collect their order", async ({ page, browser
   await expect(pick).toBeVisible();
   const options = pick.locator("option:not([value=''])");
   await expect(options).toHaveCount(14);
-  const label = (await options.nth(1).textContent())!.trim();
+  let label = (await options.nth(1).textContent())!.trim();
   await pick.selectOption({ label });
   await buyer.getByRole("button", { name: "Continue to payment" }).click();
   await buyer.getByRole("button", { name: /^Pay / }).click();
   await expect(buyer.getByRole("heading", { name: "Thank you, Linus!" })).toBeVisible();
   await expect(buyer.getByText(`Pickup day: ${label}`)).toBeVisible();
+
+  // Something came up: the buyer moves it to a later day from their order page.
+  await buyer.getByText("Change the day").click();
+  const moveTo = (await buyer.locator("#changeDay option").nth(4).textContent())!.trim();
+  await buyer.getByLabel("Pickup day").selectOption({ label: moveTo });
+  await buyer.getByRole("button", { name: "Save the new day" }).click();
+  await expect(buyer.getByText(`Pickup day: ${moveTo}`)).toBeVisible();
+  await expect(buyer.getByText("Saved. The store has been told.")).toBeVisible();
+  const label0 = label;
+  label = moveTo;
 
   // The order list sums up who's coming over the week.
   await page.goto("/admin/orders");
@@ -135,4 +145,5 @@ test("a buyer picks the day they'll collect their order", async ({ page, browser
   await expect(page.getByText(`Pickups and deliveries due ${label} not handed over yet`)).toBeVisible();
   await page.getByRole("link", { name: "#1001" }).first().click();
   await expect(page.getByText(`Collecting on ${label}`)).toBeVisible();
+  await expect(page.getByText(`Pickup day moved from ${label0} to ${label}`)).toBeVisible();
 });

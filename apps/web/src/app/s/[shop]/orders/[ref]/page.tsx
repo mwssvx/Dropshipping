@@ -1,11 +1,12 @@
 import { PixelEvent } from "@/components/PixelEvent";
 import { notFound } from "next/navigation";
-import { buyerAmounts, formatHandoverDay, buyerCancelOptions, buyerThread, formatDeliveryDate, formatDeliveryWindow, orderDelivery, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems, formatShipsBy, storePixels, surveyFor, orderDownloads, formatFileSize, transferDueBy } from "@sf/core";
+import { buyerAmounts, formatHandoverDay, handoverDayOptions, buyerCancelOptions, buyerThread, formatDeliveryDate, formatDeliveryWindow, orderDelivery, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems, formatShipsBy, storePixels, surveyFor, orderDownloads, formatFileSize, transferDueBy } from "@sf/core";
 import Link from "next/link";
 import { db, fulfillment, storeAddress } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
-import { cancelOrderByBuyerAction, editOrderByBuyerAction } from "../../actions";
+import { cancelOrderByBuyerAction, changeHandoverDayAction, editOrderByBuyerAction } from "../../actions";
 import { CancelOrder } from "./CancelOrder";
+import { ChangeDay } from "./ChangeDay";
 import { ReferralCard } from "@/components/ReferralCard";
 import { loadShop, storeBase, storeLang, storeT } from "../../data";
 import { ReviewForm } from "./ReviewForm";
@@ -73,6 +74,16 @@ export default async function OrderStatusPage({ params, searchParams }: { params
     : download === "unpaid" ? "Downloads open once the order is paid." : null;
   const pickupText = paid && (order.pickup || order.localDelivery) ? await storeT(handle) : null;
   const dayLang = (await storeLang(handle)) ?? "en-US";
+  // Until the day before, the buyer can move their pickup or delivery to another open day.
+  const dayOptions = pickupText ? handoverDayOptions(shop, order) : null;
+  const changeDay = pickupText && dayOptions && order.handoverOn ? (
+    <ChangeDay
+      action={changeHandoverDayAction.bind(null, handle, ref)}
+      day={order.handoverOn}
+      dates={dayOptions.map((d) => [d, formatHandoverDay(d, dayLang)])}
+      text={{ label: order.pickup ? pickupText.pickupDay : pickupText.deliveryDay, changeDay: pickupText.changeDay, saveDay: pickupText.saveDay, dayChanged: pickupText.dayChanged }}
+    />
+  ) : null;
   const steps = order.pickup ? [
     { label: "Order confirmed", done: paid },
     { label: "Being prepared", done: paid },
@@ -243,11 +254,14 @@ export default async function OrderStatusPage({ params, searchParams }: { params
         </p>
       )}
       {pickupText && order.localDelivery && order.paymentStatus !== "refunded" && (
-        <p className="banner banner-info text-sm" role="status">
-          {order.fulfillmentStatus === "delivered" ? pickupText.localDelivered(shop.name) : pickupText.localDeliveryWaiting(shop.name)}
-          {order.fulfillmentStatus !== "delivered" && shop.localDeliveryArea?.note && <> {shop.localDeliveryArea.note.replace(/\.$/, "")}.</>}
-          {order.fulfillmentStatus !== "delivered" && order.handoverOn && <> {pickupText.deliveryDay}: {formatHandoverDay(order.handoverOn, dayLang)}.</>}
-        </p>
+        <div className="banner banner-info text-sm" role="status">
+          <p>
+            {order.fulfillmentStatus === "delivered" ? pickupText.localDelivered(shop.name) : pickupText.localDeliveryWaiting(shop.name)}
+            {order.fulfillmentStatus !== "delivered" && shop.localDeliveryArea?.note && <> {shop.localDeliveryArea.note.replace(/\.$/, "")}.</>}
+            {order.fulfillmentStatus !== "delivered" && order.handoverOn && <> {pickupText.deliveryDay}: {formatHandoverDay(order.handoverOn, dayLang)}.</>}
+          </p>
+          {changeDay}
+        </div>
       )}
       {pickupText && order.pickup && order.paymentStatus !== "refunded" && (
         <section className="banner banner-info text-sm flex flex-col gap-1" role="status" aria-label={pickupText.pickUp}>
@@ -263,6 +277,7 @@ export default async function OrderStatusPage({ params, searchParams }: { params
             <p>{pickupText.pickupWaiting}</p>
           )}
           {order.fulfillmentStatus !== "delivered" && order.handoverOn && <p>{pickupText.pickupDay}: {formatHandoverDay(order.handoverOn, dayLang)}</p>}
+          {changeDay}
         </section>
       )}
       {paid && shipped.length === 0 && !order.preorderShipsBy && !order.pickup && !order.localDelivery && (
