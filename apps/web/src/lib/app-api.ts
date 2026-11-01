@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  setGrowthSettings,
+  setAbandonedCartOffer,
   setGiftWrap,
   MAX_GIFT_WRAP_NOTE,
   createGiftGuides,
@@ -1455,18 +1457,19 @@ const routes: Record<string, Handler> = {
   "GET holiday-checklist": async ({ db, shop, role }) => {
     const checks = await holidayChecklist(db, shop);
     // Lines the app can set up itself open that screen; the rest open the website.
-    const inApp: Record<string, { path: string; area: Area }> = {
+    const inApp: Record<string, { path: string; area: Area; also?: Area }> = {
       "order-by": { path: "/holiday-date", area: "shipping" },
       late: { path: "/late-emails", area: "shipping" },
       sale: { path: "/sales", area: "marketing" },
       "gift-guides": { path: "/collections", area: "collections" },
       "gift-wrap": { path: "/gift-wrap", area: "shipping" },
+      reminders: { path: "/checkouts", area: "marketing", also: "orders" },
     };
     return {
       season: holidaySeason(),
       checks: checks.map((c) => {
         const a = inApp[c.key];
-        return { key: c.key, title: c.title, done: c.done, detail: c.detail, app: a && can(role, a.area) ? a.path : null, web: c.href };
+        return { key: c.key, title: c.title, done: c.done, detail: c.detail, app: a && can(role, a.area) && (!a.also || can(role, a.also)) ? a.path : null, web: c.href };
       }),
     };
   },
@@ -1924,6 +1927,8 @@ const routes: Record<string, Handler> = {
     return {
       days: ABANDONED_DAYS,
       remindersOn: shop.abandonedCartEmails,
+      // The second reminder, a day later, with a one-time code for this percent off.
+      offerPercent: shop.abandonedCartOffer?.percentOff ?? null,
       totals,
       checkouts: checkouts.map((c) => ({
         id: c.id,
@@ -1938,6 +1943,26 @@ const routes: Record<string, Handler> = {
         // The order they paid with in the end: this checkout, or a new one.
         paidAs: c.recoveredBy,
       })),
+    };
+  },
+  "PUT checkouts/reminders": async ({ req, db, shop, user }) => {
+    const b = await body<{ on?: unknown; offer?: unknown; percentOff?: unknown }>(req);
+    const on = b.on === true;
+    const percent = on && b.offer === true ? Number.parseInt(str(b.percentOff).trim() || "0", 10) : null;
+    await setAbandonedCartOffer(db, shop.id, percent);
+    await setGrowthSettings(db, shop.id, { abandonedCartEmails: on });
+    await logged(
+      { shop, user, db },
+      !on ? "Turned off checkout reminders in the app" : percent ? `Turned on checkout reminders, the second with ${percent}% off, in the app` : "Turned on checkout reminders in the app",
+      { href: "/admin/marketing#reminders-heading" },
+    );
+    return {
+      ok: true,
+      message: !on
+        ? "Saved. Buyers who leave at checkout aren't reminded."
+        : percent
+          ? `Saved. Buyers who leave get a reminder after an hour, and a day later a one-time code for ${percent}% off.`
+          : "Saved. Buyers who leave get a reminder after an hour.",
     };
   },
   "GET customers": async ({ url, db, shop }) => {
@@ -2076,6 +2101,7 @@ function routeArea(key: string): Area | null {
   if (key === "POST customers/:id/credit") return "gift_cards";
   if (key === "POST orders/:id/transfer-paid" || key === "PUT bank-transfers") return "money";
   if (key === "PUT products/:id/collections/:collectionId") return "collections";
+  if (key === "PUT checkouts/reminders") return "marketing";
   const path = key.split(" ")[1]!;
   if (path.startsWith("orders")) return "orders";
   if (path.startsWith("products") || path.startsWith("imports")) return "products";

@@ -2227,3 +2227,29 @@ test("gift wrapping turned on from the app", async ({ page, browser }) => {
   await page.getByRole("button", { name: "Save gift wrapping" }).click();
   await expect(page.getByText("Saved. Checkout doesn't offer gift wrapping.")).toBeVisible();
 });
+
+test("checkout reminder emails set from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `cr${Date.now()}`);
+  await signIn(page, email);
+  await tab(page, "Orders");
+  await page.getByRole("tab", { name: "All" }).click();
+  await page.getByRole("link", { name: /Left at checkout/ }).click();
+  const reminders = page.getByRole("region", { name: "Reminder emails" });
+  await expect(reminders.getByRole("switch", { name: "Remind buyers who leave at checkout" })).toBeChecked();
+  await reminders.getByRole("switch", { name: "Send a second reminder with a code" }).click();
+  await reminders.getByRole("textbox", { name: "Percent off (%)" }).fill("80");
+  await reminders.getByRole("button", { name: "Save reminder emails" }).click();
+  await expect(page.getByText("Pick between 5% and 50% off.")).toBeVisible();
+  await reminders.getByRole("textbox", { name: "Percent off (%)" }).fill("15");
+  await reminders.getByRole("button", { name: "Save reminder emails" }).click();
+  await expect(page.getByText("Saved. Buyers who leave get a reminder after an hour, and a day later a one-time code for 15% off.")).toBeVisible();
+  await shot(page, "390-app-checkout-reminders");
+
+  await web.goto(`${WEB}/admin/marketing`);
+  await expect(web.getByLabel("Code gives (% off)")).toHaveValue("15");
+
+  await reminders.getByRole("switch", { name: "Remind buyers who leave at checkout" }).click();
+  await reminders.getByRole("button", { name: "Save reminder emails" }).click();
+  await expect(page.getByText("Saved. Buyers who leave at checkout aren't reminded.")).toBeVisible();
+  await expect(page.getByText("Reminder emails are off, so nobody is reminded. Turn them on below.")).toBeVisible();
+});

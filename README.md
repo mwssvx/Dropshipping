@@ -2036,3 +2036,7 @@ The app's Collections screen offers to make the gift guides ("Gifts under $25", 
 ### Gift wrapping in the app (after launch, part 389)
 
 Settings in the app has a Gift wrapping row under Shipping. Turn wrapping on with its price and what buyers get, or off. The holiday checklist's gift wrapping line opens it.
+
+### Checkout reminders in the app (after launch, part 390)
+
+The app's Left at checkout screen has a Reminder emails section. Turn the reminder an hour after a buyer leaves on or off, and add a second reminder a day later with a one-time code for 5% to 50% off. The holiday checklist's reminders line opens it.
