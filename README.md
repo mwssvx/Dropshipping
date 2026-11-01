@@ -2228,3 +2228,7 @@ A product's screen in the app has "Personalisation": up to three text fields buy
 ### Price per unit in the app (after launch, part 437)
 
 A product's screen in the app has "Price per unit": what one of each option holds, like 500 ml or 250 g, so the store shows the price per litre, kg or metre under the price, as the EU requires.
+
+### Badge and put on sale later in the app (after launch, part 438)
+
+A product's screen in the app has "Badge", its own short label like "Limited edition", and, for drafts, "Put on sale later": the day and time it goes on sale by itself, on the phone's clock, with a switch for the coming-soon page until then.

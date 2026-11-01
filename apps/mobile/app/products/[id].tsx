@@ -232,6 +232,8 @@ export default function ProductScreen() {
       {p.giftCard ? null : <PersonalizationSection product={p} busy={busy} act={act} />}
       {p.giftCard ? null : <DetailsSection product={p} busy={busy} act={act} />}
       {p.giftCard ? null : <UnitPriceSection product={p} busy={busy} act={act} />}
+      {p.status === "draft" ? <LaunchSection product={p} busy={busy} act={act} /> : null}
+      <BadgeSection product={p} busy={busy} act={act} />
       <TagsSection product={p} busy={busy} act={act} />
       <CollectionsSection product={p} busy={busy} act={act} />
       <BackupSection product={p} busy={busy} act={act} currency={cur} />
@@ -487,6 +489,67 @@ function UnitPriceSection({ product: p, busy, act }: { product: Product; busy: s
             act("units", async () => (await api<{ message: string }>(`products/${p.id}/contents`, { method: "PUT", body: { rows: p.variants.map((v) => ({ variantId: v.id, ...rows[v.id] })) } })).message)
           }
         />
+      </Card>
+    </Section>
+  );
+}
+
+/** The merchant's own short label on this product's card and page, like "Bestseller". */
+function BadgeSection({ product: p, busy, act }: { product: Product; busy: string | null; act: Act }) {
+  const saved = p.badge ?? "";
+  const [edit, setEdit] = useState<string | null>(null);
+  const v = edit ?? saved;
+  useEffect(() => setEdit(null), [p]);
+  return (
+    <Section title="Badge">
+      <Card>
+        <Field label="Badge text" value={v} onChangeText={setEdit} placeholder="Bestseller" hint="A short label on this product's card and page, like “Limited edition”. Leave it empty for none." />
+        <Button label="Save badge" busy={busy === "badge"} disabled={!!busy || edit === null} onPress={() => act("badge", async () => (await api<{ message: string }>(`products/${p.id}/badge`, { method: "PUT", body: { badge: v } })).message)} />
+      </Card>
+    </Section>
+  );
+}
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const spokenTime = (iso: string) => new Date(iso).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+
+/** A draft that goes on sale by itself at a time on this phone's clock, with an optional coming-soon page until then. */
+function LaunchSection({ product: p, busy, act }: { product: Product; busy: string | null; act: Act }) {
+  const at = p.publishAt ? new Date(p.publishAt) : null;
+  const saved = at ? { day: `${at.getFullYear()}-${pad2(at.getMonth() + 1)}-${pad2(at.getDate())}`, time: `${pad2(at.getHours())}:${pad2(at.getMinutes())}` } : { day: "", time: "09:00" };
+  const [edit, setEdit] = useState<typeof saved | null>(null);
+  const s = edit ?? saved;
+  useEffect(() => setEdit(null), [p]);
+  const exact = () => {
+    const d = new Date(`${s.day.trim()}T${s.time.trim()}`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s.day.trim()) || !/^\d{1,2}:\d{2}$/.test(s.time.trim()) || Number.isNaN(d.getTime())) throw new Error("Enter the day like 2026-12-01 and the time like 18:00.");
+    return d.toISOString();
+  };
+  return (
+    <Section title="Put on sale later">
+      <Card>
+        <Body muted>For a launch or a drop you announce ahead: it goes on sale by itself at this time, on your phone's clock.</Body>
+        {p.publishAt ? <Body>{`Goes on sale by itself on ${spokenTime(p.publishAt)}. Until then buyers can't see it.`}</Body> : null}
+        <Field label="Day" value={s.day} onChangeText={(v) => setEdit({ ...s, day: v })} placeholder="2026-12-01" keyboardType="numbers-and-punctuation" autoCapitalize="none" />
+        <Field label="Time" value={s.time} onChangeText={(v) => setEdit({ ...s, time: v })} placeholder="18:00" keyboardType="numbers-and-punctuation" autoCapitalize="none" hint="24-hour, like 18:00." />
+        <Button
+          label={p.publishAt ? "Change time" : "Schedule"}
+          busy={busy === "launch"}
+          disabled={!!busy || edit === null}
+          onPress={() => act("launch", async () => (await api<{ message: string }>(`products/${p.id}/publish-at`, { method: "PUT", body: { at: exact() } })).message)}
+        />
+        {p.publishAt ? (
+          <>
+            <Button label="Cancel schedule" kind="secondary" busy={busy === "unlaunch"} disabled={!!busy} onPress={() => act("unlaunch", async () => (await api<{ message: string }>(`products/${p.id}/publish-at`, { method: "PUT", body: { at: "" } })).message)} />
+            <Toggle
+              label="Show a coming-soon page"
+              value={!!p.comingSoon}
+              disabled={!!busy}
+              onChange={(on) => void act("soon", async () => (await api<{ message: string }>(`products/${p.id}/coming-soon`, { method: "PUT", body: { on } })).message)}
+            />
+            <Body muted>At its usual address: the price, a countdown and a box to be emailed the moment it's out.</Body>
+          </>
+        ) : null}
       </Card>
     </Section>
   );

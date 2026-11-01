@@ -56,6 +56,10 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  BADGE_MAX_LENGTH,
+  setComingSoon,
+  schedulePublish,
+  setProductBadge,
   CONTENT_UNITS,
   setVariantContents,
   setPersonalization,
@@ -597,6 +601,12 @@ const productView = (p: ProductRow) => ({
   detailsText: detailsText(p.details),
   /** Text fields buyers fill in before adding it to their cart, like a name to engrave. */
   personalization: p.personalization,
+  /** The merchant's own label on its card and page, like "Bestseller". */
+  badge: p.badge,
+  /** When a draft goes on sale by itself. */
+  publishAt: p.publishAt,
+  /** Whether that draft shows a coming-soon page until then. */
+  comingSoon: p.comingSoon,
 });
 
 const customerView = (p: Awaited<ReturnType<typeof getCustomerProfile>>) => ({
@@ -3258,6 +3268,34 @@ const routes: Record<string, Handler> = {
     revalidatePath(`/admin/products/${params.id}`);
     revalidatePath(`/s/${shop.handle}`, "layout");
     return { ok: true, message: saved ? "Saved. The price per unit shows under the price on the store." : "Saved. No price per unit is shown." };
+  },
+  "PUT products/:id/badge": async ({ req, params, db, shop }) => {
+    const b = await body<{ badge?: unknown }>(req);
+    const badge = await setProductBadge(db, shop.id, params.id!, str(b.badge));
+    revalidatePath(`/admin/products/${params.id}`);
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: badge ? "Saved. The badge shows on this product's card and page." : "Saved. This product has no badge of its own." };
+  },
+  // A draft that goes on sale by itself at a time; the app sends it as an exact time, so time zones match the phone.
+  "PUT products/:id/publish-at": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ at?: unknown }>(req);
+    const product = await getProduct(db, shop.id, params.id!);
+    const at = str(b.at) ? new Date(str(b.at)) : null;
+    await schedulePublish(db, shop.id, product.id, at);
+    await logged({ shop, user, db }, at ? `Scheduled “${product.title}” to go on sale, in the app` : `Cancelled the scheduled sale start of “${product.title}” in the app`, { href: `/admin/products/${product.id}` });
+    revalidatePath(`/admin/products/${product.id}`);
+    revalidatePath("/admin/products");
+    return { ok: true, message: at ? "Scheduled. Until then buyers can't see it." : "Cancelled. It stays a draft until you put it on sale." };
+  },
+  "PUT products/:id/coming-soon": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ on?: unknown }>(req);
+    const product = await getProduct(db, shop.id, params.id!);
+    const on = b.on === true;
+    await setComingSoon(db, shop.id, product.id, on);
+    await logged({ shop, user, db }, on ? `Turned on the coming-soon page of “${product.title}” in the app` : `Turned off the coming-soon page of “${product.title}” in the app`, { href: `/admin/products/${product.id}` });
+    revalidatePath(`/admin/products/${product.id}`);
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: on ? "Saved. Shoppers see the price, a countdown and a box to be emailed when it's out." : "Saved. No coming-soon page." };
   },
   "POST products/:id/listing": async ({ params, shop }) => {
     const run = await writeListing(await agents(), shop, params.id!);
