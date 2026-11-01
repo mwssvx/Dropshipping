@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  getSupplierLink,
+  setProductSupplier,
   productSwatches,
   setSwatches,
   setQuantityBreaks,
@@ -3328,6 +3330,29 @@ const routes: Record<string, Handler> = {
     revalidatePath(`/s/${shop.handle}`, "layout");
     const sw = productSwatches(await getProduct(db, shop.id, params.id!));
     return { ok: true, message: `Saved. Buyers see these dots when they pick a ${(sw?.option ?? "colour").toLowerCase()}.` };
+  },
+  // Who sends a product: the supplier it came from, the merchant, or one of their own suppliers by email.
+  "GET products/:id/sent-by": async ({ params, db, shop }) => {
+    const product = await getProduct(db, shop.id, params.id!);
+    const [link, own] = await Promise.all([product.supplierId ? getSupplierLink(db, shop.id, product.supplierId) : undefined, listOwnSuppliers(db, shop.id)]);
+    const api = link && link.provider !== "email" ? supplierLabel(suppliers(), link) : null;
+    return {
+      giftCard: product.giftCard,
+      api,
+      current: link ? (link.provider === "email" ? link.id : "api") : "",
+      own: own.map((o) => ({ id: o.id, name: o.name })),
+    };
+  },
+  "PUT products/:id/sent-by": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ supplierId?: unknown }>(req);
+    const id = str(b.supplierId);
+    const product = await getProduct(db, shop.id, params.id!);
+    if (id === "api") return { ok: true, message: "Nothing changed." };
+    await setProductSupplier(db, shop.id, product.id, id || null);
+    const own = id ? (await listOwnSuppliers(db, shop.id)).find((o) => o.id === id) : null;
+    await logged({ shop, user, db }, own ? `Had ${own.name} send ${product.title}, in the app` : `Set ${product.title} to be sent by the store, in the app`, { href: `/admin/products/${product.id}` });
+    revalidatePath(`/admin/products/${product.id}`);
+    return { ok: true, message: own ? `Saved. Paid orders for it are emailed to ${own.name}, with a link where they add tracking.` : "Saved. You send it and add the tracking yourself." };
   },
   "POST products/:id/listing": async ({ params, shop }) => {
     const run = await writeListing(await agents(), shop, params.id!);

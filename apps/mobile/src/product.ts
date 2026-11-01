@@ -6,6 +6,7 @@ export type Product = {
   descriptionHtml: string;
   aiGenerated: boolean;
   sourceUrl: string | null;
+  updatedAt?: string;
   variants: { id: string; title: string; priceMinor: number; compareAtMinor: number | null; costMinor: number | null; stock: number | null; weightGrams: number | null; sku: string | null; contents?: { amount: number; unit: string } | null }[];
   /** Goes in a parcel, so it can have a weight. */
   ships: boolean;

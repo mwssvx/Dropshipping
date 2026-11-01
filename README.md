@@ -2244,3 +2244,7 @@ A product's Customs section in the app has "Ships from (country code)", for a su
 ### Colour dots in the app (after launch, part 441)
 
 A product with a colour option has "Color dots" on its screen in the app: names like Navy fill themselves in, and the rest are typed like #191970, with a dot showing each colour before you save.
+
+### Who sends it, in the app (after launch, part 442)
+
+A product's screen in the app has "Who sends it": the supplier it was imported from, you (adding tracking yourself), or one of your own suppliers, who then get its paid orders by email with a link to add tracking.
