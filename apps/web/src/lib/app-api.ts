@@ -56,6 +56,9 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  QUIZ_MAX_ANSWERS,
+  QUIZ_MAX_QUESTIONS,
+  setProductQuiz,
   setShopLanguages,
   translationSummary,
   LANGUAGES,
@@ -2091,6 +2094,30 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, "Changed the languages buyers can pick, in the app", { href: "/admin/languages" });
     return { ok: true, message: "Saved. Buyers can pick these languages at the bottom of the store." };
   },
+  // The product quiz at <store>/quiz: questions whose answers each lead to a product tag.
+  "GET quiz": async ({ db, shop }) => {
+    const [tags, store] = await Promise.all([productTags(db, shop.id), storeAddress(shop)]);
+    return { quiz: shop.productQuiz, tags: tags.map((t) => t.tag), url: `${store}/quiz`, maxQuestions: QUIZ_MAX_QUESTIONS, maxAnswers: QUIZ_MAX_ANSWERS };
+  },
+  "PUT quiz": async ({ req, db, shop, user }) => {
+    const b = await body<{ title?: unknown; intro?: unknown; on?: unknown; questions?: unknown }>(req);
+    const questions = (Array.isArray(b.questions) ? b.questions : []).map((q: { text?: unknown; answers?: unknown }) => ({
+      text: str(q?.text),
+      answers: (Array.isArray(q?.answers) ? q.answers : []).map((a: { label?: unknown; tag?: unknown }) => ({ label: str(a?.label), tag: str(a?.tag) })),
+    }));
+    const quiz = await setProductQuiz(db, shop.id, { title: str(b.title), intro: str(b.intro), on: b.on !== false, questions });
+    await logged({ shop, user, db }, "Saved the product quiz, in the app", { href: "/admin/quiz" });
+    revalidatePath("/admin/quiz");
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: quiz?.on ? "Saved. Shoppers can take the quiz now." : "Saved. The quiz is hidden from the store." };
+  },
+  "DELETE quiz": async ({ db, shop, user }) => {
+    await setProductQuiz(db, shop.id, null);
+    await logged({ shop, user, db }, "Removed the product quiz, in the app", { href: "/admin/quiz" });
+    revalidatePath("/admin/quiz");
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: "Quiz removed." };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -2910,6 +2937,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("redirects")) return "domains";
   if (path === "currencies") return "currencies";
   if (path === "languages") return "theme";
+  if (path === "quiz") return "marketing";
   if (path.startsWith("pricing")) return "products";
   if (path.startsWith("checkout-settings")) return "shipping";
   if (path === "local" || path.startsWith("local/")) return "shipping";

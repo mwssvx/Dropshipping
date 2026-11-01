@@ -80,6 +80,7 @@ export default function ProductsScreen() {
         <Row href="/size-charts" title="Size charts" subtitle="Measurements per size, on products or whole collections" />
         {can("collections") ? <Row href="/collections" title="Collections" subtitle="Groups of products buyers can browse" /> : null}
         {can("marketing") ? <Row href="/bundles" title="Bundles" subtitle="Products sold together for less" /> : null}
+        {can("marketing") ? <Row href="/quiz" title="Product quiz" subtitle="A few questions that point shoppers to the right products" /> : null}
         {can("suppliers") ? <Row href="/suppliers" title="Suppliers" subtitle="How each is doing, and your own wholesalers and makers" /> : null}
       </List>
     </Screen>
