@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  endEarlyAccess,
+  giveEarlyAccess,
   saleResults,
   setLowestPriceNote,
   DAILY_DEALS_MIN,
@@ -3700,7 +3702,7 @@ const routes: Record<string, Handler> = {
     const ended = all.filter((x) => x.status === "ended").slice(0, 5);
     const shown = [...all.filter((x) => x.status !== "ended"), ...ended];
     // How each sale that has started did, against the same number of days just before it.
-    const results = await saleResults(db, shop.id, shown);
+    const [results, store] = await Promise.all([saleResults(db, shop.id, shown), storeAddress(shop)]);
     const days = (n: number) => (n === 1 ? "1 day" : `${n} days`);
     const result = (id: string, running: boolean) => {
       const r = results.get(id);
@@ -3716,6 +3718,8 @@ const routes: Record<string, Handler> = {
     return {
       sales: shown.map((x) => ({
         result: result(x.id, x.status === "running"),
+        // A scheduled sale's early access code, with the link that applies it.
+        early: x.early ? { code: x.early.code, startsAt: x.early.startsAt, customerTag: x.early.customerTag, link: `${store}/discount/${x.early.code}` } : null,
         id: x.id,
         title: x.title,
         percentOff: x.percentOff,
@@ -3773,7 +3777,7 @@ const routes: Record<string, Handler> = {
   },
 
   "POST sales/:id": async ({ req, params, db, shop, user }) => {
-    const b = await body<{ action?: unknown; days?: unknown }>(req);
+    const b = await body<{ action?: unknown; days?: unknown; hours?: unknown; tag?: unknown }>(req);
     const sale = (await listSales(db, shop.id)).find((x) => x.id === params.id);
     if (!sale) throw new NotFoundError("Sale");
     let message: string;
@@ -3786,6 +3790,16 @@ const routes: Record<string, Handler> = {
       await endSale(db, shop.id, sale.id);
       message = sale.status === "scheduled" ? `${sale.title} won't start.` : `${sale.title} has ended. Prices are back to normal.`;
       await logged({ shop, user, db }, `Ended the sale ${sale.title} in the app`, { href: "/admin/sales" });
+    } else if (b.action === "early") {
+      const hours = typeof b.hours === "number" ? b.hours : Number.NaN;
+      const tag = str(b.tag).trim();
+      const d = await giveEarlyAccess(db, shop.id, sale.id, { hours, customerTag: tag || null });
+      message = `Early access is on with the code ${d.code}${tag ? `, for customers tagged “${tag}”` : ""}. Send them the link.`;
+      await logged({ shop, user, db }, `Gave early access to the sale ${sale.title} in the app`, { href: "/admin/sales" });
+    } else if (b.action === "end-early") {
+      await endEarlyAccess(db, shop.id, sale.id);
+      message = `Early access to ${sale.title} has stopped.`;
+      await logged({ shop, user, db }, `Stopped early access to the sale ${sale.title} in the app`, { href: "/admin/sales" });
     } else throw new HttpError(400, "Pick end or extend.");
     revalidatePath(`/s/${shop.handle}`, "layout");
     return { ok: true, message };

@@ -4498,3 +4498,38 @@ test("a sale scheduled for later from the app", async ({ page, browser }) => {
   await web.goto(`${WEB}/admin/sales`);
   await expect(web.getByRole("listitem", { name: "Basket week" })).toContainText(/Scheduled|Starts|starts/);
 });
+
+test("early access to a scheduled sale from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `ea${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Wool Throw");
+  await web.getByLabel("Price", { exact: true }).fill("60.00");
+  await web.getByLabel("Stock", { exact: true }).fill("6");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Sales", exact: true }).click();
+  await page.getByRole("textbox", { name: "Sale name" }).fill("Winter warm");
+  await page.getByRole("textbox", { name: "Percent off everything" }).fill("15");
+  await page.getByRole("tab", { name: "Later" }).click();
+  const d = new Date(Date.now() + 4 * 86_400_000);
+  await page.getByRole("textbox", { name: "Day" }).fill(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+  await page.getByRole("button", { name: "Schedule the sale" }).click();
+  await expect(page.getByText(/^Winter warm is scheduled/)).toBeVisible();
+
+  await page.getByRole("tab", { name: "1 day before" }).click();
+  await page.getByRole("textbox", { name: "Only customers tagged (optional)" }).fill("vip");
+  await page.getByRole("button", { name: "Give early access to Winter warm" }).click();
+  await expect(page.getByText(/^Early access is on with the code [A-Z0-9-]+, for customers tagged “vip”\. Send them the link\.$/)).toBeVisible();
+  await expect(page.getByText(/only for customers tagged “vip”\.$/)).toBeVisible();
+  await expect(page.getByText(/\/discount\/[A-Z0-9-]+$/)).toBeVisible();
+  await shot(page, "452-app-early-access");
+
+  await web.goto(`${WEB}/admin/sales`);
+  await expect(web.getByLabel("Early access to Winter warm")).toContainText("only for customers tagged “vip”");
+
+  await page.getByRole("button", { name: "Stop early access to Winter warm" }).click();
+  await expect(page.getByText("Early access to Winter warm has stopped.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Give early access to Winter warm" })).toBeVisible();
+});

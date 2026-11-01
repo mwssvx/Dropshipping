@@ -2284,3 +2284,7 @@ Each sale that has started shows its results on the app's Sales screen: orders, 
 ### Schedule a sale from the app (after launch, part 451)
 
 The app's "Start a sale" form has Starts: Now or Later. Pick a day and time on your phone's clock, and the sale starts and ends by itself.
+
+### Early access to a sale in the app (after launch, part 452)
+
+A scheduled sale's card in the app has "Give early access": pick when it opens (from now, or one to three days before) and, if you like, a customer tag such as vip. The app shows the code and a link to share, and you can stop it again.

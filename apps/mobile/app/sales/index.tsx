@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View } from "react-native";
+import { Share, View } from "react-native";
 import { send, useApi } from "../../src/api";
 import { when } from "../../src/format";
 import { BackLink, Banner, Body, Button, Card, EmptyState, Field, Heading, List, LoadError, Loading, Pill, Row, Screen, Section, Segmented, Toggle } from "../../src/ui";
@@ -15,6 +15,7 @@ type Sale = {
   endsAt: string | null;
   countdown: boolean;
   result?: { text: string; vs: string | null; tone: Tone } | null;
+  early?: { code: string; startsAt: string | null; customerTag: string | null; link: string } | null;
 };
 
 const LOWEST = [
@@ -149,6 +150,7 @@ export default function SalesScreen() {
                   {x.result.vs ? <Pill label={x.result.vs} tone={x.result.tone} /> : null}
                 </View>
               ) : null}
+              {x.status === "scheduled" ? <EarlyAccess sale={x} busy={busy} run={run} /> : null}
               {x.status !== "ended" ? (
                 <View style={{ flexDirection: "row", gap: space(2), flexWrap: "wrap" }}>
                   {x.endsAt ? (
@@ -182,5 +184,48 @@ export default function SalesScreen() {
         </Section>
       ) : null}
     </Screen>
+  );
+}
+
+const BEFORE = [
+  ["0", "From now"],
+  ["24", "1 day before"],
+  ["48", "2 days before"],
+  ["72", "3 days before"],
+] as const;
+
+/** A scheduled sale's early access: a code with the same percent off that stops when the sale starts. */
+function EarlyAccess({ sale: x, busy, run }: { sale: Sale; busy: string | null; run: (key: string, path: string, payload: unknown, label: string) => Promise<boolean> }) {
+  const [hours, setHours] = useState<(typeof BEFORE)[number][0]>("0");
+  const [tag, setTag] = useState("");
+  if (x.early) {
+    const e = x.early;
+    return (
+      <View style={{ gap: space(2) }}>
+        <Body>
+          {`Early access with the code ${e.code}${e.startsAt && new Date(e.startsAt) > new Date() ? `, from ${when(e.startsAt)}` : ""} until the sale starts${e.customerTag ? `, only for customers tagged “${e.customerTag}”` : ", for anyone with the link"}.`}
+        </Body>
+        <Body muted>{e.link}</Body>
+        <View style={{ flexDirection: "row", gap: space(2), flexWrap: "wrap" }}>
+          <Button label="Share the link" kind="secondary" a11y={`Share the early access link to ${x.title}`} onPress={() => void Share.share({ message: e.link })} />
+          <Button label="Stop early access" kind="ghost" a11y={`Stop early access to ${x.title}`} busy={busy === `noearly-${x.id}`} disabled={!!busy} onPress={() => void run(`noearly-${x.id}`, `sales/${x.id}`, { action: "end-early" }, `Stop early access to ${x.title}`)} />
+        </View>
+      </View>
+    );
+  }
+  return (
+    <View style={{ gap: space(2) }}>
+      <Body muted>{`Let subscribers or your best customers in first: a code with the same ${x.percentOff}% off that stops when the sale starts.`}</Body>
+      <Segmented label={`Early access to ${x.title} from`} options={BEFORE.map(([v, l]) => [v, l] as [typeof v, string])} value={hours} onChange={setHours} />
+      <Field label="Only customers tagged (optional)" value={tag} onChangeText={setTag} placeholder="vip" autoCapitalize="none" />
+      <Button
+        label="Give early access"
+        kind="secondary"
+        a11y={`Give early access to ${x.title}`}
+        busy={busy === `early-${x.id}`}
+        disabled={!!busy}
+        onPress={() => void run(`early-${x.id}`, `sales/${x.id}`, { action: "early", hours: Number(hours), tag: tag.trim() }, `Early access to ${x.title}`)}
+      />
+    </View>
   );
 }
