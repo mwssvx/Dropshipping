@@ -56,6 +56,10 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  reviewRewardStats,
+  reviewRequestStats,
+  setReviewReward,
+  setReviewRequestDays,
   PRODUCT_INFO_MAX,
   setProductInfo,
   setRecentSales,
@@ -2753,6 +2757,30 @@ const routes: Record<string, Handler> = {
     revalidatePath(`/s/${shop.handle}`, "layout");
     return { ok: true, message: "Saved. The notes show under every product's description." };
   },
+  "GET review-emails": async ({ db, shop }) => {
+    const [requests, reward] = await Promise.all([reviewRequestStats(db, shop.id), reviewRewardStats(db, shop.id)]);
+    return { currency: shop.currency, days: shop.reviewRequestDays, reminder: shop.reviewReminder, percent: shop.reviewRewardPercent, requests, reward };
+  },
+  "PUT review-emails/requests": async ({ req, db, shop, user }) => {
+    const b = await body<{ on?: unknown; days?: unknown; reminder?: unknown }>(req);
+    const days = b.on === true ? Number.parseInt(str(b.days), 10) : 0;
+    const reminder = days > 0 && b.reminder === true;
+    await setReviewRequestDays(db, shop.id, Number.isNaN(days) ? -1 : days, reminder);
+    await logged({ shop, user, db }, days ? `Set review requests to go out ${days} ${days === 1 ? "day" : "days"} after delivery, in the app` : "Turned off review requests in the app", { href: "/admin/reviews" });
+    revalidatePath("/admin/reviews");
+    return {
+      ok: true,
+      message: days ? `Saved. Buyers are asked ${days} ${days === 1 ? "day" : "days"} after their order arrives${reminder ? ", and reminded once a week later" : ""}.` : "Saved. Buyers aren't emailed for a review.",
+    };
+  },
+  "PUT review-emails/reward": async ({ req, db, shop, user }) => {
+    const b = await body<{ on?: unknown; percent?: unknown }>(req);
+    const percent = b.on === true ? Number.parseInt(str(b.percent), 10) : null;
+    await setReviewReward(db, shop.id, percent === null ? null : Number.isNaN(percent) ? -1 : percent);
+    await logged({ shop, user, db }, percent ? `Turned on a ${percent}% thank-you code for reviews, in the app` : "Turned off thank-you codes for reviews in the app", { href: "/admin/reviews#reward-heading" });
+    revalidatePath("/admin/reviews");
+    return { ok: true, message: percent ? `Saved. Buyers get ${percent}% off their next order for a review.` : "Saved. No thank-you code for reviews." };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -3615,6 +3643,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("shipping/")) return "shipping";
   if (path.startsWith("delivery-dates")) return "shipping";
   if (path.startsWith("product-pages")) return "products";
+  if (path.startsWith("review-emails")) return "reviews";
   if (path.startsWith("signup")) return "marketing";
   if (path.startsWith("gift-cards")) return "gift_cards";
   if (path.startsWith("sales")) return "marketing";

@@ -2196,3 +2196,7 @@ The app's Delivery dates screen has the same-day cutoff: orders in by the hour y
 ### Product pages in the app (after launch, part 429)
 
 The Products tab in the app has "Product pages": the "Only 3 left" note, the running-low email, sale, sold-out and new badges, where sold-out products go, Add to cart on cards, staying on the page after adding, share buttons, recent sales, and the notes under every product.
+
+### Review emails in the app (after launch, part 430)
+
+The app's Reviews screen links to "Review emails": turn the email asking buyers for a review on or off, pick how many days after their order arrives it goes out, add the one reminder a week later, and turn on a 5% to 30% thank-you code for reviewing, with how many were sent and used in the last 30 days.
