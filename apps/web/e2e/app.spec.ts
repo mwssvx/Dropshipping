@@ -2729,3 +2729,39 @@ test("the plan, what it cost and switching, from the app", async ({ page, browse
   await web.goto(`${WEB}/admin/plan`);
   await expect(web.getByRole("heading", { name: "You're on Starter" })).toBeVisible();
 });
+
+test("the pricing rule changed from the app, and products brought in line", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `pr${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/import`);
+  await web.getByRole("link", { name: /sunset projection lamp/i }).click();
+  await web.getByRole("button", { name: "Import and publish" }).click();
+  await expect(web.getByText("Imported and live on your store.")).toBeVisible();
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Pricing rule/ }).click();
+  const examples = page.getByRole("region", { name: "Examples" });
+  await expect(examples).toContainText(/Costs \$3\.00: sells for \$[\d.]+\.99/);
+  const off = page.getByRole("region", { name: "Products that don't follow the rule" });
+  await expect(off).toContainText("Every product with a known supplier cost already follows your rule.");
+
+  const times = page.getByRole("textbox", { name: "Times the supplier's cost" });
+  await times.fill("lots");
+  await page.getByRole("button", { name: "Save rule" }).click();
+  await expect(page.getByText("Enter how many times the cost, like 2.5.")).toBeVisible();
+  await times.fill("4");
+  await page.getByRole("tab", { name: ".00" }).click();
+  await page.getByRole("button", { name: "Save rule" }).click();
+  await expect(page.getByText("Saved. Products you import from now on start at these prices.")).toBeVisible();
+  await expect(examples).toContainText("Costs $3.00: sells for $12.00");
+  await expect(off).toContainText("1 product has prices your rule would change.");
+  await expect(off.getByRole("link", { name: /^Sunset Projection Lamp/ }).first()).toBeVisible();
+  await shot(page, "405-app-pricing");
+
+  await off.getByRole("button", { name: "Update 1 product…" }).click();
+  await off.getByRole("button", { name: "Update 1 product now" }).click();
+  await expect(page.getByText(/^Updated \d+ prices? on 1 product\.$/)).toBeVisible();
+  await expect(off).toContainText("Every product with a known supplier cost already follows your rule.");
+  await web.goto(`${WEB}/admin/pricing`);
+  await expect(web.getByText("Every product with a known supplier cost already follows your rule.")).toBeVisible();
+});

@@ -2096,3 +2096,7 @@ The Products tab in the app has an Inventory row: the stock the store keeps itse
 ### Plan in the app (after launch, part 404)
 
 Settings in the app has a Plan row. It shows the plan, what it cost over the last 30 days for the orders and sales the store had, and which plan would have cost least for the same sales, then lists every plan with what it would have cost. Switching asks once to confirm; a plan that needs a card opens the payment page in the browser and changes once the payment goes through.
+
+### Pricing rule in the app (after launch, part 405)
+
+The Products tab in the app has a Pricing rule row: set how an imported product's starting price comes from the supplier's cost (times the cost, or cost plus an amount), how prices end (.99, .95, .00 or as is), the lowest price and a crossed-out price, and see three example costs with the price and what you'd keep after fees. Products whose prices don't follow the rule are listed and can be updated all at once, after a confirm.
