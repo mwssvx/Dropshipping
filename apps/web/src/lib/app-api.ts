@@ -56,6 +56,14 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  setTipping,
+  setFreeGift,
+  setAddonActive,
+  deleteAddon,
+  createAddon,
+  freeGiftChoices,
+  MAX_ADDONS,
+  listAddons,
   removeDomain,
   setPrimaryDomain,
   checkDomain,
@@ -2316,6 +2324,71 @@ const routes: Record<string, Handler> = {
     revalidatePath("/admin/domains");
     return { ok: true, message: "Domain removed. Your free address still works." };
   },
+  // Checkout extras: one more product for a little less, a free gift over an amount, and tips.
+  "GET addons": async ({ db, shop }) => {
+    const [addons, products, gifts] = await Promise.all([listAddons(db, shop.id), bundleProductChoices(db, shop.id), freeGiftChoices(db, shop.id)]);
+    return {
+      currency: shop.currency,
+      max: MAX_ADDONS,
+      addons: addons.map((a) => ({ id: a.id, title: a.title, percentOff: a.percentOff, pitch: a.pitch, bought: a.bought, revenueMinor: a.revenueMinor, live: a.live, active: a.active })),
+      products: products.filter((p) => !addons.some((a) => a.productId === p.id)).map((p) => ({ id: p.id, title: p.title })),
+      gifts,
+      freeGift: shop.freeGift ? { variantId: shop.freeGift.variantId, min: (shop.freeGift.minSubtotalMinor / 100).toFixed(2) } : null,
+      tipping: shop.tipping,
+    };
+  },
+  "POST addons": async ({ req, db, shop, user }) => {
+    const b = await body<{ productId?: unknown; percentOff?: unknown; pitch?: unknown }>(req);
+    const pct = str(b.percentOff).trim();
+    await createAddon(db, shop.id, { productId: str(b.productId), percentOff: pct === "" ? 0 : Number(pct), pitch: str(b.pitch) });
+    revalidatePath("/admin/addons");
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    await logged({ shop, user, db }, "Added a checkout add-on, in the app", { href: "/admin/addons" });
+    return { ok: true, message: "Add-on saved. Buyers see it at checkout." };
+  },
+  "PUT addons/:id": async ({ req, params, db, shop }) => {
+    const b = await body<{ active?: unknown }>(req);
+    await setAddonActive(db, shop.id, params.id!, b.active === true);
+    revalidatePath("/admin/addons");
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: b.active === true ? "Add-on turned on." : "Add-on turned off." };
+  },
+  "DELETE addons/:id": async ({ params, db, shop }) => {
+    await deleteAddon(db, shop.id, params.id!);
+    revalidatePath("/admin/addons");
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: "Add-on deleted." };
+  },
+  "PUT free-gift": async ({ req, db, shop, user }) => {
+    const b = await body<{ on?: unknown; variantId?: unknown; min?: unknown }>(req);
+    const on = b.on === true;
+    if (on) {
+      let minSubtotalMinor = 0;
+      try {
+        minSubtotalMinor = parseMoney(str(b.min).trim().replace(/^[$€£¥₹]\s*/, ""));
+      } catch {
+        throw new UserError("Enter the order amount, like 75.00.");
+      }
+      await setFreeGift(db, shop.id, { variantId: str(b.variantId), minSubtotalMinor });
+    } else await setFreeGift(db, shop.id, null);
+    await logged({ shop, user, db }, on ? "Set a free gift for bigger orders, in the app" : "Turned off the free gift, in the app", { href: "/admin/addons#gift-heading" });
+    revalidatePath("/admin/addons");
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: on ? "Saved. Carts show how much more it takes, and the gift is added once they get there." : "Saved. Orders don't get a free gift." };
+  },
+  "PUT tips": async ({ req, db, shop, user }) => {
+    const b = await body<{ on?: unknown; percents?: unknown; note?: unknown }>(req);
+    let saved = null;
+    if (b.on === true) {
+      const percents = str(b.percents).split(/[,\s]+/).map((v) => v.trim().replace(/%$/, "")).filter(Boolean).map(Number);
+      if (percents.some((p) => !Number.isFinite(p))) throw new UserError("Enter each tip as a whole percentage, like 10.");
+      saved = await setTipping(db, shop.id, { percents, note: str(b.note) });
+    } else await setTipping(db, shop.id, null);
+    await logged({ shop, user, db }, saved ? "Asked for tips at checkout, in the app" : "Stopped asking for tips, in the app", { href: "/admin/addons#tips-heading" });
+    revalidatePath("/admin/addons");
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: saved ? "Saved. Checkout asks buyers if they'd like to tip." : "Saved. Checkout doesn't ask for tips." };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -3137,6 +3210,7 @@ function routeArea(key: string): Area | null {
   if (path === "currencies") return "currencies";
   if (path === "languages") return "theme";
   if (path === "quiz") return "marketing";
+  if (path === "addons" || path.startsWith("addons/") || path === "free-gift" || path === "tips") return "marketing";
   if (path === "search-listings") return "products";
   if (path === "taxes" || path.startsWith("taxes/")) return "taxes";
   if (path === "invoices") return "taxes";

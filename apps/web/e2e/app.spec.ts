@@ -3263,3 +3263,56 @@ test("custom domains connected and swapped from the app", async ({ page, browser
   await expect(web.getByRole("heading", { name: `www.${id}.com` })).toBeVisible();
   await expect(web.getByRole("heading", { name: `shop.${id}.com` })).toHaveCount(0);
 });
+
+test("checkout add-ons, free gift and tips set from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `ad${Date.now()}`);
+  for (const [title, price] of [["Phone Stand", "12.00"], ["Beeswax Candle", "8.00"]] as const) {
+    await web.goto(`${WEB}/admin/products/new`);
+    await web.getByLabel("Title").fill(title);
+    await web.getByLabel("Price", { exact: true }).fill(price);
+    await web.getByRole("button", { name: "Save product" }).click();
+    await expect(web.getByText("Product added.")).toBeVisible();
+  }
+
+  await signIn(page, email);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("link", { name: /^Add-ons, free gift and tips/ }).click();
+  await expect(page.getByText("No add-ons yet")).toBeVisible();
+  await page.getByRole("textbox", { name: "Product to offer" }).fill("stand");
+  await page.getByRole("button", { name: "Pick Phone Stand" }).click();
+  await page.getByRole("textbox", { name: "One line for buyers (optional)" }).fill("Keeps your phone up");
+  await page.getByRole("button", { name: "Add add-on" }).click();
+  await expect(page.getByText("Add-on saved. Buyers see it at checkout.")).toBeVisible();
+  await expect(page.getByText("Phone Stand · 10% off")).toBeVisible();
+  await expect(page.getByText("At checkout", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Turn off Phone Stand" }).click();
+  await expect(page.getByText("Add-on turned off.")).toBeVisible();
+  await expect(page.getByText("Off", { exact: true })).toBeVisible();
+
+  const gift = page.getByRole("region", { name: "Free gift" });
+  await gift.getByRole("switch", { name: "Give a free gift with bigger orders" }).click();
+  await gift.getByRole("button", { name: /^Pick Beeswax Candle/ }).click();
+  await gift.getByRole("textbox", { name: /^For orders over/ }).fill("fifty");
+  await gift.getByRole("button", { name: "Save free gift" }).click();
+  await expect(page.getByText("Enter the order amount, like 75.00.")).toBeVisible();
+  await gift.getByRole("textbox", { name: /^For orders over/ }).fill("50");
+  await gift.getByRole("button", { name: "Save free gift" }).click();
+  await expect(page.getByText("Saved. Carts show how much more it takes, and the gift is added once they get there.")).toBeVisible();
+
+  const tips = page.getByRole("region", { name: "Tips" });
+  await tips.getByRole("switch", { name: "Ask for a tip at checkout" }).click();
+  await tips.getByRole("textbox", { name: "Tip choices (% of the order)" }).fill("5, 10");
+  await tips.getByRole("button", { name: "Save tips" }).click();
+  await expect(page.getByText("Saved. Checkout asks buyers if they'd like to tip.")).toBeVisible();
+  await shot(page, "420-app-addons");
+
+  await web.goto(`${WEB}/admin/addons`);
+  await expect(web.getByRole("listitem", { name: "Phone Stand" })).toContainText("Off");
+  await expect(web.getByLabel("For orders over")).toHaveValue("50.00");
+  await expect(web.getByLabel("Tip choice 1")).toHaveValue("5");
+  await expect(web.getByLabel("Tip choice 2")).toHaveValue("10");
+
+  await page.getByRole("button", { name: "Delete Phone Stand" }).click();
+  await expect(page.getByText("Add-on deleted.")).toBeVisible();
+  await expect(page.getByText("No add-ons yet").last()).toBeVisible();
+});
