@@ -2264,3 +2264,7 @@ A shipped order's screen in the app has "Send a replacement", for a parcel that 
 ### Change an order in the app (after launch, part 446)
 
 A paid order that hasn't shipped has "Change the order" on its screen in the app: fix the street, city, postal code or phone, or swap an item for another size at the same price. We cancel the supplier order, place it again with the change, and email the customer. Moving it to another country still means cancelling the order.
+
+### Move a pickup or delivery day in the app (after launch, part 447)
+
+A pickup or local delivery with a day has "Move to another day…" on its screen in the app. Pick any day from today to the end of the buyer's window, and the buyer is emailed the new day, the same as on the website.
