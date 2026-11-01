@@ -2116,3 +2116,7 @@ Once pickup or local delivery is on, the same screen in the app has "Pickup and 
 ### Profit report in the app (after launch, part 409)
 
 The Money tab has a "Profit report" row: the same report as the web's Profit page, for the last 7, 30 or 90 days. It shows sales, supplier costs, fees, ads, profit and the break-even ROAS, then every product's profit with its ROAS, flagging products with no cost and products losing money on ads. Add ad spend for a day, a channel and (optionally) one product with a note, and remove an entry you got wrong.
+
+### Size charts in the app (after launch, part 410)
+
+The Products tab has a "Size charts" row. Start a chart by name, then type its table on the phone: the columns split by commas, and one size per line with its measurements in column order (a line pasted from a spreadsheet works too, and a short line gets empty cells to fill in later). Pick centimetres or inches, add a note, attach it to products and collections, hide it from the store or delete it.
