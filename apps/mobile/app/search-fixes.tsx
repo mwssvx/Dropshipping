@@ -1,3 +1,4 @@
+import { useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
 import { api, useApi } from "../src/api";
@@ -13,7 +14,9 @@ type Data = { fixes: { from: string; to: string }[]; nothing: { term: string; se
  */
 export default function SearchFixesScreen() {
   const data = useApi<Data>("search-fixes");
-  const [from, setFrom] = useState("");
+  // From Analytics: a search that found nothing, to fix.
+  const params = useLocalSearchParams<{ from?: string }>();
+  const [from, setFrom] = useState(params.from ?? "");
   const [to, setTo] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{ tone: "success" | "critical"; text: string } | null>(null);

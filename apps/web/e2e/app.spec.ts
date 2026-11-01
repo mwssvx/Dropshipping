@@ -2626,3 +2626,26 @@ test("store pages and policies added and edited from the app", async ({ page, br
   await page.goto("/notices");
   await expect(badge.getByRole("listitem", { name: /^A returns policy buyers can read: met/ })).toBeVisible();
 });
+
+test("what shoppers search for, on the app's Analytics screen", async ({ page, browser }) => {
+  const id = `sr${Date.now()}`;
+  const { email } = await merchant(browser, id);
+  const buyer = await (await browser.newContext()).newPage();
+  for (const q of ["night light", "night light", "lampshade"]) {
+    await buyer.goto(`${WEB}/s/pocket-shop-${id}/search?q=${encodeURIComponent(q)}`);
+    await expect(buyer.getByRole("heading", { level: 1 })).toBeVisible();
+  }
+
+  await signIn(page, email);
+  await page.goto("/analytics");
+  const searches = page.getByRole("region", { name: "What shoppers search for" });
+  await expect(async () => {
+    await page.reload();
+    await expect(searches.getByText("3 searches, 100% found nothing.")).toBeVisible({ timeout: 1000 });
+  }).toPass();
+  await expect(searches.getByText("2 searches", { exact: true })).toBeVisible();
+  await shot(page, "401-app-search-report");
+  await searches.getByRole("link", { name: "Fix the search “lampshade”" }).click();
+  await expect(page).toHaveURL(/\/search-fixes\?from=lampshade$/);
+  await expect(page.getByRole("textbox", { name: "When shoppers search for" })).toHaveValue("lampshade");
+});

@@ -18,6 +18,7 @@ type Report = {
   salesBySource: { source: string; orders: number; salesMinor: number }[];
   sources: { source: string; visitors: number }[];
   busiest: { day: string; part: string } | null;
+  searches: { total: number; nothingShare: number | null; top: { term: string; searches: number; results: number }[]; nothing: { term: string; searches: number }[] };
 };
 type Days = "7" | "30" | "90";
 
@@ -131,6 +132,36 @@ export default function AnalyticsScreen() {
               <Body muted>Add ?utm_source=instagram to the links you post to see each one here.</Body>
             </Section>
           ) : null}
+          <Section title="What shoppers search for">
+            {r.searches.total === 0 ? (
+              <Body muted>Words shoppers type into your store's search box show here. Only the words are kept, never who searched.</Body>
+            ) : (
+              <>
+                <Body muted>{`${r.searches.total === 1 ? "1 search" : `${r.searches.total} searches`}, ${pct(r.searches.nothingShare)} found nothing.`}</Body>
+                <List>
+                  {r.searches.top.map((t) => (
+                    <Row key={t.term} title={t.term} subtitle={t.results === 1 ? "1 result" : `${t.results} results`} right={<Text style={{ color: color.ink }}>{`${t.searches} ${t.searches === 1 ? "search" : "searches"}`}</Text>} />
+                  ))}
+                </List>
+                {r.searches.nothing.length ? (
+                  <>
+                    <Heading>Found nothing</Heading>
+                    <List>
+                      {r.searches.nothing.map((t) => (
+                        <Row
+                          key={t.term}
+                          href={can("products") ? (`/search-fixes?from=${encodeURIComponent(t.term)}` as never) : undefined}
+                          title={t.term}
+                          subtitle={`${t.searches === 1 ? "1 search" : `${t.searches} searches`}${can("products") ? " · Fix it" : ""}`}
+                          a11y={can("products") ? `Fix the search “${t.term}”` : undefined}
+                        />
+                      ))}
+                    </List>
+                  </>
+                ) : null}
+              </>
+            )}
+          </Section>
           {can("marketing") ? (
             <List>
               <Row href="/survey" title="How buyers found you" subtitle="The buyer survey on the order page, and what they answered" />
