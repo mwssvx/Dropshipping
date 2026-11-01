@@ -56,6 +56,11 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  SHIPPING_SURCHARGE_MAX,
+  PRODUCT_PROCESSING_MAX,
+  setBlockedCountries,
+  setShippingSurcharge,
+  setProductProcessingDays,
   BUYER_EDIT_HOURS,
   RISK_HOLD_LABELS,
   setRiskHold,
@@ -564,6 +569,15 @@ const productView = (p: ProductRow) => ({
   /** The least and most a buyer can order. */
   purchaseLimit: p.purchaseLimit,
   tags: p.tags,
+  giftCard: p.giftCard,
+  digital: p.digital,
+  /** Days it takes to get ready before it ships; null uses the store's. */
+  processingDays: p.processingDays,
+  /** What each one adds to shipping, for bulky things. */
+  shippingSurchargeMinor: p.shippingSurchargeMinor,
+  /** Countries it can't be shipped to. */
+  blockedCountries: p.blockedCountries,
+  blockedCountryNames: p.blockedCountries.map(countryName),
 });
 
 const customerView = (p: Awaited<ReturnType<typeof getCustomerProfile>>) => ({
@@ -3126,6 +3140,37 @@ const routes: Record<string, Handler> = {
     // Where it ships from stays as it is: that's set on the website.
     await setCustomsInfo(db, shop.id, params.id!, { hsCode: str(b.hsCode), originCountry: str(b.originCountry) });
     return productView(await getProduct(db, shop.id, params.id!));
+  },
+  // Shipping for one product: preparing time, extra shipping and countries it can't go to.
+  // Each is checked before any is saved, since the setters each write on their own.
+  "PUT products/:id/shipping": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ processingDays?: unknown; surcharge?: unknown; blockedCountries?: unknown }>(req);
+    const product = await getProduct(db, shop.id, params.id!);
+    if (product.giftCard) throw new UserError("Gift cards aren't shipped.");
+    const rawDays = str(b.processingDays).trim();
+    const days = rawDays === "" ? null : /^\d+$/.test(rawDays) ? Number(rawDays) : NaN;
+    if (days !== null && !(days >= 0 && days <= PRODUCT_PROCESSING_MAX)) throw new UserError(`Enter 0 to ${PRODUCT_PROCESSING_MAX} days to get it ready, or leave it empty for your store's.`);
+    const rawSurcharge = str(b.surcharge).trim();
+    let surcharge = 0;
+    if (rawSurcharge) {
+      try {
+        surcharge = parseMoney(rawSurcharge);
+      } catch {
+        throw new UserError("Enter the extra shipping like 15 or 15.50.");
+      }
+      if (surcharge < 0 || surcharge > SHIPPING_SURCHARGE_MAX) throw new UserError("Enter extra shipping from 0 to 1,000, or leave it empty for none.");
+    }
+    const countries = str(b.blockedCountries).split(/[\s,]+/).map((c) => c.trim().toUpperCase()).map((c) => (c === "UK" ? "GB" : c)).filter(Boolean);
+    const unknown = countries.find((c) => !(SHIPPING_COUNTRIES as readonly string[]).includes(c));
+    if (unknown) throw new UserError(`${unknown} isn't a country code the store ships to. Use two letters, like GB or AU.`);
+    if (!product.digital) {
+      await setProductProcessingDays(db, shop.id, product.id, days);
+      await setShippingSurcharge(db, shop.id, product.id, surcharge);
+    }
+    await setBlockedCountries(db, shop.id, product.id, countries);
+    await logged({ shop, user, db }, `Changed shipping for ${product.title} in the app`, { href: `/admin/products/${product.id}` });
+    revalidatePath(`/admin/products/${product.id}`);
+    return { ok: true, message: "Shipping for this product saved.", product: productView(await getProduct(db, shop.id, product.id)) };
   },
   "POST products/:id/listing": async ({ params, shop }) => {
     const run = await writeListing(await agents(), shop, params.id!);

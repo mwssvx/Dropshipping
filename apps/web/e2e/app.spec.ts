@@ -3751,3 +3751,46 @@ test("risk check and buyer cancellations, from the app", async ({ page, browser 
   await web.reload();
   await expect(web.locator("#hold")).toHaveValue("off");
 });
+
+test("preparing time, extra shipping and blocked countries for a product, from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `ps${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Oak Side Table");
+  await web.getByLabel("Price", { exact: true }).fill("180.00");
+  await web.getByLabel("Stock", { exact: true }).fill("4");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const productUrl = web.url();
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Oak Side Table/ }).click();
+  const ship = page.getByRole("region", { name: "Shipping this product" });
+
+  // Nothing is saved when one box is wrong.
+  await ship.getByRole("textbox", { name: "Days to get it ready" }).fill("5");
+  await ship.getByRole("textbox", { name: /^Extra shipping for each one/ }).fill("25");
+  await ship.getByRole("textbox", { name: "Can't ship to (country codes)" }).fill("au, zz");
+  await ship.getByRole("button", { name: "Save shipping" }).click();
+  await expect(page.getByText("ZZ isn't a country code the store ships to. Use two letters, like GB or AU.")).toBeVisible();
+  await ship.getByRole("textbox", { name: "Can't ship to (country codes)" }).fill("au, jp");
+  await ship.getByRole("button", { name: "Save shipping" }).click();
+  await expect(page.getByText("Shipping for this product saved.")).toBeVisible();
+  await expect(ship.getByText("Doesn't ship to Australia, Japan.")).toBeVisible();
+  await shot(page, "433-app-product-shipping");
+
+  await web.goto(productUrl);
+  await expect(web.locator("#product-processing")).toHaveValue("5");
+  await expect(web.locator("#product-surcharge")).toHaveValue("25.00");
+  await expect(web.getByRole("note").filter({ hasText: "Doesn't ship to" })).toHaveText("Doesn't ship to Australia, Japan.");
+
+  // Emptying the boxes goes back to the store's preparing time, no extra and everywhere.
+  await ship.getByRole("textbox", { name: "Days to get it ready" }).fill("");
+  await ship.getByRole("textbox", { name: /^Extra shipping for each one/ }).fill("");
+  await ship.getByRole("textbox", { name: "Can't ship to (country codes)" }).fill("");
+  await ship.getByRole("button", { name: "Save shipping" }).click();
+  await expect(page.getByText("Doesn't ship to Australia, Japan.")).toHaveCount(0);
+  await web.reload();
+  await expect(web.locator("#product-processing")).toHaveValue("");
+  await expect(web.locator("#product-surcharge")).toHaveValue("");
+});
