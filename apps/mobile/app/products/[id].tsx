@@ -239,6 +239,7 @@ export default function ProductScreen() {
       <BackupSection product={p} busy={busy} act={act} currency={cur} />
       <PreorderSection product={p} busy={busy} act={act} />
       <LimitsSection product={p} busy={busy} act={act} />
+      {p.giftCard ? null : <BreaksSection product={p} busy={busy} act={act} />}
       {p.giftCard ? null : <ShippingSection product={p} busy={busy} act={act} currency={cur} />}
       {p.giftCard ? null : <AgeSection product={p} busy={busy} act={act} />}
       {p.giftCard ? null : <ReorderSection product={p} busy={busy} act={act} />}
@@ -550,6 +551,43 @@ function LaunchSection({ product: p, busy, act }: { product: Product; busy: stri
             <Body muted>At its usual address: the price, a countdown and a box to be emailed the moment it's out.</Body>
           </>
         ) : null}
+      </Card>
+    </Section>
+  );
+}
+
+const BREAK_ROWS = 3;
+
+/** Buyers who take more of this product pay less for each one: up to three steps. */
+function BreaksSection({ product: p, busy, act }: { product: Product; busy: string | null; act: Act }) {
+  const saved = Array.from({ length: BREAK_ROWS }, (_, i) => {
+    const t = p.quantityBreaks?.[i];
+    return { minQty: t ? String(t.minQty) : "", percentOff: t ? String(t.percentOff) : "" };
+  });
+  const [edit, setEdit] = useState<typeof saved | null>(null);
+  const rows = edit ?? saved;
+  useEffect(() => setEdit(null), [p]);
+  const set = (i: number, patch: Partial<(typeof saved)[number]>) => setEdit(rows.map((r, n) => (n === i ? { ...r, ...patch } : r)));
+  return (
+    <Section title="Quantity discounts">
+      <Card>
+        <Body muted>Buyers who take more of this product pay less for each one. Different options count together. Wholesale buyers get your wholesale price instead. Leave a row empty to skip it.</Body>
+        {rows.map((r, i) => (
+          <View key={i} style={{ flexDirection: "row", gap: space(2) }}>
+            <View style={{ flex: 1 }}>
+              <Field label={`Buy at least (${i + 1})`} value={r.minQty} onChangeText={(v) => set(i, { minQty: v })} keyboardType="number-pad" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Field label={`Percent off (${i + 1})`} value={r.percentOff} onChangeText={(v) => set(i, { percentOff: v })} keyboardType="number-pad" />
+            </View>
+          </View>
+        ))}
+        <Button
+          label="Save quantity discounts"
+          busy={busy === "breaks"}
+          disabled={!!busy || edit === null}
+          onPress={() => act("breaks", async () => (await api<{ message: string }>(`products/${p.id}/quantity-breaks`, { method: "PUT", body: { tiers: rows } })).message)}
+        />
       </Card>
     </Section>
   );

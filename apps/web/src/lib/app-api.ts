@@ -56,6 +56,7 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  setQuantityBreaks,
   BADGE_MAX_LENGTH,
   setComingSoon,
   schedulePublish,
@@ -607,6 +608,8 @@ const productView = (p: ProductRow) => ({
   publishAt: p.publishAt,
   /** Whether that draft shows a coming-soon page until then. */
   comingSoon: p.comingSoon,
+  /** Buy this many or more, save this percent on each. */
+  quantityBreaks: p.quantityBreaks,
 });
 
 const customerView = (p: Awaited<ReturnType<typeof getCustomerProfile>>) => ({
@@ -3296,6 +3299,18 @@ const routes: Record<string, Handler> = {
     revalidatePath(`/admin/products/${product.id}`);
     revalidatePath(`/s/${shop.handle}`, "layout");
     return { ok: true, message: on ? "Saved. Shoppers see the price, a countdown and a box to be emailed when it's out." : "Saved. No coming-soon page." };
+  },
+  "PUT products/:id/quantity-breaks": async ({ req, params, db, shop }) => {
+    const b = await body<{ tiers?: unknown }>(req);
+    if (!Array.isArray(b.tiers)) throw new UserError("Send the discounts as a list.");
+    const tiers = b.tiers
+      .map((t: Record<string, unknown>) => ({ q: str(t.minQty).trim(), p: str(t.percentOff).trim() }))
+      .filter((r) => r.q || r.p)
+      .map((r) => ({ minQty: Number.parseInt(r.q, 10) || 0, percentOff: Number.parseInt(r.p, 10) || 0 }));
+    await setQuantityBreaks(db, shop.id, params.id!, tiers);
+    revalidatePath(`/admin/products/${params.id}`);
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: tiers.length ? "Quantity discounts saved." : "Saved. No quantity discounts on this product." };
   },
   "POST products/:id/listing": async ({ params, shop }) => {
     const run = await writeListing(await agents(), shop, params.id!);

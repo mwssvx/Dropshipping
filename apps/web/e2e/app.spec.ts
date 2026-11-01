@@ -4005,3 +4005,50 @@ test("a badge, and a draft put on sale later with a coming-soon page, from the a
   await web.reload();
   await expect(web.locator("#publish-at")).toHaveValue("");
 });
+
+test("quantity discounts for a product, from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `qb${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Bamboo Straws");
+  await web.getByLabel("Price", { exact: true }).fill("8.00");
+  await web.getByLabel("Stock", { exact: true }).fill("100");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const productUrl = web.url();
+  const store = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Bamboo Straws/ }).click();
+  const breaks = page.getByRole("region", { name: "Quantity discounts" });
+
+  // A bigger quantity needs a bigger discount.
+  await breaks.getByRole("textbox", { name: "Buy at least (1)" }).fill("2");
+  await breaks.getByRole("textbox", { name: "Percent off (1)" }).fill("10");
+  await breaks.getByRole("textbox", { name: "Buy at least (2)" }).fill("5");
+  await breaks.getByRole("textbox", { name: "Percent off (2)" }).fill("5");
+  await breaks.getByRole("button", { name: "Save quantity discounts" }).click();
+  await expect(page.getByText("Bigger quantities should get bigger discounts.")).toBeVisible();
+  await breaks.getByRole("textbox", { name: "Percent off (2)" }).fill("15");
+  await breaks.getByRole("button", { name: "Save quantity discounts" }).click();
+  await expect(page.getByText("Quantity discounts saved.")).toBeVisible();
+  await shot(page, "439-app-quantity-breaks");
+
+  await web.goto(productUrl);
+  await expect(web.getByLabel("Quantity 2")).toHaveValue("5");
+  await expect(web.getByLabel("Percent off 2")).toHaveValue("15");
+  await web.goto(store);
+  const tiers = web.getByRole("region", { name: "Buy more, save more" });
+  await expect(tiers).toContainText("Buy 2 or more, save 10%");
+  await expect(tiers).toContainText("Buy 5 or more, save 15%");
+
+  // Emptying every row removes them.
+  for (const n of [1, 2]) {
+    await breaks.getByRole("textbox", { name: `Buy at least (${n})` }).fill("");
+    await breaks.getByRole("textbox", { name: `Percent off (${n})` }).fill("");
+  }
+  await breaks.getByRole("button", { name: "Save quantity discounts" }).click();
+  await expect(page.getByText("Saved. No quantity discounts on this product.")).toBeVisible();
+  await web.reload();
+  await expect(web.getByRole("region", { name: "Buy more, save more" })).toHaveCount(0);
+});
