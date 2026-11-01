@@ -2329,3 +2329,27 @@ test("gift cards put on sale from the app", async ({ page, browser }) => {
   await page.goto("/holiday-checklist");
   await expect(page.getByRole("region", { name: "Done" }).getByRole("button", { name: "Sell gift cards, done" })).toBeVisible();
 });
+
+test("delivery dates set from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `dd${Date.now()}`);
+  await signIn(page, email);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("link", { name: /^Delivery dates/ }).click();
+  await expect(page.getByRole("heading", { name: "Delivery dates", level: 1 })).toBeVisible();
+  await expect(page.getByRole("switch", { name: "Show delivery dates" })).toBeChecked();
+  await page.getByRole("textbox", { name: "Days to get an order ready" }).fill("20");
+  await page.getByRole("button", { name: "Save delivery dates" }).click();
+  await expect(page.getByText("Processing time is between 0 and 14 days.")).toBeVisible();
+  await page.getByRole("textbox", { name: "Days to get an order ready" }).fill("3");
+  await page.getByRole("button", { name: "Save delivery dates" }).click();
+  await expect(page.getByText("Saved. Product pages, the cart and receipts say when orders arrive.")).toBeVisible();
+  await shot(page, "394-app-delivery-dates");
+  await web.goto(`${WEB}/admin/shipping`);
+  await expect(web.getByLabel("Processing days")).toHaveValue("3");
+
+  await page.getByRole("switch", { name: "Show delivery dates" }).click();
+  await page.getByRole("button", { name: "Save delivery dates" }).click();
+  await expect(page.getByText("Saved. Buyers don't see delivery dates.")).toBeVisible();
+  await page.goto("/holiday-checklist");
+  await expect(page.getByRole("region", { name: "To do" }).getByRole("button", { name: "Show delivery dates" })).toBeVisible();
+});

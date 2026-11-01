@@ -56,6 +56,7 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  setDeliveryEstimates,
   createGiftCardProduct,
   giftCardProduct,
   setHolidayReturns,
@@ -1490,6 +1491,16 @@ const routes: Record<string, Handler> = {
         : `Saved. Every order has your usual ${shop.returnWindowDays} days to come back.`,
     };
   },
+  // Delivery dates: product pages, the cart, checkout and receipts say when orders arrive.
+  "GET delivery-dates": async ({ shop }) => ({ on: shop.deliveryEstimates, processingDays: shop.processingDays }),
+  "PUT delivery-dates": async ({ req, db, shop, user }) => {
+    const b = await body<{ on?: unknown; processingDays?: unknown }>(req);
+    const days = str(b.processingDays).trim();
+    const saved = await setDeliveryEstimates(db, shop.id, { enabled: b.on === true, processingDays: days === "" ? Number.NaN : Number(days) });
+    await logged({ shop, user, db }, saved.enabled ? `Turned on delivery dates, ${saved.processingDays} days to get ready, in the app` : "Turned off delivery dates in the app", { href: "/admin/shipping#delivery-heading" });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: saved.enabled ? "Saved. Product pages, the cart and receipts say when orders arrive." : "Saved. Buyers don't see delivery dates." };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -1531,6 +1542,7 @@ const routes: Record<string, Handler> = {
       sale: { path: "/sales", area: "marketing" },
       "gift-guides": { path: "/collections", area: "collections" },
       "gift-wrap": { path: "/gift-wrap", area: "shipping" },
+      delivery: { path: "/delivery-dates", area: "shipping" },
       returns: { path: "/holiday-returns", area: "returns" },
       "gift-cards": { path: "/gift-cards", area: "gift_cards" },
       popup: { path: "/signup", area: "marketing" },
@@ -2230,6 +2242,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("late-emails")) return "shipping";
   if (path.startsWith("holiday-date")) return "shipping";
   if (path.startsWith("gift-wrap")) return "shipping";
+  if (path.startsWith("delivery-dates")) return "shipping";
   if (path.startsWith("signup")) return "marketing";
   if (path.startsWith("gift-cards")) return "gift_cards";
   if (path.startsWith("sales")) return "marketing";
