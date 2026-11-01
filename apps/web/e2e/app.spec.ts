@@ -3794,3 +3794,46 @@ test("preparing time, extra shipping and blocked countries for a product, from t
   await expect(web.locator("#product-processing")).toHaveValue("");
   await expect(web.locator("#product-surcharge")).toHaveValue("");
 });
+
+test("age check and reorder reminder for a product, from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `ar${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Cold Brew Beans");
+  await web.getByLabel("Price", { exact: true }).fill("16.00");
+  await web.getByLabel("Stock", { exact: true }).fill("30");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const productUrl = web.url();
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Cold Brew Beans/ }).click();
+
+  const age = page.getByRole("region", { name: "Age check" });
+  await age.getByRole("textbox", { name: "Buyers must be at least" }).fill("30");
+  await age.getByRole("button", { name: "Save age check" }).click();
+  await expect(page.getByText("Pick an age from 13 to 25, or none.")).toBeVisible();
+  await age.getByRole("textbox", { name: "Buyers must be at least" }).fill("21");
+  await age.getByRole("button", { name: "Save age check" }).click();
+  await expect(page.getByText("Saved. Buyers confirm they're 21 or older at checkout.")).toBeVisible();
+
+  const reorder = page.getByRole("region", { name: "Reorder reminder" });
+  await reorder.getByRole("textbox", { name: "It usually lasts (days)" }).fill("3");
+  await reorder.getByRole("button", { name: "Save reorder reminder" }).click();
+  await expect(page.getByText("Pick 7 to 180 days, or no reminder.")).toBeVisible();
+  await reorder.getByRole("textbox", { name: "It usually lasts (days)" }).fill("25");
+  await reorder.getByRole("button", { name: "Save reorder reminder" }).click();
+  await expect(page.getByText("Saved. Buyers are asked if they're running low 25 days after it arrives.")).toBeVisible();
+  await shot(page, "434-app-age-reorder");
+
+  // 25 isn't one of the website's usual choices, so it's added to the list there.
+  await web.goto(productUrl);
+  await expect(web.locator("#min-age")).toHaveValue("21");
+  await expect(web.locator("#reorder-days")).toHaveValue("25");
+
+  await age.getByRole("textbox", { name: "Buyers must be at least" }).fill("");
+  await age.getByRole("button", { name: "Save age check" }).click();
+  await expect(page.getByText("Saved. Buyers of any age can order it.")).toBeVisible();
+  await web.reload();
+  await expect(web.locator("#min-age")).toHaveValue("");
+});

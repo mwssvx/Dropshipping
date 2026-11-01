@@ -2212,3 +2212,7 @@ The Orders tab in the app has "Order settings": pick which risky orders wait for
 ### Shipping a product, in the app (after launch, part 433)
 
 A product's screen in the app has "Shipping this product": extra days to get it ready for things made to order, extra shipping for each one of a bulky thing, and the countries it can't be sent to, typed as two-letter codes. Nothing is saved when one of them is wrong.
+
+### Age check and reorder reminder in the app (after launch, part 434)
+
+A product's screen in the app has "Age check", the minimum age buyers confirm at checkout for things like alcohol or knives, and "Reorder reminder", the days it usually lasts before buyers get one "running low?" email.

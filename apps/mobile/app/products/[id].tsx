@@ -234,6 +234,8 @@ export default function ProductScreen() {
       <PreorderSection product={p} busy={busy} act={act} />
       <LimitsSection product={p} busy={busy} act={act} />
       {p.giftCard ? null : <ShippingSection product={p} busy={busy} act={act} currency={cur} />}
+      {p.giftCard ? null : <AgeSection product={p} busy={busy} act={act} />}
+      {p.giftCard ? null : <ReorderSection product={p} busy={busy} act={act} />}
 
       <Section title="On your store">
         {p.status === "active" ? (
@@ -328,6 +330,40 @@ function ShippingSection({ product: p, busy, act, currency }: { product: Product
           disabled={!!busy || !edit}
           onPress={() => act("shipping", async () => (await api<{ message: string }>(`products/${p.id}/shipping`, { method: "PUT", body: s })).message)}
         />
+      </Card>
+    </Section>
+  );
+}
+
+/** The legal minimum age buyers confirm at checkout, for things like alcohol or knives. */
+function AgeSection({ product: p, busy, act }: { product: Product; busy: string | null; act: Act }) {
+  const saved = p.minAge == null ? "" : String(p.minAge);
+  const [edit, setEdit] = useState<string | null>(null);
+  const v = edit ?? saved;
+  useEffect(() => setEdit(null), [p]);
+  return (
+    <Section title="Age check">
+      <Card>
+        <Body muted>For alcohol, vapes, knives and anything else with a legal minimum age. Buyers tick a box at checkout to say they're old enough, and the order shows it so you can ask the courier to check ID.</Body>
+        <Field label="Buyers must be at least" value={v} onChangeText={setEdit} keyboardType="number-pad" placeholder="Any age" hint="An age from 13 to 25. Leave it empty for any age." />
+        <Button label="Save age check" busy={busy === "age"} disabled={!!busy || edit === null} onPress={() => act("age", async () => (await api<{ message: string }>(`products/${p.id}/min-age`, { method: "PUT", body: { minAge: v } })).message)} />
+      </Card>
+    </Section>
+  );
+}
+
+/** One "running low?" email to buyers, this many days after their order arrives, for things that run out. */
+function ReorderSection({ product: p, busy, act }: { product: Product; busy: string | null; act: Act }) {
+  const saved = p.reorderDays == null ? "" : String(p.reorderDays);
+  const [edit, setEdit] = useState<string | null>(null);
+  const v = edit ?? saved;
+  useEffect(() => setEdit(null), [p]);
+  return (
+    <Section title="Reorder reminder">
+      <Card>
+        <Body muted>For things that run out, like coffee, vitamins or refills. That many days after an order arrives, the buyer gets one email asking if they're running low. Not if they've already bought it again.</Body>
+        <Field label="It usually lasts (days)" value={v} onChangeText={setEdit} keyboardType="number-pad" placeholder="No reminder" hint="7 to 180 days. Leave it empty for no reminder." />
+        <Button label="Save reorder reminder" busy={busy === "reorder"} disabled={!!busy || edit === null} onPress={() => act("reorder", async () => (await api<{ message: string }>(`products/${p.id}/reorder`, { method: "PUT", body: { reorderDays: v } })).message)} />
       </Card>
     </Section>
   );
