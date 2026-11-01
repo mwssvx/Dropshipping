@@ -56,6 +56,13 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  keepsFromSale,
+  compareAtFor,
+  priceFromCost,
+  setPricingRule,
+  applyRepricing,
+  previewRepricing,
+  pricingRuleOf,
   platformFeeFor,
   PLAN_IDS,
   changePlan,
@@ -1781,6 +1788,56 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, `Changed the plan to ${PLANS[plan].name} in the app`, { href: "/admin/plan" });
     return { ok: true, url: null, message: `Done. You're on ${PLANS[plan].name}.` };
   },
+  // The pricing rule that sets the starting price of every imported product, with examples, and
+  // the products whose prices it would change, updated all at once.
+  "GET pricing": async ({ db, shop }) => {
+    const rule = pricingRuleOf(shop);
+    const { rows, noCost, products } = await previewRepricing(db, shop, rule);
+    return {
+      rule,
+      examples: [300, 800, 2000].map((costMinor) => {
+        const priceMinor = priceFromCost(costMinor, rule);
+        return { costMinor, priceMinor, compareAtMinor: compareAtFor(priceMinor, rule), keepMinor: keepsFromSale(shop, priceMinor, costMinor) };
+      }),
+      repricing: {
+        products,
+        options: rows.length,
+        noCost,
+        rows: rows.slice(0, 20).map((r) => ({ variantId: r.variantId, productId: r.productId, title: r.variant === "Default" ? r.product : `${r.product} (${r.variant})`, costMinor: r.costMinor, priceMinor: r.priceMinor, newPriceMinor: r.newPriceMinor, newCompareAtMinor: r.newCompareAtMinor })),
+      },
+    };
+  },
+  "PUT pricing": async ({ req, db, shop, user }) => {
+    const b = await body<{ kind?: unknown; multiplier?: unknown; fixed?: unknown; ending?: unknown; compareAt?: unknown; compareAtPercent?: unknown; minPrice?: unknown }>(req);
+    // A currency sign in front is fine; letters aren't.
+    const amount = (raw: string, what: string) => {
+      try {
+        return parseMoney(raw.trim().replace(/^[$€£¥₹]\s*/, ""));
+      } catch {
+        throw new UserError(`Enter ${what} like 10.00.`);
+      }
+    };
+    const kind = b.kind === "fixed" ? "fixed" : "multiplier";
+    const multiplier = Number(str(b.multiplier).trim());
+    if (kind === "multiplier" && !(multiplier > 0)) throw new UserError("Enter how many times the cost, like 2.5.");
+    await setPricingRule(db, shop.id, {
+      kind,
+      value: kind === "fixed" ? amount(str(b.fixed), "the amount") : multiplier,
+      ending: (["99", "95", "00", "none"] as const).find((e) => e === b.ending) ?? "99",
+      compareAtPercent: b.compareAt === true ? Math.round(Number(str(b.compareAtPercent)) || 0) : null,
+      minPriceMinor: str(b.minPrice).trim() ? amount(str(b.minPrice), "the lowest price") : 0,
+    });
+    await logged({ shop, user, db }, "Changed the pricing rule in the app", { href: "/admin/pricing" });
+    return { ok: true, message: "Saved. Products you import from now on start at these prices." };
+  },
+  "POST pricing/apply": async ({ db, shop, user }) => {
+    const r = await applyRepricing(db, shop);
+    // Buyers who saved a product hear about it right away when the new rule makes it cheaper.
+    await sendPriceDrops(await stock(), { shopId: shop.id });
+    await logged({ shop, user, db }, `Updated ${r.products === 1 ? "1 product" : `${r.products} products`} to the pricing rule in the app`, { href: "/admin/pricing" });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: `Updated ${r.variants === 1 ? "1 price" : `${r.variants} prices`} on ${r.products === 1 ? "1 product" : `${r.products} products`}.` };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -2548,6 +2605,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("restock") || path.startsWith("stock-count") || path.startsWith("inventory")) return "products";
   if (path.startsWith("price-changes")) return "products";
   if (path.startsWith("search-fixes")) return "products";
+  if (path.startsWith("pricing")) return "products";
   if (path.startsWith("blog")) return "pages";
   if (path === "pages" || path.startsWith("pages/")) return "pages";
   if (path.startsWith("trust")) return "trust";
