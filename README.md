@@ -2068,3 +2068,7 @@ Settings in the app has a Store look row. When the theme draft (designed on the 
 ### Search fixes in the app (after launch, part 397)
 
 The Products tab in the app has a Search fixes row. It lists the searches from the last 30 days that found nothing, with how many times each was searched; tapping one fills it in, so it can be pointed at words that find what the shopper meant ("lampshade" shows the results for "lamp shade"). Fixes can be removed there too, and a fixed search leaves the list until the fix is removed.
+
+### Blog in the app (after launch, part 398)
+
+Settings in the app has a Blog section. Start a post with its title, write it in plain text (a blank line for a new paragraph, ## for a subheading, - for a list), add a summary and topics, and publish it now or at a day and time you pick. A live post can be shared or taken back to a draft, a scheduled one moved or unscheduled, and any post deleted. Photos, featured products and the AI writer stay on the website, and saving in the app keeps them.

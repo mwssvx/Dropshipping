@@ -56,6 +56,14 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  createPost,
+  updatePost,
+  setPostPublished,
+  deletePost,
+  listPosts,
+  getPost,
+  isScheduled,
+  POST_TAGS_MAX,
   searchReport,
   setSearchFix,
   removeSearchFix,
@@ -333,6 +341,12 @@ const orderSummary = (o: OrderRow) => ({
   paidAt: o.paidAt,
   createdAt: o.createdAt,
 });
+
+/** A blog post as the app lists it: a draft, waiting for its time, or live, with its store link. */
+function blogPostView(p: { id: string; title: string; handle: string; status: "draft" | "published"; publishedAt: Date | null; updatedAt: Date; tags: string[] }, store: string) {
+  const state = p.status !== "published" ? "draft" : isScheduled(p) ? "scheduled" : "live";
+  return { id: p.id, title: p.title, state, publishedAt: p.publishedAt, updatedAt: p.updatedAt, tags: p.tags, url: `${store.replace(/\/$/, "")}/blog/${p.handle}` };
+}
 
 /** Stock on the store is the main supplier's plus the backup's, so it's re-read after a change. */
 async function resyncStock(shopId: string, productId: string) {
@@ -1582,6 +1596,57 @@ const routes: Record<string, Handler> = {
     revalidatePath(`/s/${shop.handle}`, "layout");
     return { ok: true, message: `Removed. Searching “${from}” shows its own results again.` };
   },
+  // The blog: posts listed newest change first, written and published from the phone. Photos,
+  // featured products and the AI writer stay on the website; saving here keeps what's set there.
+  "GET blog": async ({ db, shop }) => {
+    const [posts, store] = await Promise.all([listPosts(db, shop.id), storeAddress(shop)]);
+    return { posts: posts.map((p) => blogPostView(p, store)) };
+  },
+  "GET blog/:id": async ({ params, db, shop }) => {
+    const [post, store] = await Promise.all([getPost(db, shop.id, params.id!), storeAddress(shop)]);
+    return { post: { ...blogPostView(post, store), body: post.body, excerpt: post.excerpt ?? "", tags: post.tags.join(", "), hasImage: !!post.imageUrl, productCount: post.productIds.length }, topicsMax: POST_TAGS_MAX };
+  },
+  "POST blog": async ({ req, db, shop, user }) => {
+    const b = await body<{ title?: unknown; body?: unknown; excerpt?: unknown; tags?: unknown }>(req);
+    const post = await createPost(db, shop.id, { title: str(b.title), body: str(b.body), excerpt: str(b.excerpt), tags: str(b.tags) });
+    await logged({ shop, user, db }, `Started the blog post “${post.title}” in the app`, { href: `/admin/blog/${post.id}` });
+    return { ok: true, id: post.id, message: "Saved as a draft. Only you can see it until it's published." };
+  },
+  "PUT blog/:id": async ({ req, params, db, shop }) => {
+    const b = await body<{ title?: unknown; body?: unknown; excerpt?: unknown; tags?: unknown }>(req);
+    const post = await getPost(db, shop.id, params.id!);
+    // The address, photo and featured products are kept as they are.
+    await updatePost(db, shop.id, post.id, { title: str(b.title), body: str(b.body), excerpt: str(b.excerpt), tags: str(b.tags), handle: post.handle, imageUrl: post.imageUrl ?? "", productIds: post.productIds });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: post.status === "published" && !isScheduled(post) ? "Saved. The post on your store shows the changes." : "Saved." };
+  },
+  "POST blog/:id/publish": async ({ req, params, db, shop, user }) => {
+    // "Publish now" sends no body; a time to publish at comes as { at }.
+    const b = req.headers.get("content-type")?.includes("json") ? await body<{ at?: unknown }>(req) : {};
+    const raw = str(b.at).trim();
+    const at = raw ? new Date(raw) : null;
+    if (at && Number.isNaN(at.getTime())) throw new UserError("Pick a date and time to publish.");
+    const post = await setPostPublished(db, shop.id, params.id!, true, new Date(), at);
+    const later = isScheduled(post);
+    await logged({ shop, user, db }, later ? `Scheduled the blog post “${post.title}” in the app` : `Published the blog post “${post.title}” in the app`, { href: `/admin/blog/${post.id}` });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: later ? "Scheduled. The post goes up on your store by itself." : "Published. The post is on your store's blog." };
+  },
+  "POST blog/:id/unpublish": async ({ params, db, shop, user }) => {
+    const before = await getPost(db, shop.id, params.id!);
+    const waiting = isScheduled(before);
+    const post = await setPostPublished(db, shop.id, before.id, false);
+    await logged({ shop, user, db }, `Took the blog post “${post.title}” back to a draft in the app`, { href: `/admin/blog/${post.id}` });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: waiting ? "Unscheduled. The post stays a draft." : "Unpublished. The post is a draft again and off your store." };
+  },
+  "DELETE blog/:id": async ({ params, db, shop, user }) => {
+    const post = await getPost(db, shop.id, params.id!);
+    await deletePost(db, shop.id, post.id);
+    await logged({ shop, user, db }, `Deleted the blog post “${post.title}” in the app`, { href: "/admin/blog" });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: `Deleted “${post.title}”.` };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -2349,6 +2414,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("restock") || path.startsWith("stock-count")) return "products";
   if (path.startsWith("price-changes")) return "products";
   if (path.startsWith("search-fixes")) return "products";
+  if (path.startsWith("blog")) return "pages";
   if (path.startsWith("suppliers")) return "suppliers";
   if (path.startsWith("cart-links")) return "marketing";
   if (path.startsWith("wholesale")) return "wholesale";
