@@ -3601,3 +3601,39 @@ test("same-day shipping cutoff set from the app", async ({ page, browser }) => {
   await cutoff.getByRole("button", { name: "Save cutoff" }).click();
   await expect(cutoff.getByText("Saved. There's no same-day cutoff.")).toBeVisible();
 });
+
+test("product page settings and notes set from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `pp${Date.now()}`);
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Product pages/ }).click();
+
+  await page.getByRole("textbox", { name: "Say how many are left at" }).fill("80");
+  await page.getByRole("button", { name: "Save product pages" }).click();
+  await expect(page.getByText("Pick a number from 0 to 50. 0 turns the note off.")).toBeVisible();
+  await page.getByRole("textbox", { name: "Say how many are left at" }).fill("4");
+  await page.getByRole("textbox", { name: "“New” for this many days" }).fill("14");
+  await page.getByRole("tab", { name: "Hidden" }).click();
+  await page.getByRole("switch", { name: "Stay on the page after “Add to cart”" }).click();
+  await page.getByRole("switch", { name: "Show how many sold in the last week" }).click();
+  await page.getByRole("switch", { name: "Show share buttons on product pages" }).click();
+  await page.getByRole("button", { name: "Save product pages" }).click();
+  await expect(page.getByText("Saved. Your store's product pages and cards follow it now.")).toBeVisible();
+
+  await page.getByRole("textbox", { name: "Note 1 title" }).fill("Shipping");
+  await page.getByRole("button", { name: "Save notes" }).click();
+  await expect(page.getByText("Write what “Shipping” should say.")).toBeVisible();
+  await page.getByRole("textbox", { name: "Note 1 text" }).fill("Ships in 2 days from our warehouse.");
+  await page.getByRole("button", { name: "Save notes" }).click();
+  await expect(page.getByText("Saved. The notes show under every product's description.")).toBeVisible();
+  await shot(page, "429-app-product-pages");
+
+  await web.goto(`${WEB}/admin/products`);
+  await expect(web.getByLabel("Say how many are left at")).toHaveValue("4");
+  await expect(web.getByLabel("“New” for this many days")).toHaveValue("14");
+  await expect(web.getByRole("radio", { name: /^Hidden/ })).toBeChecked();
+  await expect(web.getByRole("radio", { name: /^Stay on the page/ })).toBeChecked();
+  await expect(web.getByRole("checkbox", { name: "Show how many sold in the last week" })).toBeChecked();
+  await expect(web.getByRole("checkbox", { name: "Show share buttons on product pages" })).not.toBeChecked();
+  await expect(web.getByRole("region", { name: "Notes under every product" }).getByRole("textbox").first()).toHaveValue("Shipping");
+});

@@ -79,6 +79,7 @@ export default function ProductsScreen() {
         <Row href="/search-listings" title="Search listings" subtitle="How your products look in Google, and what to fix" />
         <Row href="/search-fixes" title="Search fixes" subtitle="Point searches that found nothing at words that do" />
         <Row href="/size-charts" title="Size charts" subtitle="Measurements per size, on products or whole collections" />
+        <Row href="/product-pages" title="Product pages" subtitle="Stock notes, badges, sold-out products, share buttons and notes under every product" />
         {can("collections") ? <Row href="/collections" title="Collections" subtitle="Groups of products buyers can browse" /> : null}
         {can("marketing") ? <Row href="/bundles" title="Bundles" subtitle="Products sold together for less" /> : null}
         {can("marketing") ? <Row href="/quiz" title="Product quiz" subtitle="A few questions that point shoppers to the right products" /> : null}
