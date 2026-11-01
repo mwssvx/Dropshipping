@@ -2152,3 +2152,7 @@ Settings in the app has a "Sales channels" section: the feed links for Google Sh
 ### Invoices in the app (after launch, part 418)
 
 Settings in the app has "Invoices" under Taxes: fill in the registered business name, address, number prefix, next number and footer printed on every invoice and credit note (with a warning while something tax offices need is missing), and see the latest invoices and credit notes issued, each opening its order.
+
+### Domains in the app (after launch, part 419)
+
+Settings in the app has "Domains" under Web addresses: see the free address, connect a domain you own with the DNS record to add where you bought it, check it again, make a connected domain the main address, or remove one.

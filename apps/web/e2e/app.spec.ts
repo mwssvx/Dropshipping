@@ -3229,3 +3229,37 @@ test("invoice details set from the app, with the invoices issued", async ({ page
   await expect(web.getByLabel("Registered business name")).toHaveValue("Pocket Candles LLC");
   await expect(web.getByLabel("Next number")).toHaveValue("100");
 });
+
+test("custom domains connected and swapped from the app", async ({ page, browser }) => {
+  const id = `dm${Date.now()}`;
+  const { web, email } = await merchant(browser, id);
+  await signIn(page, email);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("link", { name: /^Domains/ }).click();
+  await expect(page.getByText(new RegExp(`pocket-shop-${id}`)).first()).toBeVisible();
+
+  // Tests skip the DNS lookup, so a domain connects as soon as it's added.
+  const box = page.getByRole("textbox", { name: "Domain you own" });
+  await box.fill(`shop.${id}.com`);
+  await page.getByRole("button", { name: "Connect domain" }).click();
+  await expect(page.getByText(`Connected. Buyers can shop at https://shop.${id}.com.`)).toBeVisible();
+  const first = page.getByRole("region", { name: `shop.${id}.com` });
+  await expect(first.getByText("Main address", { exact: true })).toBeVisible();
+  await box.fill(`https://www.${id}.com/`);
+  await page.getByRole("button", { name: "Connect domain" }).click();
+  const second = page.getByRole("region", { name: `www.${id}.com` });
+  await second.getByRole("button", { name: `Make www.${id}.com the main address` }).click();
+  await expect(page.getByText(`www.${id}.com is now your main address.`)).toBeVisible();
+  await expect(second.getByText("Main address", { exact: true })).toBeVisible();
+  await expect(first.getByText("Main address", { exact: true })).toHaveCount(0);
+  await shot(page, "419-app-domains");
+
+  await first.getByRole("button", { name: `Remove shop.${id}.com…` }).click();
+  await first.getByRole("button", { name: `Remove shop.${id}.com now` }).click();
+  await expect(page.getByText("Domain removed. Your free address still works.")).toBeVisible();
+  await expect(page.getByRole("region", { name: `shop.${id}.com` })).toHaveCount(0);
+
+  await web.goto(`${WEB}/admin/domains`);
+  await expect(web.getByRole("heading", { name: `www.${id}.com` })).toBeVisible();
+  await expect(web.getByRole("heading", { name: `shop.${id}.com` })).toHaveCount(0);
+});
