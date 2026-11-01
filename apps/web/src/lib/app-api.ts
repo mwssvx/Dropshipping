@@ -2732,7 +2732,7 @@ const routes: Record<string, Handler> = {
   "PUT product-pages": async ({ req, db, shop }) => {
     const b = await body<Record<string, unknown>>(req);
     const num = (v: unknown) => (str(v).trim() === "" ? Number.NaN : Number(str(v).trim()));
-    // The ones that can be refused go first, so a refusal saves nothing.
+    // The numbers that can be refused go first, so a refused one stops the save before the switches change.
     await setLowStockNote(db, shop.id, num(b.lowStockNote));
     await setRestockAlert(db, shop.id, num(b.restockAlertAt));
     await setBadgeSettings(db, shop.id, { sale: b.saleBadge === true, soldOut: b.soldOutBadge === true, newDays: str(b.newDays).trim() === "" ? 0 : Number(str(b.newDays)) });
