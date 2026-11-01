@@ -1,8 +1,8 @@
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { useApi } from "../../src/api";
 import { FULFILMENT, money, PAYMENT, when } from "../../src/format";
-import { EmptyState, Field, List, LoadError, Loading, Pill, Row, Screen, Segmented } from "../../src/ui";
+import { Button, EmptyState, Field, List, LoadError, Loading, Pill, Row, Screen, Segmented } from "../../src/ui";
 
 type Order = { id: string; number: number; name: string; email: string; totalMinor: number; currency: string; paymentStatus: string; fulfillmentStatus: string; held?: boolean; paidAt: string | null; createdAt: string; daysLate?: number; handover?: { kind: "pickup" | "delivery"; day: string | null; ready: boolean } };
 type Show = "open" | "to_post" | "handover" | "problems" | "late" | "all";
@@ -59,6 +59,10 @@ export default function OrdersScreen() {
           <EmptyState heading={EMPTY[show][0]} body={EMPTY[show][1]} />
         )
       ) : (
+        <>
+        {!q && (show === "late" || show === "open") ? (
+          <Button label="Email these buyers" kind="secondary" onPress={() => router.push({ pathname: "/orders/email", params: { show } })} />
+        ) : null}
         <List>
           {orders.map((o) => {
             const f = FULFILMENT[o.fulfillmentStatus] ?? { label: o.fulfillmentStatus, tone: "neutral" as const };
@@ -79,6 +83,7 @@ export default function OrdersScreen() {
             );
           })}
         </List>
+        </>
       )}
       {!q && list.data ? (
         <List>
