@@ -14,7 +14,7 @@ type Attention = { kind: string; title: string; body: string; url: string; tone:
 type Today = { currency: string; salesTodayMinor: number | null; ordersToday: number; sales7dMinor: number | null; orders7d: number; attention: Attention[]; pending: Proposal[]; waiting?: { returns: number | null; reviews: number | null; questions?: number | null } };
 
 // Things the app doesn't do itself open the web admin.
-const WEB_ONLY: Record<string, string> = { "/notices": "/admin/trust", "/products#supplier-sold-out": "/admin/products#supplier-sold-out" };
+const WEB_ONLY: Record<string, string> = { "/products#supplier-sold-out": "/admin/products#supplier-sold-out" };
 
 export default function TodayScreen() {
   const { me } = useSession();

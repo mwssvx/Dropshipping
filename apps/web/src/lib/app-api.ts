@@ -56,6 +56,11 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  listNotices,
+  markNoticesRead,
+  verifiedChecklist,
+  submitAppeal,
+  refreshVerified,
   createPost,
   updatePost,
   setPostPublished,
@@ -1647,6 +1652,41 @@ const routes: Record<string, Handler> = {
     revalidatePath(`/s/${shop.handle}`, "layout");
     return { ok: true, message: `Deleted “${post.title}”.` };
   },
+  // The store's standing with us: warnings and pauses with the reason, what to do and a deadline,
+  // appeals and their replies, and the verified badge's checklist. Opening it marks notices read.
+  "GET trust": async ({ db, shop }) => {
+    const [notices, check] = await Promise.all([listNotices(db, shop.id), verifiedChecklist(db, shop)]);
+    await markNoticesRead(db, shop.id);
+    const open = notices.filter((n) => !n.closedAt);
+    return {
+      paused: shop.status !== "active",
+      open: open.map((n) => ({
+        id: n.id,
+        kind: n.kind,
+        title: n.title,
+        explanation: n.explanation,
+        whatToDo: n.whatToDo,
+        dueBy: n.dueBy,
+        createdAt: n.createdAt,
+        automatic: n.createdBy === "Automatic check",
+        appeals: n.appeals.map((a) => ({ id: a.id, message: a.message, status: a.status, response: a.response })),
+        canAppeal: !n.appeals.some((a) => a.status === "open"),
+      })),
+      history: notices.filter((n) => n.closedAt).map((n) => ({ id: n.id, kind: n.kind, title: n.title, createdAt: n.createdAt })),
+      verifiedSince: shop.verifiedAt,
+      checklist: check.items.map((i) => ({ key: i.key, label: i.label, met: i.met, detail: i.detail })),
+    };
+  },
+  "POST trust/:id/appeal": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ message?: unknown }>(req);
+    await submitAppeal(db, shop.id, params.id!, str(b.message));
+    await logged({ shop, user, db }, "Sent an appeal about a notice from us, in the app", { href: "/admin/trust" });
+    return { ok: true, message: "Sent. A person reads every appeal and replies here, usually within two working days." };
+  },
+  "POST trust/verified": async ({ db, shop }) => {
+    const since = await refreshVerified(db, shop.id);
+    return { ok: true, message: since ? "Checked. Your store has the verified badge." : "Checked. Your store doesn't meet every rule yet." };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -2415,6 +2455,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("price-changes")) return "products";
   if (path.startsWith("search-fixes")) return "products";
   if (path.startsWith("blog")) return "pages";
+  if (path.startsWith("trust")) return "trust";
   if (path.startsWith("suppliers")) return "suppliers";
   if (path.startsWith("cart-links")) return "marketing";
   if (path.startsWith("wholesale")) return "wholesale";
