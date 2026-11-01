@@ -2236,3 +2236,7 @@ A product's screen in the app has "Badge", its own short label like "Limited edi
 ### Quantity discounts in the app (after launch, part 439)
 
 A product's screen in the app has "Quantity discounts": up to three steps like "Buy 2 or more, save 10%", with bigger quantities getting bigger discounts. The product page shows them under "Buy more, save more".
+
+### Ships from, in the app (after launch, part 440)
+
+A product's Customs section in the app has "Ships from (country code)", for a supplier warehouse abroad. Product pages then say "Ships from China" and duty notes follow it. The store's own country is the same as leaving it empty.

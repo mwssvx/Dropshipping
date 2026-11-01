@@ -15,6 +15,7 @@ export type Product = {
   missing: ("photo" | "description" | "weight" | "customs" | "cost")[];
   hsCode: string | null;
   originCountry: string | null;
+  shipsFrom?: string | null;
   /** Sold-out options can still be ordered, promised to ship by a date. */
   preorder?: { shipsBy: string; limit: number | null } | null;
   /** On the product screen only: how many were pre-ordered on paid orders. */

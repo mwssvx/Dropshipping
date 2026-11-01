@@ -22,6 +22,7 @@ export default function ProductScreen() {
   const [cost, setCost] = useState<Record<string, string>>({});
   const [hs, setHs] = useState("");
   const [origin, setOrigin] = useState("");
+  const [from, setFrom] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{ tone: "success" | "critical" | "info"; text: string } | null>(
     imported ? { tone: "success", text: "Imported as a draft. Next: let AI write the listing, then put it on sale." } : null,
@@ -36,6 +37,7 @@ export default function ProductScreen() {
     setWeight(Object.fromEntries(p.variants.map((v) => [v.id, kg(v.weightGrams)])));
     setHs(p.hsCode ?? "");
     setOrigin(p.originCountry ?? "");
+    setFrom(p.shipsFrom ?? "");
     setCost(Object.fromEntries(p.variants.map((v) => [v.id, v.costMinor === null ? "" : (v.costMinor / 100).toFixed(2)])));
   }, [p]);
 
@@ -217,11 +219,18 @@ export default function ProductScreen() {
             <Body muted>Printed on customs forms for orders abroad, and used for duty notes.</Body>
             <Field label="HS code" value={hs} onChangeText={setHs} keyboardType="numbers-and-punctuation" hint="6 to 10 digits, like 6912.00." />
             <Field label="Made in (country code)" value={origin} onChangeText={(t) => setOrigin(t.toUpperCase().slice(0, 2))} autoCapitalize="none" hint="Two letters, like CN or US." />
-            {hs.trim() !== (p.hsCode ?? "") || origin.trim() !== (p.originCountry ?? "") ? (
+            <Field
+              label="Ships from (country code)"
+              value={from}
+              onChangeText={(t) => setFrom(t.toUpperCase().slice(0, 2))}
+              autoCapitalize="none"
+              hint="For a supplier warehouse abroad. Product pages say where it ships from, and duties follow it. Leave it empty when it leaves from your store's country."
+            />
+            {hs.trim() !== (p.hsCode ?? "") || origin.trim() !== (p.originCountry ?? "") || from.trim() !== (p.shipsFrom ?? "") ? (
               <Button
                 label="Save customs details"
                 busy={busy === "customs"}
-                onPress={() => act("customs", async () => (await api(`products/${id}/customs`, { method: "PUT", body: { hsCode: hs, originCountry: origin } }), "Customs details saved."))}
+                onPress={() => act("customs", async () => (await api(`products/${id}/customs`, { method: "PUT", body: { hsCode: hs, originCountry: origin, shipsFrom: from } }), "Customs details saved."))}
               />
             ) : null}
           </Card>

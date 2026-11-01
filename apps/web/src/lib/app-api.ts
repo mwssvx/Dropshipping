@@ -578,6 +578,8 @@ const productView = (p: ProductRow) => ({
   missing: missingDetails(p),
   hsCode: p.hsCode,
   originCountry: p.originCountry,
+  /** Where it leaves from, when that's not the store's country; null means from home. */
+  shipsFrom: p.shipsFrom,
   /** Sold-out options can still be ordered, promised to ship by a date. */
   preorder: p.preorder,
   /** The least and most a buyer can order. */
@@ -3168,9 +3170,11 @@ const routes: Record<string, Handler> = {
     return productView(product);
   },
   "PUT products/:id/customs": async ({ req, params, db, shop }) => {
-    const b = await body<{ hsCode?: unknown; originCountry?: unknown }>(req);
-    // Where it ships from stays as it is: that's set on the website.
-    await setCustomsInfo(db, shop.id, params.id!, { hsCode: str(b.hsCode), originCountry: str(b.originCountry) });
+    const b = await body<{ hsCode?: unknown; originCountry?: unknown; shipsFrom?: unknown }>(req);
+    // Older app versions don't send where it ships from, so it stays as it is for them.
+    await setCustomsInfo(db, shop.id, params.id!, { hsCode: str(b.hsCode), originCountry: str(b.originCountry), ...(typeof b.shipsFrom === "string" && { shipsFrom: b.shipsFrom }) });
+    revalidatePath(`/admin/products/${params.id}`);
+    revalidatePath(`/s/${shop.handle}`, "layout");
     return productView(await getProduct(db, shop.id, params.id!));
   },
   // Shipping for one product: preparing time, extra shipping and countries it can't go to.

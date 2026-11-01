@@ -4052,3 +4052,40 @@ test("quantity discounts for a product, from the app", async ({ page, browser })
   await web.reload();
   await expect(web.getByRole("region", { name: "Buy more, save more" })).toHaveCount(0);
 });
+
+test("where a product ships from, from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `sf${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Paper Lantern");
+  await web.getByLabel("Price", { exact: true }).fill("14.00");
+  await web.getByLabel("Stock", { exact: true }).fill("20");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const productUrl = web.url();
+  const store = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Paper Lantern/ }).click();
+  const customs = page.getByRole("region", { name: "Customs" });
+  await customs.getByRole("textbox", { name: "Ships from (country code)" }).fill("xx");
+  await customs.getByRole("button", { name: "Save customs details" }).click();
+  await expect(page.getByText("Enter the country it ships from as a two-letter code, like CN or US.")).toBeVisible();
+  await customs.getByRole("textbox", { name: "Ships from (country code)" }).fill("cn");
+  await expect(customs.getByRole("textbox", { name: "Ships from (country code)" })).toHaveValue("CN");
+  await customs.getByRole("button", { name: "Save customs details" }).click();
+  await expect(page.getByText("Customs details saved.")).toBeVisible();
+  await shot(page, "440-app-ships-from");
+
+  await web.goto(productUrl);
+  await expect(web.locator("#customs-ships-from")).toHaveValue("CN");
+  await web.goto(store);
+  await expect(web.locator("#ships-from")).toHaveText("Ships from China");
+
+  // Its own country is the same as leaving it empty.
+  await customs.getByRole("textbox", { name: "Ships from (country code)" }).fill("us");
+  await customs.getByRole("button", { name: "Save customs details" }).click();
+  await expect(customs.getByRole("textbox", { name: "Ships from (country code)" })).toHaveValue("");
+  await web.reload();
+  await expect(web.locator("#ships-from")).toHaveCount(0);
+});
