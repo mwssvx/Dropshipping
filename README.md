@@ -2056,3 +2056,7 @@ The app's Gift cards screen can put gift cards on sale: type the amounts (up to 
 ### Delivery dates in the app (after launch, part 394)
 
 Settings in the app has a Delivery dates row under Shipping. Turn the arrival dates on product pages, the cart, checkout and receipts on or off, and set the days an order takes to get ready. The holiday checklist's delivery dates line opens it.
+
+### Backup suppliers in the app (after launch, part 395)
+
+An imported product's screen in the app has a Backup supplier section. Paste a second supplier's link to the same product and orders go there when the main supplier runs out; the section lists what each option costs there and what's in stock, and the backup can be removed. The holiday checklist's backup suppliers line opens the first best seller without one.

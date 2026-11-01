@@ -230,6 +230,7 @@ export default function ProductScreen() {
 
       <TagsSection product={p} busy={busy} act={act} />
       <CollectionsSection product={p} busy={busy} act={act} />
+      <BackupSection product={p} busy={busy} act={act} currency={cur} />
       <PreorderSection product={p} busy={busy} act={act} />
       <LimitsSection product={p} busy={busy} act={act} />
 
@@ -370,6 +371,50 @@ function CollectionsSection({ product: p, busy, act }: { product: Product; busy:
             ))}
           </View>
         ) : null}
+      </Card>
+    </Section>
+  );
+}
+
+/** A backup supplier: the same product at a second supplier, so an order goes there when the main one runs out. */
+function BackupSection({ product: p, busy, act, currency }: { product: Product; busy: string | null; act: Act; currency: string }) {
+  const [url, setUrl] = useState("");
+  const [confirm, setConfirm] = useState(false);
+  useEffect(() => setConfirm(false), [p]);
+  const b = p.backup;
+  if (!b?.possible) return null;
+  return (
+    <Section title="Backup supplier">
+      <Card>
+        {b.link ? (
+          <>
+            {b.link.gone ? <Banner tone="warning">The backup listing was taken down. Add another one.</Banner> : null}
+            <Body>Orders go to the backup when the main supplier is out of stock, and its stock counts toward yours.</Body>
+            <View role="list" aria-label="Backup options" style={{ gap: space(1) }}>
+              {b.link.options.map((o) => (
+                <View key={o.title} role="listitem">
+                  <Body>{o.covered ? `${o.title}: costs ${money(o.costMinor ?? 0, currency)}${o.stock === null ? "" : `, ${o.stock} in stock`}` : `${o.title}: no match there`}</Body>
+                </View>
+              ))}
+            </View>
+            {confirm ? (
+              <Button label="Remove backup" kind="danger" busy={busy === "backup"} disabled={!!busy} onPress={() => act("backup", async () => (await api<{ message: string }>(`products/${p.id}/backup`, { method: "DELETE" })).message)} />
+            ) : (
+              <Button label="Remove backup…" kind="ghost" disabled={!!busy} onPress={() => setConfirm(true)} />
+            )}
+          </>
+        ) : (
+          <>
+            <Body muted>Paste a second supplier's link to the same product. When the main supplier runs out, orders go there instead of becoming a problem.</Body>
+            <Field label="Backup supplier link" value={url} onChangeText={setUrl} keyboardType="url" autoCapitalize="none" placeholder="https://" />
+            <Button
+              label="Add backup"
+              busy={busy === "backup"}
+              disabled={!!busy || !url.trim()}
+              onPress={() => act("backup", async () => (await api<{ message: string }>(`products/${p.id}/backup`, { method: "PUT", body: { url } })).message)}
+            />
+          </>
+        )}
       </Card>
     </Section>
   );
