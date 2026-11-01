@@ -3523,3 +3523,53 @@ test("browse reminders turned on and off from the app", async ({ page, browser }
   await web.reload();
   await expect(web.getByRole("checkbox", { name: "Send browse reminders" })).not.toBeChecked();
 });
+
+test("shipping zones and rates set up from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `sz${Date.now()}`);
+  await signIn(page, email);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("link", { name: /^Shipping rates/ }).click();
+  await expect(page.getByText(/to every country\. Set up zones to charge by country/)).toBeVisible();
+  await page.getByRole("button", { name: "Set up shipping zones" }).click();
+  await expect(page.getByText("Zones set up. Change their rates and countries below.")).toBeVisible();
+
+  const home = page.getByRole("region", { name: "United States" });
+  await expect(home.getByText("Standard · $4.99 · free over $50.00")).toBeVisible();
+  await home.getByRole("button", { name: "Remove Express from United States" }).click();
+  await expect(page.getByText("Rate removed.")).toBeVisible();
+  await home.getByRole("button", { name: "Add a rate to United States" }).click();
+  await home.getByRole("textbox", { name: "Rate name" }).fill("Overnight");
+  await home.getByRole("textbox", { name: /^Price/ }).fill("19.99");
+  await home.getByRole("textbox", { name: "Days from" }).fill("1");
+  await home.getByRole("textbox", { name: "Days to" }).fill("one");
+  await home.getByRole("button", { name: "Add rate" }).click();
+  await expect(page.getByText("Enter delivery days as whole numbers.")).toBeVisible();
+  await home.getByRole("textbox", { name: "Days to" }).fill("1");
+  await home.getByRole("button", { name: "Add rate" }).click();
+  await expect(page.getByText("Rate added. Buyers can pick it at checkout.")).toBeVisible();
+  await expect(home.getByText("Overnight · $19.99")).toBeVisible();
+  await expect(home.getByText("1 day", { exact: true })).toBeVisible();
+
+  await page.getByRole("link", { name: /^Add a zone/ }).click();
+  await page.getByRole("textbox", { name: "Zone name" }).fill("Australia and NZ");
+  await expect(page.getByRole("switch", { name: "United States (in United States)" })).toBeDisabled();
+  await page.getByRole("switch", { name: "Australia", exact: true }).click();
+  await page.getByRole("switch", { name: "New Zealand", exact: true }).click();
+  await page.getByRole("button", { name: "Add zone" }).click();
+  const pacific = page.getByRole("region", { name: "Australia and NZ" }).last();
+  await expect(pacific.getByText("No rates yet, so buyers in these countries can't check out.")).toBeVisible();
+  await expect(pacific.getByText("Australia, New Zealand")).toBeVisible();
+  await shot(page, "427-app-shipping-zones");
+
+  await web.goto(`${WEB}/admin/shipping`);
+  await expect(web.getByRole("listitem", { name: "Australia and NZ zone" })).toBeVisible();
+  await expect(web.getByRole("listitem", { name: "United States: Overnight" })).toBeVisible();
+  await expect(web.getByRole("listitem", { name: "United States: Express" })).toHaveCount(0);
+
+  await pacific.getByRole("link", { name: "Edit the Australia and NZ zone" }).click();
+  await page.getByRole("button", { name: "Delete zone…" }).click();
+  await page.getByRole("button", { name: "Delete Australia and NZ now" }).click();
+  await expect(page.getByRole("region", { name: "United States" }).last()).toBeVisible();
+  await web.reload();
+  await expect(web.getByRole("listitem", { name: "Australia and NZ zone" })).toHaveCount(0);
+});
