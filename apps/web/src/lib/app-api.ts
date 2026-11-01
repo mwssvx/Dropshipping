@@ -56,6 +56,13 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  createPage,
+  updatePage,
+  deletePage,
+  listPages,
+  getPage,
+  draftPolicies,
+  addPolicyPages,
   listNotices,
   markNoticesRead,
   verifiedChecklist,
@@ -1687,6 +1694,50 @@ const routes: Record<string, Handler> = {
     const since = await refreshVerified(db, shop.id);
     return { ok: true, message: since ? "Checked. Your store has the verified badge." : "Checked. Your store doesn't meet every rule yet." };
   },
+  // Store pages (About us, Shipping, Returns...): plain text, visible or hidden, and the policy
+  // pages we write from the store's own settings, added with a tap.
+  "GET pages": async ({ db, shop }) => {
+    const [pages, drafts, store] = await Promise.all([listPages(db, shop.id), draftPolicies(db, shop), storeAddress(shop)]);
+    const root = store.replace(/\/$/, "");
+    return {
+      pages: pages.map((p) => ({ id: p.id, title: p.title, published: p.published, url: `${root}/pages/${p.handle}` })),
+      policies: drafts.map((d) => ({ kind: d.kind, title: d.title, added: !!d.existingId })),
+    };
+  },
+  "POST pages": async ({ req, db, shop, user }) => {
+    const b = await body<{ title?: unknown; body?: unknown }>(req);
+    // A new page starts hidden, so it isn't on the store half-written.
+    const page = await createPage(db, shop.id, { title: str(b.title), body: str(b.body), published: false });
+    await logged({ shop, user, db }, `Added the page “${page.title}” in the app`, { href: `/admin/pages/${page.id}` });
+    return { ok: true, id: page.id, message: "Added. It's hidden until you show it on the store." };
+  },
+  "POST pages/policies": async ({ req, db, shop, user }) => {
+    const b = await body<{ kinds?: unknown }>(req);
+    const pages = await addPolicyPages(db, shop, Array.isArray(b.kinds) ? b.kinds.map(String) : []);
+    if (pages.length) await logged({ shop, user, db }, `Added policy pages in the app: ${pages.map((p) => p.title).join(", ")}`, { href: "/admin/pages" });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: pages.length ? `Added ${pages.map((p) => p.title).join(", ")}. Edit them any time.` : "Those pages are already there." };
+  },
+  "GET pages/:id": async ({ params, db, shop }) => {
+    const [page, store] = await Promise.all([getPage(db, shop.id, params.id!), storeAddress(shop)]);
+    return { page: { id: page.id, title: page.title, body: page.body, published: page.published, url: `${store.replace(/\/$/, "")}/pages/${page.handle}` } };
+  },
+  "PUT pages/:id": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ title?: unknown; body?: unknown; published?: unknown }>(req);
+    const before = await getPage(db, shop.id, params.id!);
+    // The address and search description are kept as they are.
+    const page = await updatePage(db, shop.id, before.id, { title: str(b.title), body: str(b.body), handle: before.handle, seoDescription: before.seoDescription ?? "", published: b.published === true });
+    if (page.published !== before.published) await logged({ shop, user, db }, `${page.published ? "Showed" : "Hid"} the page “${page.title}” in the app`, { href: `/admin/pages/${page.id}` });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: page.published ? "Saved. The page is on your store." : "Saved. The page is hidden from buyers." };
+  },
+  "DELETE pages/:id": async ({ params, db, shop, user }) => {
+    const page = await getPage(db, shop.id, params.id!);
+    await deletePage(db, shop.id, page.id);
+    await logged({ shop, user, db }, `Deleted the page “${page.title}” in the app`, { href: "/admin/pages" });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: `Deleted “${page.title}”.` };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -2455,6 +2506,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("price-changes")) return "products";
   if (path.startsWith("search-fixes")) return "products";
   if (path.startsWith("blog")) return "pages";
+  if (path === "pages" || path.startsWith("pages/")) return "pages";
   if (path.startsWith("trust")) return "trust";
   if (path.startsWith("suppliers")) return "suppliers";
   if (path.startsWith("cart-links")) return "marketing";

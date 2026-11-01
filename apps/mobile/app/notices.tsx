@@ -123,6 +123,7 @@ export default function NoticesScreen() {
                   <View key={i.key} role="listitem" aria-label={`${i.label}: ${i.met ? "met" : "not yet"}, ${i.detail}`} style={{ gap: 2 }}>
                     <Heading>{`${i.met ? "✓" : "○"} ${i.label}`}</Heading>
                     <Body muted>{i.detail}</Body>
+                    {i.key === "returns" && !i.met ? <Row href="/pages" title="Add a returns page" /> : null}
                   </View>
                 ))}
               </View>

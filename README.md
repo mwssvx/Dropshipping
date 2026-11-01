@@ -2076,3 +2076,7 @@ Settings in the app has a Blog section. Start a post with its title, write it in
 ### Trust in the app (after launch, part 399)
 
 A warning or pause from us now opens in the app: Today's "A warning from us" (or "Your store is paused") goes to a Trust screen, also under Settings, with what happened, what to do and the deadline. Reply or appeal from the phone and the person's answer shows there. The screen also lists the verified store badge's rules and whether the store meets each, with Check now, and closed notices under History.
+
+### Pages in the app (after launch, part 400)
+
+Settings in the app has a Pages row under Blog and pages. It lists the store's pages with whether buyers can see them, adds the policy pages we write from the store's settings (returns, shipping, privacy, terms, accessibility) with a tap, and starts a page of your own, hidden until you show it. A page's title and text can be edited, it can be shown or hidden, shared and deleted. The Trust screen's "A returns policy buyers can read" line links there while it's missing.

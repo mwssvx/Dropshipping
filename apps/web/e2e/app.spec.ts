@@ -2574,3 +2574,55 @@ test("a warning from us read and answered in the app", async ({ page, browser })
   await page.getByRole("link", { name: "Settings" }).click();
   await expect(page.getByRole("link", { name: /^Your store's standing/ })).toBeVisible();
 });
+
+test("store pages and policies added and edited from the app", async ({ page, browser }) => {
+  const id = `pg${Date.now()}`;
+  const { email } = await merchant(browser, id);
+  const buyer = await (await browser.newContext()).newPage();
+
+  await signIn(page, email);
+  await page.goto("/notices");
+  const badge = page.getByRole("region", { name: "Verified store badge" });
+  await expect(badge.getByRole("listitem", { name: /^A returns policy buyers can read: not yet/ })).toBeVisible();
+  await badge.getByRole("link", { name: "Add a returns page" }).click();
+  await expect(page).toHaveURL(/\/pages$/);
+  await expect(page.getByText("No pages yet")).toBeVisible();
+
+  const policies = page.getByRole("region", { name: "Store policies" });
+  await policies.getByRole("switch", { name: "Privacy policy" }).click();
+  await policies.getByRole("switch", { name: "Terms of service" }).click();
+  await policies.getByRole("button", { name: "Add policy pages" }).click();
+  await expect(page.getByText("Added Returns and refunds, Shipping, Accessibility statement. Edit them any time.")).toBeVisible();
+  const mine = page.getByRole("region", { name: "Your pages" });
+  await expect(mine.getByRole("link", { name: "Returns and refunds, visible" })).toBeVisible();
+  await expect(policies.getByRole("switch", { name: "Privacy policy" })).toBeVisible();
+  await expect(policies.getByRole("switch", { name: "Returns and refunds" })).toHaveCount(0);
+  await buyer.goto(`${WEB}/s/pocket-shop-${id}/pages/returns`);
+  await expect(buyer.getByRole("heading", { name: "Returns and refunds" })).toBeVisible();
+
+  // A page of your own starts hidden.
+  await page.getByRole("textbox", { name: "Title" }).fill("About us");
+  await page.getByRole("button", { name: "Start a page" }).click();
+  await expect(page).toHaveURL(/\/pages\/[0-9a-f-]{36}$/);
+  await page.getByRole("textbox", { name: "Text" }).fill("We're two friends who make lamps in Austin.\n\nEvery lamp is tested before it ships.");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Saved. The page is hidden from buyers.")).toBeVisible();
+  await buyer.goto(`${WEB}/s/pocket-shop-${id}/pages/about-us`);
+  await expect(buyer.getByRole("heading", { name: "About us" })).toHaveCount(0);
+  await page.getByRole("switch", { name: "Visible on the store" }).click();
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Saved. The page is on your store.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Share the page" })).toBeVisible();
+  await buyer.reload();
+  await expect(buyer.getByRole("heading", { name: "About us" })).toBeVisible();
+  await expect(buyer.getByText("Every lamp is tested before it ships.")).toBeVisible();
+  await shot(page, "400-app-pages");
+
+  await page.getByRole("button", { name: "Delete this page…" }).click();
+  await page.getByRole("button", { name: "Delete this page" }).click();
+  await expect(page).toHaveURL(/\/pages$/);
+  await expect(mine.getByRole("link", { name: /^About us/ })).toHaveCount(0);
+
+  await page.goto("/notices");
+  await expect(badge.getByRole("listitem", { name: /^A returns policy buyers can read: met/ })).toBeVisible();
+});
