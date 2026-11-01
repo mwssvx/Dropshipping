@@ -6,7 +6,8 @@ import { useCan, useSession } from "../../src/session";
 import { BackLink, Banner, Body, Button, Card, EmptyState, Field, List, LoadError, Loading, Pill, Row, Screen, Section, Stat, Toggle } from "../../src/ui";
 
 type Checkout = { id: string; number: number; name: string | null; email: string; totalMinor: number; currency: string; items: number; createdAt: string; reminder: "none" | "sent" | "code"; paidAs: number | null };
-type Data = { days: number; remindersOn: boolean; offerPercent: number | null; totals: { count: number; valueMinor: number; recovered: number }; checkouts: Checkout[] };
+type Browse = { on: boolean; hours: number; sent: number; orders: number; salesMinor: number };
+type Data = { days: number; remindersOn: boolean; browse: Browse; offerPercent: number | null; totals: { count: number; valueMinor: number; recovered: number }; checkouts: Checkout[] };
 
 /** Buyers who got to checkout and didn't pay: what they left, whether they were reminded, and who came back. */
 export default function CheckoutsScreen() {
@@ -53,6 +54,7 @@ export default function CheckoutsScreen() {
         </>
       )}
       {d && can("marketing") ? <RemindersSection data={d} reload={data.reload} /> : null}
+      {d && can("marketing") ? <BrowseSection browse={d.browse} currency={cur} reload={data.reload} /> : null}
     </Screen>
   );
 }
@@ -99,6 +101,39 @@ function RemindersSection({ data: d, reload }: { data: Data; reload: () => Promi
           </>
         ) : null}
         <Button label="Save reminder emails" busy={busy} disabled={busy || !edit} onPress={save} />
+      </Card>
+    </Section>
+  );
+}
+
+/** Browse reminders: one email to a signed-in subscriber who looked at a product and left without it. */
+function BrowseSection({ browse: b, currency, reload }: { browse: Browse; currency: string; reload: () => Promise<void> }) {
+  const [on, setOn] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ tone: "success" | "critical"; text: string } | null>(null);
+  const v = on ?? b.on;
+  async function save() {
+    setBusy(true);
+    setNote(null);
+    try {
+      const r = await api<{ message: string }>("checkouts/browse", { method: "PUT", body: { on: v } });
+      setNote({ tone: "success", text: r.message });
+      setOn(null);
+      await reload();
+    } catch (e) {
+      setNote({ tone: "critical", text: (e as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Section title="Browse reminders">
+      <Card>
+        {note ? <Banner tone={note.tone}>{note.text}</Banner> : null}
+        <Body muted>{`When a subscriber looks at a product while signed in and doesn't buy it, we email them about ${b.hours} hours later with a link back to it. Nobody gets more than one a week, and it's skipped when they ordered since or the product sold out.`}</Body>
+        <Toggle label="Send browse reminders" value={v} onChange={setOn} />
+        <Button label="Save browse reminders" busy={busy} disabled={busy || on === null} onPress={save} />
+        <Body muted>{`Last 30 days: ${b.sent} ${b.sent === 1 ? "buyer" : "buyers"} reminded · ${b.orders} ${b.orders === 1 ? "order" : "orders"} from them · ${money(b.salesMinor, currency)}`}</Body>
       </Card>
     </Section>
   );

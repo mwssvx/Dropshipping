@@ -2180,3 +2180,7 @@ Settings in the app has "After the order" under Checkout extras: write the thank
 ### Refer a friend in the app (after launch, part 425)
 
 Discount codes in the app links to "Refer a friend": turn the program on or off, set the friend's percent off, the store credit the buyer who shared gets, and the friend's smallest order, and see how many friends got a code, what they bought and the credit given.
+
+### Browse reminders in the app (after launch, part 426)
+
+The app's "Left at checkout" screen has Browse reminders under the checkout reminder emails: turn on the one email a signed-in subscriber gets after looking at a product and leaving without it, and see how many were reminded in the last 30 days and what they bought.
