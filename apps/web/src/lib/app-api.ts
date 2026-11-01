@@ -56,6 +56,7 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  setPhotoTexts,
   getSupplierLink,
   setProductSupplier,
   productSwatches,
@@ -569,6 +570,8 @@ const productView = (p: ProductRow) => ({
   status: p.status,
   imageUrl: p.imageUrl,
   images: productPhotos(p),
+  /** What each photo shows, by its address, for screen readers and image search. */
+  imageAlts: p.imageAlts ?? {},
   descriptionHtml: p.descriptionHtml,
   aiGenerated: p.aiGenerated,
   sourceUrl: p.sourceUrl,
@@ -3353,6 +3356,16 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, own ? `Had ${own.name} send ${product.title}, in the app` : `Set ${product.title} to be sent by the store, in the app`, { href: `/admin/products/${product.id}` });
     revalidatePath(`/admin/products/${product.id}`);
     return { ok: true, message: own ? `Saved. Paid orders for it are emailed to ${own.name}, with a link where they add tracking.` : "Saved. You send it and add the tracking yourself." };
+  },
+  "PUT products/:id/photo-texts": async ({ req, params, db, shop }) => {
+    const b = await body<{ texts?: unknown }>(req);
+    if (!Array.isArray(b.texts)) throw new UserError("Send the descriptions as a list.");
+    const texts = b.texts.map(str);
+    const described = await setPhotoTexts(db, shop.id, params.id!, texts);
+    revalidatePath(`/admin/products/${params.id}`);
+    revalidatePath("/admin/seo");
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: described === texts.length ? "Saved. Every photo has a description." : `Saved. ${described} of ${texts.length} photos have a description.` };
   },
   "POST products/:id/listing": async ({ params, shop }) => {
     const run = await writeListing(await agents(), shop, params.id!);

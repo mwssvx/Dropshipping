@@ -3,6 +3,9 @@ export type Product = {
   title: string;
   status: "draft" | "active" | "archived";
   imageUrl: string | null;
+  /** Every photo in order; the first is the main one. */
+  images?: string[];
+  imageAlts?: Record<string, string>;
   descriptionHtml: string;
   aiGenerated: boolean;
   sourceUrl: string | null;

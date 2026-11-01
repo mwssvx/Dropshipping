@@ -2248,3 +2248,7 @@ A product with a colour option has "Color dots" on its screen in the app: names 
 ### Who sends it, in the app (after launch, part 442)
 
 A product's screen in the app has "Who sends it": the supplier it was imported from, you (adding tracking yourself), or one of your own suppliers, who then get its paid orders by email with a link to add tracking.
+
+### Photo descriptions in the app (after launch, part 443)
+
+A product with photos has "Describe each photo" on its screen in the app: say what each one shows, up to 125 characters. Screen readers read it out and image search uses it; an empty one uses the product's name.

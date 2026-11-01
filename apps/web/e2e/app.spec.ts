@@ -4163,3 +4163,43 @@ test("who sends a product, picked from the app", async ({ page, browser }) => {
   await web.reload();
   await expect(web.locator("#supplierId").locator("option:checked")).toHaveText("Me (I add tracking myself)");
 });
+
+test("photo descriptions for a product, from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `pt${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Glass Vase");
+  await web.getByLabel("Price", { exact: true }).fill("30.00");
+  await web.getByLabel("Stock", { exact: true }).fill("6");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const productUrl = web.url();
+  const photos = web.getByRole("region", { name: "Photos" });
+  // Two tiny 16×16 PNGs, orange and blue.
+  for (const [name, b64] of [
+    ["orange.png", "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR4nGP4NNOLJMQwqmFUw/DVAAD9ItUQ1CpVsgAAAABJRU5ErkJggg=="],
+    ["blue.png", "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR4nGMIq9hHEmIY1TCqYfhqAAAekowQ1ZAHyAAAAABJRU5ErkJggg=="],
+  ] as const) {
+    await photos.getByLabel("Upload a photo").setInputFiles({ name, mimeType: "image/png", buffer: Buffer.from(b64, "base64") });
+    await photos.getByRole("button", { name: "Add photo" }).click();
+    await expect(photos.getByText("Photo added.")).toBeVisible();
+  }
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Glass Vase/ }).click();
+  const describe = page.getByRole("region", { name: "Describe each photo" });
+  await describe.getByRole("textbox", { name: "Photo 1 (main)" }).fill("A".repeat(130));
+  await describe.getByRole("button", { name: "Save descriptions" }).click();
+  await expect(page.getByText("Keep each description to 125 characters. Photo 1 is 130.")).toBeVisible();
+  await describe.getByRole("textbox", { name: "Photo 1 (main)" }).fill("Clear glass vase with tulips on a windowsill");
+  await describe.getByRole("button", { name: "Save descriptions" }).click();
+  await expect(page.getByText("Saved. 1 of 2 photos have a description.")).toBeVisible();
+  await describe.getByRole("textbox", { name: "Photo 2" }).fill("The vase empty, from above");
+  await describe.getByRole("button", { name: "Save descriptions" }).click();
+  await expect(page.getByText("Saved. Every photo has a description.")).toBeVisible();
+  await shot(page, "443-app-photo-text");
+
+  await web.goto(productUrl);
+  await expect(web.locator("#photo-text-0")).toHaveValue("Clear glass vase with tulips on a windowsill");
+  await expect(web.locator("#photo-text-1")).toHaveValue("The vase empty, from above");
+});
