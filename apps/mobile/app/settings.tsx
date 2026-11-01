@@ -113,6 +113,13 @@ export default function Settings() {
           </List>
         </Section>
       ) : null}
+      {can("trust") ? (
+        <Section title="Trust">
+          <List>
+            <Row href="/notices" title="Your store's standing" subtitle="Warnings from us, appeals, and the verified store badge" />
+          </List>
+        </Section>
+      ) : null}
       {can("pages") ? (
         <Section title="Blog">
           <List>

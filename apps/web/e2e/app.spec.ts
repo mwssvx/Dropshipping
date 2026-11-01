@@ -2515,3 +2515,62 @@ test("a blog post written, published, scheduled and deleted from the app", async
   await expect(page).toHaveURL(/\/blog$/);
   await expect(page.getByText("No posts yet")).toBeVisible();
 });
+
+test("a warning from us read and answered in the app", async ({ page, browser }) => {
+  const id = `tr${Date.now()}`;
+  const { email } = await merchant(browser, id);
+  // Staff (listed in STAFF_EMAILS for the test server) warn the store.
+  const staff = await (await browser.newContext()).newPage();
+  await staff.goto(`${WEB}/signup`);
+  await staff.getByLabel("Email").fill("staff-app@example.com");
+  await staff.getByLabel("Password").fill(PASSWORD);
+  await staff.getByRole("button", { name: "Create account" }).click();
+  await expect(staff.getByLabel("Store name")).toBeVisible();
+  await staff.goto(`${WEB}/staff`);
+  await staff.getByRole("link", { name: `Pocket Shop ${id}` }).click();
+  await staff.getByLabel("Reason").selectOption("late_shipping");
+  await staff.getByLabel(/What happened/).fill("Four orders from last week still have no tracking after 10 days.");
+  await staff.getByRole("button", { name: "Send notice" }).click();
+  await expect(staff.getByText("Sent.")).toBeVisible();
+
+  await signIn(page, email);
+  await page.getByRole("link", { name: /^A warning from us/ }).click();
+  await expect(page).toHaveURL(/\/notices$/);
+  await expect(page.getByText("Your store is open, but there's something to fix below.")).toBeVisible();
+  const notice = page.getByRole("region", { name: "Orders are shipping late" });
+  await expect(notice).toContainText("Warning");
+  await expect(notice).toContainText(/Fix by /);
+  await expect(notice).toContainText("What happened: Four orders from last week still have no tracking after 10 days.");
+  await expect(notice).toContainText("What to do: Ship or refund the late orders");
+
+  const reply = notice.getByRole("textbox", { name: "What you changed, or why this is wrong" });
+  await reply.fill("Shipped.");
+  await notice.getByRole("button", { name: "Send reply" }).click();
+  await expect(page.getByText("Tell us what you changed or why you think this is wrong, in a sentence or two.")).toBeVisible();
+  await reply.fill("All four orders shipped yesterday with tracking, and I moved those items to a faster supplier.");
+  await notice.getByRole("button", { name: "Send reply" }).click();
+  await expect(page.getByText("Sent. A person reads every appeal and replies here, usually within two working days.")).toBeVisible();
+  await expect(notice).toContainText("Your appeal: All four orders shipped yesterday");
+  await expect(notice).toContainText("Waiting for a reply.");
+  await expect(notice.getByRole("button", { name: "Send reply" })).toHaveCount(0);
+
+  const badge = page.getByRole("region", { name: "Verified store badge" });
+  await expect(badge.getByRole("listitem", { name: "In good standing, with no open warnings: not yet, 1 open" })).toBeVisible();
+  await badge.getByRole("button", { name: "Check now" }).click();
+  await expect(page.getByText("Checked. Your store doesn't meet every rule yet.")).toBeVisible();
+  await shot(page, "399-app-trust");
+
+  // A person accepts the appeal, which closes the warning.
+  await staff.goto(`${WEB}/staff`);
+  const appeal = staff.getByRole("article").filter({ hasText: `Pocket Shop ${id}` });
+  await appeal.getByLabel("Reply to the merchant").fill("Thanks, confirmed the tracking. Closed.");
+  await appeal.getByRole("button", { name: "Accept" }).click();
+  await expect(appeal).toHaveCount(0);
+
+  await page.reload();
+  await expect(page.getByText("All good. Nothing needs your attention.")).toBeVisible();
+  await expect(page.getByRole("region", { name: "History" })).toContainText("Orders are shipping late");
+  await expect(badge.getByRole("listitem", { name: "In good standing, with no open warnings: met, Good standing" })).toBeVisible();
+  await page.getByRole("link", { name: "Settings" }).click();
+  await expect(page.getByRole("link", { name: /^Your store's standing/ })).toBeVisible();
+});
