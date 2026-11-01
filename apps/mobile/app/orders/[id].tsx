@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { Linking, Share, View } from "react-native";
 import { api, useApi } from "../../src/api";
@@ -9,6 +9,7 @@ import { useCan } from "../../src/session";
 import { DISPUTE_STATUS } from "../../src/disputes";
 
 type Detail = {
+  replaceable?: { id: string; title: string; quantity: number }[];
   id: string;
   number: number;
   name: string;
@@ -362,6 +363,8 @@ export default function OrderScreen() {
         </Card>
       </Section>
 
+      {o.replaceable?.length ? <ReplacementSection order={o} /> : null}
+
       {can("orders") ? (
         <NotesSection key={`${o.staffNote ?? ""}|${(o.tags ?? []).join(",")}`} order={o} busy={busy} save={(body) => run("notes", `orders/${o.id}/notes`, body)} />
       ) : o.staffNote || o.tags?.length ? (
@@ -473,6 +476,48 @@ function NotesSection({ order: o, busy, save }: { order: Detail; busy: string | 
         <Field label="Tags" value={tags} onChangeText={setTags} placeholder="follow up, priority" autoCapitalize="none" hint="Separate with commas. Filter the order list by them." />
         <Field label="Note" value={noteText} onChangeText={setNoteText} multiline hint="Only your team sees it." />
         <Button label="Save note and tags" busy={busy === "notes"} disabled={!!busy || !changed} onPress={() => void save({ note: noteText, tags })} />
+      </Card>
+    </Section>
+  );
+}
+
+/** Send items again for free when a parcel was lost, damaged or wrong: a new order to the supplier at no charge. */
+function ReplacementSection({ order: o }: { order: Detail }) {
+  const lines = o.replaceable ?? [];
+  const [open, setOpen] = useState(false);
+  const [qty, setQty] = useState<Record<string, string>>(() => Object.fromEntries(lines.map((l) => [l.id, String(l.quantity)])));
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function send() {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api<{ id: string; number: number; message: string }>(`orders/${o.id}/replacement`, { body: { items: lines.map((l) => ({ lineId: l.id, quantity: qty[l.id] ?? "0" })), note: message } });
+      router.push({ pathname: "/orders/[id]", params: { id: r.id, made: r.message } });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Section title="Send a replacement">
+      <Card>
+        <Body muted>For a parcel that was lost, damaged or wrong. It goes to the supplier as a new order at no charge to the buyer, and they get an email. It counts as a cost in your profit report.</Body>
+        {open ? (
+          <>
+            {error ? <Banner tone="critical">{error}</Banner> : null}
+            {lines.map((l) => (
+              <Field key={l.id} label={`${l.title} (of ${l.quantity})`} value={qty[l.id] ?? ""} onChangeText={(t) => setQty({ ...qty, [l.id]: t })} keyboardType="number-pad" />
+            ))}
+            <Field label="Message to the buyer (optional)" value={message} onChangeText={setMessage} multiline placeholder="Sorry it got lost. Here's a new one." />
+            <Button label="Send replacement" busy={busy} onPress={() => void send()} />
+            <Button label="Cancel" kind="ghost" onPress={() => setOpen(false)} disabled={busy} />
+          </>
+        ) : (
+          <Button label="Send a replacement…" kind="secondary" onPress={() => setOpen(true)} />
+        )}
       </Card>
     </Section>
   );

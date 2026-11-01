@@ -2256,3 +2256,7 @@ A product with photos has "Describe each photo" on its screen in the app: say wh
 ### Order note and tags in the app (after launch, part 444)
 
 An order's screen in the app lets the team write its note and tags, which only the team sees. The website's order list filters by the same tags.
+
+### Send a replacement in the app (after launch, part 445)
+
+A shipped order's screen in the app has "Send a replacement", for a parcel that was lost, damaged or wrong: pick how many of each item to send again and add a message, and it goes out as a new order at no charge to the buyer.

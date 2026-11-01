@@ -56,6 +56,9 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  sendReplacement,
+  replacementBlocked,
+  replaceableLines,
   updateOrderNotes,
   setPhotoTexts,
   getSupplierLink,
@@ -809,6 +812,8 @@ const routes: Record<string, Handler> = {
           ? { kind: o.pickup ? "pickup" : "delivery", day: o.handoverOn, readyAt: o.pickupReadyAt, done: o.fulfillmentStatus === "delivered" }
           : null,
       postYourself: postYourself ? { own: !!ownParcel } : null,
+      // Shipped and paid: the items that can be sent again for free, when a parcel was lost, damaged or wrong.
+      replaceable: !replacementBlocked(o) && can(role, "orders") ? (await replaceableLines(db, o.id)).map((l) => ({ id: l.id, title: l.title, quantity: l.quantity })) : [],
       sameAddress: sameDoor?.orders.length
         ? { orders: sameDoor.orders.map((x) => ({ id: x.id, number: x.number, createdAt: x.createdAt, ownItems: x.ownItems })), oneBox: sameDoor.ownItems && sameDoor.orders.some((x) => x.ownItems) }
         : null,
@@ -2900,6 +2905,16 @@ const routes: Record<string, Handler> = {
     revalidatePath(`/admin/orders/${params.id}`);
     revalidatePath("/admin/orders");
     return { ok: true, message: "Note and tags saved." };
+  },
+  "POST orders/:id/replacement": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ items?: unknown; note?: unknown }>(req);
+    const raw = Array.isArray(b.items) ? (b.items as Record<string, unknown>[]) : [];
+    const items = raw.map((i) => ({ lineId: str(i.lineId), quantity: Number(str(i.quantity).trim() || 0) }));
+    if (items.some((i) => !Number.isInteger(i.quantity) || i.quantity < 0)) throw new UserError("Enter whole numbers for the quantities.");
+    const { id, number } = await sendReplacement(await fulfillment(), shop, params.id!, { items, note: str(b.note) });
+    await logged({ shop, user, db }, `Sent a free replacement (#${number}) for order {order} in the app`, { orderId: params.id! });
+    revalidatePath("/admin/orders", "layout");
+    return { ok: true, id, number, message: `Replacement #${number} is on its way, and the buyer got an email.` };
   },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
