@@ -5,7 +5,7 @@ import { Image, View } from "react-native";
 import { api, send, useApi } from "../../src/api";
 import { kg, money, parseKg, parseMoney } from "../../src/format";
 import { useCan, useSession } from "../../src/session";
-import { BackLink, Banner, Body, Button, Card, Field, Heading, LoadError, Loading, Pill, Screen, Section, Toggle } from "../../src/ui";
+import { BackLink, Banner, Body, Button, Card, Field, Heading, LoadError, Loading, Pill, Screen, Section, Segmented, Toggle } from "../../src/ui";
 import { color, radius, space } from "../../src/theme";
 import { STATUS, type Product } from "../../src/product";
 
@@ -231,6 +231,7 @@ export default function ProductScreen() {
       {p.giftCard ? null : <VideoSection product={p} busy={busy} act={act} />}
       {p.giftCard ? null : <PersonalizationSection product={p} busy={busy} act={act} />}
       {p.giftCard ? null : <DetailsSection product={p} busy={busy} act={act} />}
+      {p.giftCard ? null : <UnitPriceSection product={p} busy={busy} act={act} />}
       <TagsSection product={p} busy={busy} act={act} />
       <CollectionsSection product={p} busy={busy} act={act} />
       <BackupSection product={p} busy={busy} act={act} currency={cur} />
@@ -450,6 +451,40 @@ function PersonalizationSection({ product: p, busy, act }: { product: Product; b
           disabled={!!busy || edit === null}
           onPress={() =>
             act("personal", async () => (await api<{ message: string }>(`products/${p.id}/personalization`, { method: "PUT", body: { fields: rows.map((r) => ({ ...r, maxLength: Number(r.maxLength) })) } })).message)
+          }
+        />
+      </Card>
+    </Section>
+  );
+}
+
+// The same units as the website's price-per-unit form (core CONTENT_UNITS).
+const CONTENT_UNITS: [string, string][] = [["g", "g"], ["kg", "kg"], ["ml", "ml"], ["cl", "cl"], ["l", "l"], ["cm", "cm"], ["m", "m"], ["m2", "m²"], ["item", "items"]];
+
+/** What one of each option holds, so the store shows the price per kg, litre or metre under the price. */
+function UnitPriceSection({ product: p, busy, act }: { product: Product; busy: string | null; act: Act }) {
+  const saved = Object.fromEntries(p.variants.map((v) => [v.id, { amount: v.contents ? String(v.contents.amount) : "", unit: v.contents?.unit ?? "g" }]));
+  const [edit, setEdit] = useState<typeof saved | null>(null);
+  const rows = edit ?? saved;
+  useEffect(() => setEdit(null), [p]);
+  const single = p.variants.length === 1;
+  const set = (id: string, patch: Partial<{ amount: string; unit: string }>) => setEdit({ ...rows, [id]: { ...rows[id]!, ...patch } });
+  return (
+    <Section title="Price per unit">
+      <Card>
+        <Body muted>For things sold by weight, volume or length, like coffee, oil or fabric. Say what one holds and the store shows the price per kg, litre or metre under the price, as the EU requires. Leave it empty for anything else.</Body>
+        {p.variants.map((v) => (
+          <View key={v.id} style={{ gap: space(2) }}>
+            <Field label={single ? "Pack contents" : `Pack contents (${v.title})`} value={rows[v.id]?.amount ?? ""} onChangeText={(t) => set(v.id, { amount: t })} keyboardType="decimal-pad" placeholder="250" />
+            <Segmented label={single ? "Pack unit" : `Pack unit (${v.title})`} value={rows[v.id]?.unit ?? "g"} onChange={(u) => set(v.id, { unit: u })} options={CONTENT_UNITS} />
+          </View>
+        ))}
+        <Button
+          label="Save price per unit"
+          busy={busy === "units"}
+          disabled={!!busy || edit === null}
+          onPress={() =>
+            act("units", async () => (await api<{ message: string }>(`products/${p.id}/contents`, { method: "PUT", body: { rows: p.variants.map((v) => ({ variantId: v.id, ...rows[v.id] })) } })).message)
           }
         />
       </Card>

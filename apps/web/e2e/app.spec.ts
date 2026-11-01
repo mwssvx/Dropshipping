@@ -3920,3 +3920,36 @@ test("personalisation fields for a product, from the app", async ({ page, browse
   await web.reload();
   await expect(fields.locator("#pf-label-0")).toHaveCount(0);
 });
+
+test("price per unit for a product, from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `up${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Olive Oil");
+  await web.getByLabel("Price", { exact: true }).fill("12.00");
+  await web.getByLabel("Stock", { exact: true }).fill("10");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const store = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Olive Oil/ }).click();
+  const units = page.getByRole("region", { name: "Price per unit" });
+  await units.getByRole("textbox", { name: "Pack contents" }).fill("lots");
+  await units.getByRole("button", { name: "Save price per unit" }).click();
+  await expect(page.getByText("The contents should be a number above 0, like 250 or 1.5.")).toBeVisible();
+  await units.getByRole("textbox", { name: "Pack contents" }).fill("500");
+  await units.getByRole("tablist", { name: "Pack unit" }).getByRole("tab", { name: "ml", exact: true }).click();
+  await units.getByRole("button", { name: "Save price per unit" }).click();
+  await expect(page.getByText("Saved. The price per unit shows under the price on the store.")).toBeVisible();
+  await expect(units.getByRole("tab", { name: "ml", exact: true })).toHaveAttribute("aria-selected", "true");
+  await shot(page, "437-app-unit-price");
+
+  // $12.00 for 500 ml is $24.00 a litre.
+  await web.goto(store);
+  await expect(web.locator("main").getByText("$24.00 / l").first()).toBeVisible();
+
+  await units.getByRole("textbox", { name: "Pack contents" }).fill("");
+  await units.getByRole("button", { name: "Save price per unit" }).click();
+  await expect(page.getByText("Saved. No price per unit is shown.")).toBeVisible();
+});
