@@ -3006,19 +3006,18 @@ test("currencies buyers can pay in, turned on from the app", async ({ page, brow
   await page.getByRole("link", { name: "Settings" }).click();
   await page.getByRole("link", { name: /^Currencies/ }).click();
   await expect(page.getByText("USD is always on: it's your store's currency.")).toBeVisible();
-  // Each rate shows what a product would cost in that currency.
-  await expect(page.getByText(/^1 USD is \d\.\d{4} · A product at \$24\.99 is €/)).toBeVisible();
+  // Each rate shows what a product would cost in that currency, rounded to .99 until that's turned off.
+  await expect(page.getByText(/^1 USD is \d\.\d{4} · A product at \$24\.99 is €\d+\.99$/)).toBeVisible();
   await page.getByRole("switch", { name: "EUR · Euro" }).click();
   await page.getByRole("switch", { name: "GBP · British pound" }).click();
   await page.getByRole("switch", { name: "Round converted prices to end in .99" }).click();
   await page.getByRole("button", { name: "Save currencies" }).click();
   await expect(page.getByText("Saved. Buyers see the change on their next page.")).toBeVisible();
-  await expect(page.getByText(/· A product at \$24\.99 is €\d+\.99$/)).toBeVisible();
   await shot(page, "412-app-currencies");
 
   await web.goto(`${WEB}/admin/currencies`);
   await expect(web.getByRole("checkbox", { name: "EUR · Euro" })).toBeChecked();
   await expect(web.getByRole("checkbox", { name: "GBP · British pound" })).toBeChecked();
   await expect(web.getByRole("checkbox", { name: "CAD · Canadian dollar" })).not.toBeChecked();
-  await expect(web.getByRole("checkbox", { name: /Round converted prices/ })).toBeChecked();
+  await expect(web.getByRole("checkbox", { name: /Round converted prices/ })).not.toBeChecked();
 });
