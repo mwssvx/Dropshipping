@@ -2044,3 +2044,7 @@ The app's Left at checkout screen has a Reminder emails section. Turn the remind
 ### New subscribers in the app (after launch, part 391)
 
 The app's Discount codes screen has a New subscribers row. Set the welcome offer (5% to 50% off, an optional smallest order, and how long the code lasts) or turn it off, and turn the sign-up pop-up on, opening when a visitor looks about to leave or after 5 to 60 seconds. The holiday checklist's sign-up offer line opens it.
+
+### Holiday returns in the app (after launch, part 392)
+
+The app's Returns screen has a Holiday returns row. Keep returns open longer for orders paid in a holiday stretch (Nov 1 to Dec 24 is suggested, returnable until Jan 31), or turn it off. The holiday checklist's gift returns line opens it.

@@ -2285,3 +2285,27 @@ test("welcome offer and sign-up pop-up set from the app", async ({ page, browser
   await page.goto("/holiday-checklist");
   await expect(page.getByRole("region", { name: "Done" }).getByRole("button", { name: "Collect emails with a sign-up offer, done" })).toBeVisible();
 });
+
+test("holiday returns kept open longer from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `hr${Date.now()}`);
+  await signIn(page, email);
+  await page.getByRole("button", { name: /^Returns/ }).click();
+  await page.getByRole("link", { name: /^Holiday returns/ }).click();
+  await expect(page.getByRole("heading", { name: "Holiday returns", level: 1 })).toBeVisible();
+  await page.getByRole("switch", { name: "Keep returns open longer for holiday orders" }).click();
+  const now = new Date();
+  const y = now.getUTCMonth() === 11 && now.getUTCDate() > 24 ? now.getUTCFullYear() + 1 : now.getUTCFullYear();
+  await expect(page.getByRole("textbox", { name: "Orders paid from" })).toHaveValue(`${y}-11-01`);
+  await page.getByRole("textbox", { name: "Can be returned until" }).fill(`${y}-12-01`);
+  await page.getByRole("button", { name: "Save holiday returns" }).click();
+  await expect(page.getByText("Returns have to stay open after the last order day.")).toBeVisible();
+  await page.getByRole("textbox", { name: "Can be returned until" }).fill(`${y + 1}-01-31`);
+  await page.getByRole("button", { name: "Save holiday returns" }).click();
+  await expect(page.getByText("Saved. Orders paid Nov 1 to Dec 24 can be returned until Jan 31.")).toBeVisible();
+  await shot(page, "392-app-holiday-returns");
+
+  await web.goto(`${WEB}/admin/returns`);
+  await expect(web.getByLabel("Returns open until")).toHaveValue(`${y + 1}-01-31`);
+  await page.goto("/holiday-checklist");
+  await expect(page.getByRole("region", { name: "Done" }).getByRole("button", { name: "Keep returns open for gifts, done" })).toBeVisible();
+});
