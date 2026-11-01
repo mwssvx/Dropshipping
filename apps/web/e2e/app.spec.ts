@@ -2168,7 +2168,7 @@ test("the holiday checklist in the app, with a line set up from the app", async 
   await expect(page.getByRole("heading", { name: "Holiday checklist", level: 1 })).toBeVisible();
   await expect(page.getByText(/^\d+ of 12 done$/)).toBeVisible();
   const todo = page.getByRole("region", { name: "To do" });
-  await expect(todo.getByRole("button", { name: "Schedule a holiday look, opens the website" })).toBeVisible();
+  await expect(todo.getByRole("button", { name: "Schedule a holiday look" })).toBeVisible();
   await shot(page, "387-app-holiday-checklist");
 
   await todo.getByRole("button", { name: "Email buyers when an order runs late" }).click();
@@ -2381,4 +2381,41 @@ test("a backup supplier added and removed from the app", async ({ page, browser 
   await backup.getByRole("button", { name: "Remove backup" }).click();
   await expect(page.getByText("Backup removed.")).toBeVisible();
   await expect(backup.getByRole("textbox", { name: "Backup supplier link" })).toBeVisible();
+});
+
+test("a new store look scheduled, cancelled and published from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `lk${Date.now()}`);
+  await web.goto(`${WEB}/admin/theme`);
+  await web.getByRole("tab", { name: "Themes" }).click();
+  await web.getByLabel("Also replace my home page sections").check();
+  await web.getByRole("button", { name: "Use Boutique" }).click();
+  await expect(web.getByText("Draft saved. Not live yet.")).toBeVisible();
+
+  await signIn(page, email);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("link", { name: /^Store look/ }).click();
+  const draft = page.getByRole("region", { name: "Your draft" });
+  await expect(draft).toContainText("Your draft has changes that aren't on the store yet.");
+  const day = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+  await draft.getByRole("textbox", { name: "Goes live on" }).fill(day(10));
+  await draft.getByRole("textbox", { name: "Switches back on (optional)" }).fill(day(5));
+  await draft.getByRole("button", { name: "Schedule" }).click();
+  await expect(page.getByText("Switch back after the new look goes live.")).toBeVisible();
+  await draft.getByRole("textbox", { name: "Switches back on (optional)" }).fill(day(12));
+  await draft.getByRole("button", { name: "Schedule" }).click();
+  await expect(page.getByText("Scheduled. The new look goes live by itself and switches back when you said.")).toBeVisible();
+  const scheduled = page.getByRole("region", { name: "Scheduled" });
+  await expect(scheduled.getByRole("heading", { name: /^Goes live / })).toBeVisible();
+  await shot(page, "396-app-store-look");
+  await page.goto("/holiday-checklist");
+  await expect(page.getByRole("region", { name: "Done" }).getByRole("button", { name: "Schedule a holiday look, done" })).toBeVisible();
+
+  await page.goto("/store-look");
+  await page.getByRole("button", { name: "Cancel the scheduled look…" }).click();
+  await page.getByRole("button", { name: "Cancel the scheduled look" }).click();
+  await expect(page.getByText("Cancelled. The store keeps the look it has.")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Scheduled" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Publish now" }).click();
+  await expect(page.getByText("Published. Buyers see the new look now.")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Your draft" })).toContainText("The store shows your latest look.");
 });
