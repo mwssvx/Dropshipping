@@ -2108,3 +2108,7 @@ Settings in the app has a Checkout row under Shipping: the smallest order a buye
 ### Pickup and local delivery in the app (after launch, part 407)
 
 Settings in the app has a "Pickup and local delivery" row under Shipping: turn on local pickup with the address and how to collect, and local delivery with the postal codes you deliver to, its price, the order amount it's free over and a note for buyers.
+
+### Pickup and delivery days in the app (after launch, part 408)
+
+Once pickup or local delivery is on, the same screen in the app has "Pickup and delivery days": let buyers pick the day they collect or get their order, tick the weekdays you hand orders over and set the days' notice you need. The time zone is the one already set on the web.

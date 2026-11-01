@@ -2833,3 +2833,38 @@ test("local pickup and local delivery turned on from the app", async ({ page, br
   await expect(web.getByLabel("Postal codes you deliver to")).toHaveValue("78613, 787");
   await expect(web.getByLabel(/^Delivery price/)).toHaveValue("5.00");
 });
+
+test("pickup and delivery days picked from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `hd${Date.now()}`);
+  await signIn(page, email);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("link", { name: /^Pickup and local delivery/ }).click();
+  // The days only matter once the store hands orders over itself.
+  await expect(page.getByRole("region", { name: "Pickup and delivery days" })).toHaveCount(0);
+  const pickup = page.getByRole("region", { name: "Local pickup" });
+  await pickup.getByRole("switch", { name: "Offer local pickup" }).click();
+  await pickup.getByRole("textbox", { name: "Pickup address" }).fill("12 Main St, Austin, TX 78701");
+  await pickup.getByRole("button", { name: "Save pickup" }).click();
+  await expect(page.getByText("Saved. Buyers can pick up their order at checkout.")).toBeVisible();
+
+  const days = page.getByRole("region", { name: "Pickup and delivery days" });
+  await days.getByRole("switch", { name: "Buyers pick the day they collect or get their order" }).click();
+  for (const d of ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]) await days.getByRole("switch", { name: d, exact: true }).click();
+  await days.getByRole("button", { name: "Save days" }).click();
+  await expect(page.getByText("Tick at least one day.")).toBeVisible();
+  await days.getByRole("switch", { name: "Saturday", exact: true }).click();
+  await days.getByRole("textbox", { name: "Days' notice you need" }).fill("9");
+  await days.getByRole("button", { name: "Save days" }).click();
+  await expect(page.getByText("Pick 0 to 7 days' notice.")).toBeVisible();
+  await days.getByRole("textbox", { name: "Days' notice you need" }).fill("2");
+  await days.getByRole("switch", { name: "Sunday", exact: true }).click();
+  await days.getByRole("button", { name: "Save days" }).click();
+  await expect(page.getByText("Saved. Buyers pick from Saturday, Sunday at checkout.")).toBeVisible();
+  await shot(page, "408-app-handover-days");
+
+  await web.goto(`${WEB}/admin/shipping`);
+  await expect(web.getByRole("checkbox", { name: "Buyers pick the day they collect or get their order" })).toBeChecked();
+  await expect(web.getByRole("checkbox", { name: "Saturday" })).toBeChecked();
+  await expect(web.getByRole("checkbox", { name: "Monday" })).not.toBeChecked();
+  await expect(web.getByLabel("Notice you need")).toHaveValue("2");
+});

@@ -6,7 +6,15 @@ import { BackLink, Banner, Body, Button, Card, Field, List, LoadError, Loading, 
 type Data = {
   pickup: { address: string; instructions: string | null } | null;
   delivery: { postalPrefixes: string[]; priceMinor: number; freeOverMinor: number | null; note: string | null } | null;
+  days: { weekdays: number[]; leadDays: number; timeZone: string } | null;
+  zone: string;
+  leadMax: number;
 };
+type Days = { on: boolean; weekdays: number[]; leadDays: string };
+
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+// Monday first, as on the web.
+const ORDER = [1, 2, 3, 4, 5, 6, 0];
 type Pickup = { on: boolean; address: string; instructions: string };
 type Delivery = { on: boolean; postalPrefixes: string; price: string; freeOver: string; note: string };
 
@@ -18,6 +26,7 @@ export default function LocalScreen() {
   const data = useApi<Data>("local");
   const [pickup, setPickup] = useState<Pickup | null>(null);
   const [delivery, setDelivery] = useState<Delivery | null>(null);
+  const [days, setDays] = useState<Days | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{ tone: "success" | "critical"; text: string } | null>(null);
   const d = data.data;
@@ -25,6 +34,7 @@ export default function LocalScreen() {
   const l =
     delivery ??
     (d ? { on: !!d.delivery, postalPrefixes: d.delivery?.postalPrefixes.join(", ") ?? "", price: amount(d.delivery?.priceMinor), freeOver: amount(d.delivery?.freeOverMinor), note: d.delivery?.note ?? "" } : null);
+  const h = days ?? (d ? { on: !!d.days, weekdays: d.days?.weekdays ?? [1, 2, 3, 4, 5], leadDays: String(d.days?.leadDays ?? 1) } : null);
 
   async function run(key: string, path: string, body: unknown, after: () => void) {
     setBusy(key);
@@ -45,7 +55,7 @@ export default function LocalScreen() {
     <Screen title="Pickup and local delivery" back={<BackLink href="/settings" label="Settings" />} onRefresh={data.reload} refreshing={data.loading && !!d}>
       {note ? <Banner tone={note.tone}>{note.text}</Banner> : null}
       <LoadError error={data.error} stale={data.stale} retry={data.reload} />
-      {!d || !p || !l ? (
+      {!d || !p || !l || !h ? (
         data.loading ? <Loading /> : null
       ) : (
         <>
@@ -77,6 +87,28 @@ export default function LocalScreen() {
               <Button label="Save local delivery" busy={busy === "delivery"} disabled={!!busy || !delivery} onPress={() => run("delivery", "local/delivery", l, () => setDelivery(null))} />
             </Card>
           </Section>
+          {d.pickup || d.delivery || d.days ? (
+            <Section title="Pickup and delivery days">
+              <Card>
+                <Body muted>Let buyers who collect their order or get it from you pick the day at checkout, from the next two weeks you're open. The day shows on the order, and buyers get a reminder email the day before.</Body>
+                <Toggle label="Buyers pick the day they collect or get their order" value={h.on} onChange={(v) => setDays({ ...h, on: v })} />
+                {h.on ? (
+                  <>
+                    {ORDER.map((n) => (
+                      <Toggle
+                        key={n}
+                        label={WEEKDAYS[n]!}
+                        value={h.weekdays.includes(n)}
+                        onChange={(v) => setDays({ ...h, weekdays: v ? [...h.weekdays, n] : h.weekdays.filter((x) => x !== n) })}
+                      />
+                    ))}
+                    <Field label="Days' notice you need" value={h.leadDays} onChangeText={(v) => setDays({ ...h, leadDays: v })} keyboardType="number-pad" hint={`0 for the same day, up to ${d.leadMax}. Days are counted in ${d.zone} time.`} />
+                  </>
+                ) : null}
+                <Button label="Save days" busy={busy === "days"} disabled={!!busy || !days} onPress={() => run("days", "local/days", h, () => setDays(null))} />
+              </Card>
+            </Section>
+          ) : null}
           {d.pickup || d.delivery ? (
             <List>
               <Row href="/orders" title="Pickups and deliveries" subtitle="Mark orders ready, collected or delivered from the Orders tab" />

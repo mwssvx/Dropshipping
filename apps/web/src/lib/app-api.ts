@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  HANDOVER_LEAD_MAX,
+  setHandoverDays,
   setLocalDelivery,
   setLocalPickup,
   setDeliveryProtection,
@@ -1887,7 +1889,29 @@ const routes: Record<string, Handler> = {
   },
   // Local pickup (where and how buyers collect) and local delivery (the postal codes the store
   // delivers to itself, its price, and the order amount it's free over).
-  "GET local": async ({ shop }) => ({ pickup: shop.localPickup, delivery: shop.localDeliveryArea }),
+  "GET local": async ({ shop }) => ({
+    pickup: shop.localPickup,
+    delivery: shop.localDeliveryArea,
+    // The days buyers can pick for a pickup or delivery, in the store's time zone.
+    days: shop.handoverDays,
+    zone: (() => {
+      const z = shop.handoverDays?.timeZone ?? shop.shipCutoff?.timeZone ?? defaultCutoffZone(shop.country);
+      return CUTOFF_TIME_ZONES.find(([id]) => id === z)?.[1] ?? z;
+    })(),
+    leadMax: HANDOVER_LEAD_MAX,
+  }),
+  "PUT local/days": async ({ req, db, shop, user }) => {
+    const b = await body<{ on?: unknown; weekdays?: unknown; leadDays?: unknown }>(req);
+    const zone = shop.handoverDays?.timeZone ?? shop.shipCutoff?.timeZone ?? defaultCutoffZone(shop.country);
+    const lead = str(b.leadDays).trim();
+    const saved =
+      b.on === true
+        ? await setHandoverDays(db, shop.id, { weekdays: Array.isArray(b.weekdays) ? b.weekdays.map(Number) : [], leadDays: lead === "" ? Number.NaN : Number(lead), timeZone: zone })
+        : await setHandoverDays(db, shop.id, null);
+    await logged({ shop, user, db }, saved ? "Let buyers pick a pickup or delivery day, in the app" : "Stopped asking buyers for a pickup or delivery day, in the app", { href: "/admin/shipping#handover-heading" });
+    const names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    return { ok: true, message: saved ? `Saved. Buyers pick from ${[1, 2, 3, 4, 5, 6, 0].filter((d) => saved.weekdays.includes(d)).map((d) => names[d]).join(", ")} at checkout.` : "Saved. Buyers don't pick a day." };
+  },
   "PUT local/pickup": async ({ req, db, shop, user }) => {
     const b = await body<{ on?: unknown; address?: unknown; instructions?: unknown }>(req);
     const saved = await setLocalPickup(db, shop.id, b.on === true ? { address: str(b.address), instructions: str(b.instructions) } : null);
