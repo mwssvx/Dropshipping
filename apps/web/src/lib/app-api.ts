@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  setGiftWrap,
+  MAX_GIFT_WRAP_NOTE,
   createGiftGuides,
   giftGuideTitles,
   holidayChecklist,
@@ -1396,6 +1398,28 @@ const routes: Record<string, Handler> = {
     const day = saved ? new Date(`${saved.arriveBy}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : "";
     return { ok: true, message: saved ? `Saved. Product pages say when to order for ${saved.name}, arriving by ${day}.` : "Removed. Product pages no longer give an order-by date." };
   },
+  // Gift wrapping: buyers sending a gift can have it wrapped at checkout, for the price set here.
+  "GET gift-wrap": async ({ shop }) => ({ wrap: shop.giftWrap, noteMax: MAX_GIFT_WRAP_NOTE }),
+  "PUT gift-wrap": async ({ req, db, shop, user }) => {
+    const b = await body<{ on?: unknown; price?: unknown; note?: unknown }>(req);
+    let saved = null;
+    if (b.on === true) {
+      // A currency sign in front is fine; letters aren't.
+      const raw = str(b.price).trim().replace(/^[$€£¥₹]\s*/, "");
+      let priceMinor = 0;
+      try {
+        priceMinor = raw ? parseMoney(raw) : 0;
+      } catch {
+        throw new UserError("Enter the wrapping price as an amount, like 4.00.");
+      }
+      saved = await setGiftWrap(db, shop.id, { priceMinor, note: str(b.note) });
+    } else {
+      await setGiftWrap(db, shop.id, null);
+    }
+    await logged({ shop, user, db }, saved ? `Turned on gift wrapping at ${formatMoney(saved.priceMinor, shop.currency)} in the app` : "Turned off gift wrapping in the app", { href: "/admin/shipping#gift-wrap" });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: saved ? "Saved. Buyers sending a gift can have it wrapped." : "Saved. Checkout doesn't offer gift wrapping." };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -1436,6 +1460,7 @@ const routes: Record<string, Handler> = {
       late: { path: "/late-emails", area: "shipping" },
       sale: { path: "/sales", area: "marketing" },
       "gift-guides": { path: "/collections", area: "collections" },
+      "gift-wrap": { path: "/gift-wrap", area: "shipping" },
     };
     return {
       season: holidaySeason(),
@@ -2087,6 +2112,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("ship-pause")) return "shipping";
   if (path.startsWith("late-emails")) return "shipping";
   if (path.startsWith("holiday-date")) return "shipping";
+  if (path.startsWith("gift-wrap")) return "shipping";
   if (path.startsWith("gift-cards")) return "gift_cards";
   if (path.startsWith("sales")) return "marketing";
   if (path.startsWith("returns")) return "returns";
