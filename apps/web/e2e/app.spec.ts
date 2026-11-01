@@ -2699,3 +2699,33 @@ test("the store's own stock on the app's Inventory screen", async ({ page, brows
   await list.getByRole("link", { name: /^Olive Soap/ }).click();
   await expect(page).toHaveURL(/\/products\/[0-9a-f-]{36}$/);
 });
+
+test("the plan, what it cost and switching, from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `pl${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/import`);
+  await web.getByRole("link", { name: /sunset projection lamp/i }).click();
+  await web.getByRole("button", { name: "Import and publish" }).click();
+  await expect(web.getByText("Imported and live on your store.")).toBeVisible();
+  await buy(browser, new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href);
+
+  await signIn(page, email);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("link", { name: /^Your plan/ }).click();
+  const free = page.getByRole("region", { name: "You're on Free" });
+  await expect(free).toContainText(/Last 30 days: 1 order, \$[\d.,]+ in sales\. This plan cost you \$[\d.,]+ \(\$[\d.,]+ in sales fees\)\./);
+  await expect(page.getByRole("group", { name: "Free" })).toContainText("Current");
+  await expect(page.getByText("Test mode: plan changes apply straight away and nothing is charged.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Upgrade to Starter…" }).click();
+  await page.getByRole("button", { name: "Upgrade to Starter now" }).click();
+  await expect(page.getByText("Done. You're on Starter.")).toBeVisible();
+  const starter = page.getByRole("region", { name: "You're on Starter" });
+  // For one small order, the free plan would have cost less: the app says so.
+  await expect(starter).toContainText(/Free would have cost \$[\d.,]+ less for the same sales\./);
+  await expect(page.getByRole("group", { name: "Free" })).toContainText("Costs least");
+  await expect(page.getByRole("button", { name: "Switch to Free…" })).toBeVisible();
+  await shot(page, "404-app-plan");
+
+  await web.goto(`${WEB}/admin/plan`);
+  await expect(web.getByRole("heading", { name: "You're on Starter" })).toBeVisible();
+});
