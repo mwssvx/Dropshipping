@@ -18,6 +18,8 @@ type Sale = {
   early?: { code: string; startsAt: string | null; customerTag: string | null; link: string } | null;
 };
 
+type Ahead = { id: string; name: string; saleTitle: string; when: string; span: string; start: string | null; end: string; endLabel: string; planned: string | null };
+
 const LOWEST = [
   ["eu", "Visitors in Europe", "Where the law asks for it: the EU, the rest of the EEA, the UK and Switzerland."],
   ["everyone", "Everyone", "Honest pricing builds trust anywhere."],
@@ -32,7 +34,8 @@ const STATUS: Record<Sale["status"], { label: string; tone: Tone }> = {
 
 /** Sales: start one on everything from the phone, keep it on longer, or end it. */
 export default function SalesScreen() {
-  const list = useApi<{ sales: Sale[]; lowestPriceNote?: string }>("sales");
+  const list = useApi<{ sales: Sale[]; lowestPriceNote?: string; ahead?: Ahead[] }>("sales");
+  const [plan, setPlan] = useState<Ahead | null>(null);
   const [title, setTitle] = useState("");
   const [percent, setPercent] = useState("");
   const [days, setDays] = useState("3");
@@ -70,13 +73,21 @@ export default function SalesScreen() {
       }
       startsAt = at.toISOString();
     }
-    const ok = await run("start", "sales", { title: title.trim(), percentOff: n, days: days === "open" ? null : Number(days), countdown, startsAt }, `${later ? "Schedule" : "Start"} ${title.trim()}`);
+    // A shopping date's sale ends at midnight after its last day, on the phone's clock.
+    const endsAt = plan ? new Date(`${plan.end}T00:00`).toISOString() : null;
+    const ok = await run(
+      "start",
+      "sales",
+      { title: title.trim(), percentOff: n, days: plan || days === "open" ? null : Number(days), countdown, startsAt, endsAt },
+      `${later ? "Schedule" : "Start"} ${title.trim()}`,
+    );
     if (ok) {
       setTitle("");
       setPercent("");
       setCountdown(false);
       setLater(false);
       setDay("");
+      setPlan(null);
     }
   }
 
@@ -88,21 +99,28 @@ export default function SalesScreen() {
         <Card>
           <Field label="Sale name" value={title} onChangeText={setTitle} placeholder="Weekend sale" autoCapitalize="sentences" />
           <Field label="Percent off everything" value={percent} onChangeText={setPercent} keyboardType="number-pad" placeholder="20" />
-          <Segmented
-            label="How long"
-            options={[
-              ["1", "1 day"],
-              ["3", "3 days"],
-              ["7", "A week"],
-              ["open", "Until I end it"],
-            ]}
-            value={days}
-            onChange={(v) => {
-              setDays(v);
-              if (v === "open") setCountdown(false);
-            }}
-          />
-          {days !== "open" ? <Toggle label="Countdown on the store" value={countdown} onChange={setCountdown} /> : null}
+          {plan ? (
+            <View style={{ gap: space(2) }}>
+              <Body>{`Filled in for ${plan.name}. Ends at midnight after ${plan.endLabel}.`}</Body>
+              <Button label="Don't use these dates" kind="ghost" onPress={() => setPlan(null)} />
+            </View>
+          ) : (
+            <Segmented
+              label="How long"
+              options={[
+                ["1", "1 day"],
+                ["3", "3 days"],
+                ["7", "A week"],
+                ["open", "Until I end it"],
+              ]}
+              value={days}
+              onChange={(v) => {
+                setDays(v);
+                if (v === "open") setCountdown(false);
+              }}
+            />
+          )}
+          {plan || days !== "open" ? <Toggle label="Countdown on the store" value={countdown} onChange={setCountdown} /> : null}
           <Segmented
             label="Starts"
             options={[
@@ -126,6 +144,32 @@ export default function SalesScreen() {
         <Row title="Deal of the day" subtitle="One product a day at a lower price, with one link to share" href="/daily-deals" />
       </List>
       <LoadError error={list.error} stale={list.stale} retry={list.reload} />
+      {list.data?.ahead?.length ? (
+        <Section title="Dates coming up">
+          <List>
+            {list.data.ahead.map((d) => (
+              <Row
+                key={d.id}
+                title={d.name}
+                subtitle={`${d.when} · ${d.span}`}
+                a11y={d.planned ? `${d.name}, planned: ${d.planned}` : `Plan a sale for ${d.name}`}
+                right={d.planned ? <Pill label={`Planned: ${d.planned}`} tone="success" /> : "Plan"}
+                onPress={
+                  d.planned
+                    ? undefined
+                    : () => {
+                        setPlan(d);
+                        setTitle(d.saleTitle);
+                        setLater(!!d.start);
+                        setDay(d.start ?? "");
+                        setTime("00:00");
+                      }
+                }
+              />
+            ))}
+          </List>
+        </Section>
+      ) : null}
       {!sales ? (
         list.loading ? <Loading /> : null
       ) : sales.length === 0 ? (
