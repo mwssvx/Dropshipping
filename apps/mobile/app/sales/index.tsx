@@ -2,7 +2,7 @@ import { useState } from "react";
 import { View } from "react-native";
 import { send, useApi } from "../../src/api";
 import { when } from "../../src/format";
-import { BackLink, Banner, Body, Button, Card, EmptyState, Field, Heading, LoadError, Loading, Pill, Screen, Section, Segmented, Toggle } from "../../src/ui";
+import { BackLink, Banner, Body, Button, Card, EmptyState, Field, Heading, List, LoadError, Loading, Pill, Row, Screen, Section, Segmented, Toggle } from "../../src/ui";
 import { space, type Tone } from "../../src/theme";
 
 type Sale = { id: string; title: string; percentOff: number; status: "scheduled" | "running" | "ended"; covers: string; startsAt: string; endsAt: string | null; countdown: boolean };
@@ -76,6 +76,9 @@ export default function SalesScreen() {
           <Body muted>It starts now, on everything but gift cards, with the old price crossed out. Sales on a collection or chosen products, or starting later, are on the website.</Body>
         </Card>
       </Section>
+      <List>
+        <Row title="Deal of the day" subtitle="One product a day at a lower price, with one link to share" href="/daily-deals" />
+      </List>
       <LoadError error={list.error} stale={list.stale} retry={list.reload} />
       {!sales ? (
         list.loading ? <Loading /> : null
