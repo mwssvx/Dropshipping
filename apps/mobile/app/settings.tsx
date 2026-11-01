@@ -128,6 +128,13 @@ export default function Settings() {
           </List>
         </Section>
       ) : null}
+      {can("marketing") ? (
+        <Section title="Sales channels">
+          <List>
+            <Row href="/channels" title="Google, Facebook, Pinterest and TikTok" subtitle="Feed links to list your products, and ad tracking" />
+          </List>
+        </Section>
+      ) : null}
       {can("taxes") ? (
         <Section title="Taxes">
           <List>

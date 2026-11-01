@@ -2144,3 +2144,7 @@ The Products tab has a "Search listings" row: the products on sale whose Google 
 ### Taxes and duties in the app (after launch, part 416)
 
 Settings in the app has a "Taxes" section with "Taxes and duties": add or remove the places you're registered to collect tax (with the registration number), say whether your prices include tax, pick what buyers abroad are told about import duties, and see the tax collected this quarter or last, per place.
+
+### Sales channels in the app (after launch, part 417)
+
+Settings in the app has a "Sales channels" section: the feed links for Google Shopping, Facebook and Instagram, Pinterest and TikTok (one per store language), each to share to a computer with the steps to paste it in, the Google product reviews feed, what's left out of the feeds and why, and the ad tracking tag IDs with who's asked before tracking.

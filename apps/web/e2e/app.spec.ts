@@ -3163,3 +3163,33 @@ test("taxes and import duties set from the app", async ({ page, browser }) => {
   await expect(page.getByText("Removed. Buyers there aren't charged tax any more.")).toBeVisible();
   await expect(page.getByText("Nowhere yet")).toBeVisible();
 });
+
+test("sales channel feed links and ad tracking from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `ch${Date.now()}`);
+  await signIn(page, email);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("link", { name: /^Google, Facebook, Pinterest and TikTok/ }).click();
+  await expect(page.getByText(/^0 products \(0 options\) in your feeds/)).toBeVisible();
+  const google = page.getByRole("region", { name: "Google Shopping" });
+  await expect(google.getByRole("button", { name: "Share the Google Shopping feed link" })).toContainText(/\/feeds\/google\.xml$/);
+  await expect(page.getByRole("region", { name: "Facebook and Instagram" }).getByRole("button", { name: /feed link/ })).toContainText(/\/feeds\/meta\.csv$/);
+  await expect(page.getByText("Nothing. Every product on your store is in the feeds.")).toBeVisible();
+
+  const ads = page.getByRole("region", { name: "Ad tracking" });
+  await ads.getByRole("textbox", { name: "Meta pixel ID" }).fill("1234567890123456");
+  await ads.getByRole("textbox", { name: "Google tag ID" }).fill("G-ABC123DEF4");
+  await ads.getByRole("tab", { name: "Only where the law requires" }).click();
+  await ads.getByRole("button", { name: "Save ad tracking" }).click();
+  await expect(page.getByText("Saved. Your store now reports views, carts, checkouts and orders to these tags.")).toBeVisible();
+  await shot(page, "417-app-channels");
+
+  await web.goto(`${WEB}/admin/channels`);
+  await expect(web.getByLabel("Meta pixel ID")).toHaveValue("1234567890123456");
+  await expect(web.getByLabel("Google tag ID")).toHaveValue("G-ABC123DEF4");
+  await expect(web.getByRole("radio", { name: /^Only visitors in the EU/ })).toBeChecked();
+
+  await ads.getByRole("textbox", { name: "Meta pixel ID" }).fill("");
+  await ads.getByRole("textbox", { name: "Google tag ID" }).fill("");
+  await ads.getByRole("button", { name: "Save ad tracking" }).click();
+  await expect(page.getByText("Saved. No ad tags are loaded on your store.")).toBeVisible();
+});
