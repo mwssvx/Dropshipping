@@ -161,6 +161,10 @@ export default function MoneyScreen() {
           ) : null}
 
           <List>
+            <Row href="/profit" title="Profit report" subtitle="Every product's profit after costs, fees and ads, over 7, 30 or 90 days, and the ad spend you entered" />
+          </List>
+
+          <List>
             <Row
               href="/disputes"
               title={d.disputesOpen ? `Disputes (${d.disputesOpen} to answer)` : "Disputes"}
