@@ -3427,3 +3427,43 @@ test("win-back and birthday codes set from the app", async ({ page, browser }) =
   await expect(web.getByLabel("Birthday percent off")).toHaveValue("25");
   await expect(web.getByLabel("Days to use the birthday code")).toHaveValue("10");
 });
+
+test("thank-you note, after-checkout offer and subscribe and save set from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `ao${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Phone Stand");
+  await web.getByLabel("Price", { exact: true }).fill("12.00");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+
+  await signIn(page, email);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("link", { name: /^After the order/ }).click();
+
+  await page.getByRole("textbox", { name: "Thank-you note" }).fill("Follow us on Instagram @pocketshop.");
+  await page.getByRole("button", { name: "Save note" }).click();
+  await expect(page.getByText("Saved. Buyers see it right after paying and in the confirmation email.")).toBeVisible();
+
+  const offer = page.getByRole("region", { name: "After-checkout offer" });
+  await offer.getByRole("switch", { name: "Offer one more product right after checkout" }).click();
+  await offer.getByRole("button", { name: "Save after-checkout offer" }).click();
+  await expect(page.getByText("Pick a product to offer.")).toBeVisible();
+  await offer.getByRole("button", { name: "Pick Phone Stand" }).click();
+  await offer.getByRole("textbox", { name: "Buyer saves (%)" }).fill("20");
+  await offer.getByRole("button", { name: "Save after-checkout offer" }).click();
+  await expect(page.getByText("Saved. Buyers see it on their order page right after paying.")).toBeVisible();
+  await expect(offer.getByText("Added 0 times · $0.00 in extra sales")).toBeVisible();
+
+  const sub = page.getByRole("region", { name: "Subscribe and save" });
+  await sub.getByRole("switch", { name: "Let buyers subscribe to their order" }).click();
+  await sub.getByRole("textbox", { name: "Subscriber saves (%)" }).fill("15");
+  await sub.getByRole("button", { name: "Save subscribe and save" }).click();
+  await expect(page.getByText("Saved. Buyers see the offer on their order page after paying.")).toBeVisible();
+  await shot(page, "424-app-after-order");
+
+  await web.goto(`${WEB}/admin/marketing`);
+  await expect(web.locator("#thankYouNote")).toHaveValue("Follow us on Instagram @pocketshop.");
+  await expect(web.getByLabel("Product to offer")).toHaveValue(/.+/);
+  await expect(web.getByLabel("Buyer saves (%)")).toHaveValue("20");
+  await expect(web.getByLabel("Subscriber saves (%)")).toHaveValue("15");
+});

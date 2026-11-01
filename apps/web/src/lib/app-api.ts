@@ -56,6 +56,13 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  SUBSCRIBE_WITHIN_DAYS,
+  POST_PURCHASE_MINUTES,
+  THANK_YOU_NOTE_MAX,
+  setThankYouNote,
+  setSubscriptionOffer,
+  setPostPurchaseOffer,
+  postPurchaseStats,
   setBirthdayOffer,
   birthdaysKnown,
   birthdayStats,
@@ -2507,6 +2514,37 @@ const routes: Record<string, Handler> = {
     revalidatePath("/admin/marketing");
     return { ok: true, message: b.on === true ? "Saved. Codes go out with the daily emails." : "Turned off. Codes already sent still work." };
   },
+  "GET after-order": async ({ db, shop }) => {
+    const [products, afterCheckout, subs] = await Promise.all([productChoices(db, shop.id), postPurchaseStats(db, shop.id), subscriptionStats(db, shop.id)]);
+    return {
+      currency: shop.currency,
+      thankYou: { note: shop.thankYouNote, max: THANK_YOU_NOTE_MAX },
+      afterCheckout: { offer: shop.postPurchaseOffer, minutes: POST_PURCHASE_MINUTES, orders: afterCheckout.orders, revenueMinor: afterCheckout.revenueMinor },
+      products: products.filter((p) => p.status === "active" && !p.giftCard).map((p) => ({ id: p.id, title: p.title })),
+      subscribe: { offer: shop.subscriptionOffer, withinDays: SUBSCRIBE_WITHIN_DAYS, active: subs.active, orders: subs.orders, salesMinor: subs.salesMinor },
+    };
+  },
+  "PUT after-order/thank-you": async ({ req, db, shop }) => {
+    const note = str((await body<{ note?: unknown }>(req)).note);
+    await setThankYouNote(db, shop.id, note);
+    revalidatePath("/admin/marketing");
+    return { ok: true, message: note.trim() ? "Saved. Buyers see it right after paying and in the confirmation email." : "Saved. Buyers don't see a note." };
+  },
+  "PUT after-order/offer": async ({ req, db, shop }) => {
+    const b = await body<{ on?: unknown; productId?: unknown; percentOff?: unknown }>(req);
+    const percent = str(b.percentOff).trim();
+    await setPostPurchaseOffer(db, shop.id, { productId: str(b.productId) || null, percentOff: percent ? Number(percent) : 0, active: b.on === true });
+    revalidatePath("/admin/marketing");
+    return { ok: true, message: b.on === true ? "Saved. Buyers see it on their order page right after paying." : "Turned off." };
+  },
+  "PUT after-order/subscribe": async ({ req, db, shop }) => {
+    const b = await body<{ on?: unknown; percentOff?: unknown }>(req);
+    const percent = str(b.percentOff).trim();
+    await setSubscriptionOffer(db, shop.id, { percentOff: percent ? Number(percent) : Number.NaN, active: b.on === true });
+    revalidatePath("/admin/marketing");
+    revalidatePath("/admin/subscriptions");
+    return { ok: true, message: b.on === true ? "Saved. Buyers see the offer on their order page after paying." : "Turned off. Existing subscriptions carry on." };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -3366,6 +3404,7 @@ function routeArea(key: string): Area | null {
   if (path === "holiday-checklist") return "home";
   if (path.startsWith("developers")) return "developers";
   if (path === "winback" || path === "birthday") return "marketing";
+  if (path.startsWith("after-order")) return "marketing";
   return null;
 }
 
