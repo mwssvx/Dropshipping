@@ -676,8 +676,11 @@ test("a sale on everything started, kept on longer and ended from the app", asyn
   await expect(web.locator("s", { hasText: "$12.00" }).first()).toBeVisible();
   await expect(web.getByText("$9.60").first()).toBeVisible();
 
-  await page.getByRole("button", { name: "Keep Weekend sale on one more day" }).click();
-  await expect(page.getByText("Weekend sale runs 1 more day.")).toBeVisible();
+  await page.getByRole("tablist", { name: "Keep Weekend sale on for another" }).getByRole("tab", { name: "+2 days" }).click();
+  await expect(page.getByText(/^The countdown on your store moves to the new end\./)).toBeVisible();
+  await shot(page, "455-app-sale-extend");
+  await page.getByRole("button", { name: "Keep Weekend sale on longer" }).click();
+  await expect(page.getByText("Weekend sale runs 2 more days.")).toBeVisible();
   await page.getByRole("button", { name: "End Weekend sale now" }).click();
   await expect(page.getByText("Weekend sale has ended. Prices are back to normal.")).toBeVisible();
   await expect(page.getByText("Ended", { exact: true })).toBeVisible();
