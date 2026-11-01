@@ -244,6 +244,7 @@ export default function ProductScreen() {
       {p.swatches && p.swatches.values.length > 1 ? <SwatchesSection product={p} busy={busy} act={act} /> : null}
       {p.status === "draft" ? <LaunchSection product={p} busy={busy} act={act} /> : null}
       <BadgeSection product={p} busy={busy} act={act} />
+      {p.images && p.images.length > 0 ? <PhotoTextSection product={p} busy={busy} act={act} /> : null}
       <TagsSection product={p} busy={busy} act={act} />
       <CollectionsSection product={p} busy={busy} act={act} />
       {p.giftCard ? null : <SentBySection product={p} busy={busy} act={act} />}
@@ -682,6 +683,31 @@ function SentBySection({ product: p, busy, act }: { product: Product; busy: stri
             />
           </>
         ) : null}
+      </Card>
+    </Section>
+  );
+}
+
+/** What each photo shows, read out to screen readers and given to image search. Empty uses the product's name. */
+function PhotoTextSection({ product: p, busy, act }: { product: Product; busy: string | null; act: Act }) {
+  const photos = p.images ?? [];
+  const saved = photos.map((src) => p.imageAlts?.[src] ?? "");
+  const [edit, setEdit] = useState<string[] | null>(null);
+  const texts = edit ?? saved;
+  useEffect(() => setEdit(null), [p]);
+  return (
+    <Section title="Describe each photo">
+      <Card>
+        <Body muted>{`Say what each photo shows, like "Lamp lit up on a bedside table". Screen readers read it out and image search uses it. Empty ones use "${p.title}". Up to 125 characters.`}</Body>
+        {photos.map((src, i) => (
+          <View key={src} style={{ flexDirection: "row", gap: space(3), alignItems: "center" }}>
+            <Image source={{ uri: src }} accessibilityLabel={`Photo ${i + 1}`} style={{ width: 56, height: 56, borderRadius: radius.md, backgroundColor: color.sunken }} />
+            <View style={{ flex: 1 }}>
+              <Field label={`Photo ${i + 1}${i === 0 ? " (main)" : ""}`} value={texts[i] ?? ""} onChangeText={(t) => setEdit(texts.map((x, n) => (n === i ? t : x)))} />
+            </View>
+          </View>
+        ))}
+        <Button label="Save descriptions" busy={busy === "alts"} disabled={!!busy || edit === null} onPress={() => act("alts", async () => (await api<{ message: string }>(`products/${p.id}/photo-texts`, { method: "PUT", body: { texts } })).message)} />
       </Card>
     </Section>
   );
