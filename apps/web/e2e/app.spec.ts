@@ -4234,3 +4234,41 @@ test("an order's note and tags, from the app", async ({ page, browser }) => {
   await web.goto(`${WEB}/admin/orders?tag=priority`);
   await expect(web.getByRole("link", { name: "#1001" }).first()).toBeVisible();
 });
+
+test("a free replacement for a lost parcel, sent from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `rp${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Ceramic Mug");
+  await web.getByLabel("Price", { exact: true }).fill("15.00");
+  await web.getByLabel("Stock", { exact: true }).fill("10");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  await buy(browser, new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href);
+
+  await signIn(page, email);
+  await tab(page, "Orders");
+  await page.getByRole("tab", { name: "All" }).click();
+  await page.getByRole("link", { name: "Order #1001" }).click();
+  // Not shipped yet, so there's nothing to replace.
+  await expect(page.getByRole("region", { name: "Send a replacement" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Add tracking" }).click();
+  await page.getByLabel("Carrier").fill("USPS");
+  await page.getByLabel("Tracking number").fill("9400111899");
+  await page.getByRole("button", { name: "Save tracking" }).click();
+  await expect(page.getByText(/^Tracking added/)).toBeVisible();
+
+  const replace = page.getByRole("region", { name: "Send a replacement" });
+  await replace.getByRole("button", { name: "Send a replacement…" }).click();
+  await replace.getByRole("textbox", { name: "Ceramic Mug (of 1)" }).fill("2");
+  await replace.getByRole("button", { name: "Send replacement" }).click();
+  await expect(page.getByText("The order had 1 of Ceramic Mug.")).toBeVisible();
+  await replace.getByRole("textbox", { name: "Ceramic Mug (of 1)" }).fill("1");
+  await replace.getByRole("textbox", { name: "Message to the buyer (optional)" }).fill("Sorry it got lost. Here's a new one.");
+  await shot(page, "445-app-replacement");
+  await replace.getByRole("button", { name: "Send replacement" }).click();
+  await expect(page.getByText("Replacement #1002 is on its way, and the buyer got an email.")).toBeVisible();
+  await expect(page.getByText(/#1002/).first()).toBeVisible();
+
+  await web.goto(`${WEB}/admin/orders`);
+  await expect(web.getByRole("link", { name: /#1002/ }).first()).toBeVisible();
+});
