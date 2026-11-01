@@ -3498,3 +3498,28 @@ test("refer a friend set from the app", async ({ page, browser }) => {
   await page.getByRole("button", { name: "Save refer a friend" }).click();
   await expect(page.getByText("Turned off. Friends' codes already sent still work, but no more credit is sent.")).toBeVisible();
 });
+
+test("browse reminders turned on and off from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `br${Date.now()}`);
+  await signIn(page, email);
+  await tab(page, "Orders");
+  await page.getByRole("tab", { name: "All" }).click();
+  await page.getByRole("link", { name: /Left at checkout/ }).click();
+  const browse = page.getByRole("region", { name: "Browse reminders" });
+  await expect(browse.getByText("Last 30 days: 0 buyers reminded · 0 orders from them · $0.00")).toBeVisible();
+  // Off for a new store.
+  const toggle = browse.getByRole("switch", { name: "Send browse reminders" });
+  await expect(toggle).not.toBeChecked();
+  await toggle.click();
+  await browse.getByRole("button", { name: "Save browse reminders" }).click();
+  await expect(browse.getByText(/^Saved\. Subscribers who look at a product and don't buy it get one email about \d+ hours later\.$/)).toBeVisible();
+  await shot(page, "426-app-browse-reminders");
+  await web.goto(`${WEB}/admin/marketing`);
+  await expect(web.getByRole("checkbox", { name: "Send browse reminders" })).toBeChecked();
+
+  await toggle.click();
+  await browse.getByRole("button", { name: "Save browse reminders" }).click();
+  await expect(browse.getByText("Saved. No browse reminders are sent.")).toBeVisible();
+  await web.reload();
+  await expect(web.getByRole("checkbox", { name: "Send browse reminders" })).not.toBeChecked();
+});

@@ -56,6 +56,9 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  BROWSE_AFTER_HOURS,
+  setBrowseReminders,
+  browseReminderStats,
   setReferralProgram,
   referralStats,
   SUBSCRIBE_WITHIN_DAYS,
@@ -3198,10 +3201,12 @@ const routes: Record<string, Handler> = {
   },
   "GET checkouts": async ({ db, shop }) => {
     // Checkouts left unpaid in the last 30 days, as on the web's Abandoned checkouts page.
-    const { checkouts, totals } = await abandonedCheckouts(db, shop.id, { size: 50 });
+    const [{ checkouts, totals }, browse] = await Promise.all([abandonedCheckouts(db, shop.id, { size: 50 }), browseReminderStats(db, shop.id)]);
     return {
       days: ABANDONED_DAYS,
       remindersOn: shop.abandonedCartEmails,
+      // Emails to signed-in subscribers who looked at a product and didn't buy it.
+      browse: { on: shop.browseReminders, hours: BROWSE_AFTER_HOURS, sent: browse.sent, orders: browse.orders, salesMinor: browse.salesMinor },
       // The second reminder, a day later, with a one-time code for this percent off.
       offerPercent: shop.abandonedCartOffer?.percentOff ?? null,
       totals,
@@ -3219,6 +3224,13 @@ const routes: Record<string, Handler> = {
         paidAs: c.recoveredBy,
       })),
     };
+  },
+  "PUT checkouts/browse": async ({ req, db, shop, user }) => {
+    const on = (await body<{ on?: unknown }>(req)).on === true;
+    await setBrowseReminders(db, shop.id, on);
+    await logged({ shop, user, db }, `${on ? "Turned on" : "Turned off"} browse reminders in the app`, { href: "/admin/marketing#browse-heading" });
+    revalidatePath("/admin/marketing");
+    return { ok: true, message: on ? `Saved. Subscribers who look at a product and don't buy it get one email about ${BROWSE_AFTER_HOURS} hours later.` : "Saved. No browse reminders are sent." };
   },
   "PUT checkouts/reminders": async ({ req, db, shop, user }) => {
     const b = await body<{ on?: unknown; offer?: unknown; percentOff?: unknown }>(req);
@@ -3377,6 +3389,7 @@ function routeArea(key: string): Area | null {
   if (key === "POST orders/:id/transfer-paid" || key === "PUT bank-transfers") return "money";
   if (key === "PUT products/:id/collections/:collectionId") return "collections";
   if (key === "PUT checkouts/reminders") return "marketing";
+  if (key === "PUT checkouts/browse") return "marketing";
   const path = key.split(" ")[1]!;
   if (path.startsWith("orders")) return "orders";
   if (path.startsWith("products") || path.startsWith("imports")) return "products";
