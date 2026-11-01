@@ -56,6 +56,12 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  MAX_SIZE_CHARTS,
+  listSizeCharts,
+  getSizeChart,
+  deleteSizeChart,
+  updateSizeChart,
+  createSizeChart,
   type ProfitRange,
   AD_CHANNEL_LABELS,
   PROFIT_RANGES,
@@ -360,6 +366,27 @@ async function body<T = Record<string, unknown>>(req: Request): Promise<T> {
 }
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
+
+/** A size chart as the app sends it; core checks every field again. */
+function sizeChartInput(b: Record<string, unknown>) {
+  const list = (v: unknown) => (Array.isArray(v) ? v.map(String) : []);
+  return {
+    name: str(b.name),
+    unit: b.unit === "in" ? ("in" as const) : ("cm" as const),
+    columns: list(b.columns),
+    rows: Array.isArray(b.rows) ? b.rows.map(list) : [],
+    note: str(b.note),
+    productIds: list(b.productIds),
+    collectionIds: list(b.collectionIds),
+    published: b.published !== false,
+  };
+}
+
+function revalidateSizeCharts(handle: string) {
+  revalidatePath("/admin/size-charts", "layout");
+  revalidatePath(`/s/${handle}`, "layout");
+}
+
 
 /* What the app sees. Kept small: phones are on slow networks. */
 
@@ -1945,6 +1972,41 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, saved ? `Offered local delivery to ${n} postal code${n === 1 ? "" : "s"}, in the app` : "Stopped offering local delivery, in the app", { href: "/admin/shipping#local-delivery-heading" });
     return { ok: true, message: saved ? `Saved. Buyers in ${n === 1 ? "1 postal code" : `${n} postal codes`} can have it delivered by you.` : "Saved. Checkout doesn't offer local delivery." };
   },
+  // Size charts: a table of measurements made once and attached to products or whole collections.
+  "GET size-charts": async ({ db, shop }) => {
+    const charts = await listSizeCharts(db, shop.id);
+    return {
+      max: MAX_SIZE_CHARTS,
+      charts: charts.map((c) => ({ id: c.id, name: c.name, sizes: c.rows.length, products: c.productIds.length, collections: c.collectionIds.length, published: c.published })),
+    };
+  },
+  "POST size-charts": async ({ req, db, shop, user }) => {
+    const chart = await createSizeChart(db, shop.id, sizeChartInput(await body(req)));
+    revalidateSizeCharts(shop.handle);
+    await logged({ shop, user, db }, `Made the size chart “${chart.name}” in the app`, { href: `/admin/size-charts/${chart.id}` });
+    return { ok: true, id: chart.id, message: chart.published ? "Saved. It shows on the products it's attached to." : "Saved. It's hidden from the store." };
+  },
+  "GET size-charts/:id": async ({ params, db, shop }) => {
+    const [c, products, collections] = await Promise.all([getSizeChart(db, shop.id, params.id!), bundleProductChoices(db, shop.id), listCollections(db, shop.id)]);
+    return {
+      chart: { id: c.id, name: c.name, unit: c.unit, columns: c.columns, rows: c.rows, note: c.note, productIds: c.productIds, collectionIds: c.collectionIds, published: c.published },
+      products: products.map((p) => ({ id: p.id, title: p.title })),
+      collections: collections.map((x) => ({ id: x.id, title: x.title })),
+    };
+  },
+  "PUT size-charts/:id": async ({ req, params, db, shop, user }) => {
+    const chart = await updateSizeChart(db, shop.id, params.id!, sizeChartInput(await body(req)));
+    revalidateSizeCharts(shop.handle);
+    await logged({ shop, user, db }, `Changed the size chart “${chart.name}” in the app`, { href: `/admin/size-charts/${chart.id}` });
+    return { ok: true, message: chart.published ? "Saved. It shows on the products it's attached to." : "Saved. It's hidden from the store." };
+  },
+  "DELETE size-charts/:id": async ({ params, db, shop, user }) => {
+    const chart = await getSizeChart(db, shop.id, params.id!);
+    await deleteSizeChart(db, shop.id, chart.id);
+    revalidateSizeCharts(shop.handle);
+    await logged({ shop, user, db }, `Deleted the size chart “${chart.name}” in the app`, { href: "/admin/size-charts" });
+    return { ok: true, message: "Size chart deleted." };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -2760,6 +2822,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("restock") || path.startsWith("stock-count") || path.startsWith("inventory")) return "products";
   if (path.startsWith("price-changes")) return "products";
   if (path.startsWith("search-fixes")) return "products";
+  if (path.startsWith("size-charts")) return "products";
   if (path.startsWith("pricing")) return "products";
   if (path.startsWith("checkout-settings")) return "shipping";
   if (path === "local" || path.startsWith("local/")) return "shipping";

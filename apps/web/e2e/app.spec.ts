@@ -2915,3 +2915,52 @@ test("the profit report and ad spend for a product, from the app", async ({ page
   await expect(page.getByText("Ad spend removed.")).toBeVisible();
   await expect(ads.getByRole("button", { name: /^Remove / })).toHaveCount(0);
 });
+
+test("a size chart typed one size per line in the app shows on the product page", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `sz${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Linen Shirt");
+  await web.getByLabel("Price", { exact: true }).fill("30.00");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const shirt = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Size charts/ }).click();
+  await expect(page.getByText("No size charts yet")).toBeVisible();
+  await page.getByRole("textbox", { name: "Name" }).fill("Shirts");
+  await page.getByRole("button", { name: "Start size chart" }).click();
+  await expect(page.getByRole("heading", { name: "Shirts", level: 1 })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Columns" })).toHaveValue("Size, Chest, Waist, Length");
+
+  const sizes = page.getByRole("textbox", { name: "Sizes" });
+  await sizes.fill("S, 86-91, 71-76, 70\nm, 96-101\nM, 1, 2, 3");
+  await page.getByRole("button", { name: "Save size chart" }).click();
+  await expect(page.getByText("Each size can only be in the chart once.")).toBeVisible();
+  // A short line gets empty cells at the end, to fill in later.
+  await sizes.fill("S, 86-91, 71-76, 70\nM, 96-101\nXL, 112, 97, 76");
+  await page.getByRole("textbox", { name: "Add a product" }).fill("linen");
+  await page.getByRole("button", { name: "Add Linen Shirt" }).click();
+  await expect(page.getByRole("button", { name: "Take Linen Shirt off this chart" })).toBeVisible();
+  await page.getByRole("button", { name: "Save size chart" }).click();
+  await expect(page.getByText("Saved. It shows on the products it's attached to.")).toBeVisible();
+  await expect(sizes).toHaveValue("S, 86-91, 71-76, 70\nM, 96-101, , \nXL, 112, 97, 76");
+  await shot(page, "410-app-size-chart");
+
+  const buyer = await (await browser.newContext()).newPage();
+  await buyer.goto(shirt);
+  await buyer.getByRole("button", { name: "Size chart" }).click();
+  const dialog = buyer.getByRole("dialog", { name: "Size chart: Shirts" });
+  await expect(dialog.getByRole("row", { name: /XL/ })).toContainText("112");
+  await expect(dialog.getByRole("columnheader", { name: "Chest (cm)" })).toBeVisible();
+
+  await page.getByRole("link", { name: "← Size charts" }).click();
+  await expect(page.getByRole("link", { name: "Shirts, on the store" })).toBeVisible();
+  await expect(page.getByText("3 sizes · 1 product")).toBeVisible();
+  await page.getByRole("link", { name: "Shirts, on the store" }).click();
+  await page.getByRole("button", { name: "Delete this size chart…" }).click();
+  await page.getByRole("button", { name: "Delete this size chart" }).click();
+  // The list screen from before is still in the stack; the one on top is new.
+  await expect(page.getByText("No size charts yet").last()).toBeVisible();
+});
