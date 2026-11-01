@@ -2176,3 +2176,7 @@ Discount codes in the app links to "Win-back and birthday codes": turn on the co
 ### After the order in the app (after launch, part 424)
 
 Settings in the app has "After the order" under Checkout extras: write the thank-you note buyers see after paying, offer one more product for less right after checkout, and let buyers subscribe to their order for a discount, with what each one has brought in.
+
+### Refer a friend in the app (after launch, part 425)
+
+Discount codes in the app links to "Refer a friend": turn the program on or off, set the friend's percent off, the store credit the buyer who shared gets, and the friend's smallest order, and see how many friends got a code, what they bought and the credit given.

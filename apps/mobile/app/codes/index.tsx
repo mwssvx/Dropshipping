@@ -79,6 +79,7 @@ export default function CodesScreen() {
         <Row href="/signup" title="New subscribers" subtitle="A welcome code for signing up, and the pop-up that asks for emails" />
         <Row href="/code-batches" title="One-time codes" subtitle="A batch of codes that each work once, for parcel cards or a market stall" />
         <Row href="/winback" title="Win-back and birthday codes" subtitle="A code for buyers who've gone quiet, and one on their birthday" />
+        <Row href="/referrals" title="Refer a friend" subtitle="A code for friends your buyers bring, and store credit for them" />
       </List>
       {!codes ? (
         list.loading ? <Loading /> : null
