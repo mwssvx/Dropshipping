@@ -178,6 +178,13 @@ export default function Settings() {
           </List>
         </Section>
       ) : null}
+      {can("marketing") ? (
+        <Section title="Checkout extras">
+          <List>
+            <Row href="/addons" title="Add-ons, free gift and tips" subtitle="One more product at checkout, a gift over an amount, and tips for you" />
+          </List>
+        </Section>
+      ) : null}
       {can("plan") ? (
         <Section title="Plan">
           <List>

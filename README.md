@@ -2156,3 +2156,7 @@ Settings in the app has "Invoices" under Taxes: fill in the registered business 
 ### Domains in the app (after launch, part 419)
 
 Settings in the app has "Domains" under Web addresses: see the free address, connect a domain you own with the DNS record to add where you bought it, check it again, make a connected domain the main address, or remove one.
+
+### Checkout extras in the app (after launch, part 420)
+
+Settings in the app has "Add-ons, free gift and tips" under Checkout extras: offer a product at checkout for a little less, turn add-ons on or off, see what each one earned, give a free gift with orders over an amount, and ask buyers for a tip.
