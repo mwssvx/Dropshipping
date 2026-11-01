@@ -37,6 +37,7 @@ export type Product = {
   publishAt?: string | null;
   comingSoon?: boolean;
   quantityBreaks?: { minQty: number; percentOff: number }[];
+  swatches?: { option: string; values: { value: string; color: string | null; named: string | null; picked: boolean }[] } | null;
   /** Lowercase, for filters, collections that fill by tag, and codes for tagged products. */
   tags?: string[];
   /** On the product screen only: the tags the store's products use, most used first. */
