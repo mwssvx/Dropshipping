@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  createGiftCardProduct,
+  giftCardProduct,
   setHolidayReturns,
   setWelcomeOffer,
   describeWelcomeOffer,
@@ -1530,6 +1532,7 @@ const routes: Record<string, Handler> = {
       "gift-guides": { path: "/collections", area: "collections" },
       "gift-wrap": { path: "/gift-wrap", area: "shipping" },
       returns: { path: "/holiday-returns", area: "returns" },
+      "gift-cards": { path: "/gift-cards", area: "gift_cards" },
       popup: { path: "/signup", area: "marketing" },
       reminders: { path: "/checkouts", area: "marketing", also: "orders" },
     };
@@ -1948,10 +1951,13 @@ const routes: Record<string, Handler> = {
   "GET gift-cards": async ({ url, db, shop }) => {
     // The same search as the web list: the full code a buyer reads out, its last 4, an email or an order number.
     const q = url.searchParams.get("q")?.trim() ?? "";
-    const { cards, outstandingMinor } = await listGiftCards(db, shop.id, { query: q, size: 30 });
+    const [{ cards, outstandingMinor }, product] = await Promise.all([listGiftCards(db, shop.id, { query: q, size: 30 }), giftCardProduct(db, shop.id)]);
+    const variants = product ? await db.query.variants.findMany({ where: (v, { eq }) => eq(v.productId, product.id), orderBy: (v, { asc }) => asc(v.position), columns: { priceMinor: true } }) : [];
     const now = new Date();
     return {
       outstandingMinor,
+      // The gift card the store sells, if it sells one.
+      selling: product ? { productId: product.id, active: product.status === "active", amountsMinor: variants.map((v) => v.priceMinor) } : null,
       cards: cards.map((c) => ({
         id: c.id,
         last4: c.last4,
@@ -1965,6 +1971,23 @@ const routes: Record<string, Handler> = {
         expiresAt: c.expiresAt,
       })),
     };
+  },
+  "POST gift-cards/sell": async ({ req, db, shop, user }) => {
+    const b = await body<{ amounts?: unknown }>(req);
+    const amounts = str(b.amounts)
+      .split(/[,\s]+/)
+      .filter(Boolean)
+      .map((raw) => {
+        try {
+          return parseMoney(raw.replace(/^[$€£¥₹]/, ""));
+        } catch {
+          throw new UserError("Enter amounts like 25 or 49.99.");
+        }
+      });
+    const product = await createGiftCardProduct(db, shop, amounts);
+    await logged({ shop, user, db }, "Started selling gift cards in the app", { href: `/admin/products/${product.id}` });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, productId: product.id, message: "Gift cards are on sale. Buyers get the code by email right after paying." };
   },
   "POST gift-cards": async ({ req, db, shop, user }) => {
     const b = await body<{ email?: unknown; amountMinor?: unknown }>(req);
