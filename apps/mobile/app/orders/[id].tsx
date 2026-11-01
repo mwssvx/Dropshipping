@@ -3,12 +3,17 @@ import { useState } from "react";
 import { Linking, Share, View } from "react-native";
 import { api, useApi } from "../../src/api";
 import { FULFILMENT, money, PAYMENT, parseMoney, when } from "../../src/format";
-import { BackLink, Banner, Body, Button, Card, Field, Heading, List, LoadError, Loading, Pill, Row, Screen, Section, Toggle } from "../../src/ui";
+import { BackLink, Banner, Body, Button, Card, Field, Heading, List, LoadError, Loading, Pill, Row, Screen, Section, Segmented, Toggle } from "../../src/ui";
 import { space } from "../../src/theme";
 import { useCan } from "../../src/session";
 import { DISPUTE_STATUS } from "../../src/disputes";
 
 type Detail = {
+  edit?: {
+    address: { name: string; line1: string; line2?: string | null; city: string; region?: string | null; postalCode: string; country: string; phone?: string | null };
+    country: string;
+    lines: { id: string; title: string; quantity: number; variantId: string | null; choices: { variantId: string; title: string }[] }[];
+  } | null;
   replaceable?: { id: string; title: string; quantity: number }[];
   id: string;
   number: number;
@@ -364,6 +369,7 @@ export default function OrderScreen() {
       </Section>
 
       {o.replaceable?.length ? <ReplacementSection order={o} /> : null}
+      {o.edit ? <EditSection key={JSON.stringify(o.edit)} order={o} busy={busy} save={(body) => run("edit", `orders/${o.id}/edit`, body)} /> : null}
 
       {can("orders") ? (
         <NotesSection key={`${o.staffNote ?? ""}|${(o.tags ?? []).join(",")}`} order={o} busy={busy} save={(body) => run("notes", `orders/${o.id}/notes`, body)} />
@@ -517,6 +523,57 @@ function ReplacementSection({ order: o }: { order: Detail }) {
           </>
         ) : (
           <Button label="Send a replacement…" kind="secondary" onPress={() => setOpen(true)} />
+        )}
+      </Card>
+    </Section>
+  );
+}
+
+const ADDRESS_FIELDS = [
+  ["name", "Name"],
+  ["line1", "Street address"],
+  ["line2", "Apartment, suite (optional)"],
+  ["city", "City"],
+  ["region", "State or region (optional)"],
+  ["postalCode", "Postal code"],
+  ["phone", "Phone for the courier (optional)"],
+] as const;
+
+/** Change the address or a size until it ships: the supplier order is placed again and the buyer is emailed. */
+function EditSection({ order: o, busy, save }: { order: Detail; busy: string | null; save: (body: unknown) => Promise<void> }) {
+  const e = o.edit!;
+  const start = Object.fromEntries(ADDRESS_FIELDS.map(([k]) => [k, String(e.address[k] ?? "")])) as Record<(typeof ADDRESS_FIELDS)[number][0], string>;
+  const [open, setOpen] = useState(false);
+  const [address, setAddress] = useState(start);
+  const [lines, setLines] = useState<Record<string, string>>(() => Object.fromEntries(e.lines.map((l) => [l.id, l.variantId ?? ""])));
+  const changed = ADDRESS_FIELDS.some(([k]) => address[k] !== start[k]) || e.lines.some((l) => lines[l.id] !== (l.variantId ?? ""));
+  return (
+    <Section title="Change the order">
+      <Card>
+        <Body muted>Until it ships. We cancel the supplier order and place it again with the change, then email the customer.</Body>
+        {open ? (
+          <>
+            {ADDRESS_FIELDS.map(([k, label]) => (
+              <Field key={k} label={label} value={address[k]} onChangeText={(t) => setAddress({ ...address, [k]: t })} autoCapitalize={k === "postalCode" ? "none" : "words"} />
+            ))}
+            <Body muted>{`In ${e.country}. To send it to another country, the order has to be cancelled and placed again.`}</Body>
+            {e.lines.map((l) => (
+              <View key={l.id} style={{ gap: 6 }}>
+              <Body>{`${l.title}${l.quantity > 1 ? ` × ${l.quantity}` : ""}`}</Body>
+              <Segmented
+                label={`Size for ${l.title}`}
+                value={lines[l.id] ?? ""}
+                onChange={(v) => setLines({ ...lines, [l.id]: v })}
+                options={l.choices.map((c) => [c.variantId, c.title] as [string, string])}
+              />
+              </View>
+            ))}
+            {e.lines.length ? <Body muted>Sizes listed are the ones at the same price and in stock.</Body> : null}
+            <Button label="Save changes to the order" busy={busy === "edit"} disabled={!!busy || !changed} onPress={() => void save({ address, lines })} />
+            <Button label="Cancel" kind="ghost" onPress={() => setOpen(false)} disabled={!!busy} />
+          </>
+        ) : (
+          <Button label="Change the address or a size…" kind="secondary" onPress={() => setOpen(true)} />
         )}
       </Card>
     </Section>

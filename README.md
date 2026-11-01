@@ -2260,3 +2260,7 @@ An order's screen in the app lets the team write its note and tags, which only t
 ### Send a replacement in the app (after launch, part 445)
 
 A shipped order's screen in the app has "Send a replacement", for a parcel that was lost, damaged or wrong: pick how many of each item to send again and add a message, and it goes out as a new order at no charge to the buyer.
+
+### Change an order in the app (after launch, part 446)
+
+A paid order that hasn't shipped has "Change the order" on its screen in the app: fix the street, city, postal code or phone, or swap an item for another size at the same price. We cancel the supplier order, place it again with the change, and email the customer. Moving it to another country still means cancelling the order.
