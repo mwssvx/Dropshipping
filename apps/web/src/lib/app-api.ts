@@ -56,6 +56,10 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  DAILY_DEALS_MIN,
+  DAILY_DEALS_MAX,
+  upcomingDailyDeals,
+  planDailyDeals,
   formatHandoverDay,
   storeHandoverOptions,
   moveHandoverDay,
@@ -2973,6 +2977,45 @@ const routes: Record<string, Handler> = {
     revalidatePath("/admin/orders");
     return { ok: true, message: "Moved. The buyer was emailed the new day." };
   },
+  // Deal of the day: one product a day at a lower price, with one link that always goes to today's.
+  "GET daily-deals": async ({ db, shop }) => {
+    const [deals, products, store] = await Promise.all([upcomingDailyDeals(db, shop.id), bundleProductChoices(db, shop.id), storeAddress(shop)]);
+    const zone = shop.shipCutoff?.timeZone ?? defaultCutoffZone(shop.country);
+    const now = new Date();
+    const today = now.toLocaleDateString("en-CA", { timeZone: zone });
+    const last = deals.at(-1);
+    const sellable = products.filter((p) => p.status === "active");
+    return {
+      link: `${store}/deal`,
+      today,
+      // A new run starts the day after the last one ends.
+      firstFree: last ? last.endsAt.toLocaleDateString("en-CA", { timeZone: zone }) : today,
+      min: DAILY_DEALS_MIN,
+      max: Math.min(DAILY_DEALS_MAX, sellable.length),
+      deals: deals.map((d) => ({
+        id: d.saleId,
+        title: d.product.title,
+        percentOff: d.percentOff,
+        on: d.startsAt <= now,
+        day: d.startsAt.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: zone }),
+      })),
+      products: sellable.map((p) => ({ id: p.id, title: p.title })),
+    };
+  },
+  "POST daily-deals": async ({ req, db, shop, user }) => {
+    const b = await body<{ productIds?: unknown; percentOff?: unknown; startDate?: unknown }>(req);
+    const deals = await planDailyDeals(db, shop, {
+      productIds: Array.isArray(b.productIds) ? b.productIds.map(str) : [],
+      percentOff: typeof b.percentOff === "number" ? b.percentOff : Number.NaN,
+      startDate: str(b.startDate),
+    });
+    const started = deals[0]!.startsAt <= new Date();
+    if (started) await sendPriceDrops(await stock(), { shopId: shop.id });
+    revalidatePath("/admin/sales");
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    await logged({ shop, user, db }, `Planned ${deals.length} deals of the day in the app`, { href: "/admin/sales" });
+    return { ok: true, message: `${deals.length} deals planned, one a day.${started ? " The first is on now." : ""}` };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -4024,6 +4067,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("signup")) return "marketing";
   if (path.startsWith("gift-cards")) return "gift_cards";
   if (path.startsWith("sales")) return "marketing";
+  if (path.startsWith("daily-deals")) return "marketing";
   if (path.startsWith("returns")) return "returns";
   if (path.startsWith("holiday-returns")) return "returns";
   if (path.startsWith("return-settings")) return "returns";

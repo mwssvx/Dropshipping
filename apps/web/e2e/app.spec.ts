@@ -4373,3 +4373,48 @@ test("a pickup moved to another day from the app", async ({ page, browser }) => 
   await web.reload();
   await expect(web.getByText(`Collecting on ${today}`)).toBeVisible();
 });
+
+test("deals of the day planned from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `dd${Date.now()}`);
+  const urls: Record<string, string> = {};
+  for (const [title, price] of [["Oak Board", "30.00"], ["Walnut Spoon", "14.00"], ["Cherry Bowl", "40.00"]]) {
+    await web.goto(`${WEB}/admin/products/new`);
+    await web.getByLabel("Title").fill(title!);
+    await web.getByLabel("Price", { exact: true }).fill(price!);
+    await web.getByLabel("Stock", { exact: true }).fill("5");
+    await web.getByRole("button", { name: "Save product" }).click();
+    await expect(web.getByText("Product added.")).toBeVisible();
+    urls[title!] = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+  }
+
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Sales", exact: true }).click();
+  await page.getByRole("link", { name: /^Deal of the day/ }).click();
+  await expect(page.getByText(/\/deal$/).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Plan the deals" })).toBeDisabled();
+  await page.getByRole("textbox", { name: "Price cut each day (%)" }).fill("25");
+  // Tapped in the order they run: the spoon first, then the board.
+  await page.getByRole("button", { name: "Walnut Spoon", exact: true }).click();
+  await page.getByRole("button", { name: "Oak Board", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Walnut Spoon, day 1" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Oak Board, day 2" })).toBeVisible();
+  await shot(page, "448-app-daily-deals");
+  await page.getByRole("button", { name: "Plan the deals" }).click();
+  await expect(page.getByText("2 deals planned, one a day. The first is on now.")).toBeVisible();
+  await expect(page.getByText("On now · 25% off")).toBeVisible();
+
+  // A second run can't land on the same days.
+  await page.getByRole("textbox", { name: "First deal on (YYYY-MM-DD)" }).fill(new Date().toISOString().slice(0, 10));
+  await page.getByRole("button", { name: "Cherry Bowl", exact: true }).click();
+  await page.getByRole("button", { name: "Oak Board", exact: true }).click();
+  await page.getByRole("button", { name: "Plan the deals" }).click();
+  await expect(page.getByText(/already have a deal of the day/)).toBeVisible();
+
+  await web.goto(`${WEB}/admin/sales`);
+  const planned = web.getByRole("list", { name: "Deals planned" });
+  await expect(planned.getByRole("listitem")).toHaveCount(2);
+  await expect(planned.getByRole("listitem").first()).toContainText(/On now.*Walnut Spoon/);
+  const buyer = await (await browser.newContext()).newPage();
+  await buyer.goto(`${urls["Walnut Spoon"]!.split("/products/")[0]}/deal`);
+  await expect(buyer.getByRole("heading", { level: 1 })).toHaveText(/Walnut Spoon/);
+});
