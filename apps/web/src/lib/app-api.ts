@@ -56,6 +56,15 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  deleteWebhookEndpoint,
+  deliverDueWebhooks,
+  retryWebhookDelivery,
+  sendTestWebhook,
+  setWebhookEndpointActive,
+  revokeApiKey,
+  WEBHOOK_EVENT_LABELS,
+  listWebhookEndpoints,
+  listApiKeys,
   setWeeklySummary,
   twoStepStatus,
   endOtherSignIns,
@@ -396,7 +405,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { BRAND } from "./brand";
 import { afterOrderPaid } from "./webhooks";
-import { agents, campaigns, db, domains, fulfillment, fxRates, logged, mailer, platformUrl, notifyLater, payments, refunds, stock, storeAddress, partnerPortalUrl, storeUrl, subscriptions, supplierPortalUrl, suppliers, tax, testPayments } from "./server";
+import { agents, campaigns, db, domains, fulfillment, fxRates, logged, mailer, platformUrl, notifyLater, payments, refunds, stock, storeAddress, partnerPortalUrl, storeUrl, subscriptions, supplierPortalUrl, suppliers, tax, testPayments, webhooks } from "./server";
 
 type User = { id: string; email: string };
 type ShopLink = { id: string; name: string; handle: string; role: string };
@@ -2422,6 +2431,53 @@ const routes: Record<string, Handler> = {
     await endSignIn(db, user.id, params.id!);
     return { message: "Signed out. That device has to sign in again." };
   },
+  "GET developers": async ({ db, shop }) => {
+    const [keys, endpoints] = await Promise.all([listApiKeys(db, shop.id), listWebhookEndpoints(db, shop.id)]);
+    return {
+      keys: keys.filter((k) => !k.revokedAt).map((k) => ({ id: k.id, name: k.name, prefix: k.prefix, access: k.access, lastUsedAt: k.lastUsedAt })),
+      // The signing secret stays on the web: the app never needs it.
+      webhooks: endpoints.map((ep) => ({
+        id: ep.id,
+        url: ep.url,
+        active: ep.active,
+        events: ep.events.map((e) => WEBHOOK_EVENT_LABELS[e]),
+        deliveries: ep.deliveries.map((d) => ({ id: d.id, event: d.event, status: d.status, attempts: d.attempts, code: d.lastStatusCode, error: d.lastError, at: d.deliveredAt ?? d.createdAt })),
+      })),
+    };
+  },
+  "DELETE developers/keys/:id": async ({ params, db, shop, user }) => {
+    const key = await db.query.apiKeys.findFirst({ where: (k, { and, eq }) => and(eq(k.id, params.id!), eq(k.shopId, shop.id)), columns: { name: true } });
+    if (!key) throw new NotFoundError("API key");
+    await revokeApiKey(db, shop.id, params.id!);
+    await logged({ shop, user, db }, `Revoked the API key “${key.name}”`, { href: "/admin/developers" });
+    revalidatePath("/admin/developers");
+    return { ok: true, message: `${key.name} revoked. Anything using it stops working now.` };
+  },
+  "PUT developers/webhooks/:id": async ({ req, params, db, shop }) => {
+    const active = (await body<{ active?: unknown }>(req)).active === true;
+    await setWebhookEndpointActive(db, shop.id, params.id!, active);
+    revalidatePath("/admin/developers");
+    return { ok: true, message: active ? "Webhook back on. New events are sent again." : "Webhook paused. Nothing is sent until you turn it back on." };
+  },
+  "POST developers/webhooks/:id/test": async ({ params, shop }) => {
+    const r = await sendTestWebhook(await webhooks(), shop.id, params.id!);
+    if (!r.ok) throw new UserError(r.error ?? "It didn't arrive.");
+    return { ok: true, message: `Delivered. Your server answered ${r.status}.` };
+  },
+  "DELETE developers/webhooks/:id": async ({ params, db, shop, user }) => {
+    const hook = await db.query.webhookEndpoints.findFirst({ where: (w, { and, eq }) => and(eq(w.id, params.id!), eq(w.shopId, shop.id)), columns: { url: true } });
+    if (!hook) throw new NotFoundError("Webhook");
+    await deleteWebhookEndpoint(db, shop.id, params.id!);
+    await logged({ shop, user, db }, `Removed the webhook to ${hook.url}`, { href: "/admin/developers" });
+    revalidatePath("/admin/developers");
+    return { ok: true, message: "Webhook removed." };
+  },
+  "POST developers/deliveries/:id/retry": async ({ params, db, shop }) => {
+    await retryWebhookDelivery(db, shop.id, params.id!);
+    await deliverDueWebhooks(await webhooks());
+    revalidatePath("/admin/developers");
+    return { ok: true, message: "Sent again." };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -3279,6 +3335,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("holiday-returns")) return "returns";
   if (path === "today") return "home";
   if (path === "holiday-checklist") return "home";
+  if (path.startsWith("developers")) return "developers";
   return null;
 }
 

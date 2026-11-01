@@ -2164,3 +2164,7 @@ Settings in the app has "Add-ons, free gift and tips" under Checkout extras: off
 ### Your account in the app (after launch, part 421)
 
 Settings in the app opens "Your account" from your email under Account: see whether two-step sign-in is on and how many recovery codes are left, turn the Monday summary email on or off, and sign out a phone or browser you don't recognise.
+
+### Developers in the app (after launch, part 422)
+
+Settings in the app has "API keys and webhooks" for store owners: see each key and when it was last used, revoke one that leaked, send a test to a webhook, pause it or turn it back on, remove it, and send a failed delivery again. New keys and webhooks are still made on the web, and the webhook signing secret is only shown there.

@@ -200,6 +200,13 @@ export default function Settings() {
           </List>
         </Section>
       ) : null}
+      {can("developers") ? (
+        <Section title="Developers">
+          <List>
+            <Row href="/developers" title="API keys and webhooks" subtitle="Revoke a key, pause or test a webhook, resend a failed delivery" />
+          </List>
+        </Section>
+      ) : null}
       <Section title="Account">
         <List>
           {me ? <Row href="/account" title={me.user.email} subtitle="Two-step sign-in, Monday summary and where you're signed in" a11y="Your account" /> : null}
