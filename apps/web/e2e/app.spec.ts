@@ -3193,3 +3193,39 @@ test("sales channel feed links and ad tracking from the app", async ({ page, bro
   await ads.getByRole("button", { name: "Save ad tracking" }).click();
   await expect(page.getByText("Saved. No ad tags are loaded on your store.")).toBeVisible();
 });
+
+test("invoice details set from the app, with the invoices issued", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `iv${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Beeswax Candle");
+  await web.getByLabel("Price", { exact: true }).fill("12.00");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  await buy(browser, new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href);
+
+  await signIn(page, email);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("link", { name: /^Invoices/ }).click();
+  await expect(page.getByText(/^Most tax offices need your registered business name/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Invoice INV-0001, order #1001" })).toBeVisible();
+  await expect(page.getByText("The next one will be INV-0002. Tax numbers come from Taxes and duties.")).toBeVisible();
+
+  await page.getByRole("textbox", { name: "Registered business name" }).fill("Pocket Candles LLC");
+  await page.getByRole("textbox", { name: "Business address" }).fill("12 Main St\nAustin, TX 78701");
+  await page.getByRole("textbox", { name: "Next number" }).fill("1");
+  await page.getByRole("button", { name: "Save invoice details" }).click();
+  await expect(page.getByText("The next number can't go below 2: numbers up to 1 are already used.")).toBeVisible();
+  await page.getByRole("textbox", { name: "Number prefix" }).fill("PC-");
+  await page.getByRole("textbox", { name: "Next number" }).fill("100");
+  await page.getByRole("button", { name: "Save invoice details" }).click();
+  await expect(page.getByText("Invoice settings saved. New invoices use them.")).toBeVisible();
+  await expect(page.getByText("The next one will be PC-0100. Tax numbers come from Taxes and duties.")).toBeVisible();
+  await expect(page.getByText(/^Most tax offices need/)).toHaveCount(0);
+  await shot(page, "418-app-invoices");
+
+  await page.getByRole("link", { name: "Invoice INV-0001, order #1001" }).click();
+  await expect(page.getByRole("heading", { name: "Order #1001" })).toBeVisible();
+  await web.goto(`${WEB}/admin/invoices`);
+  await expect(web.getByLabel("Registered business name")).toHaveValue("Pocket Candles LLC");
+  await expect(web.getByLabel("Next number")).toHaveValue("100");
+});

@@ -2148,3 +2148,7 @@ Settings in the app has a "Taxes" section with "Taxes and duties": add or remove
 ### Sales channels in the app (after launch, part 417)
 
 Settings in the app has a "Sales channels" section: the feed links for Google Shopping, Facebook and Instagram, Pinterest and TikTok (one per store language), each to share to a computer with the steps to paste it in, the Google product reviews feed, what's left out of the feeds and why, and the ad tracking tag IDs with who's asked before tracking.
+
+### Invoices in the app (after launch, part 418)
+
+Settings in the app has "Invoices" under Taxes: fill in the registered business name, address, number prefix, next number and footer printed on every invoice and credit note (with a warning while something tax offices need is missing), and see the latest invoices and credit notes issued, each opening its order.
