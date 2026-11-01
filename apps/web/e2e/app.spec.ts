@@ -4203,3 +4203,34 @@ test("photo descriptions for a product, from the app", async ({ page, browser })
   await expect(web.locator("#photo-text-0")).toHaveValue("Clear glass vase with tulips on a windowsill");
   await expect(web.locator("#photo-text-1")).toHaveValue("The vase empty, from above");
 });
+
+test("an order's note and tags, from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `on${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Soy Candle");
+  await web.getByLabel("Price", { exact: true }).fill("18.00");
+  await web.getByLabel("Stock", { exact: true }).fill("10");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  await buy(browser, new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href);
+
+  await signIn(page, email);
+  await tab(page, "Orders");
+  await page.getByRole("tab", { name: "All" }).click();
+  await page.getByRole("link", { name: "Order #1001" }).click();
+  const notes = page.getByRole("region", { name: "Your note and tags" });
+  await expect(notes.getByRole("button", { name: "Save note and tags" })).toBeDisabled();
+  await notes.getByRole("textbox", { name: "Tags" }).fill("Gift, priority");
+  await notes.getByRole("textbox", { name: "Note" }).fill("Called the buyer: leave it with the neighbour.");
+  await notes.getByRole("button", { name: "Save note and tags" }).click();
+  await expect(page.getByText("Note and tags saved.")).toBeVisible();
+  await expect(notes.getByText("priority", { exact: true })).toBeVisible();
+  await shot(page, "444-app-order-notes");
+
+  const orderId = page.url().split("/orders/")[1]!.split(/[?#]/)[0];
+  await web.goto(`${WEB}/admin/orders/${orderId}`);
+  await expect(web.locator("#order-tags")).toHaveValue("gift, priority");
+  await expect(web.locator("#order-note")).toHaveValue("Called the buyer: leave it with the neighbour.");
+  await web.goto(`${WEB}/admin/orders?tag=priority`);
+  await expect(web.getByRole("link", { name: "#1001" }).first()).toBeVisible();
+});

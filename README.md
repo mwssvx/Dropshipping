@@ -2252,3 +2252,7 @@ A product's screen in the app has "Who sends it": the supplier it was imported f
 ### Photo descriptions in the app (after launch, part 443)
 
 A product with photos has "Describe each photo" on its screen in the app: say what each one shows, up to 125 characters. Screen readers read it out and image search uses it; an empty one uses the product's name.
+
+### Order note and tags in the app (after launch, part 444)
+
+An order's screen in the app lets the team write its note and tags, which only the team sees. The website's order list filters by the same tags.

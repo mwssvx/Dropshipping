@@ -56,6 +56,7 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  updateOrderNotes,
   setPhotoTexts,
   getSupplierLink,
   setProductSupplier,
@@ -2891,6 +2892,14 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, on ? "Let buyers cancel their own orders, in the app" : "Stopped buyers cancelling their own orders, in the app", { href: "/admin/orders" });
     revalidatePath("/admin/orders");
     return { ok: true, message: on ? `Saved. Buyers can cancel from their order page in the first ${BUYER_EDIT_HOURS} hours, before it ships.` : "Saved. Buyers ask you to cancel instead." };
+  },
+  // The team's own note and tags on an order; buyers never see them.
+  "POST orders/:id/notes": async ({ req, params, db, shop }) => {
+    const b = await body<{ note?: unknown; tags?: unknown }>(req);
+    await updateOrderNotes(db, shop.id, params.id!, { note: str(b.note), tags: str(b.tags) });
+    revalidatePath(`/admin/orders/${params.id}`);
+    revalidatePath("/admin/orders");
+    return { ok: true, message: "Note and tags saved." };
   },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
