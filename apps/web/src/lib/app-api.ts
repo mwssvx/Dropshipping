@@ -56,6 +56,16 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  PRODUCT_INFO_MAX,
+  setProductInfo,
+  setRecentSales,
+  setShareButtons,
+  setStayAfterAdd,
+  setCardQuickAdd,
+  setSoldOutDisplay,
+  setBadgeSettings,
+  setRestockAlert,
+  setLowStockNote,
   setShipCutoff,
   productGaps,
   parseKg,
@@ -2707,6 +2717,42 @@ const routes: Record<string, Handler> = {
     revalidatePath("/admin/shipping");
     return { ok: true, message: "Rate removed." };
   },
+  "GET product-pages": async ({ shop }) => ({
+    lowStockNote: shop.lowStockNote,
+    restockAlertAt: shop.restockAlertAt,
+    badges: shop.productBadges,
+    soldOut: shop.soldOutProducts,
+    quickAdd: shop.cardQuickAdd,
+    stayAfterAdd: shop.stayAfterAdd,
+    shareButtons: shop.shareButtons,
+    recentSales: shop.recentSales,
+    notes: shop.productInfo,
+    notesMax: PRODUCT_INFO_MAX,
+  }),
+  "PUT product-pages": async ({ req, db, shop }) => {
+    const b = await body<Record<string, unknown>>(req);
+    const num = (v: unknown) => (str(v).trim() === "" ? Number.NaN : Number(str(v).trim()));
+    // The ones that can be refused go first, so a refusal saves nothing.
+    await setLowStockNote(db, shop.id, num(b.lowStockNote));
+    await setRestockAlert(db, shop.id, num(b.restockAlertAt));
+    await setBadgeSettings(db, shop.id, { sale: b.saleBadge === true, soldOut: b.soldOutBadge === true, newDays: str(b.newDays).trim() === "" ? 0 : Number(str(b.newDays)) });
+    await setSoldOutDisplay(db, shop.id, str(b.soldOut));
+    await setCardQuickAdd(db, shop.id, b.quickAdd === true);
+    await setStayAfterAdd(db, shop.id, b.stayAfterAdd === true);
+    await setShareButtons(db, shop.id, b.shareButtons === true);
+    await setRecentSales(db, shop.id, b.recentSales === true);
+    revalidatePath("/admin/products");
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: "Saved. Your store's product pages and cards follow it now." };
+  },
+  "PUT product-pages/notes": async ({ req, db, shop }) => {
+    const b = await body<{ notes?: unknown }>(req);
+    const rows = Array.isArray(b.notes) ? b.notes.slice(0, PRODUCT_INFO_MAX).map((n) => ({ title: str((n as { title?: unknown })?.title), text: str((n as { text?: unknown })?.text) })) : [];
+    await setProductInfo(db, shop.id, rows);
+    revalidatePath("/admin/products");
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: "Saved. The notes show under every product's description." };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -3568,6 +3614,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("gift-wrap")) return "shipping";
   if (path.startsWith("shipping/")) return "shipping";
   if (path.startsWith("delivery-dates")) return "shipping";
+  if (path.startsWith("product-pages")) return "products";
   if (path.startsWith("signup")) return "marketing";
   if (path.startsWith("gift-cards")) return "gift_cards";
   if (path.startsWith("sales")) return "marketing";

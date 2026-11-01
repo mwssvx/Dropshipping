@@ -2192,3 +2192,7 @@ Settings in the app has "Shipping rates" under Shipping: set up the starter zone
 ### Same-day cutoff in the app (after launch, part 428)
 
 The app's Delivery dates screen has the same-day cutoff: orders in by the hour you pick, in your time zone, ship that day, with a switch for shipping at weekends. Product pages count down to it.
+
+### Product pages in the app (after launch, part 429)
+
+The Products tab in the app has "Product pages": the "Only 3 left" note, the running-low email, sale, sold-out and new badges, where sold-out products go, Add to cart on cards, staying on the page after adding, share buttons, recent sales, and the notes under every product.
