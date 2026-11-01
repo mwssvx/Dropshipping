@@ -128,6 +128,13 @@ export default function Settings() {
           </List>
         </Section>
       ) : null}
+      {can("currencies") ? (
+        <Section title="Selling abroad">
+          <List>
+            <Row href="/currencies" title="Currencies" subtitle="Prices, payment and refunds in the buyer's own currency" />
+          </List>
+        </Section>
+      ) : null}
       {can("domains") ? (
         <Section title="Web addresses">
           <List>

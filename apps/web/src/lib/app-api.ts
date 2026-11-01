@@ -56,6 +56,12 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  sampleProduct,
+  setShopCurrencies,
+  convertPrice,
+  crossRate,
+  CURRENCY_NAMES,
+  CURRENCIES,
   MAX_REDIRECTS,
   deleteRedirect,
   addRedirects,
@@ -344,7 +350,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { BRAND } from "./brand";
 import { afterOrderPaid } from "./webhooks";
-import { agents, campaigns, db, fulfillment, logged, mailer, platformUrl, notifyLater, payments, refunds, stock, storeAddress, partnerPortalUrl, subscriptions, supplierPortalUrl, suppliers, tax, testPayments } from "./server";
+import { agents, campaigns, db, fulfillment, fxRates, logged, mailer, platformUrl, notifyLater, payments, refunds, stock, storeAddress, partnerPortalUrl, subscriptions, supplierPortalUrl, suppliers, tax, testPayments } from "./server";
 
 type User = { id: string; email: string };
 type ShopLink = { id: string; name: string; handle: string; role: string };
@@ -2035,6 +2041,36 @@ const routes: Record<string, Handler> = {
     revalidatePath("/admin/redirects");
     return { ok: true, message: "Redirect removed." };
   },
+  // Currencies buyers can see prices and pay in, converted at the day's rate.
+  "GET currencies": async ({ db, shop }) => {
+    const [{ rates, asOf }, sample] = await Promise.all([fxRates().rates(), sampleProduct(db, shop.id)]);
+    const price = sample?.variants[0]?.priceMinor ?? 2499;
+    return {
+      currency: shop.currency,
+      name: CURRENCY_NAMES[shop.currency] ?? shop.currency,
+      round: shop.roundConvertedPrices,
+      asOf,
+      sample: { title: sample?.title ?? "A product", price: formatMoney(price, shop.currency) },
+      options: CURRENCIES.filter((c) => c !== shop.currency).map((c) => {
+        const rate = crossRate(rates, shop.currency, c);
+        return {
+          code: c,
+          name: CURRENCY_NAMES[c] ?? c,
+          on: shop.presentmentCurrencies.includes(c),
+          rate: rate.toFixed(4),
+          sample: formatMoney(convertPrice(price, { currency: c, rate, round: shop.roundConvertedPrices }), c),
+        };
+      }),
+    };
+  },
+  "PUT currencies": async ({ req, db, shop, user }) => {
+    const b = await body<{ currencies?: unknown; round?: unknown }>(req);
+    await setShopCurrencies(db, shop, { currencies: Array.isArray(b.currencies) ? b.currencies.map(String) : [], round: b.round === true });
+    revalidatePath("/admin/currencies");
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    await logged({ shop, user, db }, "Changed the currencies buyers can pay in, in the app", { href: "/admin/currencies" });
+    return { ok: true, message: "Saved. Buyers see the change on their next page." };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -2852,6 +2888,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("search-fixes")) return "products";
   if (path.startsWith("size-charts")) return "products";
   if (path.startsWith("redirects")) return "domains";
+  if (path === "currencies") return "currencies";
   if (path.startsWith("pricing")) return "products";
   if (path.startsWith("checkout-settings")) return "shipping";
   if (path === "local" || path.startsWith("local/")) return "shipping";

@@ -2124,3 +2124,7 @@ The Products tab has a "Size charts" row. Start a chart by name, then type its t
 ### Redirects in the app (after launch, part 411)
 
 Settings in the app has a "Web addresses" section with "Redirects": paste old links one per line with where each should go, see what wasn't added and why (those lines stay in the box to fix), search your redirects with their visit counts, and remove one.
+
+### Currencies in the app (after launch, part 412)
+
+Settings in the app has a "Selling abroad" section with "Currencies": turn on the currencies buyers can see prices, pay and get refunds in, round converted prices to end in .99, and see today's rates with what a product would cost in each.
