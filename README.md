@@ -2188,3 +2188,7 @@ The app's "Left at checkout" screen has Browse reminders under the checkout remi
 ### Shipping rates in the app (after launch, part 427)
 
 Settings in the app has "Shipping rates" under Shipping: set up the starter zones, add or remove rates with their price, free-over amount, delivery days and weight range, and add, rename, change the countries of or delete a zone.
+
+### Same-day cutoff in the app (after launch, part 428)
+
+The app's Delivery dates screen has the same-day cutoff: orders in by the hour you pick, in your time zone, ship that day, with a switch for shipping at weekends. Product pages count down to it.

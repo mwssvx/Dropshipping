@@ -56,6 +56,7 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  setShipCutoff,
   productGaps,
   parseKg,
   deleteShippingRate,
@@ -1695,7 +1696,22 @@ const routes: Record<string, Handler> = {
     };
   },
   // Delivery dates: product pages, the cart, checkout and receipts say when orders arrive.
-  "GET delivery-dates": async ({ shop }) => ({ on: shop.deliveryEstimates, processingDays: shop.processingDays }),
+  "GET delivery-dates": async ({ shop }) => ({
+    on: shop.deliveryEstimates,
+    processingDays: shop.processingDays,
+    cutoff: shop.shipCutoff,
+    zones: CUTOFF_TIME_ZONES.map(([id, name]) => ({ id, name })),
+    defaultZone: defaultCutoffZone(shop.country),
+  }),
+  "PUT delivery-dates/cutoff": async ({ req, db, shop, user }) => {
+    const b = await body<{ on?: unknown; hour?: unknown; timeZone?: unknown; weekends?: unknown }>(req);
+    const saved = b.on === true ? await setShipCutoff(db, shop.id, { hour: Number(b.hour), timeZone: str(b.timeZone), weekends: b.weekends === true }) : await setShipCutoff(db, shop.id, null);
+    await logged({ shop, user, db }, saved ? "Set a same-day shipping cutoff in the app" : "Turned off the same-day shipping cutoff in the app", { href: "/admin/shipping#cutoff-heading" });
+    revalidatePath("/admin/shipping");
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    const hour = saved ? new Intl.DateTimeFormat("en-US", { hour: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(2026, 0, 1, saved.hour))) : null;
+    return { ok: true, message: hour ? `Saved. Orders in by ${hour} ship that day.` : "Saved. There's no same-day cutoff." };
+  },
   "PUT delivery-dates": async ({ req, db, shop, user }) => {
     const b = await body<{ on?: unknown; processingDays?: unknown }>(req);
     const days = str(b.processingDays).trim();

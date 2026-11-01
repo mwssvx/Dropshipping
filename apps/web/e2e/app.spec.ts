@@ -3573,3 +3573,31 @@ test("shipping zones and rates set up from the app", async ({ page, browser }) =
   await web.reload();
   await expect(web.getByRole("listitem", { name: "Australia and NZ zone" })).toHaveCount(0);
 });
+
+test("same-day shipping cutoff set from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `co${Date.now()}`);
+  await signIn(page, email);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("link", { name: /^Delivery dates/ }).click();
+  const cutoff = page.getByRole("region", { name: "Same-day cutoff" });
+  await cutoff.getByRole("switch", { name: "Orders in by a set time ship that day" }).click();
+  await expect(cutoff.getByText("Order by 2 PM")).toBeVisible();
+  await cutoff.getByRole("button", { name: "Make the cutoff an hour later" }).click();
+  await cutoff.getByRole("button", { name: "Make the cutoff an hour later" }).click();
+  await expect(cutoff.getByText("Order by 4 PM")).toBeVisible();
+  await cutoff.getByRole("button", { name: /^Your time zone: New York \(Eastern\)/ }).click();
+  await cutoff.getByRole("button", { name: "Use Chicago (Central)" }).click();
+  await cutoff.getByRole("switch", { name: "We ship at weekends" }).click();
+  await cutoff.getByRole("button", { name: "Save cutoff" }).click();
+  await expect(cutoff.getByText("Saved. Orders in by 4 PM ship that day.")).toBeVisible();
+  await shot(page, "428-app-ship-cutoff");
+
+  await web.goto(`${WEB}/admin/shipping`);
+  await expect(web.getByLabel("Order by")).toHaveValue("16");
+  await expect(web.getByLabel("Your time zone")).toHaveValue("America/Chicago");
+  await expect(web.getByRole("checkbox", { name: "We ship at weekends" })).toBeChecked();
+
+  await cutoff.getByRole("switch", { name: "Orders in by a set time ship that day" }).click();
+  await cutoff.getByRole("button", { name: "Save cutoff" }).click();
+  await expect(cutoff.getByText("Saved. There's no same-day cutoff.")).toBeVisible();
+});
