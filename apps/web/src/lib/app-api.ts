@@ -56,6 +56,13 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  setDuties,
+  setPricesIncludeTax,
+  removeTaxRegistration,
+  addTaxRegistration,
+  taxReport,
+  TAX_JURISDICTIONS,
+  listTaxRegistrations,
   SEO_DESCRIPTION_MAX,
   SEO_TITLE_MAX,
   searchSnippet,
@@ -2153,6 +2160,58 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, "Changed a product's search listing, in the app", { href: `/admin/products/${params.id}#seo-heading` });
     return { ok: true, message: "Saved. Search engines pick it up next time they visit." };
   },
+  // Taxes: where the store collects tax, whether prices include it, import duties, and what's owed this quarter.
+  "GET taxes": async ({ url, db, shop }) => {
+    const now = new Date();
+    const q = Math.floor(now.getUTCMonth() / 3) + (url.searchParams.get("period") === "last" ? -1 : 0);
+    const from = new Date(Date.UTC(now.getUTCFullYear(), q * 3, 1));
+    const to = new Date(Date.UTC(now.getUTCFullYear(), q * 3 + 3, 1) - 1);
+    const [registrations, report] = await Promise.all([listTaxRegistrations(db, shop.id), taxReport(db, shop.id, { from, to })]);
+    const name = (code: string) => TAX_JURISDICTIONS.find((j) => j.code === code)?.name ?? code;
+    const taken = new Set(registrations.map((r) => r.jurisdiction));
+    return {
+      currency: shop.currency,
+      pricesIncludeTax: shop.pricesIncludeTax,
+      duties: shop.duties,
+      registrations: registrations.map((r) => ({ id: r.id, name: name(r.jurisdiction), number: r.registrationNumber })),
+      options: TAX_JURISDICTIONS.filter((j) => !taken.has(j.code)),
+      quarter: `Q${(((q % 4) + 4) % 4) + 1} ${from.getUTCFullYear()}`,
+      report: report.map((r) => ({ jurisdiction: r.jurisdiction, label: r.label.replace(/ [\d.]+%$/, ""), orders: r.orders, salesMinor: r.salesMinor, taxMinor: r.taxMinor })),
+    };
+  },
+  "PUT taxes/prices": async ({ req, db, shop, user }) => {
+    const b = await body<{ include?: unknown }>(req);
+    await setPricesIncludeTax(db, shop.id, b.include === true);
+    revalidatePath("/admin/taxes");
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    await logged({ shop, user, db }, b.include === true ? "Set prices to include tax, in the app" : "Set tax to be added at checkout, in the app", { href: "/admin/taxes" });
+    return { ok: true, message: b.include === true ? "Saved. Your prices include tax." : "Saved. Tax is added at checkout." };
+  },
+  "PUT taxes/duties": async ({ req, db, shop, user }) => {
+    const b = await body<{ policy?: unknown }>(req);
+    const policy = await setDuties(db, shop.id, str(b.policy));
+    revalidatePath("/admin/taxes");
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    await logged(
+      { shop, user, db },
+      policy === "included" ? "Said import duties are included in prices, in the app" : policy === "buyer_pays" ? "Told buyers abroad they pay import duties on delivery, in the app" : "Stopped mentioning import duties at checkout, in the app",
+      { href: "/admin/taxes#duties-heading" },
+    );
+    return { ok: true, message: "Saved. Checkout and your shipping policy follow it." };
+  },
+  "POST taxes/registrations": async ({ req, db, shop, user }) => {
+    const b = await body<{ jurisdiction?: unknown; number?: unknown }>(req);
+    await addTaxRegistration(db, tax(), shop, { jurisdiction: str(b.jurisdiction), registrationNumber: str(b.number) });
+    revalidatePath("/admin/taxes");
+    await logged({ shop, user, db }, `Started collecting tax in ${TAX_JURISDICTIONS.find((j) => j.code === str(b.jurisdiction).toUpperCase())?.name ?? str(b.jurisdiction)}, in the app`, { href: "/admin/taxes" });
+    return { ok: true, message: "Added. Buyers there are charged tax from their next order." };
+  },
+  "DELETE taxes/registrations/:id": async ({ params, db, shop, user }) => {
+    await removeTaxRegistration(db, shop.id, params.id!);
+    revalidatePath("/admin/taxes");
+    await logged({ shop, user, db }, "Stopped collecting tax in a place, in the app", { href: "/admin/taxes" });
+    return { ok: true, message: "Removed. Buyers there aren't charged tax any more." };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -2974,6 +3033,7 @@ function routeArea(key: string): Area | null {
   if (path === "languages") return "theme";
   if (path === "quiz") return "marketing";
   if (path === "search-listings") return "products";
+  if (path === "taxes" || path.startsWith("taxes/")) return "taxes";
   if (path.startsWith("pricing")) return "products";
   if (path.startsWith("checkout-settings")) return "shipping";
   if (path === "local" || path.startsWith("local/")) return "shipping";

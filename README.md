@@ -2140,3 +2140,7 @@ The Products tab has a "Product quiz" row. Write the quiz on the phone: a title,
 ### Search listings in the app (after launch, part 415)
 
 The Products tab has a "Search listings" row: the products on sale whose Google listing needs a look (supplier filler, a title too long, nothing to show under it, the same title as another product, no photo) and the photos with no description. Tap a product to write its headline and snippet for search results, with a preview of how the result looks.
+
+### Taxes and duties in the app (after launch, part 416)
+
+Settings in the app has a "Taxes" section with "Taxes and duties": add or remove the places you're registered to collect tax (with the registration number), say whether your prices include tax, pick what buyers abroad are told about import duties, and see the tax collected this quarter or last, per place.
