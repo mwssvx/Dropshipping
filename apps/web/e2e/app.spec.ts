@@ -4635,3 +4635,34 @@ test("the buyers on the Open list emailed an update from the app", async ({ page
   await web.getByRole("link", { name: /#1001/ }).first().click();
   await expect(web.getByText("Update from you email sent to ada@example.com")).toBeVisible();
 });
+
+test("returned most, in the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `rm${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Glass Vase");
+  await web.getByLabel("Price", { exact: true }).fill("26.00");
+  await web.getByLabel("Stock", { exact: true }).fill("6");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const vase = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+  await buy(browser, vase);
+  const buyer = await (await browser.newContext()).newPage();
+  await buy(browser, vase, buyer);
+  await buyer.getByText("Return something").click();
+  await buyer.getByLabel("Why?").selectOption({ label: "It arrived damaged" });
+  await buyer.getByRole("button", { name: "Ask for a return" }).click();
+  await expect(buyer.locator("#returns")).toContainText("you asked for a return");
+
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Returns (1 open)" }).click();
+  await page.getByRole("link", { name: /^Returned most/ }).click();
+  await expect(page.getByText(/^Of 2 items sold in the last 90 days, 1 came back \(50%\)\. Why: arrived damaged \(1\)\.$/)).toBeVisible();
+  await expect(page.getByText("Glass Vase", { exact: true })).toBeVisible();
+  await expect(page.getByText(/^1 of 2 back/)).toBeVisible();
+  await shot(page, "457-app-returned-most");
+  await page.getByRole("tab", { name: "12 months" }).click();
+  await expect(page.getByText(/^Of 2 items sold in the last 12 months/)).toBeVisible();
+
+  await web.goto(`${WEB}/admin/returns`);
+  await expect(web.getByRole("region", { name: "Returned most" })).toContainText("1 of 2 back");
+});
