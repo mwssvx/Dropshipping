@@ -2883,9 +2883,8 @@ test("the profit report and ad spend for a product, from the app", async ({ page
   await tab(page, "Money");
   await page.getByRole("link", { name: /^Profit report/ }).click();
   await expect(page.getByRole("heading", { name: "Profit", level: 1 })).toBeVisible();
-  // Own stock with no cost entered: its profit is flagged as too high.
-  await expect(page.getByRole("link", { name: /^Beeswax Candle, profit .*, no cost$/ })).toBeVisible();
-  await expect(page.getByText(/^Some products have no cost/)).toBeVisible();
+  // Not posted yet, so no cost counts against it.
+  await expect(page.getByRole("link", { name: /^Beeswax Candle, profit \$\d/ })).toBeVisible();
 
   const ads = page.getByRole("region", { name: "Ad spend" });
   await ads.getByRole("tab", { name: "TikTok" }).click();
