@@ -2128,3 +2128,7 @@ Settings in the app has a "Web addresses" section with "Redirects": paste old li
 ### Currencies in the app (after launch, part 412)
 
 Settings in the app has a "Selling abroad" section with "Currencies": turn on the currencies buyers can see prices, pay and get refunds in, round converted prices to end in .99, and see today's rates with what a product would cost in each.
+
+### Store languages in the app (after launch, part 413)
+
+Settings in the app has a "Languages" section with "Store languages": turn on the languages buyers can pick, and see how much of your own words each one has translated, with what's out of date or not started. Translating stays on the web.

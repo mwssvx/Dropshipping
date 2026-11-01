@@ -56,6 +56,10 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  setShopLanguages,
+  translationSummary,
+  LANGUAGES,
+  LANGUAGE_CODES,
   sampleProduct,
   setShopCurrencies,
   convertPrice,
@@ -2071,6 +2075,22 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, "Changed the currencies buyers can pay in, in the app", { href: "/admin/currencies" });
     return { ok: true, message: "Saved. Buyers see the change on their next page." };
   },
+  // Languages the store is shown in, and how much of the merchant's own words each has translated.
+  "GET languages": async ({ db, shop }) => {
+    const summary = await translationSummary(db, shop);
+    return {
+      options: LANGUAGE_CODES.map((c) => ({ code: c, name: LANGUAGES[c].name, english: LANGUAGES[c].english, on: shop.languages.includes(c) })),
+      summary: summary.map((x) => ({ language: x.language, name: LANGUAGES[x.language].english, done: x.done, total: x.total, outdated: x.outdated, missing: x.missing })),
+    };
+  },
+  "PUT languages": async ({ req, db, shop, user }) => {
+    const b = await body<{ languages?: unknown }>(req);
+    await setShopLanguages(db, shop.id, Array.isArray(b.languages) ? b.languages.map(String) : []);
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    revalidatePath("/admin/languages", "layout");
+    await logged({ shop, user, db }, "Changed the languages buyers can pick, in the app", { href: "/admin/languages" });
+    return { ok: true, message: "Saved. Buyers can pick these languages at the bottom of the store." };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -2889,6 +2909,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("size-charts")) return "products";
   if (path.startsWith("redirects")) return "domains";
   if (path === "currencies") return "currencies";
+  if (path === "languages") return "theme";
   if (path.startsWith("pricing")) return "products";
   if (path.startsWith("checkout-settings")) return "shipping";
   if (path === "local" || path.startsWith("local/")) return "shipping";

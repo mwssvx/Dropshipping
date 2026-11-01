@@ -135,6 +135,13 @@ export default function Settings() {
           </List>
         </Section>
       ) : null}
+      {can("theme") ? (
+        <Section title="Languages">
+          <List>
+            <Row href="/languages" title="Store languages" subtitle="Show your store in the languages of the countries you sell to" />
+          </List>
+        </Section>
+      ) : null}
       {can("domains") ? (
         <Section title="Web addresses">
           <List>
