@@ -18,6 +18,7 @@ type Report = {
   salesBySource: { source: string; orders: number; salesMinor: number }[];
   sources: { source: string; visitors: number }[];
   busiest: { day: string; part: string } | null;
+  repeat: { months: { month: string; buyers: number; cameBack: number; share: number | null; complete: boolean }[]; share: number | null; averageDays: number | null; days: number };
   searches: { total: number; nothingShare: number | null; top: { term: string; searches: number; results: number }[]; nothing: { term: string; searches: number }[] };
 };
 type Days = "7" | "30" | "90";
@@ -29,6 +30,7 @@ function change(now: number, before: number) {
   const p = Math.round(Math.abs(c) * 100);
   return p === 0 ? "Same" : `${c > 0 ? "Up" : "Down"} ${p}%`;
 }
+const monthName = (m: string) => new Date(`${m}-01T12:00:00Z`).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
 const pct = (x: number | null) => (x === null ? "–" : `${(Math.round(x * 1000) / 10).toString()}%`);
 
 /** How the store is doing: sales, orders and visitors over a week, a month or three, against the days before. */
@@ -130,6 +132,26 @@ export default function AnalyticsScreen() {
                 ))}
               </List>
               <Body muted>Add ?utm_source=instagram to the links you post to see each one here.</Body>
+            </Section>
+          ) : null}
+          {r.repeat.months.some((m) => m.buyers > 0) ? (
+            <Section title="Buyers who come back">
+              <Body>
+                {r.repeat.share === null
+                  ? `Once a month's first-time buyers have had ${r.repeat.days} days, this says how many ordered again.`
+                  : `${Math.round(r.repeat.share * 100)}% of first-time buyers ordered again within ${r.repeat.days} days${r.repeat.averageDays !== null ? `, after ${r.repeat.averageDays === 1 ? "1 day" : `${r.repeat.averageDays} days`} on average` : ""}.`}
+              </Body>
+              <List>
+                {r.repeat.months.map((m) => (
+                  <Row
+                    key={m.month}
+                    title={monthName(m.month)}
+                    subtitle={m.buyers === 1 ? "1 new buyer" : `${m.buyers} new buyers`}
+                    right={<Text style={{ color: color.ink }}>{m.buyers ? `${m.cameBack} came back · ${Math.round((m.share ?? 0) * 100)}%${m.complete ? "" : " so far"}` : "–"}</Text>}
+                  />
+                ))}
+              </List>
+              <Body muted>Buyers are told apart by email. Reorder reminders, a thank-you note with a code, and birthday codes all help bring people back.</Body>
             </Section>
           ) : null}
           <Section title="What shoppers search for">

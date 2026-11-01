@@ -2649,3 +2649,25 @@ test("what shoppers search for, on the app's Analytics screen", async ({ page, b
   await expect(page).toHaveURL(/\/search-fixes\?from=lampshade$/);
   await expect(page.getByRole("textbox", { name: "When shoppers search for" })).toHaveValue("lampshade");
 });
+
+test("buyers who come back, on the app's Analytics screen", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `rb${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/import`);
+  await web.getByRole("link", { name: /sunset projection lamp/i }).click();
+  await web.getByRole("button", { name: "Import and publish" }).click();
+  await expect(web.getByText("Imported and live on your store.")).toBeVisible();
+  const lamp = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+  // The same buyer orders twice.
+  await buy(browser, lamp);
+  await buy(browser, lamp);
+
+  await signIn(page, email);
+  await page.goto("/analytics");
+  const back = page.getByRole("region", { name: "Buyers who come back" });
+  await expect(back).toContainText("Once a month's first-time buyers have had 90 days, this says how many ordered again.");
+  const month = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+  await expect(back).toContainText(month);
+  await expect(back).toContainText("1 new buyer");
+  await expect(back).toContainText("1 came back · 100% so far");
+  await shot(page, "402-app-repeat-buyers");
+});
