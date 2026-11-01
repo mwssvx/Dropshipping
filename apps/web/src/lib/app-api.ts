@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  setReferralProgram,
+  referralStats,
   SUBSCRIBE_WITHIN_DAYS,
   POST_PURCHASE_MINUTES,
   THANK_YOU_NOTE_MAX,
@@ -2545,6 +2547,44 @@ const routes: Record<string, Handler> = {
     revalidatePath("/admin/subscriptions");
     return { ok: true, message: b.on === true ? "Saved. Buyers see the offer on their order page after paying." : "Turned off. Existing subscriptions carry on." };
   },
+  "GET referrals": async ({ db, shop }) => {
+    const stats = await referralStats(db, shop.id);
+    const p = shop.referralProgram;
+    return {
+      currency: shop.currency,
+      program: p ? { friendPercentOff: p.friendPercentOff, reward: (p.rewardMinor / 100).toFixed(2), min: p.minSubtotalMinor ? (p.minSubtotalMinor / 100).toFixed(2) : "" } : null,
+      friends: stats.friends,
+      orders: stats.orders,
+      salesMinor: stats.salesMinor,
+      creditMinor: stats.creditMinor,
+    };
+  },
+  "PUT referrals": async ({ req, db, shop }) => {
+    const b = await body<{ on?: unknown; percentOff?: unknown; reward?: unknown; min?: unknown }>(req);
+    const on = b.on === true;
+    let program = null;
+    if (on) {
+      let rewardMinor: number;
+      try {
+        rewardMinor = parseMoney(str(b.reward).trim());
+      } catch {
+        throw new UserError("Enter the credit like 10.00.");
+      }
+      const min = str(b.min).trim();
+      let minSubtotalMinor = 0;
+      if (min) {
+        try {
+          minSubtotalMinor = parseMoney(min);
+        } catch {
+          throw new UserError("Enter the friend's minimum order like 25.00, or leave it empty.");
+        }
+      }
+      program = { friendPercentOff: Number.parseInt(str(b.percentOff).trim() || "NaN", 10), rewardMinor, minSubtotalMinor };
+    }
+    await setReferralProgram(db, shop.id, program);
+    revalidatePath("/admin/marketing");
+    return { ok: true, message: on ? "Saved. Buyers see their link on their order page and account." : "Turned off. Friends' codes already sent still work, but no more credit is sent." };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -3405,6 +3445,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("developers")) return "developers";
   if (path === "winback" || path === "birthday") return "marketing";
   if (path.startsWith("after-order")) return "marketing";
+  if (path === "referrals") return "marketing";
   return null;
 }
 

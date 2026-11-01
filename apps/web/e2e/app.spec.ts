@@ -3467,3 +3467,34 @@ test("thank-you note, after-checkout offer and subscribe and save set from the a
   await expect(web.getByLabel("Buyer saves (%)")).toHaveValue("20");
   await expect(web.getByLabel("Subscriber saves (%)")).toHaveValue("15");
 });
+
+test("refer a friend set from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `rf${Date.now()}`);
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Discount codes" }).click();
+  await page.getByRole("link", { name: /^Refer a friend/ }).click();
+  await expect(page.getByText("0 friends sent a code · 0 orders · $0.00 in sales")).toBeVisible();
+
+  await page.getByRole("switch", { name: "Let buyers refer friends" }).click();
+  await page.getByRole("textbox", { name: "Friend's percent off" }).fill("80");
+  await page.getByRole("button", { name: "Save refer a friend" }).click();
+  await expect(page.getByText("Friends get 5% to 50% off.")).toBeVisible();
+  await page.getByRole("textbox", { name: "Friend's percent off" }).fill("15");
+  await page.getByRole("textbox", { name: /^Credit for the buyer/ }).fill("ten");
+  await page.getByRole("button", { name: "Save refer a friend" }).click();
+  await expect(page.getByText("Enter the credit like 10.00.")).toBeVisible();
+  await page.getByRole("textbox", { name: /^Credit for the buyer/ }).fill("7.50");
+  await page.getByRole("textbox", { name: /^Friend's minimum order/ }).fill("30");
+  await page.getByRole("button", { name: "Save refer a friend" }).click();
+  await expect(page.getByText("Saved. Buyers see their link on their order page and account.")).toBeVisible();
+  await shot(page, "425-app-referrals");
+
+  await web.goto(`${WEB}/admin/marketing`);
+  await expect(web.getByLabel("Friend's percent off")).toHaveValue("15");
+  await expect(web.getByLabel(/^Credit for the buyer/)).toHaveValue("7.50");
+  await expect(web.getByLabel(/^Friend's minimum order/)).toHaveValue("30.00");
+
+  await page.getByRole("switch", { name: "Let buyers refer friends" }).click();
+  await page.getByRole("button", { name: "Save refer a friend" }).click();
+  await expect(page.getByText("Turned off. Friends' codes already sent still work, but no more credit is sent.")).toBeVisible();
+});
