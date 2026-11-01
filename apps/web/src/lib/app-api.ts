@@ -56,6 +56,7 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  setPersonalization,
   MAX_DETAILS,
   detailsText,
   setProductDetails,
@@ -592,6 +593,8 @@ const productView = (p: ProductRow) => ({
   videoUrl: p.videoUrl,
   /** The details table, one "Label: value" per line. */
   detailsText: detailsText(p.details),
+  /** Text fields buyers fill in before adding it to their cart, like a name to engrave. */
+  personalization: p.personalization,
 });
 
 const customerView = (p: Awaited<ReturnType<typeof getCustomerProfile>>) => ({
@@ -3221,6 +3224,24 @@ const routes: Record<string, Handler> = {
       ok: true,
       message: saved.length ? `Saved. ${saved.length === 1 ? "1 detail shows" : `${saved.length} details show`} under the description on the product page.` : "Saved. This product has no details table.",
     };
+  },
+  "PUT products/:id/personalization": async ({ req, params, db, shop }) => {
+    const b = await body<{ fields?: unknown }>(req);
+    if (!Array.isArray(b.fields)) throw new UserError("Send the fields as a list.");
+    const saved = await setPersonalization(
+      db,
+      shop.id,
+      params.id!,
+      b.fields.map((f: Record<string, unknown>) => ({
+        id: typeof f.id === "string" ? f.id : undefined,
+        label: str(f.label),
+        required: f.required === true,
+        maxLength: Number(f.maxLength),
+      })),
+    );
+    revalidatePath(`/admin/products/${params.id}`);
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: saved.length ? "Saved. Buyers fill these in on the product page before adding it to their cart." : "Saved. This product has no personalisation." };
   },
   "POST products/:id/listing": async ({ params, shop }) => {
     const run = await writeListing(await agents(), shop, params.id!);

@@ -2220,3 +2220,7 @@ A product's screen in the app has "Age check", the minimum age buyers confirm at
 ### Video and details in the app (after launch, part 435)
 
 A product's screen in the app has "Video", the YouTube, Vimeo or video file link shown after the photos, and "Details", the facts table under the description written one "Label: value" per line.
+
+### Personalisation in the app (after launch, part 436)
+
+A product's screen in the app has "Personalisation": up to three text fields buyers fill in before adding it to their cart, like a name to engrave, each with a label, the most characters and whether it's required.
