@@ -2308,3 +2308,7 @@ The Open and Late lists on the app's Orders tab have "Email these buyers". Write
 ### Returned most in the app (after launch, part 457)
 
 The app's Returns screen links to "Returned most": over the last 30 days, 90 days or 12 months, how many items came back and why, and each product's share with what to do about one that comes back too often.
+
+### A product's web address in the app (after launch, part 458)
+
+A product's screen in the app has "Web address": change it to something short like stoneware-mug, and links to the old address keep sending buyers to the product.

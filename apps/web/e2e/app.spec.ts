@@ -4666,3 +4666,34 @@ test("returned most, in the app", async ({ page, browser }) => {
   await web.goto(`${WEB}/admin/returns`);
   await expect(web.getByRole("region", { name: "Returned most" })).toContainText("1 of 2 back");
 });
+
+test("a product's web address changed from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `wa${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Hand Thrown Stoneware Coffee Mug Large");
+  await web.getByLabel("Price", { exact: true }).fill("24.00");
+  await web.getByLabel("Stock", { exact: true }).fill("5");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const oldUrl = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+  const productPage = web.url();
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Hand Thrown Stoneware/ }).click();
+  const address = page.getByRole("region", { name: "Web address" });
+  await expect(address.getByRole("textbox", { name: "Address" })).toHaveValue("hand-thrown-stoneware-coffee-mug-large");
+  await expect(address.getByRole("button", { name: "Save address" })).toBeDisabled();
+  await address.getByRole("textbox", { name: "Address" }).fill("Stoneware Mug");
+  await shot(page, "458-app-product-address");
+  await address.getByRole("button", { name: "Save address" }).click();
+  await expect(page.getByText("Saved. Links to the old address still work: they send buyers here.")).toBeVisible();
+  await expect(address.getByRole("textbox", { name: "Address" })).toHaveValue("stoneware-mug");
+
+  // The old link still lands on the product.
+  const buyer = await (await browser.newContext()).newPage();
+  await buyer.goto(oldUrl);
+  await expect(buyer).toHaveURL(/\/products\/stoneware-mug$/);
+  await web.goto(productPage);
+  await expect(web.locator("#handle")).toHaveValue("stoneware-mug");
+});
