@@ -56,6 +56,11 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  setWelcomeOffer,
+  describeWelcomeOffer,
+  setSignupPopup,
+  SIGNUP_POPUP_SECONDS,
+  SIGNUP_POPUP_ON_LEAVE,
   setGrowthSettings,
   setAbandonedCartOffer,
   setGiftWrap,
@@ -1422,6 +1427,42 @@ const routes: Record<string, Handler> = {
     revalidatePath(`/s/${shop.handle}`, "layout");
     return { ok: true, message: saved ? "Saved. Buyers sending a gift can have it wrapped." : "Saved. Checkout doesn't offer gift wrapping." };
   },
+  // New subscribers: the welcome offer they get by email, and the pop-up that asks for their email.
+  "GET signup": async ({ shop }) => ({
+    welcome: shop.welcomeOffer,
+    welcomeText: shop.welcomeOffer ? describeWelcomeOffer(shop.welcomeOffer, shop.currency) : null,
+    popupSeconds: shop.signupPopupSeconds,
+    popupOptions: [SIGNUP_POPUP_ON_LEAVE, ...SIGNUP_POPUP_SECONDS],
+    onLeave: SIGNUP_POPUP_ON_LEAVE,
+  }),
+  "PUT signup/welcome": async ({ req, db, shop, user }) => {
+    const b = await body<{ on?: unknown; percentOff?: unknown; minSubtotal?: unknown; days?: unknown }>(req);
+    const int = (v: unknown) => Number.parseInt(str(v).trim() || "NaN", 10);
+    let minSubtotalMinor = 0;
+    const min = str(b.minSubtotal).trim().replace(/^[$€£¥₹]\s*/, "");
+    if (b.on === true && min) {
+      try {
+        minSubtotalMinor = parseMoney(min);
+      } catch {
+        throw new UserError("Enter the smallest order as an amount, like 50.00, or leave it empty.");
+      }
+    }
+    const offer = await setWelcomeOffer(db, shop.id, b.on === true ? { percentOff: int(b.percentOff), minSubtotalMinor, days: int(b.days) } : null);
+    await logged({ shop, user, db }, offer ? `Set the welcome offer to ${describeWelcomeOffer(offer, shop.currency)} in the app` : "Turned off the welcome offer in the app", { href: "/admin/marketing" });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: offer ? `Saved. New subscribers get ${describeWelcomeOffer(offer, shop.currency)}, in a code that lasts ${offer.days} days.` : "Saved. New subscribers don't get a code." };
+  },
+  "PUT signup/popup": async ({ req, db, shop, user }) => {
+    const b = await body<{ seconds?: unknown }>(req);
+    const raw = b.seconds === null || b.seconds === undefined || b.seconds === "" ? null : Number(b.seconds);
+    const seconds = await setSignupPopup(db, shop.id, raw);
+    await logged({ shop, user, db }, seconds === null ? "Turned off the sign-up pop-up in the app" : "Turned on the sign-up pop-up in the app", { href: "/admin/marketing#popup-heading" });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return {
+      ok: true,
+      message: seconds === null ? "Saved. Visitors aren't asked for their email in a pop-up." : seconds === SIGNUP_POPUP_ON_LEAVE ? "Saved. Visitors are asked for their email when they look about to leave." : `Saved. Visitors are asked for their email ${seconds} seconds after they arrive.`,
+    };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -1463,6 +1504,7 @@ const routes: Record<string, Handler> = {
       sale: { path: "/sales", area: "marketing" },
       "gift-guides": { path: "/collections", area: "collections" },
       "gift-wrap": { path: "/gift-wrap", area: "shipping" },
+      popup: { path: "/signup", area: "marketing" },
       reminders: { path: "/checkouts", area: "marketing", also: "orders" },
     };
     return {
@@ -2139,6 +2181,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("late-emails")) return "shipping";
   if (path.startsWith("holiday-date")) return "shipping";
   if (path.startsWith("gift-wrap")) return "shipping";
+  if (path.startsWith("signup")) return "marketing";
   if (path.startsWith("gift-cards")) return "gift_cards";
   if (path.startsWith("sales")) return "marketing";
   if (path.startsWith("returns")) return "returns";

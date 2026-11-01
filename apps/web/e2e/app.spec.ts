@@ -2253,3 +2253,35 @@ test("checkout reminder emails set from the app", async ({ page, browser }) => {
   await expect(page.getByText("Saved. Buyers who leave at checkout aren't reminded.")).toBeVisible();
   await expect(page.getByText("Reminder emails are off, so nobody is reminded. Turn them on below.")).toBeVisible();
 });
+
+test("welcome offer and sign-up pop-up set from the app", async ({ page, browser }) => {
+  const { email } = await merchant(browser, `su${Date.now()}`);
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Discount codes" }).click();
+  await page.getByRole("link", { name: /^New subscribers/ }).click();
+  await expect(page.getByRole("heading", { name: "New subscribers", level: 1 })).toBeVisible();
+
+  const welcome = page.getByRole("region", { name: "Welcome offer" });
+  await welcome.getByRole("switch", { name: "Give new subscribers a code" }).click();
+  await welcome.getByRole("textbox", { name: "Percent off (%)" }).fill("60");
+  await welcome.getByRole("button", { name: "Save welcome offer" }).click();
+  await expect(page.getByText("The welcome offer is 5% to 50% off.")).toBeVisible();
+  await welcome.getByRole("textbox", { name: "Percent off (%)" }).fill("15");
+  await welcome.getByRole("textbox", { name: /^Smallest order/ }).fill("40.00");
+  await welcome.getByRole("button", { name: "Save welcome offer" }).click();
+  await expect(page.getByText("Saved. New subscribers get 15% off your first order over $40.00, in a code that lasts 30 days.")).toBeVisible();
+
+  const popup = page.getByRole("region", { name: "Sign-up pop-up" });
+  await expect(popup).toContainText("offering 15% off your first order over $40.00");
+  await popup.getByRole("switch", { name: "Ask new visitors for their email" }).click();
+  await popup.getByRole("tab", { name: "15 s" }).click();
+  await popup.getByRole("button", { name: "Save pop-up" }).click();
+  await expect(page.getByText("Saved. Visitors are asked for their email 15 seconds after they arrive.")).toBeVisible();
+  await shot(page, "391-app-signup");
+
+  await page.reload();
+  await expect(page.getByRole("tab", { name: "15 s" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("textbox", { name: /^Smallest order/ })).toHaveValue("40.00");
+  await page.goto("/holiday-checklist");
+  await expect(page.getByRole("region", { name: "Done" }).getByRole("button", { name: "Collect emails with a sign-up offer, done" })).toBeVisible();
+});
