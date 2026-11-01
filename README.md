@@ -2224,3 +2224,7 @@ A product's screen in the app has "Video", the YouTube, Vimeo or video file link
 ### Personalisation in the app (after launch, part 436)
 
 A product's screen in the app has "Personalisation": up to three text fields buyers fill in before adding it to their cart, like a name to engrave, each with a label, the most characters and whether it's required.
+
+### Price per unit in the app (after launch, part 437)
+
+A product's screen in the app has "Price per unit": what one of each option holds, like 500 ml or 250 g, so the store shows the price per litre, kg or metre under the price, as the EU requires.

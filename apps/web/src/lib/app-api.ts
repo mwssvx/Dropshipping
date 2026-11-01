@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  CONTENT_UNITS,
+  setVariantContents,
   setPersonalization,
   MAX_DETAILS,
   detailsText,
@@ -562,7 +564,7 @@ const productView = (p: ProductRow) => ({
   aiGenerated: p.aiGenerated,
   sourceUrl: p.sourceUrl,
   updatedAt: p.updatedAt,
-  variants: p.variants.map((v) => ({ id: v.id, title: v.title, priceMinor: v.priceMinor, compareAtMinor: v.compareAtMinor, costMinor: v.costMinor, stock: v.stock, weightGrams: v.weightGrams, sku: v.sku })),
+  variants: p.variants.map((v) => ({ id: v.id, title: v.title, priceMinor: v.priceMinor, compareAtMinor: v.compareAtMinor, costMinor: v.costMinor, stock: v.stock, weightGrams: v.weightGrams, sku: v.sku, contents: v.contents })),
   /** Goes in a parcel, so it can have a weight. */
   ships: shipsInParcel(p),
   /** The store's own stock: the merchant sets what it costs. */
@@ -3242,6 +3244,20 @@ const routes: Record<string, Handler> = {
     revalidatePath(`/admin/products/${params.id}`);
     revalidatePath(`/s/${shop.handle}`, "layout");
     return { ok: true, message: saved.length ? "Saved. Buyers fill these in on the product page before adding it to their cart." : "Saved. This product has no personalisation." };
+  },
+  // What each option holds, for the price per kg, litre or metre under the price.
+  "PUT products/:id/contents": async ({ req, params, db, shop }) => {
+    const b = await body<{ rows?: unknown }>(req);
+    if (!Array.isArray(b.rows)) throw new UserError("Send the options as a list.");
+    const saved = await setVariantContents(
+      db,
+      shop.id,
+      params.id!,
+      b.rows.map((r: Record<string, unknown>) => ({ variantId: str(r.variantId), amount: str(r.amount), unit: str(r.unit) })),
+    );
+    revalidatePath(`/admin/products/${params.id}`);
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: saved ? "Saved. The price per unit shows under the price on the store." : "Saved. No price per unit is shown." };
   },
   "POST products/:id/listing": async ({ params, shop }) => {
     const run = await writeListing(await agents(), shop, params.id!);
