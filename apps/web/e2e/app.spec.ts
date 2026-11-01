@@ -2405,7 +2405,8 @@ test("a new store look scheduled, cancelled and published from the app", async (
   await draft.getByRole("button", { name: "Schedule" }).click();
   await expect(page.getByText("Scheduled. The new look goes live by itself and switches back when you said.")).toBeVisible();
   const scheduled = page.getByRole("region", { name: "Scheduled" });
-  await expect(scheduled.getByRole("heading", { name: /^Goes live / })).toBeVisible();
+  await expect(scheduled.getByText(/^Goes live /)).toBeVisible();
+  await expect(scheduled.getByText(/^Switches back /)).toBeVisible();
   await shot(page, "396-app-store-look");
   await page.goto("/holiday-checklist");
   await expect(page.getByRole("region", { name: "Done" }).getByRole("button", { name: "Schedule a holiday look, done" })).toBeVisible();
