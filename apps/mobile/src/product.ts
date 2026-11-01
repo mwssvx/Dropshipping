@@ -35,6 +35,7 @@ export type Product = {
   badge?: string | null;
   publishAt?: string | null;
   comingSoon?: boolean;
+  quantityBreaks?: { minQty: number; percentOff: number }[];
   /** Lowercase, for filters, collections that fill by tag, and codes for tagged products. */
   tags?: string[];
   /** On the product screen only: the tags the store's products use, most used first. */

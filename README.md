@@ -2232,3 +2232,7 @@ A product's screen in the app has "Price per unit": what one of each option hold
 ### Badge and put on sale later in the app (after launch, part 438)
 
 A product's screen in the app has "Badge", its own short label like "Limited edition", and, for drafts, "Put on sale later": the day and time it goes on sale by itself, on the phone's clock, with a switch for the coming-soon page until then.
+
+### Quantity discounts in the app (after launch, part 439)
+
+A product's screen in the app has "Quantity discounts": up to three steps like "Buy 2 or more, save 10%", with bigger quantities getting bigger discounts. The product page shows them under "Buy more, save more".
