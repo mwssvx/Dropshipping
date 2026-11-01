@@ -3045,3 +3045,51 @@ test("store languages turned on from the app, with how much is translated", asyn
   await expect(web.getByRole("checkbox", { name: "French · Français" })).toBeChecked();
   await expect(web.getByRole("checkbox", { name: "Spanish · Español" })).not.toBeChecked();
 });
+
+test("a product quiz written in the app gives shoppers the products that fit", async ({ page, browser }) => {
+  const id = `qz${Date.now()}`;
+  const { web, email } = await merchant(browser, id);
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Product quiz/ }).click();
+  await expect(page.getByText(/your products have none yet/)).toBeVisible();
+
+  for (const [title, tags] of [["Straw Sun Hat", "summer, adults"], ["Kids Sun Hat", "summer, kids"], ["Wool Scarf", "winter, adults"]] as const) {
+    await web.goto(`${WEB}/admin/products/new`);
+    await web.getByLabel("Title").fill(title);
+    await web.getByLabel("Price", { exact: true }).fill("20.00");
+    await web.getByLabel("Tags", { exact: true }).fill(tags);
+    await web.getByRole("button", { name: "Save product" }).click();
+    await expect(web.getByText("Product added.")).toBeVisible();
+  }
+  await page.getByRole("link", { name: "← Products" }).click();
+  await page.getByRole("link", { name: /^Product quiz/ }).click();
+  await page.getByRole("textbox", { name: "Quiz title" }).last().fill("Find your hat");
+  await page.getByRole("textbox", { name: "Question 1", exact: true }).last().fill("When will you wear it?");
+  await page.getByRole("textbox", { name: "Answers to question 1" }).last().fill("In the sun: summer\nIn the cold: snow");
+  await page.getByRole("button", { name: "Add a question" }).last().click();
+  await page.getByRole("textbox", { name: "Question 2", exact: true }).last().fill("Who's it for?");
+  await page.getByRole("textbox", { name: "Answers to question 2" }).last().fill("Me: adults\nMy kids: kids");
+  await page.getByRole("button", { name: "Save the quiz" }).last().click();
+  await expect(page.getByText('No product is tagged "snow" yet. Tag some products first, or pick a tag you use.')).toBeVisible();
+  await page.getByRole("textbox", { name: "Answers to question 1" }).last().fill("In the sun: summer\nIn the cold: winter");
+  await page.getByRole("button", { name: "Save the quiz" }).last().click();
+  await expect(page.getByText("Saved. Shoppers can take the quiz now.")).toBeVisible();
+  await expect(page.getByText(new RegExp(`/s/pocket-shop-${id}/quiz$`)).last()).toBeVisible();
+  await shot(page, "414-app-quiz");
+
+  const shopper = await (await browser.newContext()).newPage();
+  await shopper.goto(`${WEB}/s/pocket-shop-${id}/quiz`);
+  await expect(shopper.getByRole("heading", { name: "Find your hat" })).toBeVisible();
+  await shopper.getByRole("group", { name: "When will you wear it?" }).getByText("In the sun").click();
+  await shopper.getByRole("group", { name: "Who's it for?" }).getByText("My kids").click();
+  await shopper.getByRole("button", { name: "See my picks" }).click();
+  const picks = shopper.getByRole("region", { name: "Your picks" });
+  await expect(picks.getByRole("link", { name: /Sun Hat/ }).first()).toHaveText(/Kids Sun Hat/);
+  await expect(picks.getByText("Wool Scarf")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Remove the quiz…" }).last().click();
+  await page.getByRole("button", { name: "Remove the quiz now" }).last().click();
+  await expect(page.getByText("Quiz removed.")).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Quiz title" }).last()).toHaveValue("");
+});

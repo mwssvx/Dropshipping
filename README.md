@@ -2132,3 +2132,7 @@ Settings in the app has a "Selling abroad" section with "Currencies": turn on th
 ### Store languages in the app (after launch, part 413)
 
 Settings in the app has a "Languages" section with "Store languages": turn on the languages buyers can pick, and see how much of your own words each one has translated, with what's out of date or not started. Translating stays on the web.
+
+### Product quiz in the app (after launch, part 414)
+
+The Products tab has a "Product quiz" row. Write the quiz on the phone: a title, a line under it, and up to five questions, each with its answers typed one per line as "the answer: the product tag it leads to". Show or hide it on the store, share its link, or remove it.
