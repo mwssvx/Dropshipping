@@ -56,6 +56,10 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  setInvoiceSettings,
+  listInvoices,
+  invoiceGaps,
+  formatInvoiceNumber,
   setAdPixels,
   shopLanguages,
   productFeed,
@@ -2247,6 +2251,24 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, saved ? "Changed the ad tracking tags, in the app" : "Removed every ad tracking tag, in the app", { href: "/admin/channels#pixels-heading" });
     return { ok: true, message: saved ? "Saved. Your store now reports views, carts, checkouts and orders to these tags." : "Saved. No ad tags are loaded on your store." };
   },
+  // Invoices: the store's details printed on them, the next number, and the latest issued.
+  "GET invoices": async ({ db, shop }) => {
+    const docs = await listInvoices(db, shop.id, {}, 50);
+    return {
+      gaps: invoiceGaps(shop),
+      settings: { legalName: shop.invoiceLegalName ?? "", address: shop.invoiceAddress ?? "", prefix: shop.invoicePrefix, nextNumber: String(shop.invoiceNextNumber), footer: shop.invoiceFooter ?? "" },
+      next: formatInvoiceNumber(shop.invoicePrefix, shop.invoiceNextNumber),
+      docs: docs.map((d) => ({ id: d.id, number: d.number, kind: d.kind, issuedAt: d.issuedAt, orderId: d.orderId, orderNumber: d.orderNumber, buyer: d.buyer, totalMinor: d.totalMinor, currency: d.currency })),
+    };
+  },
+  "PUT invoices": async ({ req, db, shop, user }) => {
+    const b = await body(req);
+    const next = str(b.nextNumber).trim();
+    await setInvoiceSettings(db, shop.id, { legalName: str(b.legalName), address: str(b.address), prefix: str(b.prefix), nextNumber: next === "" ? Number.NaN : Number(next), footer: str(b.footer) });
+    revalidatePath("/admin/invoices");
+    await logged({ shop, user, db }, "Changed the invoice details, in the app", { href: "/admin/invoices" });
+    return { ok: true, message: "Invoice settings saved. New invoices use them." };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -3069,6 +3091,7 @@ function routeArea(key: string): Area | null {
   if (path === "quiz") return "marketing";
   if (path === "search-listings") return "products";
   if (path === "taxes" || path.startsWith("taxes/")) return "taxes";
+  if (path === "invoices") return "taxes";
   if (path === "channels" || path.startsWith("channels/")) return "marketing";
   if (path.startsWith("pricing")) return "products";
   if (path.startsWith("checkout-settings")) return "shipping";

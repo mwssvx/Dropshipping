@@ -139,6 +139,7 @@ export default function Settings() {
         <Section title="Taxes">
           <List>
             <Row href="/taxes" title="Taxes and duties" subtitle="Where you collect tax, your prices, import duties and what you owe" />
+            <Row href="/invoices" title="Invoices" subtitle="Your details on invoices, and the ones issued so far" />
           </List>
         </Section>
       ) : null}
