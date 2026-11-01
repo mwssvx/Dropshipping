@@ -2184,3 +2184,7 @@ Discount codes in the app links to "Refer a friend": turn the program on or off,
 ### Browse reminders in the app (after launch, part 426)
 
 The app's "Left at checkout" screen has Browse reminders under the checkout reminder emails: turn on the one email a signed-in subscriber gets after looking at a product and leaving without it, and see how many were reminded in the last 30 days and what they bought.
+
+### Shipping rates in the app (after launch, part 427)
+
+Settings in the app has "Shipping rates" under Shipping: set up the starter zones, add or remove rates with their price, free-over amount, delivery days and weight range, and add, rename, change the countries of or delete a zone.

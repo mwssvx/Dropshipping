@@ -192,11 +192,11 @@ export function Field({
   );
 }
 
-export function Toggle({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+export function Toggle({ label, value, onChange, disabled }: { label: string; value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
-    <View style={s.toggle}>
+    <View style={[s.toggle, disabled ? { opacity: 0.5 } : null]}>
       <Text style={[s.body, { color: color.ink, flex: 1 }]}>{label}</Text>
-      <Switch accessibilityLabel={label} value={value} onValueChange={onChange} trackColor={{ true: color.accent, false: color.border }} />
+      <Switch accessibilityLabel={label} value={value} onValueChange={onChange} disabled={disabled} trackColor={{ true: color.accent, false: color.border }} />
     </View>
   );
 }

@@ -89,7 +89,8 @@ export const priceRate = (rate: Rate, goodsMinor: number) => (rate.freeOverMinor
 /** "3–5 days", or null if the merchant didn't say. */
 export function rateDays(rate: Pick<Rate, "minDays" | "maxDays">) {
   if (rate.minDays === null || rate.maxDays === null) return null;
-  return rate.minDays === rate.maxDays ? `${rate.minDays} days` : `${rate.minDays}–${rate.maxDays} days`;
+  if (rate.minDays === rate.maxDays) return rate.minDays === 1 ? "1 day" : `${rate.minDays} days`;
+  return `${rate.minDays}–${rate.maxDays} days`;
 }
 
 export function describeRate(rate: Rate, currency: string) {

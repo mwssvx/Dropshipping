@@ -56,6 +56,19 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  productGaps,
+  parseKg,
+  deleteShippingRate,
+  addShippingRate,
+  deleteShippingZone,
+  updateShippingZone,
+  createShippingZone,
+  setUpStarterZones,
+  EVERYWHERE_ELSE,
+  SHIPPING_COUNTRIES,
+  rateWeight,
+  rateDays,
+  describeRate,
   BROWSE_AFTER_HOURS,
   setBrowseReminders,
   browseReminderStats,
@@ -2588,6 +2601,96 @@ const routes: Record<string, Handler> = {
     revalidatePath("/admin/marketing");
     return { ok: true, message: on ? "Saved. Buyers see their link on their order page and account." : "Turned off. Friends' codes already sent still work, but no more credit is sent." };
   },
+  "GET shipping/zones": async ({ db, shop }) => {
+    const { zones, isDefault } = await listShippingZones(db, shop.id);
+    const byWeight = !isDefault && zones.some((z) => z.rates.some((r) => r.minWeightGrams != null || r.maxWeightGrams != null));
+    const all = [EVERYWHERE_ELSE, ...[...SHIPPING_COUNTRIES].sort((a, b) => countryName(a).localeCompare(countryName(b)))];
+    return {
+      currency: shop.currency,
+      isDefault,
+      standard: isDefault ? describeRate(zones[0]!.rates[0]!, shop.currency) : null,
+      home: countryName(shop.country),
+      noWeight: byWeight ? (await productGaps(db, shop.id)).weight : 0,
+      countries: all.map((code) => ({ code, name: countryName(code) })),
+      zones: isDefault
+        ? []
+        : zones.map((z) => ({
+            id: z.id,
+            name: z.name,
+            countries: z.countries,
+            rates: z.rates.map((r) => ({
+              id: r.id,
+              name: r.name,
+              price: r.priceMinor ? formatMoney(r.priceMinor, shop.currency) : "Free",
+              freeOver: r.priceMinor > 0 && r.freeOverMinor !== null ? formatMoney(r.freeOverMinor, shop.currency) : null,
+              days: rateDays(r),
+              weight: rateWeight(r),
+            })),
+          })),
+    };
+  },
+  "POST shipping/zones/starter": async ({ db, shop }) => {
+    await setUpStarterZones(db, shop);
+    revalidatePath("/admin/shipping");
+    return { ok: true, message: "Zones set up. Change their rates and countries below." };
+  },
+  "POST shipping/zones": async ({ req, db, shop }) => {
+    const b = await body<{ name?: unknown; countries?: unknown }>(req);
+    await createShippingZone(db, shop.id, { name: str(b.name), countries: Array.isArray(b.countries) ? b.countries.map(String) : [] });
+    revalidatePath("/admin/shipping");
+    return { ok: true, message: "Zone added. Give it a rate so buyers there can check out." };
+  },
+  "PUT shipping/zones/:id": async ({ req, params, db, shop }) => {
+    const b = await body<{ name?: unknown; countries?: unknown }>(req);
+    await updateShippingZone(db, shop.id, params.id!, { name: str(b.name), countries: Array.isArray(b.countries) ? b.countries.map(String) : [] });
+    revalidatePath("/admin/shipping");
+    return { ok: true, message: "Zone saved." };
+  },
+  "DELETE shipping/zones/:id": async ({ params, db, shop }) => {
+    await deleteShippingZone(db, shop.id, params.id!);
+    revalidatePath("/admin/shipping");
+    return { ok: true, message: "Zone deleted." };
+  },
+  "POST shipping/zones/:id/rates": async ({ req, params, db, shop }) => {
+    const b = await body<Record<string, unknown>>(req);
+    const amount = (v: unknown, label: string) => {
+      const t = str(v).trim().replace(/^[^\d]+/, "");
+      if (!t) return null;
+      try {
+        return parseMoney(t);
+      } catch {
+        throw new UserError(`Enter ${label} like 4.99.`);
+      }
+    };
+    const days = (v: unknown) => {
+      const t = str(v).trim();
+      if (!t) return null;
+      const n = Number(t);
+      if (!Number.isInteger(n)) throw new UserError("Enter delivery days as whole numbers.");
+      return n;
+    };
+    const kg = (v: unknown) => {
+      const grams = parseKg(str(v));
+      if (Number.isNaN(grams)) throw new UserError("Enter weights in kg, like 0.5 or 2.");
+      return grams;
+    };
+    await addShippingRate(db, shop.id, params.id!, {
+      name: str(b.name),
+      priceMinor: amount(b.price, "the price") ?? 0,
+      freeOverMinor: amount(b.freeOver, "the free shipping amount"),
+      minDays: days(b.minDays),
+      maxDays: days(b.maxDays),
+      minWeightGrams: kg(b.minKg),
+      maxWeightGrams: kg(b.maxKg),
+    });
+    revalidatePath("/admin/shipping");
+    return { ok: true, message: "Rate added. Buyers can pick it at checkout." };
+  },
+  "DELETE shipping/rates/:id": async ({ params, db, shop }) => {
+    await deleteShippingRate(db, shop.id, params.id!);
+    revalidatePath("/admin/shipping");
+    return { ok: true, message: "Rate removed." };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -3447,6 +3550,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("late-emails")) return "shipping";
   if (path.startsWith("holiday-date")) return "shipping";
   if (path.startsWith("gift-wrap")) return "shipping";
+  if (path.startsWith("shipping/")) return "shipping";
   if (path.startsWith("delivery-dates")) return "shipping";
   if (path.startsWith("signup")) return "marketing";
   if (path.startsWith("gift-cards")) return "gift_cards";
