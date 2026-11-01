@@ -56,6 +56,9 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  setAdPixels,
+  shopLanguages,
+  productFeed,
   setDuties,
   setPricesIncludeTax,
   removeTaxRegistration,
@@ -2212,6 +2215,38 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, "Stopped collecting tax in a place, in the app", { href: "/admin/taxes" });
     return { ok: true, message: "Removed. Buyers there aren't charged tax any more." };
   },
+  // Sales channels: the product feeds Google, Meta, Pinterest and TikTok read, what's left out, and ad tracking.
+  "GET channels": async ({ db, shop }) => {
+    const address = await storeAddress(shop);
+    const [{ items, issues }, reviews] = await Promise.all([productFeed(db, shop, { origin: address }), reviewCounts(db, shop.id)]);
+    const languages = shopLanguages(shop);
+    const link = (file: string) => [
+      { label: "Feed link", url: `${address}/feeds/${file}` },
+      ...languages.map((l) => ({ label: `Feed link in ${LANGUAGES[l].english}`, url: `${address}/feeds/${file}?lang=${l}` })),
+    ];
+    return {
+      products: new Set(items.map((i) => i.groupId)).size,
+      options: items.length,
+      withBarcode: items.filter((i) => i.gtin).length,
+      feeds: [
+        { id: "google", name: "Google Shopping", links: link("google.xml"), steps: "In Google Merchant Center, open Products, then Add products, choose “Add products from a file” and “Add a link to your file”. Paste the link and pick a daily fetch." },
+        { id: "meta", name: "Facebook and Instagram", links: link("meta.csv"), steps: "In Meta Commerce Manager, open your catalog, then Data sources, Data feed, “Scheduled feed”. Paste the link and pick a daily update." },
+        { id: "pinterest", name: "Pinterest", links: link("google.xml"), steps: "In your Pinterest business account, open Ads, then Catalogs, “Create data source”. Paste the link, pick XML, your currency and a daily update." },
+        { id: "tiktok", name: "TikTok", links: link("google.xml"), steps: "In TikTok Ads Manager, open Assets, then Catalogs, add products with “Data feed”, paste the link and pick a daily update." },
+      ],
+      reviews: { published: reviews.published, url: `${address}/feeds/reviews.xml` },
+      issues: issues.map((i) => ({ productId: i.productId, title: i.title, problem: i.problem })),
+      pixels: { meta: shop.adPixels?.meta ?? "", tiktok: shop.adPixels?.tiktok ?? "", google: shop.adPixels?.google ?? "", pinterest: shop.adPixels?.pinterest ?? "", consent: shop.cookieConsent },
+    };
+  },
+  "PUT channels/pixels": async ({ req, db, shop, user }) => {
+    const b = await body(req);
+    const saved = await setAdPixels(db, shop.id, { meta: str(b.meta), tiktok: str(b.tiktok), google: str(b.google), pinterest: str(b.pinterest), consent: b.consent === "eu_uk" ? "eu_uk" : "everyone" });
+    revalidatePath("/admin/channels");
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    await logged({ shop, user, db }, saved ? "Changed the ad tracking tags, in the app" : "Removed every ad tracking tag, in the app", { href: "/admin/channels#pixels-heading" });
+    return { ok: true, message: saved ? "Saved. Your store now reports views, carts, checkouts and orders to these tags." : "Saved. No ad tags are loaded on your store." };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -3034,6 +3069,7 @@ function routeArea(key: string): Area | null {
   if (path === "quiz") return "marketing";
   if (path === "search-listings") return "products";
   if (path === "taxes" || path.startsWith("taxes/")) return "taxes";
+  if (path === "channels" || path.startsWith("channels/")) return "marketing";
   if (path.startsWith("pricing")) return "products";
   if (path.startsWith("checkout-settings")) return "shipping";
   if (path === "local" || path.startsWith("local/")) return "shipping";
