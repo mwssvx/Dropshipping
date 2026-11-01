@@ -3021,3 +3021,27 @@ test("currencies buyers can pay in, turned on from the app", async ({ page, brow
   await expect(web.getByRole("checkbox", { name: "CAD · Canadian dollar" })).not.toBeChecked();
   await expect(web.getByRole("checkbox", { name: /Round converted prices/ })).not.toBeChecked();
 });
+
+test("store languages turned on from the app, with how much is translated", async ({ page, browser }) => {
+  const id = `la${Date.now()}`;
+  const { web, email } = await merchant(browser, id);
+  await signIn(page, email);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("link", { name: /^Store languages/ }).click();
+  await expect(page.getByText("English is always on: it's your store's language.")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Translated so far" })).toHaveCount(0);
+  await page.getByRole("switch", { name: "German · Deutsch" }).click();
+  await page.getByRole("switch", { name: "French · Français" }).click();
+  await page.getByRole("button", { name: "Save languages" }).click();
+  await expect(page.getByText("Saved. Buyers can pick these languages at the bottom of the store.")).toBeVisible();
+  const done = page.getByRole("region", { name: "Translated so far" });
+  await expect(done.getByText("German", { exact: true })).toBeVisible();
+  await expect(done.getByText("French", { exact: true })).toBeVisible();
+  await expect(done.getByText(/^0 of \d+ translated/).first()).toBeVisible();
+  await shot(page, "413-app-languages");
+
+  await web.goto(`${WEB}/admin/languages`);
+  await expect(web.getByRole("checkbox", { name: "German · Deutsch" })).toBeChecked();
+  await expect(web.getByRole("checkbox", { name: "French · Français" })).toBeChecked();
+  await expect(web.getByRole("checkbox", { name: "Spanish · Español" })).not.toBeChecked();
+});
