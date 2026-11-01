@@ -202,7 +202,7 @@ export default function Settings() {
       ) : null}
       <Section title="Account">
         <List>
-          {me ? <Row title={me.user.email} subtitle={me.shop.name} /> : null}
+          {me ? <Row href="/account" title={me.user.email} subtitle="Two-step sign-in, Monday summary and where you're signed in" a11y="Your account" /> : null}
           <Row title="Open the web admin" right={<Pill label="↗" />} onPress={() => Linking.openURL(`${API_URL}/admin`)} />
           {me ? <Row title="View your store" right={<Pill label="↗" />} onPress={() => Linking.openURL(me.shop.address)} /> : null}
         </List>

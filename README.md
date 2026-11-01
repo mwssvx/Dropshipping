@@ -2160,3 +2160,7 @@ Settings in the app has "Domains" under Web addresses: see the free address, con
 ### Checkout extras in the app (after launch, part 420)
 
 Settings in the app has "Add-ons, free gift and tips" under Checkout extras: offer a product at checkout for a little less, turn add-ons on or off, see what each one earned, give a free gift with orders over an amount, and ask buyers for a tip.
+
+### Your account in the app (after launch, part 421)
+
+Settings in the app opens "Your account" from your email under Account: see whether two-step sign-in is on and how many recovery codes are left, turn the Monday summary email on or off, and sign out a phone or browser you don't recognise.

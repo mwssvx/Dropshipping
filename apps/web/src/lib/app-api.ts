@@ -56,6 +56,11 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  setWeeklySummary,
+  twoStepStatus,
+  endOtherSignIns,
+  endSignIn,
+  listSignIns,
   setTipping,
   setFreeGift,
   setAddonActive,
@@ -2388,6 +2393,34 @@ const routes: Record<string, Handler> = {
     revalidatePath("/admin/addons");
     revalidatePath(`/s/${shop.handle}`, "layout");
     return { ok: true, message: saved ? "Saved. Checkout asks buyers if they'd like to tip." : "Saved. Checkout doesn't ask for tips." };
+  },
+  "GET account": async ({ req, db, user, shop, role }) => {
+    const [status, signIns, membership] = await Promise.all([
+      twoStepStatus(db, user.id),
+      listSignIns(db, user.id, bearer(req) ?? undefined),
+      db.query.shopMembers.findFirst({ where: (m, { and, eq }) => and(eq(m.shopId, shop.id), eq(m.userId, user.id)) }),
+    ]);
+    return {
+      email: user.email,
+      shopName: shop.name,
+      twoStep: { on: status.on, since: status.since, recoveryCodesLeft: status.recoveryCodesLeft },
+      summary: can(role, "money") ? (membership?.weeklySummary ?? true) : null,
+      signIns: signIns.map((s) => ({ id: s.id, device: s.device, current: s.current, signedInAt: s.signedInAt, lastSeenAt: s.lastSeenAt })),
+    };
+  },
+  "PUT account/summary": async ({ req, db, user, shop, role }) => {
+    if (!can(role, "money")) throw new UserError("Your role can't see this store's money, so there's no summary to send you.");
+    const on = (await body<{ on?: unknown }>(req)).on === true;
+    await setWeeklySummary(db, shop.id, user.id, on);
+    return { message: on ? `Saved. You'll get ${shop.name}'s summary on Mondays.` : `Saved. You won't get ${shop.name}'s summary any more.` };
+  },
+  "POST account/sign-ins/others": async ({ req, db, user }) => {
+    const ended = await endOtherSignIns(db, user.id, bearer(req)!);
+    return { message: ended === 1 ? "Signed out of 1 other device." : `Signed out of ${ended} other devices.` };
+  },
+  "DELETE account/sign-ins/:id": async ({ db, user, params }) => {
+    await endSignIn(db, user.id, params.id!);
+    return { message: "Signed out. That device has to sign in again." };
   },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
