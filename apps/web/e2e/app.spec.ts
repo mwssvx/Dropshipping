@@ -4563,3 +4563,40 @@ test("a sale planned for a shopping date from the app", async ({ page, browser }
   await web.goto(`${WEB}/admin/sales`);
   await expect(web.getByRole("listitem", { name, exact: true })).toContainText(`Planned: ${title}`);
 });
+
+test("a sale's email written from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `se${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Cotton Tote");
+  await web.getByLabel("Price", { exact: true }).fill("16.00");
+  await web.getByLabel("Stock", { exact: true }).fill("6");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Sales", exact: true }).click();
+  await page.getByRole("textbox", { name: "Sale name" }).fill("Tote week");
+  await page.getByRole("textbox", { name: "Percent off everything" }).fill("10");
+  await page.getByRole("tab", { name: "A week" }).click();
+  await page.getByRole("button", { name: "Start the sale" }).click();
+  await expect(page.getByText(/^Tote week is on/)).toBeVisible();
+  await page.getByRole("button", { name: "Write the email for Tote week" }).click();
+  // The draft waits in Campaigns, ready for a test send.
+  await expect(page.getByRole("group", { name: "Tote week: 10% off everything" })).toBeVisible();
+  await shot(page, "454-app-sale-email");
+
+  // A one-day sale is near its end, so its email is the last-chance one.
+  await page.goBack();
+  await page.getByRole("button", { name: "End Tote week now" }).click();
+  await expect(page.getByText("Tote week has ended. Prices are back to normal.")).toBeVisible();
+  await page.getByRole("textbox", { name: "Sale name" }).fill("Flash");
+  await page.getByRole("textbox", { name: "Percent off everything" }).fill("15");
+  await page.getByRole("tab", { name: "1 day" }).click();
+  await page.getByRole("button", { name: "Start the sale" }).click();
+  await expect(page.getByText(/^Flash is on/)).toBeVisible();
+  await page.getByRole("button", { name: "Write the last-chance email for Flash" }).click();
+  await expect(page.getByRole("group", { name: /^Last chance: Flash ends / })).toBeVisible();
+
+  await web.goto(`${WEB}/admin/campaigns`);
+  await expect(web.getByText("Tote week: 10% off everything")).toBeVisible();
+});

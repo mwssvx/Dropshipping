@@ -2292,3 +2292,7 @@ A scheduled sale's card in the app has "Give early access": pick when it opens (
 ### Plan a sale for a shopping date in the app (after launch, part 453)
 
 The app's Sales screen lists the shopping dates coming up in your country (Black Friday, Christmas and so on), each with the sale already planned for it. Tap one to fill in the sale's name and dates, pick the discount, and schedule it.
+
+### A sale's email from the app (after launch, part 454)
+
+A sale that's on has "Email your subscribers" on its card in the app, or "Email: last chance" in its final two days. It writes the email as a campaign draft and opens Campaigns, where you send yourself a test and then send it.
