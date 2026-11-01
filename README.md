@@ -2168,3 +2168,7 @@ Settings in the app opens "Your account" from your email under Account: see whet
 ### Developers in the app (after launch, part 422)
 
 Settings in the app has "API keys and webhooks" for store owners: see each key and when it was last used, revoke one that leaked, send a test to a webhook, pause it or turn it back on, remove it, and send a failed delivery again. New keys and webhooks are still made on the web, and the webhook signing secret is only shown there.
+
+### Win-back and birthday codes in the app (after launch, part 423)
+
+Discount codes in the app links to "Win-back and birthday codes": turn on the code that goes to subscribers who haven't ordered in 30 to 180 days, and the one on their birthday, with the percent off and how long each lasts, and see how many were sent, used and what they sold.

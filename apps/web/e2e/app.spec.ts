@@ -3393,3 +3393,37 @@ test("API keys revoked and webhooks tested and paused from the app", async ({ pa
     server.close();
   }
 });
+
+test("win-back and birthday codes set from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `wb${Date.now()}`);
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Discount codes" }).click();
+  await page.getByRole("link", { name: /^Win-back and birthday codes/ }).click();
+  await expect(page.getByText("No subscriber has added their birthday yet.")).toBeVisible();
+
+  const winback = page.getByRole("region", { name: "Win-back emails" });
+  await winback.getByRole("switch", { name: "Email a code to subscribers who haven't ordered in a while" }).click();
+  await winback.getByRole("tab", { name: "90 days" }).click();
+  await winback.getByRole("textbox", { name: "Percent off" }).fill("70");
+  await winback.getByRole("button", { name: "Save win-back emails" }).click();
+  await expect(page.getByText("The win-back offer is 5% to 50% off.")).toBeVisible();
+  await winback.getByRole("textbox", { name: "Percent off" }).fill("20");
+  await winback.getByRole("button", { name: "Save win-back emails" }).click();
+  await expect(page.getByText("Saved. Codes go out with the daily emails.")).toBeVisible();
+  await expect(page.getByText("Nobody is due one right now.")).toBeVisible();
+
+  const birthday = page.getByRole("region", { name: "Birthday codes" });
+  await birthday.getByRole("switch", { name: "Email subscribers a code on their birthday" }).click();
+  await birthday.getByRole("textbox", { name: "Birthday percent off" }).fill("25");
+  await birthday.getByRole("textbox", { name: "Days to use the birthday code" }).fill("10");
+  await birthday.getByRole("button", { name: "Save birthday codes" }).click();
+  await expect(page.getByText("Saved. Codes go out with the daily emails.")).toBeVisible();
+  await expect(birthday.getByText("Codes sent", { exact: true })).toBeVisible();
+  await shot(page, "423-app-winback");
+
+  await web.goto(`${WEB}/admin/marketing`);
+  await expect(web.getByLabel("After their last order")).toHaveValue("90");
+  await expect(web.getByLabel("Percent off", { exact: true })).toHaveValue("20");
+  await expect(web.getByLabel("Birthday percent off")).toHaveValue("25");
+  await expect(web.getByLabel("Days to use the birthday code")).toHaveValue("10");
+});
