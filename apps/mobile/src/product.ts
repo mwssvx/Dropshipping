@@ -29,6 +29,8 @@ export type Product = {
   blockedCountryNames?: string[];
   minAge?: number | null;
   reorderDays?: number | null;
+  videoUrl?: string | null;
+  detailsText?: string;
   /** Lowercase, for filters, collections that fill by tag, and codes for tagged products. */
   tags?: string[];
   /** On the product screen only: the tags the store's products use, most used first. */

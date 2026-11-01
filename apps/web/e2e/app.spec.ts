@@ -3837,3 +3837,42 @@ test("age check and reorder reminder for a product, from the app", async ({ page
   await web.reload();
   await expect(web.locator("#min-age")).toHaveValue("");
 });
+
+test("a product's video and details table, from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `vd${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Desk Lamp");
+  await web.getByLabel("Price", { exact: true }).fill("45.00");
+  await web.getByLabel("Stock", { exact: true }).fill("8");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const productUrl = web.url();
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Desk Lamp/ }).click();
+
+  const video = page.getByRole("region", { name: "Video", exact: true });
+  await video.getByRole("textbox", { name: "Video link" }).fill("not a link");
+  await video.getByRole("button", { name: "Save video" }).click();
+  await expect(page.getByText("Paste a YouTube or Vimeo link, or the https address of a video file ending in .mp4, .webm or .mov.")).toBeVisible();
+  await video.getByRole("textbox", { name: "Video link" }).fill("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  await video.getByRole("button", { name: "Save video" }).click();
+  await expect(page.getByText("Saved. The video shows after the photos on the product page.")).toBeVisible();
+
+  const details = page.getByRole("region", { name: "Details", exact: true });
+  await details.getByRole("textbox", { name: "Details", exact: true }).fill("Material: Brass\nBulb: E27, not included");
+  await details.getByRole("button", { name: "Save details" }).click();
+  await expect(page.getByText("Saved. 2 details show under the description on the product page.")).toBeVisible();
+  await shot(page, "435-app-video-details");
+
+  await web.goto(productUrl);
+  await expect(web.locator("#video-url")).toHaveValue("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  await expect(web.locator("#details")).toHaveValue("Material: Brass\nBulb: E27, not included");
+
+  await video.getByRole("textbox", { name: "Video link" }).fill("");
+  await video.getByRole("button", { name: "Save video" }).click();
+  await expect(page.getByText("Saved. This product has no video.")).toBeVisible();
+  await web.reload();
+  await expect(web.locator("#video-url")).toHaveValue("");
+});
