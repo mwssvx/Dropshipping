@@ -59,6 +59,7 @@ export default function ReturnsScreen() {
         rows.map((r) => <ReturnCard key={r.id} r={r} done={(text, ok) => (setNote({ tone: ok ? "success" : "critical", text }), ok && list.reload())} />)
       )}
       <List>
+        <Row href="/returns/most" title="Returned most" subtitle="Which products come back, out of how many sold, and why" />
         <Row href="/return-settings" title="Return settings" subtitle="How long buyers have to ask, and what they do once you approve" />
         <Row href="/holiday-returns" title="Holiday returns" subtitle="Let gifts bought for the holidays come back later, until the end of January" />
       </List>

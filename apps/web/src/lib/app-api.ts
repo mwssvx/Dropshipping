@@ -56,6 +56,9 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  RETURNS_MIN_SOLD,
+  RETURNS_REPORT_DAYS,
+  returnsByProduct,
   MAX_BULK_ORDERS,
   emailOrderUpdate,
   LAST_CHANCE_MS,
@@ -3038,6 +3041,38 @@ const routes: Record<string, Handler> = {
       done.failed ? `${done.failed === 1 ? "1 email" : `${done.failed} emails`} didn't go out; the order page shows which.` : "",
     ];
     return { ok: true, ...done, message: parts.filter(Boolean).join(" ") };
+  },
+  // Which products come back, out of how many sold, and why: the website's "Returned most".
+  "GET returns/most": async ({ url, db, shop }) => {
+    const days = RETURNS_REPORT_DAYS.find((d) => String(d) === url.searchParams.get("days")) ?? 90;
+    const r = await returnsByProduct(db, shop.id, { days });
+    const short: Record<string, string> = {
+      never_arrived: "never arrived",
+      damaged: "arrived damaged",
+      wrong_item: "wrong item",
+      not_as_described: "not as described",
+      too_small_or_big: "didn't fit",
+      changed_mind: "changed their mind",
+      other: "something else",
+    };
+    const pct = (share: number) => `${Math.round(share * 100)}%`;
+    const why = (reasons: { reason: string; units: number }[]) => reasons.map((x) => `${short[x.reason] ?? x.reason} (${x.units})`).join(", ");
+    return {
+      days,
+      minSold: RETURNS_MIN_SOLD,
+      sold: r.sold,
+      summary: r.sold
+        ? `Of ${r.sold === 1 ? "1 item" : `${r.sold.toLocaleString("en-US")} items`} sold in the ${days === 365 ? "last 12 months" : `last ${days} days`}, ${r.returned === 0 ? "none came back." : `${r.returned.toLocaleString("en-US")} came back (${pct(r.share!)}).`}${r.reasons.length ? ` Why: ${why(r.reasons.slice(0, 3))}.` : ""}`
+        : null,
+      products: r.products.map((p) => ({
+        productId: p.productId,
+        title: p.title,
+        backText: `${p.returned} of ${p.sold} back${p.share !== null ? ` · ${pct(p.share)}` : ""}`,
+        high: p.high,
+        why: why(p.reasons),
+        fix: p.high ? p.fix : null,
+      })),
+    };
   },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
