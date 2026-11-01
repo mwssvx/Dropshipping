@@ -3876,3 +3876,47 @@ test("a product's video and details table, from the app", async ({ page, browser
   await web.reload();
   await expect(web.locator("#video-url")).toHaveValue("");
 });
+
+test("personalisation fields for a product, from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `pz${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Engraved Pen");
+  await web.getByLabel("Price", { exact: true }).fill("28.00");
+  await web.getByLabel("Stock", { exact: true }).fill("12");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const productUrl = web.url();
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Engraved Pen/ }).click();
+  const box = page.getByRole("region", { name: "Personalisation" });
+
+  // A field needs a label.
+  await box.getByRole("button", { name: "Add a field" }).click();
+  await box.getByRole("button", { name: "Save personalisation" }).click();
+  await expect(page.getByText('Give each field a label, like "Name to engrave".')).toBeVisible();
+  await box.getByRole("textbox", { name: "Field 1 label" }).fill("Name to engrave");
+  await box.getByRole("textbox", { name: "Field 1 most characters" }).fill("12");
+  await box.getByRole("button", { name: "Add a field" }).click();
+  await box.getByRole("textbox", { name: "Field 2 label" }).fill("Gift message");
+  await box.getByRole("switch", { name: "Field 2 required" }).click();
+  await box.getByRole("button", { name: "Save personalisation" }).click();
+  await expect(page.getByText("Saved. Buyers fill these in on the product page before adding it to their cart.")).toBeVisible();
+  await shot(page, "436-app-personalisation");
+
+  await web.goto(productUrl);
+  const fields = web.getByRole("region", { name: "Personalisation" });
+  await expect(fields.locator("#pf-label-0")).toHaveValue("Name to engrave");
+  await expect(fields.locator("#pf-max-0")).toHaveValue("12");
+  await expect(fields.locator("#pf-label-1")).toHaveValue("Gift message");
+  await expect(fields.getByRole("listitem", { name: "Field 2" }).getByRole("checkbox", { name: "Required" })).not.toBeChecked();
+
+  // Removing both turns it off.
+  await box.getByRole("button", { name: "Remove field 2" }).click();
+  await box.getByRole("button", { name: "Remove field 1" }).click();
+  await box.getByRole("button", { name: "Save personalisation" }).click();
+  await expect(page.getByText("Saved. This product has no personalisation.")).toBeVisible();
+  await web.reload();
+  await expect(fields.locator("#pf-label-0")).toHaveCount(0);
+});

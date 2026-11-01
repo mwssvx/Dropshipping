@@ -229,6 +229,7 @@ export default function ProductScreen() {
       ) : null}
 
       {p.giftCard ? null : <VideoSection product={p} busy={busy} act={act} />}
+      {p.giftCard ? null : <PersonalizationSection product={p} busy={busy} act={act} />}
       {p.giftCard ? null : <DetailsSection product={p} busy={busy} act={act} />}
       <TagsSection product={p} busy={busy} act={act} />
       <CollectionsSection product={p} busy={busy} act={act} />
@@ -413,6 +414,44 @@ function DetailsSection({ product: p, busy, act }: { product: Product; busy: str
           hint="Like material, size or what's in the box. One per line, label first, then a colon. Up to 20."
         />
         <Button label="Save details" busy={busy === "details"} disabled={!!busy || edit === null} onPress={() => act("details", async () => (await api<{ message: string }>(`products/${p.id}/details`, { method: "PUT", body: { text: v } })).message)} />
+      </Card>
+    </Section>
+  );
+}
+
+type PField = { id?: string; label: string; required: boolean; maxLength: string };
+const MAX_PERSONAL_FIELDS = 3;
+
+/** Up to three text fields buyers fill in before adding this to their cart, like a name to engrave. */
+function PersonalizationSection({ product: p, busy, act }: { product: Product; busy: string | null; act: Act }) {
+  const saved: PField[] = (p.personalization ?? []).map((f) => ({ ...f, maxLength: String(f.maxLength) }));
+  const [edit, setEdit] = useState<PField[] | null>(null);
+  const rows = edit ?? saved;
+  useEffect(() => setEdit(null), [p]);
+  const set = (i: number, patch: Partial<PField>) => setEdit(rows.map((r, n) => (n === i ? { ...r, ...patch } : r)));
+  return (
+    <Section title="Personalisation">
+      <Card>
+        <Body muted>Ask buyers for text before they add this to their cart, like a name to engrave. It shows on the order and goes to your supplier with the item. Check that your supplier offers it first.</Body>
+        {rows.map((r, i) => (
+          <View key={r.id ?? `new-${i}`} style={{ gap: space(2) }} accessibilityRole="none">
+            <Field label={`Field ${i + 1} label`} value={r.label} onChangeText={(v) => set(i, { label: v })} placeholder="Name to engrave" />
+            <Field label={`Field ${i + 1} most characters`} value={r.maxLength} onChangeText={(v) => set(i, { maxLength: v })} keyboardType="number-pad" />
+            <Toggle label={`Field ${i + 1} required`} value={r.required} onChange={(v) => set(i, { required: v })} />
+            <Button label={`Remove field ${i + 1}`} kind="ghost" onPress={() => setEdit(rows.filter((_, n) => n !== i))} disabled={!!busy} />
+          </View>
+        ))}
+        {rows.length < MAX_PERSONAL_FIELDS ? (
+          <Button label="Add a field" kind="secondary" onPress={() => setEdit([...rows, { label: "", required: true, maxLength: "20" }])} disabled={!!busy} />
+        ) : null}
+        <Button
+          label="Save personalisation"
+          busy={busy === "personal"}
+          disabled={!!busy || edit === null}
+          onPress={() =>
+            act("personal", async () => (await api<{ message: string }>(`products/${p.id}/personalization`, { method: "PUT", body: { fields: rows.map((r) => ({ ...r, maxLength: Number(r.maxLength) })) } })).message)
+          }
+        />
       </Card>
     </Section>
   );
