@@ -56,6 +56,9 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  syncProductStock,
+  removeBackupSupplier,
+  setBackupSupplier,
   setDeliveryEstimates,
   createGiftCardProduct,
   giftCardProduct,
@@ -320,6 +323,15 @@ const orderSummary = (o: OrderRow) => ({
   paidAt: o.paidAt,
   createdAt: o.createdAt,
 });
+
+/** Stock on the store is the main supplier's plus the backup's, so it's re-read after a change. */
+async function resyncStock(shopId: string, productId: string) {
+  try {
+    await syncProductStock(await stock(), shopId, productId);
+  } catch (e) {
+    if (!(e instanceof UserError)) throw e; // a supplier that's down is read again at the daily check
+  }
+}
 
 type ProductRow = Awaited<ReturnType<typeof listProducts>>[number];
 const productView = (p: ProductRow) => ({
@@ -1552,6 +1564,11 @@ const routes: Record<string, Handler> = {
       season: holidaySeason(),
       checks: checks.map((c) => {
         const a = inApp[c.key];
+        // The backups line points at the first best seller without one.
+        if (c.key === "backups" && can(role, "products")) {
+          const id = /^\/admin\/products\/([^/#]+)/.exec(c.href)?.[1];
+          return { key: c.key, title: c.title, done: c.done, detail: c.detail, app: id ? `/products/${id}` : "/products", web: c.href };
+        }
         return { key: c.key, title: c.title, done: c.done, detail: c.detail, app: a && can(role, a.area) && (!a.also || can(role, a.also)) ? a.path : null, web: c.href };
       }),
     };
@@ -1713,7 +1730,41 @@ const routes: Record<string, Handler> = {
       maxTags: MAX_PRODUCT_TAGS,
       // Hand-picked collections can be switched here; automatic ones fill by their rules.
       collections: collections.map((c) => ({ id: c.id, title: c.title, auto: !!c.rules, in: isIn.has(c.id) })),
+      // A second supplier's listing of the same product, for when the main one runs out.
+      backup: {
+        possible: !!p.supplierId && !!p.sourceUrl && !p.giftCard,
+        link: p.backup
+          ? {
+              sourceUrl: p.backup.sourceUrl,
+              gone: !!p.backup.gone,
+              checkedAt: p.backup.checkedAt,
+              options: p.variants.map((v) => ({ title: v.title, costMinor: p.backup!.variants[v.id]?.costMinor ?? null, stock: p.backup!.variants[v.id]?.stock ?? null, covered: !!p.backup!.variants[v.id] })),
+            }
+          : null,
+      },
     };
+  },
+  "PUT products/:id/backup": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ url?: unknown }>(req);
+    const p = await getProduct(db, shop.id, params.id!);
+    const { unmatched } = await setBackupSupplier(db, suppliers(), shop.id, p.id, str(b.url));
+    await resyncStock(shop.id, p.id);
+    await logged({ shop, user, db }, `Added a backup supplier for ${p.title} in the app`, { href: `/admin/products/${p.id}#backup-heading` });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return {
+      ok: true,
+      message: unmatched.length
+        ? `Backup saved. ${unmatched.join(", ")} ${unmatched.length === 1 ? "has" : "have"} no match there, so ${unmatched.length === 1 ? "it isn't" : "they aren't"} covered.`
+        : "Backup saved. Orders go there when the main supplier is out of stock.",
+    };
+  },
+  "DELETE products/:id/backup": async ({ params, db, shop, user }) => {
+    const p = await getProduct(db, shop.id, params.id!);
+    await removeBackupSupplier(db, shop.id, p.id);
+    await resyncStock(shop.id, p.id);
+    await logged({ shop, user, db }, `Removed the backup supplier for ${p.title} in the app`, { href: `/admin/products/${p.id}#backup-heading` });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: "Backup removed." };
   },
   "PUT products/:id/collections/:collectionId": async ({ req, params, db, shop, user }) => {
     const b = await body<{ in?: unknown }>(req);

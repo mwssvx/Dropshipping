@@ -28,6 +28,11 @@ export type Product = {
   maxTags?: number;
   /** The store's collections, and whether this product is in each. */
   collections?: { id: string; title: string; auto: boolean; in: boolean }[];
+  /** A second supplier's listing, for when the main one runs out; only for imported products. */
+  backup?: {
+    possible: boolean;
+    link: { sourceUrl: string; gone: boolean; checkedAt: string; options: { title: string; costMinor: number | null; stock: number | null; covered: boolean }[] } | null;
+  };
   /** On the list only: sold out, or an option at or under the store's running-low number. */
   stockLevel?: "sold_out" | "low" | null;
 };

@@ -2353,3 +2353,32 @@ test("delivery dates set from the app", async ({ page, browser }) => {
   await page.goto("/holiday-checklist");
   await expect(page.getByRole("region", { name: "To do" }).getByRole("button", { name: "Show delivery dates" })).toBeVisible();
 });
+
+test("a backup supplier added and removed from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `bs${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/import`);
+  await web.getByRole("link", { name: /galaxy projector low stock/i }).click();
+  await web.getByRole("button", { name: "Import and publish" }).click();
+  await expect(web.getByText("Imported and live on your store.")).toBeVisible();
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Galaxy Projector/i }).first().click();
+  const backup = page.getByRole("region", { name: "Backup supplier" });
+  await backup.getByRole("textbox", { name: "Backup supplier link" }).fill("https://demo-supplier.test/p/sunset-projection-lamp-2");
+  await backup.getByRole("button", { name: "Add backup" }).click();
+  await expect(page.getByText(/^None of that listing's options \(Default\) match/)).toBeVisible();
+  await backup.getByRole("textbox", { name: "Backup supplier link" }).fill("https://demo-supplier.test/p/galaxy-projector");
+  await backup.getByRole("button", { name: "Add backup" }).click();
+  await expect(page.getByText("Backup saved. Orders go there when the main supplier is out of stock.")).toBeVisible();
+  await expect(backup.getByRole("list", { name: "Backup options" })).toContainText(/Small: costs \$[\d.]+/);
+  await shot(page, "395-app-backup-supplier");
+
+  await web.reload();
+  await expect(web.getByRole("region", { name: "Backup supplier" }).getByRole("list", { name: "Backup options" })).toContainText("Small");
+
+  await backup.getByRole("button", { name: "Remove backup…" }).click();
+  await backup.getByRole("button", { name: "Remove backup" }).click();
+  await expect(page.getByText("Backup removed.")).toBeVisible();
+  await expect(backup.getByRole("textbox", { name: "Backup supplier link" })).toBeVisible();
+});
