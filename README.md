@@ -2080,3 +2080,7 @@ A warning or pause from us now opens in the app: Today's "A warning from us" (or
 ### Pages in the app (after launch, part 400)
 
 Settings in the app has a Pages row under Blog and pages. It lists the store's pages with whether buyers can see them, adds the policy pages we write from the store's settings (returns, shipping, privacy, terms, accessibility) with a tap, and starts a page of your own, hidden until you show it. A page's title and text can be edited, it can be shown or hidden, shared and deleted. The Trust screen's "A returns policy buyers can read" line links there while it's missing.
+
+### Searches on the app's Analytics screen (after launch, part 401)
+
+The app's Analytics screen now shows what shoppers search for in the chosen days: how many searches and how many found nothing, the most searched words with their results, and the ones that found nothing. Tapping one of those opens Search fixes with it filled in.
