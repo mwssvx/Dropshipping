@@ -76,6 +76,7 @@ export default function ProductsScreen() {
           subtitle="When a supplier starts charging more"
         />
         <Row href="/pricing" title="Pricing rule" subtitle="How imported products are priced from the supplier's cost" />
+        <Row href="/search-listings" title="Search listings" subtitle="How your products look in Google, and what to fix" />
         <Row href="/search-fixes" title="Search fixes" subtitle="Point searches that found nothing at words that do" />
         <Row href="/size-charts" title="Size charts" subtitle="Measurements per size, on products or whole collections" />
         {can("collections") ? <Row href="/collections" title="Collections" subtitle="Groups of products buyers can browse" /> : null}

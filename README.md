@@ -2136,3 +2136,7 @@ Settings in the app has a "Languages" section with "Store languages": turn on th
 ### Product quiz in the app (after launch, part 414)
 
 The Products tab has a "Product quiz" row. Write the quiz on the phone: a title, a line under it, and up to five questions, each with its answers typed one per line as "the answer: the product tag it leads to". Show or hide it on the store, share its link, or remove it.
+
+### Search listings in the app (after launch, part 415)
+
+The Products tab has a "Search listings" row: the products on sale whose Google listing needs a look (supplier filler, a title too long, nothing to show under it, the same title as another product, no photo) and the photos with no description. Tap a product to write its headline and snippet for search results, with a preview of how the result looks.
