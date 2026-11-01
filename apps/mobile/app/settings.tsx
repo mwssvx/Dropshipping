@@ -160,6 +160,7 @@ export default function Settings() {
       {can("domains") ? (
         <Section title="Web addresses">
           <List>
+            <Row href="/domains" title="Domains" subtitle="Connect a domain you own, like shop.example.com" />
             <Row href="/redirects" title="Redirects" subtitle="Old links that should still reach the right page" />
           </List>
         </Section>

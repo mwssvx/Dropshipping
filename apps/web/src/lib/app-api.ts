@@ -56,6 +56,12 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  removeDomain,
+  setPrimaryDomain,
+  checkDomain,
+  addDomain,
+  listDomains,
+  dnsRecordsFor,
   setInvoiceSettings,
   listInvoices,
   invoiceGaps,
@@ -377,7 +383,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { BRAND } from "./brand";
 import { afterOrderPaid } from "./webhooks";
-import { agents, campaigns, db, fulfillment, fxRates, logged, mailer, platformUrl, notifyLater, payments, refunds, stock, storeAddress, partnerPortalUrl, subscriptions, supplierPortalUrl, suppliers, tax, testPayments } from "./server";
+import { agents, campaigns, db, domains, fulfillment, fxRates, logged, mailer, platformUrl, notifyLater, payments, refunds, stock, storeAddress, partnerPortalUrl, storeUrl, subscriptions, supplierPortalUrl, suppliers, tax, testPayments } from "./server";
 
 type User = { id: string; email: string };
 type ShopLink = { id: string; name: string; handle: string; role: string };
@@ -2269,6 +2275,47 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, "Changed the invoice details, in the app", { href: "/admin/invoices" });
     return { ok: true, message: "Invoice settings saved. New invoices use them." };
   },
+  // Custom domains: connect one the merchant owns, the DNS record to add, checking it, and the main address.
+  "GET domains": async ({ db, shop }) => {
+    const [list, ctx] = await Promise.all([listDomains(db, shop.id), domains()]);
+    return {
+      free: storeUrl(shop.handle).replace(/^https?:\/\//, ""),
+      domains: list.map((d) => {
+        const record = dnsRecordsFor(d.hostname, ctx.targets)[0]!;
+        return { id: d.id, hostname: d.hostname, connected: !!d.verifiedAt && !d.lastError, verified: !!d.verifiedAt, primary: d.isPrimary, lastError: d.lastError, record };
+      }),
+    };
+  },
+  "POST domains": async ({ req, db, shop, user }) => {
+    const b = await body<{ hostname?: unknown }>(req);
+    const ctx = await domains();
+    const added = await addDomain(ctx, shop.id, str(b.hostname));
+    await logged({ shop, user, db }, `Added the domain ${added.hostname} in the app`, { href: "/admin/domains" });
+    // Records the merchant set up ahead of time are picked up straight away.
+    const d = await checkDomain(ctx, shop.id, added.id);
+    revalidatePath("/admin/domains");
+    return { ok: true, message: d.verifiedAt && !d.lastError ? `Connected. Buyers can shop at https://${d.hostname}.` : `Added. Now add the DNS record below where you bought ${d.hostname}.` };
+  },
+  "POST domains/:id/check": async ({ params, shop }) => {
+    const d = await checkDomain(await domains(), shop.id, params.id!);
+    revalidatePath("/admin/domains");
+    if (d.verifiedAt && !d.lastError) return { ok: true, message: "Connected." };
+    throw new UserError(d.lastError ?? "Not connected yet.");
+  },
+  "POST domains/:id/primary": async ({ params, db, shop, user }) => {
+    await setPrimaryDomain(db, shop.id, params.id!);
+    const d = (await listDomains(db, shop.id)).find((x) => x.id === params.id);
+    await logged({ shop, user, db }, `Made ${d?.hostname ?? "a domain"} the store's main address, in the app`, { href: "/admin/domains" });
+    revalidatePath("/admin/domains");
+    return { ok: true, message: `${d?.hostname ?? "That domain"} is now your main address.` };
+  },
+  "DELETE domains/:id": async ({ params, db, shop, user }) => {
+    const d = (await listDomains(db, shop.id)).find((x) => x.id === params.id);
+    await removeDomain(await domains(), shop.id, params.id!);
+    if (d) await logged({ shop, user, db }, `Removed the domain ${d.hostname} in the app`, { href: "/admin/domains" });
+    revalidatePath("/admin/domains");
+    return { ok: true, message: "Domain removed. Your free address still works." };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -3086,6 +3133,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("search-fixes")) return "products";
   if (path.startsWith("size-charts")) return "products";
   if (path.startsWith("redirects")) return "domains";
+  if (path === "domains" || path.startsWith("domains/")) return "domains";
   if (path === "currencies") return "currencies";
   if (path === "languages") return "theme";
   if (path === "quiz") return "marketing";
