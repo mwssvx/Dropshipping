@@ -56,6 +56,7 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  saleResults,
   setLowestPriceNote,
   DAILY_DEALS_MIN,
   DAILY_DEALS_MAX,
@@ -3697,8 +3698,24 @@ const routes: Record<string, Handler> = {
     const all = await listSales(db, shop.id);
     // Running and coming ones, then the last few that ended; the website keeps the whole list.
     const ended = all.filter((x) => x.status === "ended").slice(0, 5);
+    const shown = [...all.filter((x) => x.status !== "ended"), ...ended];
+    // How each sale that has started did, against the same number of days just before it.
+    const results = await saleResults(db, shop.id, shown);
+    const days = (n: number) => (n === 1 ? "1 day" : `${n} days`);
+    const result = (id: string, running: boolean) => {
+      const r = results.get(id);
+      if (!r) return null;
+      const up = r.lift !== null && r.lift >= 1.05;
+      const down = r.lift !== null && r.lift <= 0.95;
+      return {
+        text: `${running ? `${days(r.days)} so far` : `Over ${days(r.days)}`}: ${r.orders === 1 ? "1 order" : `${r.orders} orders`}, ${r.units === 1 ? "1 item" : `${r.units} items`} on sale, ${formatMoney(r.salesMinor, shop.currency)}`,
+        vs: r.lift === null ? null : up ? `${r.lift.toFixed(1)}× the ${days(r.days)} before` : down ? `Down ${Math.round((1 - r.lift) * 100)}% on the ${days(r.days)} before` : `About the same as the ${days(r.days)} before`,
+        tone: up ? "success" : down ? "critical" : "neutral",
+      };
+    };
     return {
-      sales: [...all.filter((x) => x.status !== "ended"), ...ended].map((x) => ({
+      sales: shown.map((x) => ({
+        result: result(x.id, x.status === "running"),
         id: x.id,
         title: x.title,
         percentOff: x.percentOff,
