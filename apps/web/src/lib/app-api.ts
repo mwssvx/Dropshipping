@@ -56,6 +56,10 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  MAX_REDIRECTS,
+  deleteRedirect,
+  addRedirects,
+  listRedirects,
   MAX_SIZE_CHARTS,
   listSizeCharts,
   getSizeChart,
@@ -2007,6 +2011,30 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, `Deleted the size chart “${chart.name}” in the app`, { href: "/admin/size-charts" });
     return { ok: true, message: "Size chart deleted." };
   },
+  // Redirects: old links that should still reach the right page. Search, since a store can have thousands.
+  "GET redirects": async ({ url, db, shop }) => {
+    const all = await listRedirects(db, shop.id);
+    const q = (url.searchParams.get("q") ?? "").trim().toLowerCase();
+    const found = q ? all.filter((r) => r.fromPath.toLowerCase().includes(q) || r.toPath.toLowerCase().includes(q)) : all;
+    return {
+      total: all.length,
+      max: MAX_REDIRECTS,
+      found: found.length,
+      redirects: found.slice(0, 100).map((r) => ({ id: r.id, from: r.fromPath, to: r.toPath, hits: r.hits })),
+    };
+  },
+  "POST redirects": async ({ req, db, shop, user }) => {
+    const b = await body<{ lines?: unknown }>(req);
+    const result = await addRedirects(db, shop.id, str(b.lines));
+    revalidatePath("/admin/redirects");
+    if (result.added) await logged({ shop, user, db }, result.added === 1 ? "Added 1 redirect in the app" : `Added ${result.added} redirects in the app`, { href: "/admin/redirects" });
+    return { ok: true, added: result.added, skipped: result.skipped, message: result.added === 1 ? "Added 1 redirect." : `Added ${result.added} redirects.` };
+  },
+  "DELETE redirects/:id": async ({ params, db, shop }) => {
+    await deleteRedirect(db, shop.id, params.id!);
+    revalidatePath("/admin/redirects");
+    return { ok: true, message: "Redirect removed." };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -2823,6 +2851,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("price-changes")) return "products";
   if (path.startsWith("search-fixes")) return "products";
   if (path.startsWith("size-charts")) return "products";
+  if (path.startsWith("redirects")) return "domains";
   if (path.startsWith("pricing")) return "products";
   if (path.startsWith("checkout-settings")) return "shipping";
   if (path === "local" || path.startsWith("local/")) return "shipping";

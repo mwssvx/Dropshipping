@@ -128,6 +128,13 @@ export default function Settings() {
           </List>
         </Section>
       ) : null}
+      {can("domains") ? (
+        <Section title="Web addresses">
+          <List>
+            <Row href="/redirects" title="Redirects" subtitle="Old links that should still reach the right page" />
+          </List>
+        </Section>
+      ) : null}
       {can("shipping") ? (
         <Section title="Shipping">
           <List>
