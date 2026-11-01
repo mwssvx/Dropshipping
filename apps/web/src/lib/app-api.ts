@@ -56,6 +56,10 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  platformFeeFor,
+  PLAN_IDS,
+  changePlan,
+  planAdvice,
   inventoryReport,
   repeatBuyers,
   COME_BACK_DAYS,
@@ -1756,6 +1760,27 @@ const routes: Record<string, Handler> = {
       rows: rows.map((r) => ({ variantId: r.variantId, productId: r.productId, title: r.title, sku: r.sku, location: r.location, stock: r.stock, incoming: r.incoming, sold: r.sold, daysLeft: r.daysLeft, low: r.low, valueAtCostMinor: r.valueAtCostMinor })),
     };
   },
+  // The plan: what it cost over the last 30 days, the plan that would have cost least for the same
+  // sales, and switching. A plan that needs a card opens the payment page in the browser.
+  "GET plan": async ({ db, shop }) => {
+    const advice = await planAdvice(db, shop);
+    return {
+      current: shop.plan,
+      advice,
+      plans: PLAN_IDS.map((id) => {
+        const p = PLANS[id];
+        return { id, name: p.name, monthlyMinor: p.monthlyMinor, feeBps: p.feeBps, blurb: p.blurb, ordersPerMonth: p.ordersPerMonth, estimateMinor: p.monthlyMinor + platformFeeFor(id, advice.salesMinor) };
+      }),
+      testMode: testPayments(),
+    };
+  },
+  "POST plan": async ({ req, db, shop, user }) => {
+    const b = await body<{ plan?: unknown }>(req);
+    const { url, plan } = await changePlan(db, payments(), shop, { plan: str(b.plan), email: user.email, returnUrl: platformUrl("/admin/plan") });
+    if (url) return { ok: true, url, message: "Finish on the payment page. Your plan changes once the payment goes through." };
+    await logged({ shop, user, db }, `Changed the plan to ${PLANS[plan].name} in the app`, { href: "/admin/plan" });
+    return { ok: true, url: null, message: `Done. You're on ${PLANS[plan].name}.` };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -2526,6 +2551,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("blog")) return "pages";
   if (path === "pages" || path.startsWith("pages/")) return "pages";
   if (path.startsWith("trust")) return "trust";
+  if (path === "plan") return "plan";
   if (path.startsWith("suppliers")) return "suppliers";
   if (path.startsWith("cart-links")) return "marketing";
   if (path.startsWith("wholesale")) return "wholesale";

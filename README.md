@@ -2092,3 +2092,7 @@ The app's Analytics screen shows, for each of the last six months, how many firs
 ### Inventory in the app (after launch, part 403)
 
 The Products tab in the app has an Inventory row: the stock the store keeps itself, in units and on the way, what it's worth at cost and at your prices, and each option with how many sold in the last 30 days and how long it lasts at that pace, the soonest to run out first. Sold out and running low options are marked, each opens its product, and Count stock and Restock orders are a tap away.
+
+### Plan in the app (after launch, part 404)
+
+Settings in the app has a Plan row. It shows the plan, what it cost over the last 30 days for the orders and sales the store had, and which plan would have cost least for the same sales, then lists every plan with what it would have cost. Switching asks once to confirm; a plan that needs a card opens the payment page in the browser and changes once the payment goes through.

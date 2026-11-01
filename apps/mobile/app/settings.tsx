@@ -139,6 +139,13 @@ export default function Settings() {
           </List>
         </Section>
       ) : null}
+      {can("plan") ? (
+        <Section title="Plan">
+          <List>
+            <Row href="/plan" title="Your plan" subtitle="What it cost you last month, and the plan that would cost least" />
+          </List>
+        </Section>
+      ) : null}
       {can("team") ? (
         <Section title="Team">
           <List>
