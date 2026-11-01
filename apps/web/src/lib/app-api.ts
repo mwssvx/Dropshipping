@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  DEFAULT_RETURN_INSTRUCTIONS,
+  setReturnSettings,
   reviewRewardStats,
   reviewRequestStats,
   setReviewReward,
@@ -2781,6 +2783,27 @@ const routes: Record<string, Handler> = {
     revalidatePath("/admin/reviews");
     return { ok: true, message: percent ? `Saved. Buyers get ${percent}% off their next order for a review.` : "Saved. No thank-you code for reviews." };
   },
+  // Return settings: how long buyers have to ask, and what they're told to do once you approve.
+  "GET return-settings": async ({ shop }) => ({
+    windowDays: shop.returnWindowDays,
+    instructions: shop.returnInstructions ?? "",
+    placeholder: DEFAULT_RETURN_INSTRUCTIONS,
+  }),
+  "PUT return-settings": async ({ req, db, shop, user }) => {
+    const b = await body<{ windowDays?: unknown; instructions?: unknown }>(req);
+    const days = str(b.windowDays).trim();
+    const windowDays = /^\d+$/.test(days) ? Number(days) : NaN;
+    await setReturnSettings(db, shop.id, { windowDays, instructions: str(b.instructions) });
+    await logged({ shop, user, db }, windowDays ? `Set returns to ${windowDays} ${windowDays === 1 ? "day" : "days"} after delivery, in the app` : "Turned off the return form in the app", { href: "/admin/returns" });
+    revalidatePath("/admin/returns");
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return {
+      ok: true,
+      message: windowDays
+        ? `Saved. Buyers can ask to return an order for ${windowDays} ${windowDays === 1 ? "day" : "days"} after it arrives.`
+        : "Saved. The return form is off, so buyers email you instead.",
+    };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -3649,6 +3672,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("sales")) return "marketing";
   if (path.startsWith("returns")) return "returns";
   if (path.startsWith("holiday-returns")) return "returns";
+  if (path.startsWith("return-settings")) return "returns";
   if (path === "today") return "home";
   if (path === "holiday-checklist") return "home";
   if (path.startsWith("developers")) return "developers";

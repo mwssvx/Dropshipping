@@ -2200,3 +2200,7 @@ The Products tab in the app has "Product pages": the "Only 3 left" note, the run
 ### Review emails in the app (after launch, part 430)
 
 The app's Reviews screen links to "Review emails": turn the email asking buyers for a review on or off, pick how many days after their order arrives it goes out, add the one reminder a week later, and turn on a 5% to 30% thank-you code for reviewing, with how many were sent and used in the last 30 days.
+
+### Return settings in the app (after launch, part 431)
+
+The app's Returns screen links to "Return settings": how many days after delivery buyers can ask to send something back (0 turns the return form off, so they email you), and what they're told to do once you approve, with the default wording shown when it's left empty.

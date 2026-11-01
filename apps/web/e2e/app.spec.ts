@@ -3681,3 +3681,37 @@ test("review request emails and the thank-you code, from the app", async ({ page
   await web.reload();
   await expect(web.getByRole("checkbox", { name: "Email buyers for a review" })).not.toBeChecked();
 });
+
+test("return settings from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `rs${Date.now()}`);
+  await signIn(page, email);
+  await page.getByRole("button", { name: /^Returns/ }).click();
+  await page.getByRole("link", { name: /^Return settings/ }).click();
+  await expect(page.getByRole("heading", { name: "Return settings", level: 1 })).toBeVisible();
+  const days = page.getByLabel("Days buyers have to ask");
+  await expect(days).toHaveValue("30");
+
+  // A window past a year is refused; 45 days with our own wording is kept.
+  await days.fill("400");
+  await page.getByRole("button", { name: "Save return settings" }).click();
+  await expect(page.getByText("Enter a return window from 0 to 365 days.")).toBeVisible();
+  await days.fill("45");
+  await page.getByLabel("What buyers do after you approve").fill("Keep it, we'll refund you today.");
+  await page.getByRole("button", { name: "Save return settings" }).click();
+  await expect(page.getByText("Saved. Buyers can ask to return an order for 45 days after it arrives.")).toBeVisible();
+  await shot(page, "431-app-return-settings");
+
+  await web.goto(`${WEB}/admin/returns`);
+  await expect(web.locator("#windowDays")).toHaveValue("45");
+  await expect(web.locator("#instructions")).toHaveValue("Keep it, we'll refund you today.");
+
+  // 0 turns the return form off; clearing the wording goes back to the default.
+  await days.fill("0");
+  await page.getByLabel("What buyers do after you approve").fill("");
+  await page.getByRole("button", { name: "Save return settings" }).click();
+  await expect(page.getByText("Saved. The return form is off, so buyers email you instead.")).toBeVisible();
+  await expect(page.getByText("Left empty, buyers get the wording shown in the box.")).toBeVisible();
+  await web.reload();
+  await expect(web.locator("#windowDays")).toHaveValue("0");
+  await expect(web.locator("#instructions")).toHaveValue("");
+});
