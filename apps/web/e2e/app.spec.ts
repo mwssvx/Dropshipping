@@ -3637,3 +3637,47 @@ test("product page settings and notes set from the app", async ({ page, browser 
   await expect(web.getByRole("checkbox", { name: "Show share buttons on product pages" })).not.toBeChecked();
   await expect(web.getByRole("region", { name: "Notes under every product" }).getByRole("textbox").first()).toHaveValue("Shipping");
 });
+
+test("review request emails and the thank-you code, from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `re${Date.now()}`);
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Reviews", exact: true }).click();
+  await page.getByRole("link", { name: /Review emails/ }).click();
+
+  // Requests start on at 7 days; a day count past 30 is refused.
+  const requests = page.getByRole("region", { name: "Review requests" });
+  await expect(requests.getByRole("switch", { name: "Email buyers for a review" })).toBeChecked();
+  await requests.getByLabel("Days after their order arrives").fill("45");
+  await requests.getByRole("button", { name: "Save review requests" }).click();
+  await expect(page.getByText("Pick 1 to 30 days, or 0 to turn it off.")).toBeVisible();
+  await requests.getByLabel("Days after their order arrives").fill("1");
+  const reminder = requests.getByRole("switch", { name: "Send one reminder a week later to buyers who haven't reviewed yet" });
+  if (!(await reminder.isChecked())) await reminder.click();
+  await requests.getByRole("button", { name: "Save review requests" }).click();
+  await expect(page.getByText("Saved. Buyers are asked 1 day after their order arrives, and reminded once a week later.")).toBeVisible();
+
+  // The thank-you code starts off; 40% is refused, 15% is kept.
+  const reward = page.getByRole("region", { name: "Thank-you code" });
+  await expect(reward.getByRole("switch", { name: "Thank buyers for a review with a code" })).not.toBeChecked();
+  await reward.getByRole("switch", { name: "Thank buyers for a review with a code" }).click();
+  await reward.getByLabel("Percent off their next order").fill("40");
+  await reward.getByRole("button", { name: "Save thank-you code" }).click();
+  await expect(page.getByText("Pick between 5% and 30% off.")).toBeVisible();
+  await reward.getByLabel("Percent off their next order").fill("15");
+  await reward.getByRole("button", { name: "Save thank-you code" }).click();
+  await expect(page.getByText("Saved. Buyers get 15% off their next order for a review.")).toBeVisible();
+  await shot(page, "430-app-review-emails");
+
+  await web.goto(`${WEB}/admin/reviews`);
+  await expect(web.getByLabel("Days after delivery")).toHaveValue("1");
+  await expect(web.getByRole("checkbox", { name: "Send one reminder a week later to buyers who haven't reviewed yet" })).toBeChecked();
+  await expect(web.getByLabel("Thank-you percent off")).toHaveValue("15");
+  await expect(web.getByRole("checkbox", { name: "Thank buyers for a review with" })).toBeChecked();
+
+  // Turning requests off clears the reminder too.
+  await requests.getByRole("switch", { name: "Email buyers for a review" }).click();
+  await requests.getByRole("button", { name: "Save review requests" }).click();
+  await expect(page.getByText("Saved. Buyers aren't emailed for a review.")).toBeVisible();
+  await web.reload();
+  await expect(web.getByRole("checkbox", { name: "Email buyers for a review" })).not.toBeChecked();
+});

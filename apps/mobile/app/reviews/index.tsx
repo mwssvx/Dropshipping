@@ -2,7 +2,7 @@ import { useState } from "react";
 import { View } from "react-native";
 import { api, useApi } from "../../src/api";
 import { when } from "../../src/format";
-import { BackLink, Banner, Body, Button, Card, EmptyState, Field, Heading, LoadError, Loading, Pill, Screen, Segmented } from "../../src/ui";
+import { BackLink, Banner, Body, Button, Card, EmptyState, Field, Heading, List, LoadError, Loading, Pill, Row, Screen, Segmented } from "../../src/ui";
 import { space } from "../../src/theme";
 
 type Review = { id: string; name: string; rating: number; body: string; status: "pending" | "published" | "hidden"; reply: string | null; photos: number; productTitle: string; createdAt: string };
@@ -35,6 +35,9 @@ export default function ReviewsScreen() {
           ["all", "All"],
         ]}
       />
+      <List>
+        <Row href="/review-emails" title="Review emails" subtitle="When buyers are asked for a review, the reminder, and a thank-you code" />
+      </List>
       <LoadError error={list.error} stale={list.stale} retry={list.reload} />
       {!rows ? (
         list.loading ? <Loading /> : null
