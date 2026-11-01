@@ -3316,3 +3316,34 @@ test("checkout add-ons, free gift and tips set from the app", async ({ page, bro
   await expect(page.getByText("Add-on deleted.")).toBeVisible();
   await expect(page.getByText("No add-ons yet").last()).toBeVisible();
 });
+
+test("your account from the app: Monday summary and signing out another device", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `ac${Date.now()}`);
+  await signIn(page, email);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("link", { name: "Your account" }).click();
+  await expect(page.getByText(`Signed in as ${email}. These settings are yours, on every store you work on.`)).toBeVisible();
+  await expect(page.getByRole("region", { name: "Two-step sign-in" }).getByText("Off", { exact: true })).toBeVisible();
+
+  const summary = page.getByRole("region", { name: "Monday summary" });
+  await summary.getByRole("switch", { name: /^Email me a summary of Pocket Shop/ }).click();
+  await summary.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText(/^Saved\. You won't get Pocket Shop \S+'s summary any more\.$/)).toBeVisible();
+
+  const devices = page.getByRole("region", { name: "Where you're signed in" });
+  await expect(devices.getByText("This device")).toBeVisible();
+  await expect(devices.getByRole("button", { name: "Sign out everywhere else" })).toHaveCount(0);
+  await shot(page, "421-app-account");
+  await devices.getByRole("button", { name: /^Sign out / }).click();
+  await expect(page.getByText("Signed out. That device has to sign in again.")).toBeVisible();
+  await expect(devices.getByRole("button", { name: /^Sign out / })).toHaveCount(0);
+
+  await web.goto(`${WEB}/admin/account`);
+  await expect(web.getByRole("button", { name: "Sign in" })).toBeVisible();
+  await web.getByLabel("Email").fill(email);
+  await web.getByLabel("Password").fill(PASSWORD);
+  await web.getByRole("button", { name: "Sign in" }).click();
+  await expect(web).toHaveURL(/\/admin$/);
+  await web.goto(`${WEB}/admin/account`);
+  await expect(web.getByRole("checkbox", { name: /^Email me a summary/ })).not.toBeChecked();
+});
