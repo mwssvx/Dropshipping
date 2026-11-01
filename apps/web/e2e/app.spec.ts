@@ -1,3 +1,5 @@
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 
 // Milestone 6: the merchant app, run from its web build on a phone-sized screen against this
@@ -3346,4 +3348,48 @@ test("your account from the app: Monday summary and signing out another device",
   await expect(web).toHaveURL(/\/admin$/);
   await web.goto(`${WEB}/admin/account`);
   await expect(web.getByRole("checkbox", { name: /^Email me a summary/ })).not.toBeChecked();
+});
+
+test("API keys revoked and webhooks tested and paused from the app", async ({ page, browser }) => {
+  const server = createServer((req, res) => {
+    req.resume();
+    req.on("end", () => res.end("ok"));
+  });
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+  const hookUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}/hook`;
+  try {
+    const { web, email } = await merchant(browser, `dv${Date.now()}`);
+    await web.goto(`${WEB}/admin/developers`);
+    await web.getByLabel("Key name").fill("Reporting");
+    await web.getByRole("button", { name: "Create key" }).click();
+    await expect(web.getByText("Copy the key for Reporting now.")).toBeVisible();
+    await web.getByLabel("Address").fill(hookUrl);
+    await web.getByRole("button", { name: "Add webhook" }).click();
+    await expect(web.getByRole("article", { name: `Webhook ${hookUrl}` })).toBeVisible();
+
+    await signIn(page, email);
+    await page.getByRole("link", { name: "Settings" }).click();
+    await page.getByRole("link", { name: /^API keys and webhooks/ }).click();
+    await expect(page.getByText(/^Reporting · sfk_\S+…$/)).toBeVisible();
+    await expect(page.getByText("Last used never")).toBeVisible();
+
+    const hook = page.getByRole("region", { name: hookUrl });
+    await hook.getByRole("button", { name: `Send a test to ${hookUrl}` }).click();
+    await expect(page.getByText("Delivered. Your server answered 200.")).toBeVisible();
+    await hook.getByRole("button", { name: "Pause" }).click();
+    await expect(page.getByText("Webhook paused. Nothing is sent until you turn it back on.")).toBeVisible();
+    await expect(hook.getByText("Paused", { exact: true })).toBeVisible();
+    await shot(page, "422-app-developers");
+
+    await page.getByRole("button", { name: "Revoke Reporting…" }).click();
+    await page.getByRole("button", { name: "Revoke Reporting now" }).click();
+    await expect(page.getByText("Reporting revoked. Anything using it stops working now.")).toBeVisible();
+    await expect(page.getByText("No keys yet")).toBeVisible();
+
+    await web.reload();
+    await expect(web.getByText("No keys yet.")).toBeVisible();
+    await expect(web.getByRole("article", { name: `Webhook ${hookUrl}` }).getByText("Paused")).toBeVisible();
+  } finally {
+    server.close();
+  }
 });
