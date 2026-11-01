@@ -131,6 +131,7 @@ export default function Settings() {
       {can("shipping") ? (
         <Section title="Shipping">
           <List>
+            <Row href="/checkout-settings" title="Checkout" subtitle="The smallest order, asking for a phone number, and delivery protection" />
             <Row href="/delivery-dates" title="Delivery dates" subtitle="Say when orders arrive, on product pages, the cart and receipts" />
             <Row href="/ship-pause" title="Shipping pause" subtitle="Your supplier is closed for a while: keep selling, and say when orders ship" />
             <Row href="/holiday-date" title="Holiday order-by date" subtitle="“Order by Dec 15 to get it in time for Christmas” on product pages" />

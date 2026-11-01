@@ -56,6 +56,9 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  setDeliveryProtection,
+  setCheckoutPhone,
+  setMinOrder,
   keepsFromSale,
   compareAtFor,
   priceFromCost,
@@ -1838,6 +1841,48 @@ const routes: Record<string, Handler> = {
     revalidatePath(`/s/${shop.handle}`, "layout");
     return { ok: true, message: `Updated ${r.variants === 1 ? "1 price" : `${r.variants} prices`} on ${r.products === 1 ? "1 product" : `${r.products} products`}.` };
   },
+  // Checkout settings: the smallest order, asking for a phone number, and delivery protection.
+  "GET checkout-settings": async ({ shop }) => ({ minOrderMinor: shop.minOrderMinor, phone: shop.checkoutPhone, protection: shop.deliveryProtection }),
+  "PUT checkout-settings/min-order": async ({ req, db, shop, user }) => {
+    const raw = str((await body<{ min?: unknown }>(req)).min).trim().replace(/^[$€£¥₹]\s*/, "");
+    let minor = 0;
+    try {
+      minor = raw ? parseMoney(raw) : 0;
+    } catch {
+      throw new UserError("Enter the smallest order as an amount, like 15.00.");
+    }
+    const saved = await setMinOrder(db, shop.id, minor);
+    await logged({ shop, user, db }, saved ? "Set the smallest order in the app" : "Took orders of any amount, in the app", { href: "/admin/shipping#min-order-heading" });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: saved ? `Saved. Carts under ${formatMoney(saved, shop.currency)} ask for a little more before checkout.` : "Saved. Orders of any amount go through." };
+  },
+  "PUT checkout-settings/phone": async ({ req, db, shop, user }) => {
+    const mode = str((await body<{ mode?: unknown }>(req)).mode);
+    if (mode !== "off" && mode !== "optional" && mode !== "required") throw new UserError("Pick whether to ask for a phone number.");
+    await setCheckoutPhone(db, shop.id, mode);
+    const said = { off: "doesn't ask for a phone number", optional: "asks for an optional phone number", required: "needs a phone number" }[mode];
+    await logged({ shop, user, db }, `Checkout now ${said}, set in the app`, { href: "/admin/shipping#phone-heading" });
+    return { ok: true, message: `Saved. Checkout ${said}.` };
+  },
+  "PUT checkout-settings/protection": async ({ req, db, shop, user }) => {
+    const b = await body<{ on?: unknown; percent?: unknown; min?: unknown }>(req);
+    let saved = null;
+    if (b.on === true) {
+      const percent = Number(str(b.percent).trim().replace(",", "."));
+      const min = str(b.min).trim().replace(/^[$€£¥₹]\s*/, "");
+      let minMinor = 0;
+      try {
+        minMinor = min ? parseMoney(min) : 0;
+      } catch {
+        throw new UserError("Enter the lowest price as an amount, like 1.50.");
+      }
+      saved = await setDeliveryProtection(db, shop.id, { percent, minMinor });
+    } else {
+      await setDeliveryProtection(db, shop.id, null);
+    }
+    await logged({ shop, user, db }, saved ? `Offered delivery protection at checkout for ${saved.percent}% of the order, in the app` : "Stopped offering delivery protection, in the app", { href: "/admin/shipping#protection-heading" });
+    return { ok: true, message: saved ? "Saved. Buyers can protect their parcel at checkout." : "Saved. Checkout doesn't offer delivery protection." };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -2606,6 +2651,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("price-changes")) return "products";
   if (path.startsWith("search-fixes")) return "products";
   if (path.startsWith("pricing")) return "products";
+  if (path.startsWith("checkout-settings")) return "shipping";
   if (path.startsWith("blog")) return "pages";
   if (path === "pages" || path.startsWith("pages/")) return "pages";
   if (path.startsWith("trust")) return "trust";

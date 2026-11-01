@@ -2765,3 +2765,37 @@ test("the pricing rule changed from the app, and products brought in line", asyn
   await web.goto(`${WEB}/admin/pricing`);
   await expect(web.getByText("Every product with a known supplier cost already follows your rule.")).toBeVisible();
 });
+
+test("checkout settings from the app: smallest order, phone number and delivery protection", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `co${Date.now()}`);
+  await signIn(page, email);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("link", { name: /^Checkout/ }).click();
+
+  const min = page.getByRole("region", { name: "Smallest order" });
+  await min.getByRole("textbox", { name: "Smallest order (USD)" }).fill("fifteen");
+  await min.getByRole("button", { name: "Save smallest order" }).click();
+  await expect(page.getByText("Enter the smallest order as an amount, like 15.00.")).toBeVisible();
+  await min.getByRole("textbox", { name: "Smallest order (USD)" }).fill("$15");
+  await min.getByRole("button", { name: "Save smallest order" }).click();
+  await expect(page.getByText("Saved. Carts under $15.00 ask for a little more before checkout.")).toBeVisible();
+
+  const phone = page.getByRole("region", { name: "Phone number at checkout" });
+  await phone.getByRole("tab", { name: "Required" }).click();
+  await phone.getByRole("button", { name: "Save phone number" }).click();
+  await expect(page.getByText("Saved. Checkout needs a phone number.")).toBeVisible();
+
+  const protection = page.getByRole("region", { name: "Delivery protection" });
+  await protection.getByRole("switch", { name: "Offer delivery protection" }).click();
+  await protection.getByRole("textbox", { name: "Price, % of the order" }).fill("50");
+  await protection.getByRole("button", { name: "Save delivery protection" }).click();
+  await expect(page.getByText(/^Pick between 0\.5% and \d+% of the order\.$/)).toBeVisible();
+  await protection.getByRole("textbox", { name: "Price, % of the order" }).fill("3");
+  await protection.getByRole("button", { name: "Save delivery protection" }).click();
+  await expect(page.getByText("Saved. Buyers can protect their parcel at checkout.")).toBeVisible();
+  await shot(page, "406-app-checkout-settings");
+
+  await web.goto(`${WEB}/admin/shipping`);
+  await expect(web.getByLabel("Smallest order ($)")).toHaveValue("15.00");
+  await expect(web.getByLabel("Buyers must enter one")).toBeChecked();
+});
