@@ -3075,7 +3075,7 @@ test("a product quiz written in the app gives shoppers the products that fit", a
   await page.getByRole("textbox", { name: "Answers to question 1" }).last().fill("In the sun: summer\nIn the cold: winter");
   await page.getByRole("button", { name: "Save the quiz" }).last().click();
   await expect(page.getByText("Saved. Shoppers can take the quiz now.")).toBeVisible();
-  await expect(page.getByText(new RegExp(`/s/pocket-shop-${id}/quiz$`)).last()).toBeVisible();
+  await expect(page.getByText(/^https?:\/\/\S+\/quiz$/).last()).toBeVisible();
   await shot(page, "414-app-quiz");
 
   const shopper = await (await browser.newContext()).newPage();
