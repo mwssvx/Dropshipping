@@ -56,6 +56,11 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  type ProfitRange,
+  AD_CHANNEL_LABELS,
+  PROFIT_RANGES,
+  productChoices,
+  deleteAdSpend,
   HANDOVER_LEAD_MAX,
   setHandoverDays,
   setLocalDelivery,
@@ -2288,9 +2293,57 @@ const routes: Record<string, Handler> = {
     };
   },
   "POST money/ad-spend": async ({ req, db, shop, user }) => {
-    const b = await body<{ day?: unknown; channel?: unknown; amountMinor?: unknown }>(req);
-    await addAdSpend(db, shop.id, { day: str(b.day) || new Date().toISOString().slice(0, 10), channel: str(b.channel) as never, amountMinor: typeof b.amountMinor === "number" ? b.amountMinor : 0 }, { userId: user.id });
+    const b = await body<{ day?: unknown; channel?: unknown; amountMinor?: unknown; productId?: unknown; note?: unknown }>(req);
+    await addAdSpend(
+      db,
+      shop.id,
+      {
+        day: str(b.day) || new Date().toISOString().slice(0, 10),
+        channel: str(b.channel) as never,
+        amountMinor: typeof b.amountMinor === "number" ? b.amountMinor : 0,
+        productId: str(b.productId) || null,
+        note: str(b.note),
+      },
+      { userId: user.id },
+    );
+    revalidatePath("/admin/profit");
+    revalidatePath("/admin/money");
     return { ok: true, message: "Ad spend added." };
+  },
+  // The full profit report, as on the web's Profit page: totals, every product, and the ad spend entered.
+  "GET money/profit": async ({ url, db, shop }) => {
+    const days = (PROFIT_RANGES.find((d) => String(d) === url.searchParams.get("days")) ?? 30) as ProfitRange;
+    const [r, products] = await Promise.all([profitReport(db, shop, days), productChoices(db, shop.id)]);
+    const titles = new Map(products.map((p) => [p.id, p.title]));
+    return {
+      currency: shop.currency,
+      days: r.days,
+      ranges: PROFIT_RANGES,
+      from: r.from,
+      to: r.to,
+      orders: r.orders,
+      totals: r.totals,
+      products: r.products,
+      untiedAdsMinor: r.untiedAdsMinor,
+      adsByChannel: r.adsByChannel,
+      giftCardSalesMinor: r.giftCardSalesMinor,
+      ads: [...r.ads].reverse().map((a) => ({
+        id: a.id,
+        day: a.day,
+        channel: AD_CHANNEL_LABELS[a.channel],
+        note: a.note,
+        amountMinor: a.amountMinor,
+        product: a.productId ? (titles.get(a.productId) ?? "A deleted product") : null,
+      })),
+      channels: Object.entries(AD_CHANNEL_LABELS).map(([value, label]) => ({ value, label })),
+      choices: products.filter((p) => !p.giftCard && p.status !== "archived").map((p) => ({ id: p.id, title: p.title })),
+    };
+  },
+  "DELETE money/ad-spend/:id": async ({ params, db, shop }) => {
+    await deleteAdSpend(db, shop.id, params.id!);
+    revalidatePath("/admin/profit");
+    revalidatePath("/admin/money");
+    return { ok: true, message: "Ad spend removed." };
   },
   "POST money/holds/:id/document": async ({ req, params, db, shop }) => {
     const type = (req.headers.get("content-type") ?? "").split(";")[0]!.trim();

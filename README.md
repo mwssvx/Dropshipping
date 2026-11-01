@@ -2112,3 +2112,7 @@ Settings in the app has a "Pickup and local delivery" row under Shipping: turn o
 ### Pickup and delivery days in the app (after launch, part 408)
 
 Once pickup or local delivery is on, the same screen in the app has "Pickup and delivery days": let buyers pick the day they collect or get their order, tick the weekdays you hand orders over and set the days' notice you need. The time zone is the one already set on the web.
+
+### Profit report in the app (after launch, part 409)
+
+The Money tab has a "Profit report" row: the same report as the web's Profit page, for the last 7, 30 or 90 days. It shows sales, supplier costs, fees, ads, profit and the break-even ROAS, then every product's profit with its ROAS, flagging products with no cost and products losing money on ads. Add ad spend for a day, a channel and (optionally) one product with a note, and remove an entry you got wrong.

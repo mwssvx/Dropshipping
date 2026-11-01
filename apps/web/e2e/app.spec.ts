@@ -2868,3 +2868,51 @@ test("pickup and delivery days picked from the app", async ({ page, browser }) =
   await expect(web.getByRole("checkbox", { name: "Monday" })).not.toBeChecked();
   await expect(web.getByLabel("Notice you need")).toHaveValue("2");
 });
+
+test("the profit report and ad spend for a product, from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `pr${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Beeswax Candle");
+  await web.getByLabel("Price", { exact: true }).fill("12.00");
+  await web.getByLabel("Stock", { exact: true }).fill("6");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  await buy(browser, new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href);
+
+  await signIn(page, email);
+  await tab(page, "Money");
+  await page.getByRole("link", { name: /^Profit report/ }).click();
+  await expect(page.getByRole("heading", { name: "Profit", level: 1 })).toBeVisible();
+  // Own stock with no cost entered: its profit is flagged as too high.
+  await expect(page.getByRole("link", { name: /^Beeswax Candle, profit .*, no cost$/ })).toBeVisible();
+  await expect(page.getByText(/^Some products have no cost/)).toBeVisible();
+
+  const ads = page.getByRole("region", { name: "Ad spend" });
+  await ads.getByRole("tab", { name: "TikTok" }).click();
+  await ads.getByRole("textbox", { name: "Amount spent (USD)" }).fill("eight");
+  await ads.getByRole("button", { name: "Add ad spend" }).click();
+  await expect(page.getByText("Enter how much you spent, like 25.00.")).toBeVisible();
+  await ads.getByRole("textbox", { name: "Amount spent (USD)" }).fill("8");
+  await ads.getByRole("textbox", { name: "For a product (optional)" }).fill("bees");
+  await ads.getByRole("button", { name: "Spend on Beeswax Candle" }).click();
+  await expect(ads.getByRole("button", { name: /^For Beeswax Candle/ })).toBeVisible();
+  await ads.getByRole("textbox", { name: "Note (optional)" }).fill("Launch post");
+  await ads.getByRole("button", { name: "Add ad spend" }).click();
+  await expect(page.getByText("Ad spend added.")).toBeVisible();
+  const today = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date());
+  await expect(ads.getByRole("button", { name: `Remove $8.00 on ${today}` })).toBeVisible();
+  await expect(ads.getByText("TikTok · Beeswax Candle · Launch post")).toBeVisible();
+  // Twelve dollars of sales for eight of ads.
+  await expect(page.getByText(/ROAS 1\.5×/)).toBeVisible();
+  await page.getByRole("tab", { name: "7 days" }).click();
+  await expect(ads.getByRole("button", { name: `Remove $8.00 on ${today}` })).toBeVisible();
+  await shot(page, "409-app-profit");
+
+  await web.goto(`${WEB}/admin/profit`);
+  await expect(web.getByRole("table", { name: "Ad spend entered" })).toContainText("Beeswax Candle");
+  await expect(web.getByRole("table", { name: "Ad spend entered" })).toContainText("$8.00");
+
+  await ads.getByRole("button", { name: `Remove $8.00 on ${today}` }).click();
+  await expect(page.getByText("Ad spend removed.")).toBeVisible();
+  await expect(ads.getByRole("button", { name: /^Remove / })).toHaveCount(0);
+});
