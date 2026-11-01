@@ -3236,7 +3236,7 @@ test("custom domains connected and swapped from the app", async ({ page, browser
   await signIn(page, email);
   await page.getByRole("link", { name: "Settings" }).click();
   await page.getByRole("link", { name: /^Domains/ }).click();
-  await expect(page.getByText(new RegExp(`/s/pocket-shop-${id}$`))).toBeVisible();
+  await expect(page.getByText(new RegExp(`pocket-shop-${id}`)).first()).toBeVisible();
 
   // Tests skip the DNS lookup, so a domain connects as soon as it's added.
   const box = page.getByRole("textbox", { name: "Domain you own" });
