@@ -51,7 +51,7 @@ type Detail = {
   /** On the store's blocked list, so checkout turns them away. */
   blocked?: boolean;
   /** Picked up by the buyer, or delivered by the store itself. */
-  handover?: { kind: "pickup" | "delivery"; day: string | null; readyAt: string | null; done: boolean } | null;
+  handover?: { kind: "pickup" | "delivery"; day: string | null; readyAt: string | null; done: boolean; moveTo?: { day: string; label: string }[] } | null;
   /** A buyer's bank pulling the money back; `checks` while it waits for an answer. */
   disputes?: {
     id: string;
@@ -97,7 +97,8 @@ export default function OrderScreen() {
   const { id, made } = useLocalSearchParams<{ id: string; made?: string }>();
   const order = useApi<Detail>(`orders/${id}`);
   const can = useCan();
-  const [panel, setPanel] = useState<null | "refund" | "tracking" | "block" | "accept" | "transfer">(null);
+  const [panel, setPanel] = useState<null | "refund" | "tracking" | "block" | "accept" | "transfer" | "move">(null);
+  const [moveDay, setMoveDay] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{ tone: "success" | "critical"; text: string } | null>(null);
   const [amount, setAmount] = useState("");
@@ -282,6 +283,36 @@ export default function OrderScreen() {
               <Button label="Delivered" onPress={() => run("delivered", `orders/${o.id}/handover`, { step: "delivered" })} busy={busy === "delivered"} disabled={!!busy} />
             )}
           </View>
+          {o.handover.day && o.handover.moveTo?.length ? (
+            panel === "move" ? (
+              <>
+                <Heading>Move to another day</Heading>
+                <List>
+                  {o.handover.moveTo.map((d) => (
+                    <Row
+                      key={d.day}
+                      title={d.label}
+                      subtitle={d.day === o.handover!.day ? "The day now" : undefined}
+                      a11y={`${d.label}${(moveDay ?? o.handover!.day) === d.day ? ", picked" : ""}`}
+                      onPress={() => setMoveDay(d.day)}
+                      right={(moveDay ?? o.handover!.day) === d.day ? "✓" : undefined}
+                    />
+                  ))}
+                </List>
+                <View style={{ flexDirection: "row", gap: space(2), flexWrap: "wrap" }}>
+                  <Button
+                    label="Move and tell the buyer"
+                    onPress={() => void run("move", `orders/${o.id}/move-day`, { day: moveDay })}
+                    busy={busy === "move"}
+                    disabled={!!busy || !moveDay || moveDay === o.handover.day}
+                  />
+                  <Button label="Cancel" kind="ghost" onPress={() => setPanel(null)} disabled={!!busy} />
+                </View>
+              </>
+            ) : (
+              <Button label="Move to another day…" kind="ghost" onPress={() => { setMoveDay(null); setPanel("move"); }} disabled={!!busy} />
+            )
+          ) : null}
         </Card>
       ) : null}
 

@@ -4309,3 +4309,67 @@ test("change an order's address from the app before it ships", async ({ page, br
   await expect(page.getByText(/^Tracking added/)).toBeVisible();
   await expect(page.getByRole("region", { name: "Change the order" })).toHaveCount(0);
 });
+
+test("a pickup moved to another day from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `md${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Stoneware Jug");
+  await web.getByLabel("Price", { exact: true }).fill("28.00");
+  await web.getByLabel("Stock", { exact: true }).fill("4");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const jug = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+  await web.goto(`${WEB}/admin/shipping`);
+  await web.getByLabel("Let buyers pick up their order").check();
+  await web.getByLabel("Pickup address").fill("Kiln Studio\n4 Rainey St, Austin");
+  await web.getByRole("button", { name: "Save pickup" }).click();
+  await expect(web.getByText("Saved. Buyers can pick up orders of your own stock.")).toBeVisible();
+  await web.reload();
+  const days = web.getByRole("region", { name: "Pickup and delivery days" });
+  await days.getByLabel("Buyers pick the day they collect or get their order").check();
+  await days.getByLabel("Saturday").check();
+  await days.getByLabel("Sunday").check();
+  await days.getByRole("button", { name: "Save days" }).click();
+  await expect(days.getByText(/^Saved\. Buyers pick from/)).toBeVisible();
+
+  const buyer = await (await browser.newContext()).newPage();
+  await buyer.goto(jug);
+  await buyer.getByRole("button", { name: "Add to cart" }).click();
+  await buyer.getByRole("link", { name: "Check out" }).click();
+  await buyer.getByLabel("Email").fill("grace@example.com");
+  await buyer.getByLabel("Full name").fill("Grace Buyer");
+  await buyer.getByLabel("Address", { exact: true }).fill("1 Main St");
+  await buyer.getByLabel("City").fill("Austin");
+  await buyer.getByLabel("State or region").fill("TX");
+  await buyer.getByLabel("Postal code").fill("78701");
+  await buyer.getByRole("radio", { name: /Pick it up yourself/ }).check();
+  const pick = buyer.getByLabel("Pickup day");
+  await pick.selectOption({ label: (await pick.locator("option:not([value=''])").nth(1).textContent())!.trim() });
+  await buyer.getByRole("button", { name: "Continue to payment" }).click();
+  await buyer.getByRole("button", { name: /^Pay/ }).click();
+  await expect(buyer.getByRole("heading", { name: "Thank you, Grace!" })).toBeVisible();
+  const orderPage = buyer.url();
+
+  // The store's own list of days starts today, even when it's earlier than the buyer could pick.
+  await web.goto(`${WEB}/admin/orders`);
+  await web.getByRole("link", { name: /#1001/ }).first().click();
+  const today = (await web.locator("#move-day option").first().textContent())!.trim();
+
+  await signIn(page, email);
+  await tab(page, "Orders");
+  await page.getByRole("tab", { name: "All" }).click();
+  await page.getByRole("link", { name: "Order #1001" }).click();
+  await page.getByRole("button", { name: "Move to another day…" }).click();
+  await expect(page.getByRole("button", { name: "Move and tell the buyer" })).toBeDisabled();
+  await page.getByRole("button", { name: today, exact: true }).click();
+  await expect(page.getByRole("button", { name: `${today}, picked` })).toBeVisible();
+  await shot(page, "447-app-move-day");
+  await page.getByRole("button", { name: "Move and tell the buyer" }).click();
+  await expect(page.getByText("Moved. The buyer was emailed the new day.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Move and tell the buyer" })).toHaveCount(0);
+
+  await buyer.goto(orderPage);
+  await expect(buyer.getByText(`Pickup day: ${today}`)).toBeVisible();
+  await web.reload();
+  await expect(web.getByText(`Collecting on ${today}`)).toBeVisible();
+});

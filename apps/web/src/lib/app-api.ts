@@ -56,6 +56,9 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  formatHandoverDay,
+  storeHandoverOptions,
+  moveHandoverDay,
   orderEditOptions,
   editOrder,
   sendReplacement,
@@ -811,7 +814,14 @@ const routes: Record<string, Handler> = {
       // Collected by the buyer or dropped off by the store: no tracking, the merchant says when it's done.
       handover:
         o.pickup || o.localDelivery
-          ? { kind: o.pickup ? "pickup" : "delivery", day: o.handoverOn, readyAt: o.pickupReadyAt, done: o.fulfillmentStatus === "delivered" }
+          ? {
+              kind: o.pickup ? "pickup" : "delivery",
+              day: o.handoverOn,
+              readyAt: o.pickupReadyAt,
+              done: o.fulfillmentStatus === "delivered",
+              // The days the store can move it to, today through the end of the buyer's window.
+              moveTo: can(role, "orders") ? (storeHandoverOptions(shop, o) ?? []).map((d) => ({ day: d, label: formatHandoverDay(d) })) : [],
+            }
           : null,
       postYourself: postYourself ? { own: !!ownParcel } : null,
       // Paid and not shipped: the address and sizes the merchant can still change.
@@ -2952,6 +2962,16 @@ const routes: Record<string, Handler> = {
           ? "Saved. The supplier has the updated order, and we emailed the customer."
           : "Saved and emailed to the customer.",
     };
+  },
+  // Moves a pickup or local delivery to another day; the buyer is emailed the new one.
+  "POST orders/:id/move-day": async ({ req, params, db, shop, user }) => {
+    const { day } = await body<{ day?: unknown }>(req);
+    await moveHandoverDay(await fulfillment(), shop.id, params.id!, str(day));
+    await logged({ shop, user, db }, "Moved the pickup or delivery day of order {order} in the app", { orderId: params.id! });
+    notifyLater(shop.id);
+    revalidatePath(`/admin/orders/${params.id}`);
+    revalidatePath("/admin/orders");
+    return { ok: true, message: "Moved. The buyer was emailed the new day." };
   },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
