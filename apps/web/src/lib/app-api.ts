@@ -56,6 +56,7 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  changeProductHandle,
   RETURNS_MIN_SOLD,
   RETURNS_REPORT_DAYS,
   returnsByProduct,
@@ -3287,6 +3288,9 @@ const routes: Record<string, Handler> = {
     return {
       ...productView(p),
       preordersSold: sold,
+      // Its web address, with the store's in front for context.
+      handle: p.handle,
+      addressPrefix: `${(await storeAddress(shop)).replace(/^https?:\/\//, "")}/products/`,
       // The store's other tags, most used first, to tap instead of typing.
       storeTags: storeTags.map((t) => t.tag).slice(0, 30),
       maxTags: MAX_PRODUCT_TAGS,
@@ -3548,6 +3552,17 @@ const routes: Record<string, Handler> = {
     revalidatePath("/admin/seo");
     revalidatePath(`/s/${shop.handle}`, "layout");
     return { ok: true, message: described === texts.length ? "Saved. Every photo has a description." : `Saved. ${described} of ${texts.length} photos have a description.` };
+  },
+  // A short, readable web address; links to the old one keep working.
+  "PUT products/:id/handle": async ({ req, params, db, shop, user }) => {
+    const before = await getProduct(db, shop.id, params.id!);
+    const { handle } = await changeProductHandle(db, shop.id, before.id, str((await body<{ handle?: unknown }>(req)).handle));
+    if (handle === before.handle) return { ok: true, handle, message: "That's already its address." };
+    await logged({ shop, user, db }, `Changed the web address of ${before.title} to /products/${handle} in the app`, { href: `/admin/products/${before.id}` });
+    revalidatePath(`/admin/products/${before.id}`);
+    revalidatePath("/admin/redirects");
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, handle, message: "Saved. Links to the old address still work: they send buyers here." };
   },
   "POST products/:id/listing": async ({ params, shop }) => {
     const run = await writeListing(await agents(), shop, params.id!);

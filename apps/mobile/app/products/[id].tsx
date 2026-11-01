@@ -245,6 +245,7 @@ export default function ProductScreen() {
       {p.status === "draft" ? <LaunchSection product={p} busy={busy} act={act} /> : null}
       <BadgeSection product={p} busy={busy} act={act} />
       {p.images && p.images.length > 0 ? <PhotoTextSection product={p} busy={busy} act={act} /> : null}
+      {p.handle ? <AddressSection product={p} busy={busy} act={act} /> : null}
       <TagsSection product={p} busy={busy} act={act} />
       <CollectionsSection product={p} busy={busy} act={act} />
       {p.giftCard ? null : <SentBySection product={p} busy={busy} act={act} />}
@@ -689,6 +690,27 @@ function SentBySection({ product: p, busy, act }: { product: Product; busy: stri
 }
 
 /** What each photo shows, read out to screen readers and given to image search. Empty uses the product's name. */
+/** The product's web address: something short that buyers and search engines understand. */
+function AddressSection({ product: p, busy, act }: { product: Product; busy: string | null; act: Act }) {
+  const [edit, setEdit] = useState<string | null>(null);
+  useEffect(() => setEdit(null), [p.handle]);
+  const value = edit ?? p.handle ?? "";
+  return (
+    <Section title="Web address">
+      <Card>
+        <Body muted>Change it to something short that buyers and search engines understand. Old links keep working.</Body>
+        <Field label="Address" value={value} onChangeText={setEdit} autoCapitalize="none" hint={`${p.addressPrefix ?? "/products/"}${value}`} />
+        <Button
+          label="Save address"
+          busy={busy === "handle"}
+          disabled={!!busy || edit === null || !value.trim()}
+          onPress={() => act("handle", async () => (await api<{ message: string }>(`products/${p.id}/handle`, { method: "PUT", body: { handle: value } })).message)}
+        />
+      </Card>
+    </Section>
+  );
+}
+
 function PhotoTextSection({ product: p, busy, act }: { product: Product; busy: string | null; act: Act }) {
   const photos = p.images ?? [];
   const saved = photos.map((src) => p.imageAlts?.[src] ?? "");
