@@ -2100,3 +2100,7 @@ Settings in the app has a Plan row. It shows the plan, what it cost over the las
 ### Pricing rule in the app (after launch, part 405)
 
 The Products tab in the app has a Pricing rule row: set how an imported product's starting price comes from the supplier's cost (times the cost, or cost plus an amount), how prices end (.99, .95, .00 or as is), the lowest price and a crossed-out price, and see three example costs with the price and what you'd keep after fees. Products whose prices don't follow the rule are listed and can be updated all at once, after a confirm.
+
+### Checkout settings in the app (after launch, part 406)
+
+Settings in the app has a Checkout row under Shipping: the smallest order a buyer can place, whether checkout asks for a phone number (optional, required or not at all), and delivery protection with its price as a share of the order and its lowest price.
