@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { router } from "expo-router";
 import { Share, View } from "react-native";
 import { send, useApi } from "../../src/api";
 import { when } from "../../src/format";
@@ -16,6 +17,7 @@ type Sale = {
   countdown: boolean;
   result?: { text: string; vs: string | null; tone: Tone } | null;
   early?: { code: string; startsAt: string | null; customerTag: string | null; link: string } | null;
+  lastChance?: boolean;
 };
 
 type Ahead = { id: string; name: string; saleTitle: string; when: string; span: string; start: string | null; end: string; endLabel: string; planned: string | null };
@@ -197,6 +199,18 @@ export default function SalesScreen() {
               {x.status === "scheduled" ? <EarlyAccess sale={x} busy={busy} run={run} /> : null}
               {x.status !== "ended" ? (
                 <View style={{ flexDirection: "row", gap: space(2), flexWrap: "wrap" }}>
+                  {x.status === "running" ? (
+                    <Button
+                      label={x.lastChance ? "Email: last chance" : "Email your subscribers"}
+                      kind="secondary"
+                      a11y={`Write the ${x.lastChance ? "last-chance email" : "email"} for ${x.title}`}
+                      busy={busy === `email-${x.id}`}
+                      disabled={!!busy}
+                      onPress={async () => {
+                        if (await run(`email-${x.id}`, `sales/${x.id}`, { action: "email" }, `Email for ${x.title}`)) router.push("/campaigns");
+                      }}
+                    />
+                  ) : null}
                   {x.endsAt ? (
                     <Button label="One more day" kind="secondary" a11y={`Keep ${x.title} on one more day`} busy={busy === `extend-${x.id}`} onPress={() => run(`extend-${x.id}`, `sales/${x.id}`, { action: "extend", days: 1 }, `Keep ${x.title} on longer`)} />
                   ) : null}

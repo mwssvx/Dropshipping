@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  LAST_CHANCE_MS,
+  saleEmail,
   upcomingSaleDates,
   endEarlyAccess,
   giveEarlyAccess,
@@ -3719,6 +3721,8 @@ const routes: Record<string, Handler> = {
     return {
       sales: shown.map((x) => ({
         result: result(x.id, x.status === "running"),
+        // Near its end, the email to write is the last-chance one.
+        lastChance: x.status === "running" && !!x.endsAt && x.endsAt.getTime() - Date.now() <= LAST_CHANCE_MS,
         // A scheduled sale's early access code, with the link that applies it.
         early: x.early ? { code: x.early.code, startsAt: x.early.startsAt, customerTag: x.early.customerTag, link: `${store}/discount/${x.early.code}` } : null,
         id: x.id,
@@ -3822,6 +3826,13 @@ const routes: Record<string, Handler> = {
       await endSale(db, shop.id, sale.id);
       message = sale.status === "scheduled" ? `${sale.title} won't start.` : `${sale.title} has ended. Prices are back to normal.`;
       await logged({ shop, user, db }, `Ended the sale ${sale.title} in the app`, { href: "/admin/sales" });
+    } else if (b.action === "email") {
+      // The sale's announcement, or its last-chance email near the end, as a campaign draft.
+      const draft = await saleEmail(db, shop, sale.id);
+      if (!draft) throw new UserError("Only a sale that's on now has an email to write.");
+      const c = await createCampaign(db, shop.id, user.id, { subject: draft.subject, body: draft.body, buttonLabel: draft.buttonLabel, buttonPath: draft.buttonPath, audience: draft.audience });
+      await logged({ shop, user, db }, `Wrote the email for the sale ${sale.title} in the app`, { href: `/admin/campaigns/${c.id}` });
+      return { ok: true, campaignId: c.id, message: `Draft saved: “${draft.subject}”. Send yourself a test, then send it.` };
     } else if (b.action === "early") {
       const hours = typeof b.hours === "number" ? b.hours : Number.NaN;
       const tag = str(b.tag).trim();
