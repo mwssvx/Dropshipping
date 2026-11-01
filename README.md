@@ -2120,3 +2120,7 @@ The Money tab has a "Profit report" row: the same report as the web's Profit pag
 ### Size charts in the app (after launch, part 410)
 
 The Products tab has a "Size charts" row. Start a chart by name, then type its table on the phone: the columns split by commas, and one size per line with its measurements in column order (a line pasted from a spreadsheet works too, and a short line gets empty cells to fill in later). Pick centimetres or inches, add a note, attach it to products and collections, hide it from the store or delete it.
+
+### Redirects in the app (after launch, part 411)
+
+Settings in the app has a "Web addresses" section with "Redirects": paste old links one per line with where each should go, see what wasn't added and why (those lines stay in the box to fix), search your redirects with their visit counts, and remove one.

@@ -2964,3 +2964,38 @@ test("a size chart typed one size per line in the app shows on the product page"
   // The list screen from before is still in the stack; the one on top is new.
   await expect(page.getByText("No size charts yet").last()).toBeVisible();
 });
+
+test("redirects added from the app send old links to the right page", async ({ page, browser }) => {
+  const id = `rd${Date.now()}`;
+  const { email } = await merchant(browser, id);
+  const store = `${WEB}/s/pocket-shop-${id}`;
+  await signIn(page, email);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("link", { name: /^Redirects/ }).click();
+  await expect(page.getByText("No redirects yet")).toBeVisible();
+
+  const box = page.getByRole("textbox", { name: "One per line: the old address, then where it goes" });
+  await box.fill("/pages/about-us /pages/contact\n/pages/faq /pages/faq\njust-one");
+  await page.getByRole("button", { name: "Add redirects" }).click();
+  await expect(page.getByText("Added 1 redirect.")).toBeVisible();
+  await expect(page.getByText(/A redirect can't point to itself\./)).toBeVisible();
+  await expect(page.getByText(/Needs two addresses: old, then new\./)).toBeVisible();
+  // What didn't work stays in the box to fix.
+  await expect(box).toHaveValue("/pages/faq /pages/faq\njust-one");
+  await expect(page.getByText("Goes to /pages/contact · 0 visits")).toBeVisible();
+
+  const buyer = await (await browser.newContext()).newPage();
+  await buyer.goto(`${store}/pages/about-us`);
+  await expect(buyer).toHaveURL(new RegExp(`${store}/pages/contact$`));
+  await page.getByRole("link", { name: "← Settings" }).click();
+  await page.getByRole("link", { name: /^Redirects/ }).click();
+  await expect(page.getByText("Goes to /pages/contact · 1 visit").last()).toBeVisible();
+  await shot(page, "411-app-redirects");
+
+  await page.getByRole("textbox", { name: "Search redirects" }).fill("nothing-like-it");
+  await expect(page.getByText("No redirects match")).toBeVisible();
+  await page.getByRole("textbox", { name: "Search redirects" }).fill("about");
+  await page.getByRole("button", { name: "Remove redirect from /pages/about-us" }).click();
+  await expect(page.getByText("Redirect removed.")).toBeVisible();
+  await expect(page.getByText("No redirects yet")).toBeVisible();
+});
