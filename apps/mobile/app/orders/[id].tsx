@@ -362,7 +362,9 @@ export default function OrderScreen() {
         </Card>
       </Section>
 
-      {o.staffNote || o.tags?.length ? (
+      {can("orders") ? (
+        <NotesSection key={`${o.staffNote ?? ""}|${(o.tags ?? []).join(",")}`} order={o} busy={busy} save={(body) => run("notes", `orders/${o.id}/notes`, body)} />
+      ) : o.staffNote || o.tags?.length ? (
         <Section title="Your note and tags">
           <Card>
             {o.tags?.length ? (
@@ -452,5 +454,26 @@ export default function OrderScreen() {
         ) : null}
       </Section>}
     </Screen>
+  );
+}
+
+/** The team's own note and tags on an order. Buyers never see them; the order list filters by the tags. */
+function NotesSection({ order: o, busy, save }: { order: Detail; busy: string | null; save: (body: { note: string; tags: string }) => Promise<void> }) {
+  const [noteText, setNoteText] = useState(o.staffNote ?? "");
+  const [tags, setTags] = useState((o.tags ?? []).join(", "));
+  const changed = noteText !== (o.staffNote ?? "") || tags !== (o.tags ?? []).join(", ");
+  return (
+    <Section title="Your note and tags">
+      <Card>
+        {o.tags?.length ? (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space(1) }}>
+            {o.tags.map((t) => <Pill key={t} label={t} />)}
+          </View>
+        ) : null}
+        <Field label="Tags" value={tags} onChangeText={setTags} placeholder="follow up, priority" autoCapitalize="none" hint="Separate with commas. Filter the order list by them." />
+        <Field label="Note" value={noteText} onChangeText={setNoteText} multiline hint="Only your team sees it." />
+        <Button label="Save note and tags" busy={busy === "notes"} disabled={!!busy || !changed} onPress={() => void save({ note: noteText, tags })} />
+      </Card>
+    </Section>
   );
 }
