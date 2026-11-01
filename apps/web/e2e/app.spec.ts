@@ -4418,3 +4418,18 @@ test("deals of the day planned from the app", async ({ page, browser }) => {
   await buyer.goto(`${urls["Walnut Spoon"]!.split("/products/")[0]}/deal`);
   await expect(buyer.getByRole("heading", { level: 1 })).toHaveText(/Walnut Spoon/);
 });
+
+test("who sees the lowest earlier price, set from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `lp${Date.now()}`);
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Sales", exact: true }).click();
+  const lowest = page.getByRole("region", { name: "Lowest earlier price" });
+  await expect(lowest.getByRole("button", { name: "Show it to Visitors in Europe, picked" })).toBeVisible();
+  await lowest.getByRole("button", { name: "Show it to Everyone", exact: true }).click();
+  await expect(page.getByText("Saved. Product pages follow it now.")).toBeVisible();
+  await expect(lowest.getByRole("button", { name: "Show it to Everyone, picked" })).toBeVisible();
+  await shot(page, "449-app-lowest-price");
+
+  await web.goto(`${WEB}/admin/sales`);
+  await expect(web.getByRole("radio", { name: /^Everyone/ })).toBeChecked();
+});

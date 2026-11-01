@@ -7,6 +7,12 @@ import { space, type Tone } from "../../src/theme";
 
 type Sale = { id: string; title: string; percentOff: number; status: "scheduled" | "running" | "ended"; covers: string; startsAt: string; endsAt: string | null; countdown: boolean };
 
+const LOWEST = [
+  ["eu", "Visitors in Europe", "Where the law asks for it: the EU, the rest of the EEA, the UK and Switzerland."],
+  ["everyone", "Everyone", "Honest pricing builds trust anywhere."],
+  ["off", "Nobody", "Only if you don't sell to Europe."],
+] as const;
+
 const STATUS: Record<Sale["status"], { label: string; tone: Tone }> = {
   running: { label: "On now", tone: "success" },
   scheduled: { label: "Coming", tone: "info" },
@@ -15,7 +21,7 @@ const STATUS: Record<Sale["status"], { label: string; tone: Tone }> = {
 
 /** Sales: start one on everything from the phone, keep it on longer, or end it. */
 export default function SalesScreen() {
-  const list = useApi<{ sales: Sale[] }>("sales");
+  const list = useApi<{ sales: Sale[]; lowestPriceNote?: string }>("sales");
   const [title, setTitle] = useState("");
   const [percent, setPercent] = useState("");
   const [days, setDays] = useState("3");
@@ -23,10 +29,10 @@ export default function SalesScreen() {
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{ tone: Tone; text: string } | null>(null);
 
-  async function run(key: string, path: string, payload: unknown, label: string) {
+  async function run(key: string, path: string, payload: unknown, label: string, method: "POST" | "PUT" = "POST") {
     setBusy(key);
     try {
-      const r = await send<{ message: string }>(path, "POST", payload, label);
+      const r = await send<{ message: string }>(path, method, payload, label);
       setNote({ tone: "success", text: r === "queued" ? "Saved. It's sent when you're back online." : r.message });
       list.reload();
       return true;
@@ -110,6 +116,26 @@ export default function SalesScreen() {
           ))}
         </Section>
       )}
+      {list.data?.lowestPriceNote ? (
+        <Section title="Lowest earlier price">
+          <Body muted>In the EU, a reduced price has to show the lowest price of the 30 days before the discount. Your store works it out and shows it under crossed-out prices.</Body>
+          <List>
+            {LOWEST.map(([value, label, hint]) => (
+              <Row
+                key={value}
+                title={label}
+                subtitle={hint}
+                a11y={`Show it to ${label}${list.data!.lowestPriceNote === value ? ", picked" : ""}`}
+                right={list.data!.lowestPriceNote === value ? "✓" : undefined}
+                onPress={() => {
+                  if (busy || list.data!.lowestPriceNote === value) return;
+                  void run("lowest", "sales/lowest-price", { note: value }, "Lowest earlier price", "PUT");
+                }}
+              />
+            ))}
+          </List>
+        </Section>
+      ) : null}
     </Screen>
   );
 }

@@ -2272,3 +2272,7 @@ A pickup or local delivery with a day has "Move to another day…" on its screen
 ### Deal of the day in the app (after launch, part 448)
 
 The app's Sales screen has "Deal of the day". It shows the link to share and the deals already planned. To plan more, pick the first day and the price cut, then tap products in the order they run, one a day.
+
+### Lowest earlier price in the app (after launch, part 449)
+
+The app's Sales screen ends with "Lowest earlier price": pick whether visitors in Europe, everyone or nobody see the lowest price of the 30 days before a discount, the same setting as on the website.
