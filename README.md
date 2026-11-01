@@ -2064,3 +2064,7 @@ An imported product's screen in the app has a Backup supplier section. Paste a s
 ### Store look in the app (after launch, part 396)
 
 Settings in the app has a Store look row. When the theme draft (designed on the website) has changes, publish it now or schedule it to go live by itself and, optionally, switch back (a Black Friday look from Friday to Monday night). A scheduled look can be cancelled, and a live one kept instead of switching back. With this, every line of the holiday checklist opens a screen in the app.
+
+### Search fixes in the app (after launch, part 397)
+
+The Products tab in the app has a Search fixes row. It lists the searches from the last 30 days that found nothing, with how many times each was searched; tapping one fills it in, so it can be pointed at words that find what the shopper meant ("lampshade" shows the results for "lamp shade"). Fixes can be removed there too, and a fixed search leaves the list until the fix is removed.

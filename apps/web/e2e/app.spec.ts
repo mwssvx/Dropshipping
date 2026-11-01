@@ -2420,3 +2420,44 @@ test("a new store look scheduled, cancelled and published from the app", async (
   await expect(page.getByText("Published. Buyers see the new look now.")).toBeVisible();
   await expect(page.getByRole("region", { name: "Your draft" })).toContainText("The store shows your latest look.");
 });
+
+test("a search that found nothing fixed from the app", async ({ page, browser }) => {
+  const id = `sf${Date.now()}`;
+  const { web, email } = await merchant(browser, id);
+  const buyer = await (await browser.newContext()).newPage();
+  for (const q of ["lampshade", "lampshade", "glow thing"]) {
+    await buyer.goto(`${WEB}/s/pocket-shop-${id}/search?q=${encodeURIComponent(q)}`);
+    await expect(buyer.getByRole("heading", { level: 1 })).toBeVisible();
+  }
+
+  await signIn(page, email);
+  await page.goto("/products");
+  await page.getByRole("link", { name: /^Search fixes/ }).click();
+  const nothing = page.getByRole("region", { name: "Found nothing" });
+  await expect(async () => {
+    await page.reload();
+    await expect(nothing.getByRole("button", { name: "Fix “lampshade”, 2 searches" })).toBeVisible({ timeout: 1000 });
+  }).toPass();
+  await expect(nothing.getByRole("button", { name: "Fix “glow thing”, 1 search" })).toBeVisible();
+  await nothing.getByRole("button", { name: "Fix “lampshade”, 2 searches" }).click();
+  await expect(page.getByRole("textbox", { name: "When shoppers search for" })).toHaveValue("lampshade");
+  await page.getByRole("textbox", { name: "Show the results for" }).fill("lampshade");
+  await page.getByRole("button", { name: "Save fix" }).click();
+  await expect(page.getByText("Pick different words to show results for.")).toBeVisible();
+  await page.getByRole("textbox", { name: "Show the results for" }).fill("Lamp Shade");
+  await page.getByRole("button", { name: "Save fix" }).click();
+  await expect(page.getByText("Saved. Searching “lampshade” now shows the results for “lamp shade”.")).toBeVisible();
+  const fixes = page.getByRole("region", { name: "Your search fixes" });
+  await expect(fixes).toContainText("“lampshade” shows the results for “lamp shade”");
+  // A fixed search leaves the list of ones that found nothing.
+  await expect(nothing.getByRole("button", { name: /^Fix “lampshade”/ })).toHaveCount(0);
+  await shot(page, "397-app-search-fixes");
+
+  await web.goto(`${WEB}/admin/search-fixes`);
+  await expect(web.getByRole("region", { name: "Your search fixes" })).toContainText("lampshade shows results for lamp shade");
+
+  await fixes.getByRole("button", { name: "Remove the fix for “lampshade”" }).click();
+  await expect(page.getByText("Removed. Searching “lampshade” shows its own results again.")).toBeVisible();
+  await expect(fixes).toContainText("No fixes yet");
+  await expect(nothing.getByRole("button", { name: "Fix “lampshade”, 2 searches" })).toBeVisible();
+});

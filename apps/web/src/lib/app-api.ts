@@ -56,6 +56,11 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  searchReport,
+  setSearchFix,
+  removeSearchFix,
+  SEARCH_TERM_MAX,
+  MAX_SEARCH_FIXES,
   keepScheduledTheme,
   cancelThemeSchedule,
   scheduleTheme,
@@ -1546,6 +1551,37 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, "Kept the store's scheduled look instead of switching back, in the app", { href: "/admin/theme" });
     return { ok: true, message: "Kept. This look stays until you change it." };
   },
+  // Search fixes: words shoppers searched for that found nothing, pointed at words that do. The
+  // last 30 days' searches that found nothing are listed so one can be fixed with a tap.
+  "GET search-fixes": async ({ db, shop }) => {
+    const now = new Date();
+    const to = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) + 86_400_000;
+    const report = await searchReport(db, shop.id, { from: new Date(to - 30 * 86_400_000), to: new Date(to) });
+    const fixed = new Set(shop.searchFixes.map((f) => f.from));
+    return {
+      fixes: shop.searchFixes,
+      nothing: report.nothing.filter((t) => !fixed.has(t.term)).map((t) => ({ term: t.term, searches: t.searches })),
+      max: SEARCH_TERM_MAX,
+      maxFixes: MAX_SEARCH_FIXES,
+    };
+  },
+  "PUT search-fixes": async ({ req, db, shop, user }) => {
+    const b = await body<{ from?: unknown; to?: unknown }>(req);
+    const fixes = await setSearchFix(db, shop.id, { from: str(b.from), to: str(b.to) });
+    const from = str(b.from).toLowerCase().replace(/\s+/g, " ").trim();
+    const fix = fixes.find((f) => f.from === from);
+    await logged({ shop, user, db }, `Pointed searches for “${from}” at “${fix?.to ?? ""}” in the app`, { href: "/admin/search-fixes" });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: `Saved. Searching “${from}” now shows the results for “${fix?.to ?? ""}”.` };
+  },
+  "DELETE search-fixes/:from": async ({ params, db, shop, user }) => {
+    const from = params.from!;
+    if (!shop.searchFixes.some((f) => f.from === from)) throw new UserError("That search fix is already gone.");
+    await removeSearchFix(db, shop.id, from);
+    await logged({ shop, user, db }, `Removed the search fix for “${from}” in the app`, { href: "/admin/search-fixes" });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: `Removed. Searching “${from}” shows its own results again.` };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -2312,6 +2348,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("collections")) return "collections";
   if (path.startsWith("restock") || path.startsWith("stock-count")) return "products";
   if (path.startsWith("price-changes")) return "products";
+  if (path.startsWith("search-fixes")) return "products";
   if (path.startsWith("suppliers")) return "suppliers";
   if (path.startsWith("cart-links")) return "marketing";
   if (path.startsWith("wholesale")) return "wholesale";
