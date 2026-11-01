@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  productSwatches,
+  setSwatches,
   setQuantityBreaks,
   BADGE_MAX_LENGTH,
   setComingSoon,
@@ -612,6 +614,8 @@ const productView = (p: ProductRow) => ({
   comingSoon: p.comingSoon,
   /** Buy this many or more, save this percent on each. */
   quantityBreaks: p.quantityBreaks,
+  /** The colour option's values and the dot each shows as, when it has one. */
+  swatches: p.giftCard ? null : productSwatches(p),
 });
 
 const customerView = (p: Awaited<ReturnType<typeof getCustomerProfile>>) => ({
@@ -3315,6 +3319,15 @@ const routes: Record<string, Handler> = {
     revalidatePath(`/admin/products/${params.id}`);
     revalidatePath(`/s/${shop.handle}`, "layout");
     return { ok: true, message: tiers.length ? "Quantity discounts saved." : "Saved. No quantity discounts on this product." };
+  },
+  "PUT products/:id/swatches": async ({ req, params, db, shop }) => {
+    const b = await body<{ colors?: unknown }>(req);
+    const colors = b.colors && typeof b.colors === "object" ? Object.fromEntries(Object.entries(b.colors as Record<string, unknown>).map(([k, v]) => [k, str(v)])) : {};
+    await setSwatches(db, shop.id, params.id!, colors);
+    revalidatePath(`/admin/products/${params.id}`);
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    const sw = productSwatches(await getProduct(db, shop.id, params.id!));
+    return { ok: true, message: `Saved. Buyers see these dots when they pick a ${(sw?.option ?? "colour").toLowerCase()}.` };
   },
   "POST products/:id/listing": async ({ params, shop }) => {
     const run = await writeListing(await agents(), shop, params.id!);

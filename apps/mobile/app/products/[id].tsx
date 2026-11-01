@@ -241,6 +241,7 @@ export default function ProductScreen() {
       {p.giftCard ? null : <PersonalizationSection product={p} busy={busy} act={act} />}
       {p.giftCard ? null : <DetailsSection product={p} busy={busy} act={act} />}
       {p.giftCard ? null : <UnitPriceSection product={p} busy={busy} act={act} />}
+      {p.swatches && p.swatches.values.length > 1 ? <SwatchesSection product={p} busy={busy} act={act} /> : null}
       {p.status === "draft" ? <LaunchSection product={p} busy={busy} act={act} /> : null}
       <BadgeSection product={p} busy={busy} act={act} />
       <TagsSection product={p} busy={busy} act={act} />
@@ -597,6 +598,47 @@ function BreaksSection({ product: p, busy, act }: { product: Product; busy: stri
           disabled={!!busy || edit === null}
           onPress={() => act("breaks", async () => (await api<{ message: string }>(`products/${p.id}/quantity-breaks`, { method: "PUT", body: { tiers: rows } })).message)}
         />
+      </Card>
+    </Section>
+  );
+}
+
+/** A colour dot for each value of the colour option. Names like "Navy" fill themselves in; the rest are typed as #rrggbb. */
+function SwatchesSection({ product: p, busy, act }: { product: Product; busy: string | null; act: Act }) {
+  const sw = p.swatches!;
+  const saved = Object.fromEntries(sw.values.map((v) => [v.value, v.picked ? (v.color ?? "") : ""]));
+  const [edit, setEdit] = useState<Record<string, string> | null>(null);
+  const colors = edit ?? saved;
+  useEffect(() => setEdit(null), [p]);
+  const lower = sw.option.toLowerCase();
+  return (
+    <Section title={`${sw.option} dots`}>
+      <Card>
+        <Body muted>{`Each ${lower} shows as a dot of that colour on the product page. Common names like Navy or Olive fill themselves in; type the rest like #191970.`}</Body>
+        {sw.values.map((v) => {
+          const typed = (colors[v.value] ?? "").trim().toLowerCase();
+          const shown = /^#[0-9a-f]{6}$/.test(typed) ? typed : typed ? null : v.named;
+          return (
+            <View key={v.value} style={{ flexDirection: "row", gap: space(3), alignItems: "center" }}>
+              <View
+                role="img"
+                aria-label={shown ? `${v.value} dot ${shown}` : `${v.value} has no dot`}
+                style={{ width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: color.border, backgroundColor: shown ?? "transparent" }}
+              />
+              <View style={{ flex: 1 }}>
+                <Field
+                  label={`${sw.option} ${v.value}`}
+                  value={colors[v.value] ?? ""}
+                  onChangeText={(t) => setEdit({ ...colors, [v.value]: t })}
+                  autoCapitalize="none"
+                  placeholder={v.named ?? "#cccccc"}
+                  hint={v.named ? `Empty uses its name's colour, ${v.named}.` : "Empty shows it as words only."}
+                />
+              </View>
+            </View>
+          );
+        })}
+        <Button label="Save colours" busy={busy === "swatches"} disabled={!!busy || edit === null} onPress={() => act("swatches", async () => (await api<{ message: string }>(`products/${p.id}/swatches`, { method: "PUT", body: { colors } })).message)} />
       </Card>
     </Section>
   );

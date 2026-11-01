@@ -4089,3 +4089,40 @@ test("where a product ships from, from the app", async ({ page, browser }) => {
   await web.reload();
   await expect(web.locator("#ships-from")).toHaveCount(0);
 });
+
+test("colour dots for a product, from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `sw${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Linen Tee");
+  await web.getByLabel("Price", { exact: true }).fill("25.00");
+  await web.getByRole("button", { name: "Add options like size or colour" }).click();
+  await web.getByLabel("Option 1", { exact: true }).fill("Color");
+  await web.getByLabel("Option 1 values, separated by commas").fill("Navy, Sage, Midnight");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const productUrl = web.url();
+  const store = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Linen Tee/ }).click();
+  const dots = page.getByRole("region", { name: "Color dots" });
+  // Navy fills itself in from its name; Midnight has no dot yet.
+  await expect(dots.getByRole("img", { name: "Navy dot #1f2a4d" })).toBeVisible();
+  await expect(dots.getByRole("img", { name: "Midnight has no dot" })).toBeVisible();
+  await dots.getByRole("textbox", { name: "Color Midnight" }).fill("dark blue");
+  await dots.getByRole("button", { name: "Save colours" }).click();
+  await expect(page.getByText("Pick a colour for Midnight.")).toBeVisible();
+  await dots.getByRole("textbox", { name: "Color Midnight" }).fill("#191970");
+  await expect(dots.getByRole("img", { name: "Midnight dot #191970" })).toBeVisible();
+  await dots.getByRole("button", { name: "Save colours" }).click();
+  await expect(page.getByText("Saved. Buyers see these dots when they pick a color.")).toBeVisible();
+  await shot(page, "441-app-swatches");
+
+  await web.goto(productUrl);
+  await expect(web.getByRole("region", { name: "Color dots" }).getByLabel("Color Midnight")).toHaveValue("#191970");
+  await web.goto(store);
+  const color = web.getByRole("group", { name: /^Color:/ });
+  await expect(color.locator("[data-swatch]")).toHaveCount(3);
+  await expect(color.locator('[data-swatch="#191970"]')).toHaveCount(1);
+});

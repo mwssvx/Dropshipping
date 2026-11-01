@@ -2240,3 +2240,7 @@ A product's screen in the app has "Quantity discounts": up to three steps like "
 ### Ships from, in the app (after launch, part 440)
 
 A product's Customs section in the app has "Ships from (country code)", for a supplier warehouse abroad. Product pages then say "Ships from China" and duty notes follow it. The store's own country is the same as leaving it empty.
+
+### Colour dots in the app (after launch, part 441)
+
+A product with a colour option has "Color dots" on its screen in the app: names like Navy fill themselves in, and the rest are typed like #191970, with a dot showing each colour before you save.
