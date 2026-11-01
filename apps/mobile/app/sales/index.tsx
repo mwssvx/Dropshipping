@@ -5,7 +5,17 @@ import { when } from "../../src/format";
 import { BackLink, Banner, Body, Button, Card, EmptyState, Field, Heading, List, LoadError, Loading, Pill, Row, Screen, Section, Segmented, Toggle } from "../../src/ui";
 import { space, type Tone } from "../../src/theme";
 
-type Sale = { id: string; title: string; percentOff: number; status: "scheduled" | "running" | "ended"; covers: string; startsAt: string; endsAt: string | null; countdown: boolean };
+type Sale = {
+  id: string;
+  title: string;
+  percentOff: number;
+  status: "scheduled" | "running" | "ended";
+  covers: string;
+  startsAt: string;
+  endsAt: string | null;
+  countdown: boolean;
+  result?: { text: string; vs: string | null; tone: Tone } | null;
+};
 
 const LOWEST = [
   ["eu", "Visitors in Europe", "Where the law asks for it: the EU, the rest of the EEA, the UK and Switzerland."],
@@ -104,6 +114,12 @@ export default function SalesScreen() {
                 {x.endsAt ? ` · ${x.status === "ended" ? "ended" : "ends"} ${when(x.endsAt)}` : " · until you end it"}
                 {x.countdown && x.status !== "ended" ? " · with a countdown" : ""}
               </Body>
+              {x.result ? (
+                <View accessible aria-label={`Results of ${x.title}: ${x.result.text}${x.result.vs ? `, ${x.result.vs}` : ""}`} style={{ flexDirection: "row", gap: space(2), flexWrap: "wrap", alignItems: "center" }}>
+                  <Body>{x.result.text}</Body>
+                  {x.result.vs ? <Pill label={x.result.vs} tone={x.result.tone} /> : null}
+                </View>
+              ) : null}
               {x.status !== "ended" ? (
                 <View style={{ flexDirection: "row", gap: space(2), flexWrap: "wrap" }}>
                   {x.endsAt ? (

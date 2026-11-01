@@ -2276,3 +2276,7 @@ The app's Sales screen has "Deal of the day". It shows the link to share and the
 ### Lowest earlier price in the app (after launch, part 449)
 
 The app's Sales screen ends with "Lowest earlier price": pick whether visitors in Europe, everyone or nobody see the lowest price of the 30 days before a discount, the same setting as on the website.
+
+### How a sale did, in the app (after launch, part 450)
+
+Each sale that has started shows its results on the app's Sales screen: orders, items sold on sale and what they brought in, and how that compares with the same number of days just before it.

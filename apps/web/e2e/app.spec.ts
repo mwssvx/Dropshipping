@@ -4433,3 +4433,29 @@ test("who sees the lowest earlier price, set from the app", async ({ page, brows
   await web.goto(`${WEB}/admin/sales`);
   await expect(web.getByRole("radio", { name: /^Everyone/ })).toBeChecked();
 });
+
+test("how a sale did, in the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `sr${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Pine Crate");
+  await web.getByLabel("Price", { exact: true }).fill("20.00");
+  await web.getByLabel("Stock", { exact: true }).fill("6");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const crate = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Sales", exact: true }).click();
+  await page.getByRole("textbox", { name: "Sale name" }).fill("Crate days");
+  await page.getByRole("textbox", { name: "Percent off everything" }).fill("25");
+  await page.getByRole("button", { name: "Start the sale" }).click();
+  await expect(page.getByText(/^Crate days is on/)).toBeVisible();
+  await expect(page.getByText("1 day so far: 0 orders, 0 items on sale, $0.00")).toBeVisible();
+
+  await buy(browser, crate);
+  await page.reload();
+  await expect(page.getByText("1 day so far: 1 order, 1 item on sale, $15.00")).toBeVisible();
+  await shot(page, "450-app-sale-results");
+  await web.goto(`${WEB}/admin/sales`);
+  await expect(web.getByLabel("Results of Crate days")).toContainText("1 day so far: 1 order, 1 item on sale, $15.00");
+});
