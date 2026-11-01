@@ -2172,3 +2172,7 @@ Settings in the app has "API keys and webhooks" for store owners: see each key a
 ### Win-back and birthday codes in the app (after launch, part 423)
 
 Discount codes in the app links to "Win-back and birthday codes": turn on the code that goes to subscribers who haven't ordered in 30 to 180 days, and the one on their birthday, with the percent off and how long each lasts, and see how many were sent, used and what they sold.
+
+### After the order in the app (after launch, part 424)
+
+Settings in the app has "After the order" under Checkout extras: write the thank-you note buyers see after paying, offer one more product for less right after checkout, and let buyers subscribe to their order for a discount, with what each one has brought in.

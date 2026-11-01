@@ -182,6 +182,7 @@ export default function Settings() {
         <Section title="Checkout extras">
           <List>
             <Row href="/addons" title="Add-ons, free gift and tips" subtitle="One more product at checkout, a gift over an amount, and tips for you" />
+            <Row href="/after-order" title="After the order" subtitle="A thank-you note, one more product for less, and subscribe and save" />
           </List>
         </Section>
       ) : null}
