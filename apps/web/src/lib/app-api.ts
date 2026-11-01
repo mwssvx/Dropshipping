@@ -3738,24 +3738,40 @@ const routes: Record<string, Handler> = {
     return { ok: true, lowestPriceNote: saved, message: "Saved. Product pages follow it now." };
   },
   "POST sales": async ({ req, db, shop, user }) => {
-    const b = await body<{ title?: unknown; percentOff?: unknown; days?: unknown; countdown?: unknown }>(req);
-    // From the phone: everything, starting now, for a few days or until it's ended. Collections,
-    // chosen products and a later start are on the website.
+    const b = await body<{ title?: unknown; percentOff?: unknown; days?: unknown; countdown?: unknown; startsAt?: unknown }>(req);
+    // From the phone: everything, now or from a time picked on the phone's clock, for a few days or
+    // until it's ended. Collections and chosen products are on the website.
     const days = typeof b.days === "number" && (SALE_EXTEND_DAYS as readonly number[]).includes(b.days) ? b.days : null;
     const now = new Date();
+    let startsAt = now;
+    if (typeof b.startsAt === "string" && b.startsAt) {
+      startsAt = new Date(b.startsAt);
+      if (Number.isNaN(startsAt.getTime())) throw new UserError("Pick when the sale starts.");
+      if (startsAt.getTime() < now.getTime() - 60_000) throw new UserError("Pick a start time that hasn't passed, or start it now.");
+      if (startsAt < now) startsAt = now;
+    }
     const sale = await createSale(db, shop.id, {
       title: str(b.title),
       percentOff: typeof b.percentOff === "number" ? b.percentOff : Number.NaN,
       scope: "all",
-      startsAt: now,
-      endsAt: days ? new Date(now.getTime() + days * 86_400_000) : null,
+      startsAt,
+      endsAt: days ? new Date(startsAt.getTime() + days * 86_400_000) : null,
       countdown: b.countdown === true && !!days,
     });
-    await sendPriceDrops(await stock(), { shopId: shop.id });
+    const started = sale.startsAt <= new Date();
+    // Buyers who saved a product hear about it when the sale starts now; a later one sends them when it starts.
+    if (started) await sendPriceDrops(await stock(), { shopId: shop.id });
+    revalidatePath("/admin/sales");
     revalidatePath(`/s/${shop.handle}`, "layout");
+    const length = sale.endsAt ? `, for ${days} ${days === 1 ? "day" : "days"}` : " until you end it";
+    if (!started) {
+      await logged({ shop, user, db }, `Scheduled the sale ${sale.title} (${sale.percentOff}% off everything) in the app`, { href: "/admin/sales" });
+      return { ok: true, message: `${sale.title} is scheduled: ${sale.percentOff}% off everything${length}. It starts by itself.` };
+    }
     await logged({ shop, user, db }, `Started the sale ${sale.title} (${sale.percentOff}% off everything) in the app`, { href: "/admin/sales" });
-    return { ok: true, message: `${sale.title} is on: ${sale.percentOff}% off everything${sale.endsAt ? `, for ${days} ${days === 1 ? "day" : "days"}` : " until you end it"}.` };
+    return { ok: true, message: `${sale.title} is on: ${sale.percentOff}% off everything${length}.` };
   },
+
   "POST sales/:id": async ({ req, params, db, shop, user }) => {
     const b = await body<{ action?: unknown; days?: unknown }>(req);
     const sale = (await listSales(db, shop.id)).find((x) => x.id === params.id);

@@ -2280,3 +2280,7 @@ The app's Sales screen ends with "Lowest earlier price": pick whether visitors i
 ### How a sale did, in the app (after launch, part 450)
 
 Each sale that has started shows its results on the app's Sales screen: orders, items sold on sale and what they brought in, and how that compares with the same number of days just before it.
+
+### Schedule a sale from the app (after launch, part 451)
+
+The app's "Start a sale" form has Starts: Now or Later. Pick a day and time on your phone's clock, and the sale starts and ends by itself.
