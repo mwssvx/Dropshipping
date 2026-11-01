@@ -2461,3 +2461,57 @@ test("a search that found nothing fixed from the app", async ({ page, browser })
   await expect(fixes).toContainText("No fixes yet");
   await expect(nothing.getByRole("button", { name: "Fix “lampshade”, 2 searches" })).toBeVisible();
 });
+
+test("a blog post written, published, scheduled and deleted from the app", async ({ page, browser }) => {
+  const id = `bl${Date.now()}`;
+  const { email } = await merchant(browser, id);
+  const buyer = await (await browser.newContext()).newPage();
+  const title = "Five ways to light a small room";
+
+  await signIn(page, email);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("link", { name: /^Blog posts/ }).click();
+  await expect(page.getByText("No posts yet")).toBeVisible();
+  await page.getByRole("textbox", { name: "Title" }).fill(title);
+  await page.getByRole("button", { name: "Start a post" }).click();
+  await expect(page).toHaveURL(/\/blog\/[0-9a-f-]{36}$/);
+  await expect(page.getByText("Draft", { exact: true })).toBeVisible();
+
+  const post = page.getByRole("textbox", { name: "Post" });
+  await post.fill("Too short.");
+  await page.getByRole("button", { name: "Publish now" }).click();
+  await expect(page.getByText("Write a bit more before publishing: the post is nearly empty.")).toBeVisible();
+  await post.fill("A small room needs light from more than one place.\n\n## Start with a lamp\n\nA warm lamp in a corner makes the room feel bigger.\n- Pick warm bulbs\n- Keep the ceiling light off");
+  await page.getByRole("textbox", { name: "Topics (optional)" }).fill("Lighting, Small spaces");
+  // Publishing saves the writing first.
+  await page.getByRole("button", { name: "Publish now" }).click();
+  await expect(page.getByText("Published. The post is on your store's blog.")).toBeVisible();
+  await expect(page.getByText(/^Live since /)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Share the post" })).toBeVisible();
+  await shot(page, "398-app-blog");
+
+  await buyer.goto(`${WEB}/s/pocket-shop-${id}/blog`);
+  await buyer.getByRole("link", { name: title }).click();
+  await expect(buyer.getByRole("heading", { level: 1, name: title })).toBeVisible();
+  await expect(buyer.getByRole("heading", { name: "Start with a lamp" })).toBeVisible();
+  await expect(buyer.getByRole("listitem").filter({ hasText: "Pick warm bulbs" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Unpublish" }).click();
+  await expect(page.getByText("Unpublished. The post is a draft again and off your store.")).toBeVisible();
+  await buyer.goto(`${WEB}/s/pocket-shop-${id}/blog`);
+  await expect(buyer.getByText("Nothing here yet.")).toBeVisible();
+
+  const day = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10);
+  await page.getByRole("textbox", { name: "Publish on" }).fill(day);
+  await page.getByRole("button", { name: "Schedule" }).click();
+  await expect(page.getByText("Scheduled. The post goes up on your store by itself.")).toBeVisible();
+  await expect(page.getByText(/^Goes up /)).toBeVisible();
+  await page.goto("/blog");
+  await expect(page.getByRole("link", { name: new RegExp(`^${title}, Goes up `) })).toBeVisible();
+
+  await page.getByRole("link", { name: new RegExp(`^${title}`) }).click();
+  await page.getByRole("button", { name: "Delete this post…" }).click();
+  await page.getByRole("button", { name: "Delete this post" }).click();
+  await expect(page).toHaveURL(/\/blog$/);
+  await expect(page.getByText("No posts yet")).toBeVisible();
+});
