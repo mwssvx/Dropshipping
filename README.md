@@ -2084,3 +2084,7 @@ Settings in the app has a Pages row under Blog and pages. It lists the store's p
 ### Searches on the app's Analytics screen (after launch, part 401)
 
 The app's Analytics screen now shows what shoppers search for in the chosen days: how many searches and how many found nothing, the most searched words with their results, and the ones that found nothing. Tapping one of those opens Search fixes with it filled in.
+
+### Buyers who come back, in the app (after launch, part 402)
+
+The app's Analytics screen shows, for each of the last six months, how many first-time buyers the store had and how many ordered again within 90 days ("so far" while the 90 days aren't up), with the share over the months that are complete and how long buyers took to come back on average.

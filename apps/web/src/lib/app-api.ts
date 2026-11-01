@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  repeatBuyers,
+  COME_BACK_DAYS,
   createPage,
   updatePage,
   deletePage,
@@ -678,11 +680,12 @@ const routes: Record<string, Handler> = {
     const to = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) + 86_400_000;
     const range = { from: new Date(to - days * 86_400_000), to: new Date(to) };
     const zone = shop.shipCutoff?.timeZone ?? defaultCutoffZone(shop.country);
-    const [r, before, when, searches] = await Promise.all([
+    const [r, before, when, searches, repeat] = await Promise.all([
       analyticsReport(db, shop.id, range),
       periodTotals(db, shop.id, comparisonRange(range, compare), now),
       whenBuyersBuy(db, shop.id, range, CUTOFF_TIME_ZONES.some(([z]) => z === zone) ? zone : "UTC"),
       searchReport(db, shop.id, range, 5),
+      repeatBuyers(db, shop.id, { now }),
     ]);
     return {
       days,
@@ -696,6 +699,8 @@ const routes: Record<string, Handler> = {
       sources: r.sources.slice(0, 5),
       busiest: when.busiest,
       // What shoppers typed into the store's search box; only the words are kept, never who searched.
+      // First-time buyers each month and how many ordered again within 90 days.
+      repeat: { months: repeat.months, share: repeat.share, averageDays: repeat.averageDays, days: COME_BACK_DAYS },
       searches: { total: searches.searches, nothingShare: searches.nothingShare, top: searches.top, nothing: searches.nothing.map((t) => ({ term: t.term, searches: t.searches })) },
     };
   },
