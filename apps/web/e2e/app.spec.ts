@@ -4126,3 +4126,40 @@ test("colour dots for a product, from the app", async ({ page, browser }) => {
   await expect(color.locator("[data-swatch]")).toHaveCount(3);
   await expect(color.locator('[data-swatch="#191970"]')).toHaveCount(1);
 });
+
+test("who sends a product, picked from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `sb${Date.now()}`);
+  await web.goto(`${WEB}/admin/suppliers`);
+  await web.getByLabel("Supplier name").fill("Austin Woodworks");
+  await web.getByLabel("Orders go to").fill(`wood-${Date.now()}@example.com`);
+  await web.getByRole("button", { name: "Add supplier" }).click();
+  await expect(web.getByRole("status").filter({ hasText: "Supplier added" })).toBeVisible();
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Walnut Board");
+  await web.getByLabel("Price", { exact: true }).fill("60.00");
+  await web.getByLabel("Stock", { exact: true }).fill("5");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const productUrl = web.url();
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Walnut Board/ }).click();
+  const sent = page.getByRole("region", { name: "Who sends it" });
+  await expect(sent.getByRole("button", { name: "Sent by Me (I add tracking myself), picked" })).toBeVisible();
+  await expect(sent.getByRole("button", { name: "Save who sends it" })).toBeDisabled();
+  await sent.getByRole("button", { name: "Sent by Austin Woodworks" }).click();
+  await sent.getByRole("button", { name: "Save who sends it" }).click();
+  await expect(page.getByText("Saved. Paid orders for it are emailed to Austin Woodworks, with a link where they add tracking.")).toBeVisible();
+  await expect(sent.getByRole("button", { name: "Sent by Austin Woodworks, picked" })).toBeVisible();
+  await shot(page, "442-app-sent-by");
+
+  await web.goto(productUrl);
+  await expect(web.locator("#supplierId").locator("option:checked")).toHaveText("Austin Woodworks");
+
+  await sent.getByRole("button", { name: "Sent by Me (I add tracking myself)" }).click();
+  await sent.getByRole("button", { name: "Save who sends it" }).click();
+  await expect(page.getByText("Saved. You send it and add the tracking yourself.")).toBeVisible();
+  await web.reload();
+  await expect(web.locator("#supplierId").locator("option:checked")).toHaveText("Me (I add tracking myself)");
+});

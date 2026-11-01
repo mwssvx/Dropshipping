@@ -5,7 +5,7 @@ import { Image, View } from "react-native";
 import { api, send, useApi } from "../../src/api";
 import { kg, money, parseKg, parseMoney } from "../../src/format";
 import { useCan, useSession } from "../../src/session";
-import { BackLink, Banner, Body, Button, Card, Field, Heading, LoadError, Loading, Pill, Screen, Section, Segmented, Toggle } from "../../src/ui";
+import { BackLink, Banner, Body, Button, Card, Field, Heading, List, LoadError, Loading, Pill, Row, Screen, Section, Segmented, Toggle } from "../../src/ui";
 import { color, radius, space } from "../../src/theme";
 import { STATUS, type Product } from "../../src/product";
 
@@ -246,6 +246,7 @@ export default function ProductScreen() {
       <BadgeSection product={p} busy={busy} act={act} />
       <TagsSection product={p} busy={busy} act={act} />
       <CollectionsSection product={p} busy={busy} act={act} />
+      {p.giftCard ? null : <SentBySection product={p} busy={busy} act={act} />}
       <BackupSection product={p} busy={busy} act={act} currency={cur} />
       <PreorderSection product={p} busy={busy} act={act} />
       <LimitsSection product={p} busy={busy} act={act} />
@@ -639,6 +640,48 @@ function SwatchesSection({ product: p, busy, act }: { product: Product; busy: st
           );
         })}
         <Button label="Save colours" busy={busy === "swatches"} disabled={!!busy || edit === null} onPress={() => act("swatches", async () => (await api<{ message: string }>(`products/${p.id}/swatches`, { method: "PUT", body: { colors } })).message)} />
+      </Card>
+    </Section>
+  );
+}
+
+type SentBy = { giftCard: boolean; api: string | null; current: string; own: { id: string; name: string }[] };
+
+/** Who sends this product: the supplier it came from, you, or one of your own suppliers by email. */
+function SentBySection({ product: p, busy, act }: { product: Product; busy: string | null; act: Act }) {
+  // Asked again whenever the product changes, so a save shows the new pick.
+  const data = useApi<SentBy>(`products/${p.id}/sent-by?v=${encodeURIComponent(p.updatedAt ?? "")}`);
+  const [pick, setPick] = useState<string | null>(null);
+  useEffect(() => setPick(null), [p]);
+  const d = data.data;
+  if (!d) return null;
+  const chosen = pick ?? d.current;
+  const choices: [string, string][] = [...(d.api ? [["api", d.api] as [string, string]] : []), ["", "Me (I add tracking myself)"], ...d.own.map((o) => [o.id, o.name] as [string, string])];
+  return (
+    <Section title="Who sends it">
+      <Card>
+        <Body muted>
+          {d.api
+            ? `Orders go to ${d.api} automatically. Pick one of your own suppliers to send it instead; that stops ${d.api} orders for this product.`
+            : d.own.length
+              ? "Paid orders for this product are emailed to the supplier you pick, with a link where they add tracking."
+              : "Add your own suppliers under Suppliers in Settings to have them send this product."}
+        </Body>
+        {d.own.length ? (
+          <>
+            <List>
+              {choices.map(([id, name]) => (
+                <Row key={id || "me"} title={name} a11y={`Sent by ${name}${chosen === id ? ", picked" : ""}`} onPress={() => setPick(id)} right={chosen === id ? <Pill label="Picked" tone="success" /> : null} />
+              ))}
+            </List>
+            <Button
+              label="Save who sends it"
+              busy={busy === "sentby"}
+              disabled={!!busy || pick === null || pick === d.current}
+              onPress={() => act("sentby", async () => (await api<{ message: string }>(`products/${p.id}/sent-by`, { method: "PUT", body: { supplierId: chosen } })).message)}
+            />
+          </>
+        ) : null}
       </Card>
     </Section>
   );
