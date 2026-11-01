@@ -2961,5 +2961,6 @@ test("a size chart typed one size per line in the app shows on the product page"
   await page.getByRole("link", { name: "Shirts, on the store" }).click();
   await page.getByRole("button", { name: "Delete this size chart…" }).click();
   await page.getByRole("button", { name: "Delete this size chart" }).click();
-  await expect(page.getByText("No size charts yet")).toBeVisible();
+  // The list screen from before is still in the stack; the one on top is new.
+  await expect(page.getByText("No size charts yet").last()).toBeVisible();
 });
