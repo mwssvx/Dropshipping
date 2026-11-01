@@ -56,6 +56,7 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  setLowestPriceNote,
   DAILY_DEALS_MIN,
   DAILY_DEALS_MAX,
   upcomingDailyDeals,
@@ -3707,7 +3708,17 @@ const routes: Record<string, Handler> = {
         endsAt: x.endsAt,
         countdown: x.countdown,
       })),
+      // Who sees the lowest price of the 30 days before a discount (the EU asks for it).
+      lowestPriceNote: shop.lowestPriceNote,
     };
+  },
+  "PUT sales/lowest-price": async ({ req, db, shop, user }) => {
+    const { note } = await body<{ note?: unknown }>(req);
+    const saved = await setLowestPriceNote(db, shop.id, str(note));
+    revalidatePath("/admin/sales");
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    await logged({ shop, user, db }, "Changed who sees the lowest earlier price in the app", { href: "/admin/sales" });
+    return { ok: true, lowestPriceNote: saved, message: "Saved. Product pages follow it now." };
   },
   "POST sales": async ({ req, db, shop, user }) => {
     const b = await body<{ title?: unknown; percentOff?: unknown; days?: unknown; countdown?: unknown }>(req);
