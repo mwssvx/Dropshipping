@@ -56,6 +56,11 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  keepScheduledTheme,
+  cancelThemeSchedule,
+  scheduleTheme,
+  publishTheme,
+  getTheme,
   syncProductStock,
   removeBackupSupplier,
   setBackupSupplier,
@@ -1513,6 +1518,34 @@ const routes: Record<string, Handler> = {
     revalidatePath(`/s/${shop.handle}`, "layout");
     return { ok: true, message: saved.enabled ? "Saved. Product pages, the cart and receipts say when orders arrive." : "Saved. Buyers don't see delivery dates." };
   },
+  // The store's look: the draft is designed on the website; here it's published now or scheduled.
+  "GET store-look": async ({ db, shop }) => {
+    const t = await getTheme(db, shop);
+    return { hasChanges: t.hasChanges, publishedAt: t.publishedAt, schedule: t.schedule, revertAt: t.revertAt };
+  },
+  "POST store-look/publish": async ({ db, shop, user }) => {
+    await publishTheme(db, shop);
+    await logged({ shop, user, db }, "Published changes to the store's look in the app", { href: "/admin/theme" });
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: "Published. Buyers see the new look now." };
+  },
+  "PUT store-look/schedule": async ({ req, db, shop, user }) => {
+    const b = await body<{ at?: unknown; until?: unknown }>(req);
+    const until = str(b.until).trim();
+    const saved = await scheduleTheme(db, shop, { at: new Date(str(b.at)), until: until ? new Date(until) : null });
+    await logged({ shop, user, db }, "Scheduled a new look for the store in the app", { href: "/admin/theme" });
+    return { ok: true, schedule: saved, message: saved.until ? "Scheduled. The new look goes live by itself and switches back when you said." : "Scheduled. The new look goes live by itself." };
+  },
+  "DELETE store-look/schedule": async ({ db, shop, user }) => {
+    await cancelThemeSchedule(db, shop.id);
+    await logged({ shop, user, db }, "Cancelled the store's scheduled look in the app", { href: "/admin/theme" });
+    return { ok: true, message: "Cancelled. The store keeps the look it has." };
+  },
+  "POST store-look/keep": async ({ db, shop, user }) => {
+    await keepScheduledTheme(db, shop.id);
+    await logged({ shop, user, db }, "Kept the store's scheduled look instead of switching back, in the app", { href: "/admin/theme" });
+    return { ok: true, message: "Kept. This look stays until you change it." };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -1555,6 +1588,7 @@ const routes: Record<string, Handler> = {
       "gift-guides": { path: "/collections", area: "collections" },
       "gift-wrap": { path: "/gift-wrap", area: "shipping" },
       delivery: { path: "/delivery-dates", area: "shipping" },
+      look: { path: "/store-look", area: "theme" },
       returns: { path: "/holiday-returns", area: "returns" },
       "gift-cards": { path: "/gift-cards", area: "gift_cards" },
       popup: { path: "/signup", area: "marketing" },
@@ -2289,6 +2323,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("bank-transfers")) return "orders";
   if (path.startsWith("checkouts")) return "orders";
   if (path.startsWith("store-status")) return "theme";
+  if (path.startsWith("store-look")) return "theme";
   if (path.startsWith("ship-pause")) return "shipping";
   if (path.startsWith("late-emails")) return "shipping";
   if (path.startsWith("holiday-date")) return "shipping";

@@ -106,6 +106,13 @@ export default function Settings() {
         </Section>
       ) : null}
       {can("theme") ? <StoreStatusCard /> : null}
+      {can("theme") ? (
+        <Section title="Look">
+          <List>
+            <Row href="/store-look" title="Store look" subtitle="Publish your new look now, or have it go live and switch back by itself" />
+          </List>
+        </Section>
+      ) : null}
       {can("shipping") ? (
         <Section title="Shipping">
           <List>

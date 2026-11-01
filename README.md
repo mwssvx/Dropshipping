@@ -2060,3 +2060,7 @@ Settings in the app has a Delivery dates row under Shipping. Turn the arrival da
 ### Backup suppliers in the app (after launch, part 395)
 
 An imported product's screen in the app has a Backup supplier section. Paste a second supplier's link to the same product and orders go there when the main supplier runs out; the section lists what each option costs there and what's in stock, and the backup can be removed. The holiday checklist's backup suppliers line opens the first best seller without one.
+
+### Store look in the app (after launch, part 396)
+
+Settings in the app has a Store look row. When the theme draft (designed on the website) has changes, publish it now or schedule it to go live by itself and, optionally, switch back (a Black Friday look from Friday to Monday night). A scheduled look can be cancelled, and a live one kept instead of switching back. With this, every line of the holiday checklist opens a screen in the app.

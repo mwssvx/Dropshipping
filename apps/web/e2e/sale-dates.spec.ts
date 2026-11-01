@@ -3,6 +3,10 @@ import { expect, test } from "@playwright/test";
 // Dates coming up: the Sales page lists the next shopping dates for the store's country (Black
 // Friday, Boxing Day...), fills in the sale form for one, and marks it planned once there's a sale.
 
+// The form reads its times in the browser's zone and the dates in the store's (New York for a US
+// store), so the merchant sits in New York: in UTC a date's last evening would end the sale at once.
+test.use({ timezoneId: "America/New_York" });
+
 test("a merchant plans a sale for a date coming up", async ({ page }, info) => {
   const id = `${info.project.name}-${Date.now()}`;
   await page.goto("/signup");
