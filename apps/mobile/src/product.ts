@@ -21,6 +21,12 @@ export type Product = {
   preordersSold?: number;
   /** The least and most a buyer can order. */
   purchaseLimit?: { min: number | null; max: number | null; perCustomer: number | null } | null;
+  giftCard?: boolean;
+  digital?: boolean;
+  processingDays?: number | null;
+  shippingSurchargeMinor?: number;
+  blockedCountries?: string[];
+  blockedCountryNames?: string[];
   /** Lowercase, for filters, collections that fill by tag, and codes for tagged products. */
   tags?: string[];
   /** On the product screen only: the tags the store's products use, most used first. */

@@ -233,6 +233,7 @@ export default function ProductScreen() {
       <BackupSection product={p} busy={busy} act={act} currency={cur} />
       <PreorderSection product={p} busy={busy} act={act} />
       <LimitsSection product={p} busy={busy} act={act} />
+      {p.giftCard ? null : <ShippingSection product={p} busy={busy} act={act} currency={cur} />}
 
       <Section title="On your store">
         {p.status === "active" ? (
@@ -273,6 +274,59 @@ function PreorderSection({ product: p, busy, act }: { product: Product; busy: st
           busy={busy === "preorder"}
           disabled={!!busy || !edit}
           onPress={() => act("preorder", async () => (await api<{ message: string }>(`products/${p.id}/preorder`, { method: "PUT", body: s })).message)}
+        />
+      </Card>
+    </Section>
+  );
+}
+
+/** Shipping for this product: extra days to get it ready, extra shipping for bulky things, and countries it can't go to. */
+function ShippingSection({ product: p, busy, act, currency }: { product: Product; busy: string | null; act: Act; currency: string }) {
+  const saved = {
+    processingDays: p.processingDays == null ? "" : String(p.processingDays),
+    surcharge: p.shippingSurchargeMinor ? (p.shippingSurchargeMinor / 100).toFixed(2) : "",
+    blockedCountries: (p.blockedCountries ?? []).join(", "),
+  };
+  const [edit, setEdit] = useState<typeof saved | null>(null);
+  const s = edit ?? saved;
+  useEffect(() => setEdit(null), [p]);
+  const parcel = !p.digital;
+  return (
+    <Section title="Shipping this product">
+      <Card>
+        {parcel ? (
+          <>
+            <Field
+              label="Days to get it ready"
+              value={s.processingDays}
+              onChangeText={(v) => setEdit({ ...s, processingDays: v })}
+              keyboardType="number-pad"
+              hint="For things made to order or engraved. Leave it empty to use your store's processing days. Delivery dates count it."
+            />
+            <Field
+              label={`Extra shipping for each one (${currency})`}
+              value={s.surcharge}
+              onChangeText={(v) => setEdit({ ...s, surcharge: v })}
+              keyboardType="decimal-pad"
+              placeholder="0.00"
+              hint="For bulky things like furniture or mirrors. Added to every shipping rate, even free ones. Leave it empty for none."
+            />
+          </>
+        ) : null}
+        <Field
+          label="Can't ship to (country codes)"
+          value={s.blockedCountries}
+          onChangeText={(v) => setEdit({ ...s, blockedCountries: v })}
+          autoCapitalize="none"
+          placeholder="AU, JP"
+          hint="Two letters each, with commas, for things like batteries or knives. Buyers there are told before they pay."
+        />
+        {p.blockedCountryNames?.length ? <Body>{`Doesn't ship to ${p.blockedCountryNames.join(", ")}.`}</Body> : null}
+        <Button
+          label="Save shipping"
+          busy={busy === "shipping"}
+          disabled={!!busy || !edit}
+          onPress={() => act("shipping", async () => (await api<{ message: string }>(`products/${p.id}/shipping`, { method: "PUT", body: s })).message)}
         />
       </Card>
     </Section>

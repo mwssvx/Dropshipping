@@ -2208,3 +2208,7 @@ The app's Returns screen links to "Return settings": how many days after deliver
 ### Order settings in the app (after launch, part 432)
 
 The Orders tab in the app has "Order settings": pick which risky orders wait for you before going to the supplier (high risk, medium and high, or never), and, for members who can refund, whether buyers can cancel their own order in the first 12 hours before it ships.
+
+### Shipping a product, in the app (after launch, part 433)
+
+A product's screen in the app has "Shipping this product": extra days to get it ready for things made to order, extra shipping for each one of a bulky thing, and the countries it can't be sent to, typed as two-letter codes. Nothing is saved when one of them is wrong.
