@@ -2671,3 +2671,31 @@ test("buyers who come back, on the app's Analytics screen", async ({ page, brows
   await expect(back).toContainText("1 came back · 100% so far");
   await shot(page, "402-app-repeat-buyers");
 });
+
+test("the store's own stock on the app's Inventory screen", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `iv${Date.now()}`);
+  let olive = "";
+  for (const [title, stock] of [["Olive Soap", "3"], ["Lavender Soap", "6"]]) {
+    await web.goto(`${WEB}/admin/products/new`);
+    await web.getByLabel("Title").fill(title!);
+    await web.getByLabel("Price", { exact: true }).fill("7.00");
+    await web.getByLabel("Stock", { exact: true }).fill(stock!);
+    await web.getByRole("button", { name: "Save product" }).click();
+    await expect(web.getByText("Product added.")).toBeVisible();
+    if (!olive) olive = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+  }
+  await buy(browser, olive);
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Inventory/ }).click();
+  await expect(page.getByText("In stock", { exact: true })).toBeVisible();
+  await expect(page.getByText("2 options have no cost, so the worth at cost leaves them out.", { exact: false })).toBeVisible();
+  const list = page.getByRole("region", { name: "Soonest to run out" });
+  // The one that sold comes first, with how long it lasts at that pace, marked when it runs low.
+  await expect(list.getByRole("link").first()).toHaveAccessibleName("Olive Soap, running low: 2 in stock · 1 sold in 30 days · lasts about 60 days");
+  await expect(list.getByRole("link", { name: "Lavender Soap: 6 in stock · 0 sold in 30 days" })).toBeVisible();
+  await shot(page, "403-app-inventory");
+  await list.getByRole("link", { name: /^Olive Soap/ }).click();
+  await expect(page).toHaveURL(/\/products\/[0-9a-f-]{36}$/);
+});

@@ -56,6 +56,7 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  inventoryReport,
   repeatBuyers,
   COME_BACK_DAYS,
   createPage,
@@ -1746,6 +1747,15 @@ const routes: Record<string, Handler> = {
     revalidatePath(`/s/${shop.handle}`, "layout");
     return { ok: true, message: `Deleted “${page.title}”.` };
   },
+  // The stock kept by the store itself: what it's worth, and how long each option lasts at the last
+  // 30 days' pace, the soonest to run out first. Products from a supplier follow its stock instead.
+  "GET inventory": async ({ db, shop }) => {
+    const { rows, totals } = await inventoryReport(db, shop);
+    return {
+      totals,
+      rows: rows.map((r) => ({ variantId: r.variantId, productId: r.productId, title: r.title, sku: r.sku, location: r.location, stock: r.stock, incoming: r.incoming, sold: r.sold, daysLeft: r.daysLeft, low: r.low, valueAtCostMinor: r.valueAtCostMinor })),
+    };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -2510,7 +2520,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("blocked")) return "customers";
   if (path.startsWith("tag-rules")) return "customers";
   if (path.startsWith("collections")) return "collections";
-  if (path.startsWith("restock") || path.startsWith("stock-count")) return "products";
+  if (path.startsWith("restock") || path.startsWith("stock-count") || path.startsWith("inventory")) return "products";
   if (path.startsWith("price-changes")) return "products";
   if (path.startsWith("search-fixes")) return "products";
   if (path.startsWith("blog")) return "pages";
