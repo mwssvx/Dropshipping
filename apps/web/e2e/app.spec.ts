@@ -2799,3 +2799,37 @@ test("checkout settings from the app: smallest order, phone number and delivery 
   await expect(web.getByLabel("Smallest order ($)")).toHaveValue("15.00");
   await expect(web.getByLabel("Buyers must enter one")).toBeChecked();
 });
+
+test("local pickup and local delivery turned on from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `lo${Date.now()}`);
+  await signIn(page, email);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("link", { name: /^Pickup and local delivery/ }).click();
+
+  const pickup = page.getByRole("region", { name: "Local pickup" });
+  await pickup.getByRole("switch", { name: "Offer local pickup" }).click();
+  await pickup.getByRole("button", { name: "Save pickup" }).click();
+  await expect(page.getByText("Enter the address buyers pick up from.")).toBeVisible();
+  await pickup.getByRole("textbox", { name: "Pickup address" }).fill("12 Main St, Austin, TX 78701");
+  await pickup.getByRole("textbox", { name: "How to collect (optional)" }).fill("Ring the bell at the side door.");
+  await pickup.getByRole("button", { name: "Save pickup" }).click();
+  await expect(page.getByText("Saved. Buyers can pick up their order at checkout.")).toBeVisible();
+
+  const delivery = page.getByRole("region", { name: "Local delivery" });
+  await delivery.getByRole("switch", { name: "Offer local delivery" }).click();
+  await delivery.getByRole("textbox", { name: "Postal codes you deliver to" }).fill("787, 78613");
+  await delivery.getByRole("textbox", { name: "Delivery price (USD)" }).fill("five");
+  await delivery.getByRole("button", { name: "Save local delivery" }).click();
+  await expect(page.getByText("Enter the delivery price as an amount, like 5.00.")).toBeVisible();
+  await delivery.getByRole("textbox", { name: "Delivery price (USD)" }).fill("5");
+  await delivery.getByRole("textbox", { name: "Free on orders over (USD, optional)" }).fill("50");
+  await delivery.getByRole("button", { name: "Save local delivery" }).click();
+  await expect(page.getByText("Saved. Buyers in 2 postal codes can have it delivered by you.")).toBeVisible();
+  await expect(page.getByRole("link", { name: /^Pickups and deliveries/ })).toBeVisible();
+  await shot(page, "407-app-local");
+
+  await web.goto(`${WEB}/admin/shipping`);
+  await expect(web.getByLabel("Pickup address")).toHaveValue("12 Main St, Austin, TX 78701");
+  await expect(web.getByLabel("Postal codes you deliver to")).toHaveValue("78613, 787");
+  await expect(web.getByLabel(/^Delivery price/)).toHaveValue("5.00");
+});

@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  setLocalDelivery,
+  setLocalPickup,
   setDeliveryProtection,
   setCheckoutPhone,
   setMinOrder,
@@ -1883,6 +1885,37 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, saved ? `Offered delivery protection at checkout for ${saved.percent}% of the order, in the app` : "Stopped offering delivery protection, in the app", { href: "/admin/shipping#protection-heading" });
     return { ok: true, message: saved ? "Saved. Buyers can protect their parcel at checkout." : "Saved. Checkout doesn't offer delivery protection." };
   },
+  // Local pickup (where and how buyers collect) and local delivery (the postal codes the store
+  // delivers to itself, its price, and the order amount it's free over).
+  "GET local": async ({ shop }) => ({ pickup: shop.localPickup, delivery: shop.localDeliveryArea }),
+  "PUT local/pickup": async ({ req, db, shop, user }) => {
+    const b = await body<{ on?: unknown; address?: unknown; instructions?: unknown }>(req);
+    const saved = await setLocalPickup(db, shop.id, b.on === true ? { address: str(b.address), instructions: str(b.instructions) } : null);
+    await logged({ shop, user, db }, saved ? "Offered local pickup at checkout, in the app" : "Stopped offering local pickup, in the app", { href: "/admin/shipping#pickup-heading" });
+    return { ok: true, message: saved ? "Saved. Buyers can pick up their order at checkout." : "Saved. Checkout doesn't offer pickup." };
+  },
+  "PUT local/delivery": async ({ req, db, shop, user }) => {
+    const b = await body<{ on?: unknown; postalPrefixes?: unknown; price?: unknown; freeOver?: unknown; note?: unknown }>(req);
+    let saved = null;
+    if (b.on === true) {
+      // A currency sign in front is fine; letters aren't.
+      const amount = (raw: string, what: string) => {
+        const v = raw.trim().replace(/^[$€£¥₹]\s*/, "");
+        if (!v) return null;
+        try {
+          return parseMoney(v);
+        } catch {
+          throw new UserError(`Enter the ${what} as an amount, like 5.00.`);
+        }
+      };
+      saved = await setLocalDelivery(db, shop.id, { postalPrefixes: str(b.postalPrefixes), priceMinor: amount(str(b.price), "delivery price") ?? 0, freeOverMinor: amount(str(b.freeOver), "amount for free delivery"), note: str(b.note) });
+    } else {
+      await setLocalDelivery(db, shop.id, null);
+    }
+    const n = saved?.postalPrefixes.length ?? 0;
+    await logged({ shop, user, db }, saved ? `Offered local delivery to ${n} postal code${n === 1 ? "" : "s"}, in the app` : "Stopped offering local delivery, in the app", { href: "/admin/shipping#local-delivery-heading" });
+    return { ok: true, message: saved ? `Saved. Buyers in ${n === 1 ? "1 postal code" : `${n} postal codes`} can have it delivered by you.` : "Saved. Checkout doesn't offer local delivery." };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -2652,6 +2685,7 @@ function routeArea(key: string): Area | null {
   if (path.startsWith("search-fixes")) return "products";
   if (path.startsWith("pricing")) return "products";
   if (path.startsWith("checkout-settings")) return "shipping";
+  if (path === "local" || path.startsWith("local/")) return "shipping";
   if (path.startsWith("blog")) return "pages";
   if (path === "pages" || path.startsWith("pages/")) return "pages";
   if (path.startsWith("trust")) return "trust";

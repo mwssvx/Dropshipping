@@ -2104,3 +2104,7 @@ The Products tab in the app has a Pricing rule row: set how an imported product'
 ### Checkout settings in the app (after launch, part 406)
 
 Settings in the app has a Checkout row under Shipping: the smallest order a buyer can place, whether checkout asks for a phone number (optional, required or not at all), and delivery protection with its price as a share of the order and its lowest price.
+
+### Pickup and local delivery in the app (after launch, part 407)
+
+Settings in the app has a "Pickup and local delivery" row under Shipping: turn on local pickup with the address and how to collect, and local delivery with the postal codes you deliver to, its price, the order amount it's free over and a note for buyers.
