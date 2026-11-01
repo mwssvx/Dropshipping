@@ -2204,3 +2204,7 @@ The app's Reviews screen links to "Review emails": turn the email asking buyers 
 ### Return settings in the app (after launch, part 431)
 
 The app's Returns screen links to "Return settings": how many days after delivery buyers can ask to send something back (0 turns the return form off, so they email you), and what they're told to do once you approve, with the default wording shown when it's left empty.
+
+### Order settings in the app (after launch, part 432)
+
+The Orders tab in the app has "Order settings": pick which risky orders wait for you before going to the supplier (high risk, medium and high, or never), and, for members who can refund, whether buyers can cancel their own order in the first 12 hours before it ships.

@@ -3715,3 +3715,39 @@ test("return settings from the app", async ({ page, browser }) => {
   await expect(web.locator("#windowDays")).toHaveValue("0");
   await expect(web.locator("#instructions")).toHaveValue("");
 });
+
+test("risk check and buyer cancellations, from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `os${Date.now()}`);
+  await signIn(page, email);
+  await tab(page, "Orders");
+  await page.getByRole("link", { name: /^Order settings/ }).click();
+  await expect(page.getByRole("heading", { name: "Order settings", level: 1 })).toBeVisible();
+
+  // High-risk orders are held by default; hold medium ones too.
+  const risk = page.getByRole("region", { name: "Risk check" });
+  await expect(risk.getByRole("tab", { name: "High risk" })).toHaveAttribute("aria-selected", "true");
+  await expect(risk.getByText("Hold high-risk orders (recommended)")).toBeVisible();
+  await risk.getByRole("tab", { name: "Medium and high" }).click();
+  await risk.getByRole("button", { name: "Save risk check" }).click();
+  await expect(page.getByText("Saved. Medium- and high-risk orders wait for you.")).toBeVisible();
+
+  // Buyers can cancel by default; turn it off.
+  const cancel = page.getByRole("region", { name: "Buyer cancellations" });
+  await expect(cancel.getByRole("switch", { name: "Let buyers cancel in the first 12 hours" })).toBeChecked();
+  await cancel.getByRole("switch", { name: "Let buyers cancel in the first 12 hours" }).click();
+  await cancel.getByRole("button", { name: "Save buyer cancellations" }).click();
+  await expect(page.getByText("Saved. Buyers ask you to cancel instead.")).toBeVisible();
+  await shot(page, "432-app-order-settings");
+
+  await web.goto(`${WEB}/admin/orders?show=held`);
+  await expect(web.locator("#hold")).toHaveValue("medium");
+  // The setting sits in a closed "Buyer cancellations" disclosure.
+  await expect(web.locator('input[name="buyerCancel"]')).not.toBeChecked();
+
+  // Never holding is allowed too.
+  await risk.getByRole("tab", { name: "Never" }).click();
+  await risk.getByRole("button", { name: "Save risk check" }).click();
+  await expect(page.getByText("Saved. No order is held; every paid order goes straight to the supplier.")).toBeVisible();
+  await web.reload();
+  await expect(web.locator("#hold")).toHaveValue("off");
+});

@@ -56,6 +56,10 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  BUYER_EDIT_HOURS,
+  RISK_HOLD_LABELS,
+  setRiskHold,
+  setBuyerCancel,
   DEFAULT_RETURN_INSTRUCTIONS,
   setReturnSettings,
   reviewRewardStats,
@@ -2804,6 +2808,33 @@ const routes: Record<string, Handler> = {
         : "Saved. The return form is off, so buyers email you instead.",
     };
   },
+  // Order settings: which risky orders wait for you, and whether buyers can cancel their own.
+  "GET order-settings": async ({ shop, role }) => ({
+    hold: shop.holdRiskyOrders,
+    holdOptions: Object.entries(RISK_HOLD_LABELS).map(([value, label]) => ({ value, label })),
+    buyerCancel: can(role, "refunds") ? shop.buyerCancel : null,
+    cancelHours: BUYER_EDIT_HOURS,
+  }),
+  "PUT order-settings/risk": async ({ req, db, shop, user }) => {
+    const b = await body<{ hold?: unknown }>(req);
+    await setRiskHold(db, shop.id, str(b.hold));
+    await logged({ shop, user, db }, "Changed which risky orders are held for review, in the app", { href: "/admin/orders?show=held" });
+    revalidatePath("/admin/orders");
+    const hold = str(b.hold) as keyof typeof RISK_HOLD_LABELS;
+    return {
+      ok: true,
+      message: hold === "off" ? "Saved. No order is held; every paid order goes straight to the supplier." : hold === "medium" ? "Saved. Medium- and high-risk orders wait for you." : "Saved. High-risk orders wait for you.",
+    };
+  },
+  // A refund setting, so it has its own area.
+  "PUT order-settings/buyer-cancel": async ({ req, db, shop, user }) => {
+    const b = await body<{ on?: unknown }>(req);
+    const on = b.on === true;
+    await setBuyerCancel(db, shop.id, on);
+    await logged({ shop, user, db }, on ? "Let buyers cancel their own orders, in the app" : "Stopped buyers cancelling their own orders, in the app", { href: "/admin/orders" });
+    revalidatePath("/admin/orders");
+    return { ok: true, message: on ? `Saved. Buyers can cancel from their order page in the first ${BUYER_EDIT_HOURS} hours, before it ships.` : "Saved. Buyers ask you to cancel instead." };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -3606,8 +3637,10 @@ function routeArea(key: string): Area | null {
   if (key === "PUT products/:id/collections/:collectionId") return "collections";
   if (key === "PUT checkouts/reminders") return "marketing";
   if (key === "PUT checkouts/browse") return "marketing";
+  if (key === "PUT order-settings/buyer-cancel") return "refunds";
   const path = key.split(" ")[1]!;
   if (path.startsWith("orders")) return "orders";
+  if (path.startsWith("order-settings")) return "orders";
   if (path.startsWith("products") || path.startsWith("imports")) return "products";
   if (path.startsWith("money")) return "money";
   if (path.startsWith("assistant") || path.startsWith("actions")) return "assistant";

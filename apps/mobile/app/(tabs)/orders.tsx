@@ -85,6 +85,7 @@ export default function OrdersScreen() {
           <Row href="/payment-link" title="Create a payment link" subtitle="For a buyer who asked by message: we email them a link to pay" right={<Pill label="New" />} />
           <Row href="/subscriptions" title="Subscriptions" subtitle="Buyers who get their order again every few weeks" right={<Pill label="See" />} />
           <Row href="/bank-transfers" title="Bank transfers" subtitle="Orders waiting for the buyer's transfer, and the account they pay into" right={<Pill label="See" />} />
+          <Row href="/order-settings" title="Order settings" subtitle="Which risky orders wait for you, and whether buyers can cancel their own" />
         </List>
       ) : null}
       {show === "all" && !q && list.data ? (
