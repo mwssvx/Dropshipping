@@ -2300,3 +2300,7 @@ A sale that's on has "Email your subscribers" on its card in the app, or "Email:
 ### Keep a sale on longer in the app (after launch, part 455)
 
 A sale with an end date has "Keep it on" on its card in the app, for another day, 2 or 3 days or a week, the same choices as on the website. When the sale has a countdown, the app reminds you it moves too.
+
+### Email the buyers from the app (after launch, part 456)
+
+The Open and Late lists on the app's Orders tab have "Email these buyers". Write one update in your own words, and each paid buyer on the list gets it by name with a link to their order, the same as on the website. Nobody gets the same update twice.

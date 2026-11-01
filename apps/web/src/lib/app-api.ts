@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  MAX_BULK_ORDERS,
+  emailOrderUpdate,
   LAST_CHANCE_MS,
   saleEmail,
   upcomingSaleDates,
@@ -3022,6 +3024,20 @@ const routes: Record<string, Handler> = {
     revalidatePath(`/s/${shop.handle}`, "layout");
     await logged({ shop, user, db }, `Planned ${deals.length} deals of the day in the app`, { href: "/admin/sales" });
     return { ok: true, message: `${deals.length} deals planned, one a day.${started ? " The first is on now." : ""}` };
+  },
+  // One update, in the merchant's words, to the buyers of the orders on a list: a supplier running late.
+  "POST orders/email": async ({ req, db, shop, user }) => {
+    const b = await body<{ ids?: unknown; message?: unknown }>(req);
+    const ids = Array.isArray(b.ids) ? b.ids.map(str).slice(0, MAX_BULK_ORDERS) : [];
+    const done = await emailOrderUpdate(await fulfillment(), shop.id, ids, { message: str(b.message) });
+    if (done.sent) await logged({ shop, user, db }, `Emailed an update to the buyers of ${done.sent === 1 ? "1 order" : `${done.sent} orders`} from the app`, { href: "/admin/orders" });
+    revalidatePath("/admin/orders", "layout");
+    const parts = [
+      done.sent ? `Emailed the buyers of ${done.sent === 1 ? "1 order" : `${done.sent} orders`}.` : "No one was emailed.",
+      done.skipped ? `${done.skipped === 1 ? "1 order was" : `${done.skipped} orders were`} skipped: unpaid, refunded or already sent this update.` : "",
+      done.failed ? `${done.failed === 1 ? "1 email" : `${done.failed} emails`} didn't go out; the order page shows which.` : "",
+    ];
+    return { ok: true, ...done, message: parts.filter(Boolean).join(" ") };
   },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);

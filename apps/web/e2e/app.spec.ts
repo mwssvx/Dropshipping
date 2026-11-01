@@ -4603,3 +4603,35 @@ test("a sale's email written from the app", async ({ page, browser }) => {
   await web.goto(`${WEB}/admin/campaigns`);
   await expect(web.getByText("Tote week: 10% off everything")).toBeVisible();
 });
+
+test("the buyers on the Open list emailed an update from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `eb${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Hemp Rope");
+  await web.getByLabel("Price", { exact: true }).fill("9.00");
+  await web.getByLabel("Stock", { exact: true }).fill("10");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const rope = new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href;
+  await buy(browser, rope);
+  await buy(browser, rope);
+
+  await signIn(page, email);
+  await tab(page, "Orders");
+  await page.getByRole("button", { name: "Email these buyers" }).click();
+  await expect(page.getByText("2 buyers get it")).toBeVisible();
+  await expect(page.getByText("#1001 Ada Buyer, #1002 Ada Buyer")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Email 2 buyers" })).toBeDisabled();
+  await page.getByRole("textbox", { name: "Your update" }).fill("We're packing everything this weekend, so your order ships on Monday. Thanks for waiting!");
+  await shot(page, "456-app-email-buyers");
+  await page.getByRole("button", { name: "Email 2 buyers" }).click();
+  await expect(page.getByText("Emailed the buyers of 2 orders.")).toBeVisible();
+  // The same update twice is skipped, so nobody gets it twice.
+  await page.getByRole("textbox", { name: "Your update" }).fill("We're packing everything this weekend, so your order ships on Monday. Thanks for waiting!");
+  await page.getByRole("button", { name: "Email 2 buyers" }).click();
+  await expect(page.getByText("No one was emailed. 2 orders were skipped: unpaid, refunded or already sent this update.")).toBeVisible();
+
+  await web.goto(`${WEB}/admin/orders`);
+  await web.getByRole("link", { name: /#1001/ }).first().click();
+  await expect(web.getByText("Update from you email sent to ada@example.com")).toBeVisible();
+});
