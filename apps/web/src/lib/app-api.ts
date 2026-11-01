@@ -56,6 +56,12 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  SEO_DESCRIPTION_MAX,
+  SEO_TITLE_MAX,
+  searchSnippet,
+  setProductSeo,
+  SEO_ISSUES,
+  seoReport,
   QUIZ_MAX_ANSWERS,
   QUIZ_MAX_QUESTIONS,
   setProductQuiz,
@@ -2118,6 +2124,35 @@ const routes: Record<string, Handler> = {
     revalidatePath(`/s/${shop.handle}`, "layout");
     return { ok: true, message: "Quiz removed." };
   },
+  // How products on sale look in search results, and what's holding each one back.
+  "GET search-listings": async ({ db, shop }) => {
+    const r = await seoReport(db, shop.id);
+    return {
+      checked: r.checked,
+      fine: r.fine,
+      products: r.products.map((p) => ({ id: p.id, title: p.title, listing: p.listing, issues: p.issues.map((i) => SEO_ISSUES[i]) })),
+      undescribed: r.undescribed.slice(0, 50).map((p) => ({ id: p.id, title: p.title, photos: p.photos })),
+      undescribedTotal: r.undescribed.length,
+    };
+  },
+  "GET products/:id/seo": async ({ params, db, shop }) => {
+    const p = await getProduct(db, shop.id, params.id!);
+    return {
+      title: p.seoTitle ?? "",
+      description: p.seoDescription ?? "",
+      fallback: { title: p.title, description: searchSnippet(p.descriptionHtml) },
+      url: `${(await storeAddress(shop)).replace(/^https?:\/\//, "")}/products/${p.handle}`,
+      max: { title: SEO_TITLE_MAX, description: SEO_DESCRIPTION_MAX },
+    };
+  },
+  "PUT products/:id/seo": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ title?: unknown; description?: unknown }>(req);
+    await setProductSeo(db, shop.id, params.id!, { title: str(b.title), description: str(b.description) });
+    revalidatePath(`/admin/products/${params.id}`);
+    revalidatePath("/admin/seo");
+    await logged({ shop, user, db }, "Changed a product's search listing, in the app", { href: `/admin/products/${params.id}#seo-heading` });
+    return { ok: true, message: "Saved. Search engines pick it up next time they visit." };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -2938,6 +2973,7 @@ function routeArea(key: string): Area | null {
   if (path === "currencies") return "currencies";
   if (path === "languages") return "theme";
   if (path === "quiz") return "marketing";
+  if (path === "search-listings") return "products";
   if (path.startsWith("pricing")) return "products";
   if (path.startsWith("checkout-settings")) return "shipping";
   if (path === "local" || path.startsWith("local/")) return "shipping";

@@ -3093,3 +3093,36 @@ test("a product quiz written in the app gives shoppers the products that fit", a
   await expect(page.getByText("Quiz removed.")).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Quiz title" }).last()).toHaveValue("");
 });
+
+test("a spammy search listing fixed from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `sl${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("HOT SALE Sunset Lamp Free Shipping");
+  await web.getByLabel("Price", { exact: true }).fill("25.00");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const productUrl = web.url();
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Search listings/ }).click();
+  await expect(page.getByText("1 product needs a look")).toBeVisible();
+  await page.getByRole("link", { name: /^Fix HOT SALE Sunset Lamp Free Shipping: Supplier filler/ }).click();
+  await expect(page.getByRole("heading", { name: "Search listing", level: 1 })).toBeVisible();
+  await page.getByRole("textbox", { name: "Headline in search results" }).fill("Sunset Lamp that fills a room with golden light");
+  await page.getByRole("textbox", { name: "Snippet in search results" }).fill("A projector lamp that casts a warm sunset glow on your wall. USB powered, with a turning head.");
+  await expect(page.getByText("Sunset Lamp that fills a room with golden light", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Save search listing" }).click();
+  await expect(page.getByText("Saved. Search engines pick it up next time they visit.")).toBeVisible();
+  await shot(page, "415-app-search-listing");
+
+  await page.getByRole("link", { name: "← Search listings" }).click();
+  // Still no photo, but the filler and the missing snippet are gone.
+  const row = page.getByRole("link", { name: /^Fix HOT SALE Sunset Lamp Free Shipping:/ }).last();
+  await expect(row).toContainText("Sunset Lamp that fills a room with golden light");
+  await expect(row).toContainText("No photo");
+  await expect(row).not.toContainText("filler");
+
+  await web.goto(productUrl);
+  await expect(web.getByLabel("Headline in search results")).toHaveValue("Sunset Lamp that fills a room with golden light");
+});
