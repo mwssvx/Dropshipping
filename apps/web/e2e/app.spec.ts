@@ -4272,3 +4272,40 @@ test("a free replacement for a lost parcel, sent from the app", async ({ page, b
   await web.goto(`${WEB}/admin/orders`);
   await expect(web.getByRole("link", { name: /#1002/ }).first()).toBeVisible();
 });
+
+test("change an order's address from the app before it ships", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `oe${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Linen Apron");
+  await web.getByLabel("Price", { exact: true }).fill("22.00");
+  await web.getByLabel("Stock", { exact: true }).fill("10");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  await buy(browser, new URL((await web.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!, WEB).href);
+
+  await signIn(page, email);
+  await tab(page, "Orders");
+  await page.getByRole("tab", { name: "All" }).click();
+  await page.getByRole("link", { name: "Order #1001" }).click();
+  const edit = page.getByRole("region", { name: "Change the order" });
+  await edit.getByRole("button", { name: "Change the address or a size…" }).click();
+  await expect(edit.getByRole("button", { name: "Save changes to the order" })).toBeDisabled();
+  await edit.getByRole("textbox", { name: "Street address" }).fill("42 New Lane");
+  await edit.getByRole("textbox", { name: "Apartment, suite (optional)" }).fill("Unit 7");
+  await shot(page, "446-app-order-edit");
+  await edit.getByRole("button", { name: "Save changes to the order" }).click();
+  await expect(page.getByText(/^Saved/).first()).toBeVisible();
+
+  await web.goto(`${WEB}/admin/orders`);
+  await web.getByRole("link", { name: /#1001/ }).first().click();
+  await expect(web.locator("#edit-line1")).toHaveValue("42 New Lane");
+  await expect(web.locator("#edit-line2")).toHaveValue("Unit 7");
+
+  // Once it ships, the address can't change any more.
+  await page.getByRole("button", { name: "Add tracking" }).click();
+  await page.getByLabel("Carrier").fill("USPS");
+  await page.getByLabel("Tracking number").fill("9400111899");
+  await page.getByRole("button", { name: "Save tracking" }).click();
+  await expect(page.getByText(/^Tracking added/)).toBeVisible();
+  await expect(page.getByRole("region", { name: "Change the order" })).toHaveCount(0);
+});

@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  orderEditOptions,
+  editOrder,
   sendReplacement,
   replacementBlocked,
   replaceableLines,
@@ -812,6 +814,12 @@ const routes: Record<string, Handler> = {
           ? { kind: o.pickup ? "pickup" : "delivery", day: o.handoverOn, readyAt: o.pickupReadyAt, done: o.fulfillmentStatus === "delivered" }
           : null,
       postYourself: postYourself ? { own: !!ownParcel } : null,
+      // Paid and not shipped: the address and sizes the merchant can still change.
+      edit: await (async () => {
+        if (o.paymentStatus !== "paid" || !can(role, "orders")) return null;
+        const e = await orderEditOptions(await fulfillment(), shop.id, o.id, "merchant");
+        return e.canEdit ? { address: e.address, country: countryName(e.address.country), lines: e.lines.filter((l) => l.choices.length > 0).map((l) => ({ id: l.id, title: l.title, quantity: l.quantity, variantId: l.variantId, choices: l.choices })) } : null;
+      })(),
       // Shipped and paid: the items that can be sent again for free, when a parcel was lost, damaged or wrong.
       replaceable: !replacementBlocked(o) && can(role, "orders") ? (await replaceableLines(db, o.id)).map((l) => ({ id: l.id, title: l.title, quantity: l.quantity })) : [],
       sameAddress: sameDoor?.orders.length
@@ -2915,6 +2923,35 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, `Sent a free replacement (#${number}) for order {order} in the app`, { orderId: params.id! });
     revalidatePath("/admin/orders", "layout");
     return { ok: true, id, number, message: `Replacement #${number} is on its way, and the buyer got an email.` };
+  },
+  // Changes the address or a size before it ships: the supplier order is placed again and the buyer emailed.
+  "POST orders/:id/edit": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ address?: Record<string, unknown>; lines?: Record<string, unknown> }>(req);
+    const a = b.address ?? {};
+    const text = (k: string) => str(a[k]).trim();
+    const lines = Object.fromEntries(Object.entries(b.lines ?? {}).map(([k, v]) => [k, str(v)]));
+    const { held, resent } = await editOrder(
+      await fulfillment(),
+      shop.id,
+      params.id!,
+      {
+        address: { name: text("name"), line1: text("line1"), line2: text("line2") || undefined, city: text("city"), region: text("region") || undefined, postalCode: text("postalCode"), phone: text("phone") || undefined },
+        lines,
+      },
+      "merchant",
+    );
+    await logged({ shop, user, db }, "Changed the address or items on order {order} in the app", { orderId: params.id! });
+    notifyLater(shop.id);
+    revalidatePath(`/admin/orders/${params.id}`);
+    revalidatePath("/admin/orders");
+    return {
+      ok: true,
+      message: held
+        ? "Saved and emailed to the customer. It's on hold, so send it on when you're ready."
+        : resent
+          ? "Saved. The supplier has the updated order, and we emailed the customer."
+          : "Saved and emailed to the customer.",
+    };
   },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
