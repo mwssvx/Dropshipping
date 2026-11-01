@@ -36,6 +36,9 @@ export default function SalesScreen() {
   const [percent, setPercent] = useState("");
   const [days, setDays] = useState("3");
   const [countdown, setCountdown] = useState(false);
+  const [later, setLater] = useState(false);
+  const [day, setDay] = useState("");
+  const [time, setTime] = useState("09:00");
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{ tone: Tone; text: string } | null>(null);
 
@@ -57,11 +60,22 @@ export default function SalesScreen() {
   async function start() {
     const n = Number(percent);
     if (!Number.isInteger(n) || n < 1) return setNote({ tone: "critical", text: "Enter a whole percent off, like 20." });
-    const ok = await run("start", "sales", { title: title.trim(), percentOff: n, days: days === "open" ? null : Number(days), countdown }, `Start ${title.trim()}`);
+    let startsAt: string | null = null;
+    if (later) {
+      // On the phone's clock, like the product launch time.
+      const at = new Date(`${day.trim()}T${time.trim()}`);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(day.trim()) || !/^\d{1,2}:\d{2}$/.test(time.trim()) || Number.isNaN(at.getTime())) {
+        return setNote({ tone: "critical", text: "Enter the day like 2026-12-01 and the time like 18:00." });
+      }
+      startsAt = at.toISOString();
+    }
+    const ok = await run("start", "sales", { title: title.trim(), percentOff: n, days: days === "open" ? null : Number(days), countdown, startsAt }, `${later ? "Schedule" : "Start"} ${title.trim()}`);
     if (ok) {
       setTitle("");
       setPercent("");
       setCountdown(false);
+      setLater(false);
+      setDay("");
     }
   }
 
@@ -88,8 +102,23 @@ export default function SalesScreen() {
             }}
           />
           {days !== "open" ? <Toggle label="Countdown on the store" value={countdown} onChange={setCountdown} /> : null}
-          <Button label="Start the sale" busy={busy === "start"} disabled={!title.trim() || !percent.trim()} onPress={start} />
-          <Body muted>It starts now, on everything but gift cards, with the old price crossed out. Sales on a collection or chosen products, or starting later, are on the website.</Body>
+          <Segmented
+            label="Starts"
+            options={[
+              ["now", "Now"],
+              ["later", "Later"],
+            ]}
+            value={later ? "later" : "now"}
+            onChange={(v) => setLater(v === "later")}
+          />
+          {later ? (
+            <>
+              <Field label="Day" value={day} onChangeText={setDay} placeholder="2026-12-01" keyboardType="numbers-and-punctuation" autoCapitalize="none" />
+              <Field label="Time" value={time} onChangeText={setTime} placeholder="09:00" keyboardType="numbers-and-punctuation" autoCapitalize="none" hint="24-hour, on your phone's clock." />
+            </>
+          ) : null}
+          <Button label={later ? "Schedule the sale" : "Start the sale"} busy={busy === "start"} disabled={!title.trim() || !percent.trim() || (later && !day.trim())} onPress={start} />
+          <Body muted>On everything but gift cards, with the old price crossed out, and it ends by itself. Sales on a collection or chosen products are on the website.</Body>
         </Card>
       </Section>
       <List>
