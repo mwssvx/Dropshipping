@@ -3953,3 +3953,55 @@ test("price per unit for a product, from the app", async ({ page, browser }) => 
   await units.getByRole("button", { name: "Save price per unit" }).click();
   await expect(page.getByText("Saved. No price per unit is shown.")).toBeVisible();
 });
+
+test("a badge, and a draft put on sale later with a coming-soon page, from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `bl${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Midnight Jacket");
+  await web.getByLabel("Price", { exact: true }).fill("90.00");
+  await web.getByLabel("Status").selectOption({ label: "Draft: hidden" });
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+  const productUrl = web.url();
+
+  await signIn(page, email);
+  await tab(page, "Products");
+  await page.getByRole("link", { name: /^Midnight Jacket/ }).click();
+
+  const badge = page.getByRole("region", { name: "Badge", exact: true });
+  await badge.getByRole("textbox", { name: "Badge text" }).fill("Limited edition");
+  await badge.getByRole("button", { name: "Save badge" }).click();
+  await expect(page.getByText("Saved. The badge shows on this product's card and page.")).toBeVisible();
+
+  // A time in the past is refused; two days ahead is kept.
+  const launch = page.getByRole("region", { name: "Put on sale later" });
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const dayIn = (ms: number) => {
+    const d = new Date(Date.now() + ms);
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
+  await launch.getByRole("textbox", { name: "Day" }).fill(dayIn(-2 * 86_400_000));
+  await launch.getByRole("button", { name: "Schedule" }).click();
+  await expect(page.getByText("Pick a time in the future, or put it on sale now.")).toBeVisible();
+  await launch.getByRole("textbox", { name: "Day" }).fill(dayIn(2 * 86_400_000));
+  await launch.getByRole("textbox", { name: "Time" }).fill("18:30");
+  await launch.getByRole("button", { name: "Schedule" }).click();
+  await expect(page.getByText("Scheduled. Until then buyers can't see it.")).toBeVisible();
+  await expect(launch.getByText(/^Goes on sale by itself on .* 6:30 PM\. Until then buyers can't see it\.$/)).toBeVisible();
+  await launch.getByRole("switch", { name: "Show a coming-soon page" }).click();
+  await expect(page.getByText("Saved. Shoppers see the price, a countdown and a box to be emailed when it's out.")).toBeVisible();
+  await expect(launch.getByRole("switch", { name: "Show a coming-soon page" })).toBeChecked();
+  await shot(page, "438-app-badge-launch");
+
+  await web.goto(productUrl);
+  await expect(web.locator("#product-badge")).toHaveValue("Limited edition");
+  await expect(web.locator("#publish-at")).toHaveValue(`${dayIn(2 * 86_400_000)}T18:30`);
+  await expect(web.getByRole("button", { name: "Turn off the coming-soon page" })).toBeVisible();
+
+  // Cancelling the time takes the coming-soon page down too.
+  await launch.getByRole("button", { name: "Cancel schedule" }).click();
+  await expect(page.getByText("Cancelled. It stays a draft until you put it on sale.")).toBeVisible();
+  await expect(launch.getByRole("switch", { name: "Show a coming-soon page" })).toHaveCount(0);
+  await web.reload();
+  await expect(web.locator("#publish-at")).toHaveValue("");
+});
