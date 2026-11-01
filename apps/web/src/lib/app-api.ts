@@ -56,6 +56,12 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  setBirthdayOffer,
+  birthdaysKnown,
+  birthdayStats,
+  setWinbackOffer,
+  winbackStats,
+  winbackDueCount,
   deleteWebhookEndpoint,
   deliverDueWebhooks,
   retryWebhookDelivery,
@@ -2478,6 +2484,29 @@ const routes: Record<string, Handler> = {
     revalidatePath("/admin/developers");
     return { ok: true, message: "Sent again." };
   },
+  "GET winback": async ({ db, shop }) => {
+    const [winback, due, birthdays, known] = await Promise.all([
+      winbackStats(db, shop.id),
+      shop.winbackOffer ? winbackDueCount(db, shop, shop.winbackOffer) : null,
+      birthdayStats(db, shop.id),
+      birthdaysKnown(db, shop.id),
+    ]);
+    return { currency: shop.currency, winback: { offer: shop.winbackOffer, due, ...winback }, birthday: { offer: shop.birthdayOffer, known, ...birthdays } };
+  },
+  "PUT winback": async ({ req, db, shop }) => {
+    const b = await body<{ on?: unknown; afterDays?: unknown; percentOff?: unknown; days?: unknown }>(req);
+    const int = (v: unknown) => Number.parseInt(str(v).trim() || "NaN", 10);
+    await setWinbackOffer(db, shop.id, b.on === true ? { afterDays: int(b.afterDays), percentOff: int(b.percentOff), days: int(b.days) } : null);
+    revalidatePath("/admin/marketing");
+    return { ok: true, message: b.on === true ? "Saved. Codes go out with the daily emails." : "Turned off. Codes already sent still work." };
+  },
+  "PUT birthday": async ({ req, db, shop }) => {
+    const b = await body<{ on?: unknown; percentOff?: unknown; days?: unknown }>(req);
+    const int = (v: unknown) => Number.parseInt(str(v).trim() || "NaN", 10);
+    await setBirthdayOffer(db, shop.id, b.on === true ? { percentOff: int(b.percentOff), days: int(b.days) } : null);
+    revalidatePath("/admin/marketing");
+    return { ok: true, message: b.on === true ? "Saved. Codes go out with the daily emails." : "Turned off. Codes already sent still work." };
+  },
   "GET collections": async ({ db, shop }) => {
     const [collections, store] = await Promise.all([listCollections(db, shop.id), storeAddress(shop)]);
     return {
@@ -3336,6 +3365,7 @@ function routeArea(key: string): Area | null {
   if (path === "today") return "home";
   if (path === "holiday-checklist") return "home";
   if (path.startsWith("developers")) return "developers";
+  if (path === "winback" || path === "birthday") return "marketing";
   return null;
 }
 
