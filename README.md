@@ -2296,3 +2296,7 @@ The app's Sales screen lists the shopping dates coming up in your country (Black
 ### A sale's email from the app (after launch, part 454)
 
 A sale that's on has "Email your subscribers" on its card in the app, or "Email: last chance" in its final two days. It writes the email as a campaign draft and opens Campaigns, where you send yourself a test and then send it.
+
+### Keep a sale on longer in the app (after launch, part 455)
+
+A sale with an end date has "Keep it on" on its card in the app, for another day, 2 or 3 days or a week, the same choices as on the website. When the sale has a countdown, the app reminds you it moves too.

@@ -211,9 +211,7 @@ export default function SalesScreen() {
                       }}
                     />
                   ) : null}
-                  {x.endsAt ? (
-                    <Button label="One more day" kind="secondary" a11y={`Keep ${x.title} on one more day`} busy={busy === `extend-${x.id}`} onPress={() => run(`extend-${x.id}`, `sales/${x.id}`, { action: "extend", days: 1 }, `Keep ${x.title} on longer`)} />
-                  ) : null}
+                  {x.endsAt ? <ExtendSale sale={x} busy={busy} run={run} /> : null}
                   <Button label={x.status === "scheduled" ? "Cancel" : "End now"} kind="danger" a11y={`End ${x.title} now`} busy={busy === `end-${x.id}`} onPress={() => run(`end-${x.id}`, `sales/${x.id}`, { action: "end" }, `End ${x.title}`)} />
                 </View>
               ) : null}
@@ -284,6 +282,32 @@ function EarlyAccess({ sale: x, busy, run }: { sale: Sale; busy: string | null; 
         disabled={!!busy}
         onPress={() => void run(`early-${x.id}`, `sales/${x.id}`, { action: "early", hours: Number(hours), tag: tag.trim() }, `Early access to ${x.title}`)}
       />
+    </View>
+  );
+}
+
+const EXTEND = [
+  ["1", "+1 day"],
+  ["2", "+2 days"],
+  ["3", "+3 days"],
+  ["7", "+1 week"],
+] as const;
+
+/** Keeps a sale on longer: the end moves, and so does the store's countdown. */
+function ExtendSale({ sale: x, busy, run }: { sale: Sale; busy: string | null; run: (key: string, path: string, payload: unknown, label: string) => Promise<boolean> }) {
+  const [days, setDays] = useState<(typeof EXTEND)[number][0]>("1");
+  return (
+    <View style={{ gap: space(2), flexBasis: "100%" }}>
+      <Segmented label={`Keep ${x.title} on for another`} options={EXTEND.map(([v, l]) => [v, l] as [typeof v, string])} value={days} onChange={setDays} />
+      <Button
+        label="Keep it on"
+        kind="secondary"
+        a11y={`Keep ${x.title} on longer`}
+        busy={busy === `extend-${x.id}`}
+        disabled={!!busy}
+        onPress={() => void run(`extend-${x.id}`, `sales/${x.id}`, { action: "extend", days: Number(days) }, `Keep ${x.title} on longer`)}
+      />
+      {x.countdown ? <Body muted>The countdown on your store moves to the new end. Buyers notice a sale that keeps ending, so do this once at most.</Body> : null}
     </View>
   );
 }
