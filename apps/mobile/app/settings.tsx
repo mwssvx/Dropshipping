@@ -121,9 +121,10 @@ export default function Settings() {
         </Section>
       ) : null}
       {can("pages") ? (
-        <Section title="Blog">
+        <Section title="Blog and pages">
           <List>
             <Row href="/blog" title="Blog posts" subtitle="Write a post, then publish it now or at a time you pick" />
+            <Row href="/pages" title="Pages" subtitle="About us, contact, and the shipping, returns and privacy policies" />
           </List>
         </Section>
       ) : null}
