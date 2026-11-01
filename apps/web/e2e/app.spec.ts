@@ -2168,7 +2168,7 @@ test("the holiday checklist in the app, with a line set up from the app", async 
   await expect(page.getByRole("heading", { name: "Holiday checklist", level: 1 })).toBeVisible();
   await expect(page.getByText(/^\d+ of 12 done$/)).toBeVisible();
   const todo = page.getByRole("region", { name: "To do" });
-  await expect(todo.getByRole("button", { name: "Offer gift wrapping, opens the website" })).toBeVisible();
+  await expect(todo.getByRole("button", { name: "Schedule a holiday look, opens the website" })).toBeVisible();
   await shot(page, "387-app-holiday-checklist");
 
   await todo.getByRole("button", { name: "Email buyers when an order runs late" }).click();
