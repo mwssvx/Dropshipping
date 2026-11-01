@@ -56,6 +56,10 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  MAX_DETAILS,
+  detailsText,
+  setProductDetails,
+  setProductVideo,
   setReorderDays,
   setMinAge,
   SHIPPING_SURCHARGE_MAX,
@@ -584,6 +588,10 @@ const productView = (p: ProductRow) => ({
   minAge: p.minAge,
   /** Days after delivery buyers get one "running low?" email, or null for none. */
   reorderDays: p.reorderDays,
+  /** The video link shown after the photos, or null. */
+  videoUrl: p.videoUrl,
+  /** The details table, one "Label: value" per line. */
+  detailsText: detailsText(p.details),
 });
 
 const customerView = (p: Awaited<ReturnType<typeof getCustomerProfile>>) => ({
@@ -3196,6 +3204,23 @@ const routes: Record<string, Handler> = {
     await setReorderDays(db, shop.id, product.id, days);
     revalidatePath(`/admin/products/${product.id}`);
     return { ok: true, message: days ? `Saved. Buyers are asked if they're running low ${days} days after it arrives.` : "Saved. No reorder reminder for it." };
+  },
+  "PUT products/:id/video": async ({ req, params, db, shop }) => {
+    const b = await body<{ url?: unknown }>(req);
+    const saved = await setProductVideo(db, shop.id, params.id!, str(b.url));
+    revalidatePath(`/admin/products/${params.id}`);
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return { ok: true, message: saved ? "Saved. The video shows after the photos on the product page." : "Saved. This product has no video." };
+  },
+  "PUT products/:id/details": async ({ req, params, db, shop }) => {
+    const b = await body<{ text?: unknown }>(req);
+    const saved = await setProductDetails(db, shop.id, params.id!, str(b.text));
+    revalidatePath(`/admin/products/${params.id}`);
+    revalidatePath(`/s/${shop.handle}`, "layout");
+    return {
+      ok: true,
+      message: saved.length ? `Saved. ${saved.length === 1 ? "1 detail shows" : `${saved.length} details show`} under the description on the product page.` : "Saved. This product has no details table.",
+    };
   },
   "POST products/:id/listing": async ({ params, shop }) => {
     const run = await writeListing(await agents(), shop, params.id!);

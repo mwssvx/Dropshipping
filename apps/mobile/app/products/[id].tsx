@@ -228,6 +228,8 @@ export default function ProductScreen() {
         </Section>
       ) : null}
 
+      {p.giftCard ? null : <VideoSection product={p} busy={busy} act={act} />}
+      {p.giftCard ? null : <DetailsSection product={p} busy={busy} act={act} />}
       <TagsSection product={p} busy={busy} act={act} />
       <CollectionsSection product={p} busy={busy} act={act} />
       <BackupSection product={p} busy={busy} act={act} currency={cur} />
@@ -364,6 +366,53 @@ function ReorderSection({ product: p, busy, act }: { product: Product; busy: str
         <Body muted>For things that run out, like coffee, vitamins or refills. That many days after an order arrives, the buyer gets one email asking if they're running low. Not if they've already bought it again.</Body>
         <Field label="It usually lasts (days)" value={v} onChangeText={setEdit} keyboardType="number-pad" placeholder="No reminder" hint="7 to 180 days. Leave it empty for no reminder." />
         <Button label="Save reorder reminder" busy={busy === "reorder"} disabled={!!busy || edit === null} onPress={() => act("reorder", async () => (await api<{ message: string }>(`products/${p.id}/reorder`, { method: "PUT", body: { reorderDays: v } })).message)} />
+      </Card>
+    </Section>
+  );
+}
+
+/** A YouTube, Vimeo or video file link shown after the photos on the product page. */
+function VideoSection({ product: p, busy, act }: { product: Product; busy: string | null; act: Act }) {
+  const saved = p.videoUrl ?? "";
+  const [edit, setEdit] = useState<string | null>(null);
+  const v = edit ?? saved;
+  useEffect(() => setEdit(null), [p]);
+  return (
+    <Section title="Video">
+      <Card>
+        <Field
+          label="Video link"
+          value={v}
+          onChangeText={setEdit}
+          keyboardType="url"
+          autoCapitalize="none"
+          placeholder="https://www.youtube.com/watch?v=…"
+          hint="A YouTube or Vimeo link, or the address of a video file (many suppliers have one). It shows after the photos. Leave it empty for none."
+        />
+        <Button label="Save video" busy={busy === "video"} disabled={!!busy || edit === null} onPress={() => act("video", async () => (await api<{ message: string }>(`products/${p.id}/video`, { method: "PUT", body: { url: v } })).message)} />
+      </Card>
+    </Section>
+  );
+}
+
+/** Short facts buyers look for, shown as a table under the description. */
+function DetailsSection({ product: p, busy, act }: { product: Product; busy: string | null; act: Act }) {
+  const saved = p.detailsText ?? "";
+  const [edit, setEdit] = useState<string | null>(null);
+  const v = edit ?? saved;
+  useEffect(() => setEdit(null), [p]);
+  return (
+    <Section title="Details">
+      <Card>
+        <Field
+          label="Details"
+          value={v}
+          onChangeText={setEdit}
+          multiline
+          placeholder={"Material: Aluminium\nSize: 20 × 10 × 8 cm"}
+          hint="Like material, size or what's in the box. One per line, label first, then a colon. Up to 20."
+        />
+        <Button label="Save details" busy={busy === "details"} disabled={!!busy || edit === null} onPress={() => act("details", async () => (await api<{ message: string }>(`products/${p.id}/details`, { method: "PUT", body: { text: v } })).message)} />
       </Card>
     </Section>
   );

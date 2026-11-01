@@ -2216,3 +2216,7 @@ A product's screen in the app has "Shipping this product": extra days to get it 
 ### Age check and reorder reminder in the app (after launch, part 434)
 
 A product's screen in the app has "Age check", the minimum age buyers confirm at checkout for things like alcohol or knives, and "Reorder reminder", the days it usually lasts before buyers get one "running low?" email.
+
+### Video and details in the app (after launch, part 435)
+
+A product's screen in the app has "Video", the YouTube, Vimeo or video file link shown after the photos, and "Details", the facts table under the description written one "Label: value" per line.
