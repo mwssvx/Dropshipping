@@ -3126,3 +3126,40 @@ test("a spammy search listing fixed from the app", async ({ page, browser }) => 
   await web.goto(productUrl);
   await expect(web.getByLabel("Headline in search results")).toHaveValue("Sunset Lamp that fills a room with golden light");
 });
+
+test("taxes and import duties set from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `tx${Date.now()}`);
+  await signIn(page, email);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("link", { name: /^Taxes and duties/ }).click();
+  await expect(page.getByText("Nowhere yet")).toBeVisible();
+  await expect(page.getByText("No tax collected in this period")).toBeVisible();
+
+  await page.getByRole("button", { name: "Add United Kingdom (VAT)" }).click();
+  await expect(page.getByText(/Sellers outside the UK must register/)).toBeVisible();
+  await page.getByRole("textbox", { name: "Registration number (optional)" }).fill("GB123456789");
+  await page.getByRole("button", { name: "Add registration" }).click();
+  await expect(page.getByText("Added. Buyers there are charged tax from their next order.")).toBeVisible();
+  await expect(page.getByText("GB123456789")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add United Kingdom (VAT)" })).toHaveCount(0);
+
+  await page.getByRole("tab", { name: "Include tax" }).click();
+  await page.getByRole("button", { name: "Save prices" }).click();
+  await expect(page.getByText("Saved. Your prices include tax.")).toBeVisible();
+  await page.getByRole("tab", { name: "Included" }).click();
+  await expect(page.getByText(/there's nothing more to pay when it arrives/)).toBeVisible();
+  await page.getByRole("button", { name: "Save import duties" }).click();
+  await expect(page.getByText("Saved. Checkout and your shipping policy follow it.")).toBeVisible();
+  await page.getByRole("tab", { name: "Last quarter" }).click();
+  await expect(page.getByRole("region", { name: /^Tax collected, Q\d \d{4}$/ })).toBeVisible();
+  await shot(page, "416-app-taxes");
+
+  await web.goto(`${WEB}/admin/taxes`);
+  await expect(web.getByText("United Kingdom (VAT)")).toBeVisible();
+  await expect(web.getByRole("radio", { name: /^Include tax/ })).toBeChecked();
+  await expect(web.getByRole("radio", { name: /^They're included in my prices/ })).toBeChecked();
+
+  await page.getByRole("button", { name: "Stop collecting tax in United Kingdom (VAT)" }).click();
+  await expect(page.getByText("Removed. Buyers there aren't charged tax any more.")).toBeVisible();
+  await expect(page.getByText("Nowhere yet")).toBeVisible();
+});

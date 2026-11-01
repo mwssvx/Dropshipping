@@ -128,6 +128,13 @@ export default function Settings() {
           </List>
         </Section>
       ) : null}
+      {can("taxes") ? (
+        <Section title="Taxes">
+          <List>
+            <Row href="/taxes" title="Taxes and duties" subtitle="Where you collect tax, your prices, import duties and what you owe" />
+          </List>
+        </Section>
+      ) : null}
       {can("currencies") ? (
         <Section title="Selling abroad">
           <List>
