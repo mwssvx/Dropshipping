@@ -4533,3 +4533,33 @@ test("early access to a scheduled sale from the app", async ({ page, browser }) 
   await expect(page.getByText("Early access to Winter warm has stopped.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Give early access to Winter warm" })).toBeVisible();
 });
+
+test("a sale planned for a shopping date from the app", async ({ page, browser }) => {
+  const { web, email } = await merchant(browser, `ps${Date.now()}`);
+  await web.goto(`${WEB}/admin/products/new`);
+  await web.getByLabel("Title").fill("Linen Napkins");
+  await web.getByLabel("Price", { exact: true }).fill("18.00");
+  await web.getByLabel("Stock", { exact: true }).fill("6");
+  await web.getByRole("button", { name: "Save product" }).click();
+  await expect(web.getByText("Product added.")).toBeVisible();
+
+  await signIn(page, email);
+  await page.getByRole("button", { name: "Sales", exact: true }).click();
+  const ahead = page.getByRole("region", { name: "Dates coming up" });
+  const first = ahead.getByRole("button", { name: /^Plan a sale for / }).first();
+  const name = (await first.getAttribute("aria-label"))!.replace("Plan a sale for ", "");
+  await first.click();
+  await expect(page.getByText(new RegExp(`^Filled in for ${name}\\. Ends at midnight after `))).toBeVisible();
+  const title = await page.getByRole("textbox", { name: "Sale name" }).inputValue();
+  expect(title.length).toBeGreaterThan(0);
+  await page.getByRole("textbox", { name: "Percent off everything" }).fill("20");
+  await shot(page, "453-app-plan-sale");
+  await page.getByRole("button", { name: /^(Schedule|Start) the sale$/ }).click();
+  await expect(page.getByText(new RegExp(`^${title} is (scheduled|on): 20% off everything, until `))).toBeVisible();
+  // Planned: no longer a button, just the sale's name.
+  await expect(ahead.getByText(`Planned: ${title}`)).toBeVisible();
+  await expect(ahead.getByRole("button", { name: `Plan a sale for ${name}` })).toHaveCount(0);
+
+  await web.goto(`${WEB}/admin/sales`);
+  await expect(web.getByRole("listitem", { name, exact: true })).toContainText(`Planned: ${title}`);
+});

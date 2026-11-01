@@ -2288,3 +2288,7 @@ The app's "Start a sale" form has Starts: Now or Later. Pick a day and time on y
 ### Early access to a sale in the app (after launch, part 452)
 
 A scheduled sale's card in the app has "Give early access": pick when it opens (from now, or one to three days before) and, if you like, a customer tag such as vip. The app shows the code and a link to share, and you can stop it again.
+
+### Plan a sale for a shopping date in the app (after launch, part 453)
+
+The app's Sales screen lists the shopping dates coming up in your country (Black Friday, Christmas and so on), each with the sale already planned for it. Tap one to fill in the sale's name and dates, pick the discount, and schedule it.

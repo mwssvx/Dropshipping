@@ -56,6 +56,7 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  upcomingSaleDates,
   endEarlyAccess,
   giveEarlyAccess,
   saleResults,
@@ -3729,6 +3730,31 @@ const routes: Record<string, Handler> = {
         endsAt: x.endsAt,
         countdown: x.countdown,
       })),
+      // The shopping dates coming up in the store's country, each with the sale already planned for it.
+      ahead: (() => {
+        const zone = shop.shipCutoff?.timeZone ?? defaultCutoffZone(shop.country);
+        const today = new Date().toLocaleDateString("en-CA", { timeZone: zone });
+        const calendarDay = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+        const onDay = (d: string) => calendarDay.format(new Date(`${d}T00:00:00Z`));
+        return upcomingSaleDates(shop.country, today).map((d) => {
+          const away = Math.round((Date.parse(`${d.day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
+          const last = new Date(Date.parse(`${d.end}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+          // Days on the calendar against exact times: a day either side is close enough to match.
+          const planned = all.find((x) => x.status !== "ended" && x.startsAt.getTime() < Date.parse(`${d.end}T00:00:00Z`) + 86_400_000 && (!x.endsAt || x.endsAt.getTime() > Date.parse(`${d.start}T00:00:00Z`) - 86_400_000));
+          return {
+            id: d.id,
+            name: d.name,
+            saleTitle: d.saleTitle,
+            when: `${onDay(d.day)}${away > 0 ? `, in ${away === 1 ? "1 day" : `${away} days`}` : away === 0 ? ", today" : ""}`,
+            span: d.id === "black-friday" ? "A sale from Black Friday through Cyber Monday" : last === d.start ? `A one-day sale on ${onDay(d.start)}` : `A sale ${onDay(d.start)} to ${onDay(last)}`,
+            // Already under way (Halloween week): it starts when it's added.
+            start: d.start > today ? d.start : null,
+            end: d.end,
+            endLabel: onDay(last),
+            planned: planned?.title ?? null,
+          };
+        });
+      })(),
       // Who sees the lowest price of the 30 days before a discount (the EU asks for it).
       lowestPriceNote: shop.lowestPriceNote,
     };
@@ -3742,7 +3768,7 @@ const routes: Record<string, Handler> = {
     return { ok: true, lowestPriceNote: saved, message: "Saved. Product pages follow it now." };
   },
   "POST sales": async ({ req, db, shop, user }) => {
-    const b = await body<{ title?: unknown; percentOff?: unknown; days?: unknown; countdown?: unknown; startsAt?: unknown }>(req);
+    const b = await body<{ title?: unknown; percentOff?: unknown; days?: unknown; countdown?: unknown; startsAt?: unknown; endsAt?: unknown }>(req);
     // From the phone: everything, now or from a time picked on the phone's clock, for a few days or
     // until it's ended. Collections and chosen products are on the website.
     const days = typeof b.days === "number" && (SALE_EXTEND_DAYS as readonly number[]).includes(b.days) ? b.days : null;
@@ -3754,20 +3780,26 @@ const routes: Record<string, Handler> = {
       if (startsAt.getTime() < now.getTime() - 60_000) throw new UserError("Pick a start time that hasn't passed, or start it now.");
       if (startsAt < now) startsAt = now;
     }
+    // A sale planned for a shopping date ends at the time the phone sent: midnight after its last day.
+    let endsAt = days ? new Date(startsAt.getTime() + days * 86_400_000) : null;
+    if (typeof b.endsAt === "string" && b.endsAt) {
+      endsAt = new Date(b.endsAt);
+      if (Number.isNaN(endsAt.getTime()) || endsAt <= startsAt) throw new UserError("Pick an end after the start.");
+    }
     const sale = await createSale(db, shop.id, {
       title: str(b.title),
       percentOff: typeof b.percentOff === "number" ? b.percentOff : Number.NaN,
       scope: "all",
       startsAt,
-      endsAt: days ? new Date(startsAt.getTime() + days * 86_400_000) : null,
-      countdown: b.countdown === true && !!days,
+      endsAt,
+      countdown: b.countdown === true && !!endsAt,
     });
     const started = sale.startsAt <= new Date();
     // Buyers who saved a product hear about it when the sale starts now; a later one sends them when it starts.
     if (started) await sendPriceDrops(await stock(), { shopId: shop.id });
     revalidatePath("/admin/sales");
     revalidatePath(`/s/${shop.handle}`, "layout");
-    const length = sale.endsAt ? `, for ${days} ${days === 1 ? "day" : "days"}` : " until you end it";
+    const length = !sale.endsAt ? " until you end it" : days && !b.endsAt ? `, for ${days} ${days === 1 ? "day" : "days"}` : `, until ${sale.endsAt.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: shop.shipCutoff?.timeZone ?? defaultCutoffZone(shop.country) })}`;
     if (!started) {
       await logged({ shop, user, db }, `Scheduled the sale ${sale.title} (${sale.percentOff}% off everything) in the app`, { href: "/admin/sales" });
       return { ok: true, message: `${sale.title} is scheduled: ${sale.percentOff}% off everything${length}. It starts by itself.` };
