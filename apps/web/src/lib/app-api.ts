@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  setReorderDays,
+  setMinAge,
   SHIPPING_SURCHARGE_MAX,
   PRODUCT_PROCESSING_MAX,
   setBlockedCountries,
@@ -578,6 +580,10 @@ const productView = (p: ProductRow) => ({
   /** Countries it can't be shipped to. */
   blockedCountries: p.blockedCountries,
   blockedCountryNames: p.blockedCountries.map(countryName),
+  /** The age buyers confirm at checkout, or null for any age. */
+  minAge: p.minAge,
+  /** Days after delivery buyers get one "running low?" email, or null for none. */
+  reorderDays: p.reorderDays,
 });
 
 const customerView = (p: Awaited<ReturnType<typeof getCustomerProfile>>) => ({
@@ -3171,6 +3177,25 @@ const routes: Record<string, Handler> = {
     await logged({ shop, user, db }, `Changed shipping for ${product.title} in the app`, { href: `/admin/products/${product.id}` });
     revalidatePath(`/admin/products/${product.id}`);
     return { ok: true, message: "Shipping for this product saved.", product: productView(await getProduct(db, shop.id, product.id)) };
+  },
+  "PUT products/:id/min-age": async ({ req, params, db, shop, user }) => {
+    const b = await body<{ minAge?: unknown }>(req);
+    const product = await getProduct(db, shop.id, params.id!);
+    const raw = str(b.minAge).trim();
+    const age = raw === "" ? null : /^\d+$/.test(raw) ? Number(raw) : NaN;
+    await setMinAge(db, shop.id, product.id, age);
+    await logged({ shop, user, db }, age ? `Asked buyers of ${product.title} to be ${age} or older, in the app` : `Took the age check off ${product.title} in the app`, { href: `/admin/products/${product.id}` });
+    revalidatePath(`/admin/products/${product.id}`);
+    return { ok: true, message: age ? `Saved. Buyers confirm they're ${age} or older at checkout.` : "Saved. Buyers of any age can order it." };
+  },
+  "PUT products/:id/reorder": async ({ req, params, db, shop }) => {
+    const b = await body<{ reorderDays?: unknown }>(req);
+    const product = await getProduct(db, shop.id, params.id!);
+    const raw = str(b.reorderDays).trim();
+    const days = raw === "" ? null : /^\d+$/.test(raw) ? Number(raw) : NaN;
+    await setReorderDays(db, shop.id, product.id, days);
+    revalidatePath(`/admin/products/${product.id}`);
+    return { ok: true, message: days ? `Saved. Buyers are asked if they're running low ${days} days after it arrives.` : "Saved. No reorder reminder for it." };
   },
   "POST products/:id/listing": async ({ params, shop }) => {
     const run = await writeListing(await agents(), shop, params.id!);
