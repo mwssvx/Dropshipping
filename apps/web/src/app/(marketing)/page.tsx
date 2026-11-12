@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatMoney, FREE_FEE_PERCENT, PLANS } from "@sf/core";
+import { formatMoney, FREE_FEE_PERCENT, PLANS, SUPPORT_HOURS } from "@sf/core";
 import { BRAND } from "@/lib/brand";
 
 export const metadata = {
@@ -20,7 +20,7 @@ const INCLUDED = [
 
 const FIXES = [
   ["Payouts paused? You see why.", "Every hold shows the reason, what we need, and when money moves again. Send a document from your phone."],
-  ["People when it matters", "The assistant handles routine questions and hands anything serious to a person, in the same chat."],
+  ["A person, with a promised time", `Write to our team from your admin and a real person answers within ${SUPPORT_HOURS.free} hours on every plan, faster on paid plans. You see by when.`],
   ["No surprise shutdowns", "If something's wrong you get a warning, a reason and a date, and you can appeal to a person."],
   ["Leave whenever you like", "Export your whole store in one file, at any time, for free."],
 ];
@@ -30,6 +30,7 @@ const FAQ = [
   ["What does it cost?", `Free costs $0 a month: you pay ${FREE_FEE_PERCENT}% of a sale only when you make one. Once you're earning, paid plans start at ${formatMoney(PLANS.starter.monthlyMinor, "USD")} a month and take nothing from your sales. Card processing fees are separate and the same on every plan.`],
   ["How do I get paid?", "Through Stripe, straight to your bank. The Money page shows what each sale nets after fees and when the next payout lands."],
   ["Where can I sell?", "Stores can be based in the US, UK, EU, Canada and about 70 more countries, and sell to buyers wherever your supplier ships, including the US. Where Stripe has no full accounts, it pays your money straight to your local bank."],
+  ["Can I talk to a person?", `Yes, on every plan. A person from our team answers within ${SUPPORT_HOURS.free} hours, any day, ${SUPPORT_HOURS.growth} on Growth and ${SUPPORT_HOURS.scale} on Scale. Your request shows by when, and says so if we're late.`],
   ["Can I take my store elsewhere?", "Yes. One click downloads everything: products, collections, pages, your theme and settings."],
 ];
 

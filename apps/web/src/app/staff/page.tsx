@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getEscalation, listEscalations, listOpenAppeals, listStoresForStaff, NOTICE_REASONS } from "@sf/core";
+import { formatWait, getEscalation, listEscalations, listOpenAppeals, listStoresForStaff, NOTICE_REASONS, SUPPORT_HOURS, supportRecord, supportWait } from "@sf/core";
 import { requireStaff } from "@/lib/server";
 import { DecideAppealForm, StaffReplyForm } from "./StaffForms";
 
@@ -9,18 +9,34 @@ const STATUS: Record<string, string> = { active: "pill-success", paused: "pill-c
 export default async function StaffHome() {
   const { db } = await requireStaff();
   const [appeals, stores, escalations] = await Promise.all([listOpenAppeals(db), listStoresForStaff(db), listEscalations(db)]);
-  const threads = await Promise.all(escalations.slice(0, 30).map((e) => getEscalation(db, e.conversation.id)));
+  const now = new Date();
+  // Whoever has waited past their promised answer time comes first, then whoever is due soonest.
+  const threads = (await Promise.all(escalations.slice(0, 30).map((e) => getEscalation(db, e.conversation.id))))
+    .map((t) => ({ ...t, wait: supportWait(t.messages, t.conversation.createdAt, t.shop.plan, now) }))
+    .sort((a, b) => (a.wait?.dueAt.getTime() ?? Infinity) - (b.wait?.dueAt.getTime() ?? Infinity));
+  const record = await supportRecord(db, 30, now);
+  const late = threads.filter((t) => t.wait?.overdue).length;
   return (
     <main className="px-4 sm:px-8 py-6 flex flex-col gap-6 max-w-5xl">
       <section className="flex flex-col gap-3" aria-labelledby="escalations">
         <h1 id="escalations" className="text-2xl font-bold tracking-tight">Escalations ({escalations.length})</h1>
+        <p className="text-sm" aria-label="Answer times">
+          Promise: a person answers within {SUPPORT_HOURS.free} hours on Free and Starter, {SUPPORT_HOURS.growth} on Growth, {SUPPORT_HOURS.scale} on Scale.{" "}
+          {record.answered > 0
+            ? <>Last 30 days: {record.onTime} of {record.answered} answers on time, typical wait {formatWait(record.medianMinutes!)}.</>
+            : <>No answers in the last 30 days yet.</>}
+          {late > 0 && <span className="text-critical font-semibold"> {late} late now.</span>}
+        </p>
         {escalations.length === 0 && <p className="hint">Nothing escalated.</p>}
-        {threads.map(({ conversation: c, shop, messages }) => (
+        {threads.map(({ conversation: c, shop, messages, wait }) => (
           <article key={c.id} className="card p-5 flex flex-col gap-3">
             <div className="flex items-center gap-3 flex-wrap">
               <Link href={`/staff/stores/${shop.id}`} className="font-semibold underline">{shop.name}</Link>
               <span className={`pill ${c.kind === "ticket" ? "pill-info" : "pill-critical"}`}>{c.kind === "ticket" ? "Merchant ticket" : "Buyer conversation"}</span>
               <span className="hint">{c.subject} · {day.format(c.createdAt)}</span>
+              {wait && (wait.overdue
+                ? <span className="pill pill-critical">Late by {formatWait((now.getTime() - wait.dueAt.getTime()) / 60_000)}</span>
+                : <span className="pill pill-warning">Answer within {formatWait((wait.dueAt.getTime() - now.getTime()) / 60_000)}</span>)}
             </div>
             {c.statusReason && <p className="text-sm"><span className="font-semibold">Why: </span>{c.statusReason}</p>}
             <ol className="flex flex-col gap-2 text-sm">

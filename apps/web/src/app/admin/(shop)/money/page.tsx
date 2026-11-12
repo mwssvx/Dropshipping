@@ -107,6 +107,7 @@ export default async function MoneyPage({ searchParams }: { searchParams: Promis
               {r.submittedAt ? <span className="pill pill-info">Sent, being checked</span> : r.dueBy ? <span className="pill pill-warning">Due {day.format(r.dueBy)}</span> : <span className="pill pill-critical">Needed now</span>}
             </div>
             <p className="text-sm"><span className="font-semibold">Why: </span>{r.explanation}</p>
+            <p className="hint text-sm">Questions about this? <Link className="underline" href="/admin/support">Ask a person from our team</Link>.</p>
             {r.holdsPayouts && (
               <p className="text-sm">
                 Your money is safe. Sales keep coming in and are paid out as soon as this is cleared
