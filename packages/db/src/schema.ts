@@ -715,6 +715,8 @@ export const orders = pgTable(
     taxBreakdown: jsonb("tax_breakdown").$type<TaxBreakdownLine[]>().notNull().default([]),
     taxCalculationId: text("tax_calculation_id"),
     presentment: jsonb("presentment").$type<Presentment>(),
+    // The store language the buyer checked out in ("de"), so emails about the order use it. Null is English.
+    language: text("language"),
     // The email campaign the buyer came from, when they clicked one in the last week.
     campaignId: uuid("campaign_id").references((): AnyPgColumn => campaigns.id, { onDelete: "set null" }),
     // Where the buyer's visit came from: a referring site ("instagram.com") or its utm_source, null when direct.

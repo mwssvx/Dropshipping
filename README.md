@@ -2352,3 +2352,7 @@ Reviews brought over from Shopify Product Reviews or Judge.me now say so on the 
 ### The order page in every store language (after launch, part 468)
 
 The buyer's order page now follows the store language they shopped in: the thank-you, what happens next, order progress, delivery dates, parcels and tracking, refunds, totals, downloads, gift and subscription notes, and the review, return, cancel and question forms, with dates written the local way. The words live in `apps/web/src/lib/order-text.ts` (English, German, French, Spanish, Italian, Dutch). Error messages from the server and the order edit form are still in English.
+
+### Order emails in the buyer's language (after launch, part 469)
+
+An order now remembers the store language the buyer checked out in (`orders.language`, migration 0162; only languages the store offers are kept). The emails buyers get most go out in that language: the order confirmation, shipped, delivered or picked up, refund, ready to pick up, the "Track your order" link and the checkout reminder, with dates written the local way. The words are in `packages/core/src/email-text.ts`. Rarer emails (bank transfer, payment links, order changes, the second reminder with a code, gift notes and the per-parcel shipping email) are still in English.

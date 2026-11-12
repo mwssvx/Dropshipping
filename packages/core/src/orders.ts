@@ -6,6 +6,7 @@ import { BLOCKED_MESSAGE, blockedMatch } from "./blocklist";
 import { tipAmount } from "./tips";
 import { blockedItemMessage } from "./country-limits";
 import { applyDisputeEvent } from "./disputes";
+import { shopLanguages } from "./languages";
 import { NotFoundError, UserError } from "./errors";
 import type { PaymentEvent, PaymentProvider } from "./payments";
 import { applyDiscount, automaticOffers, bxgyMissing, describeDiscount, findUsableDiscount, spreadDiscountOver, type Discount, type OfferUnit, type UsableDiscount } from "./discounts";
@@ -464,6 +465,8 @@ export async function startCheckout(
     subscription?: { id: string; percentOff: number };
     /** The buyer is on the store's checkout page, so the store's phone setting applies. */
     storefront?: boolean;
+    /** The store language the buyer is reading ("de"), for emails about the order. Ignored unless the store offers it. */
+    language?: string | null;
     /**
      * Whose tax exemption applies when nobody is signed in: set only by the merchant's own tools
      * (a payment link they built), never from a form the buyer fills in.
@@ -656,6 +659,7 @@ export async function startCheckout(
         platformFeeMinor,
         processingFeeMinor: dueMinor ? estimateProcessingFee(dueMinor) : 0,
         presentment,
+        language: input.language && (shopLanguages(shop) as string[]).includes(input.language) ? input.language : null,
         campaignId,
         visitSource: input.visitSource?.slice(0, 100) || null,
         visitPostId: input.visitPostId ?? null,

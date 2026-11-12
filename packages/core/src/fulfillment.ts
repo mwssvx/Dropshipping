@@ -23,6 +23,7 @@ import { describePersonalization } from "./personalization";
 import { byShipping, orderParcels, parcelShippedEmail } from "./parcels";
 import { formatShipsBy, preorderWaitingOn } from "./preorders";
 import { MAX_BULK_ORDERS } from "./orders";
+import { emailText, type EmailText } from "./email-text";
 
 /** A personalised item's text, under it in emails. */
 /**
@@ -508,7 +509,11 @@ export const ORDER_EMAIL_LABELS: Record<EmailKind, string> = {
 async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kind: EmailKind, ref: string) {
   const link = await ctx.orderStatusUrl(shop, order);
   // On a gift the address is the recipient's, so the buyer is greeted by the name they gave.
-  const first = (order.gift?.from ?? order.shippingAddress.name).split(" ")[0];
+  const first = (order.gift?.from ?? order.shippingAddress.name).split(" ")[0] ?? "";
+  // The buyer's store language for the emails they get most; the rest stay in English.
+  const e = emailText(order.language);
+  const shortDay = new Intl.DateTimeFormat(e.locale, { month: "short", day: "numeric", timeZone: "UTC" });
+  const window = (w: Parameters<typeof formatDeliveryWindow>[0]) => (order.language ? formatDeliveryWindow(w, (d) => shortDay.format(d)) : formatDeliveryWindow(w));
   if (kind === "gift_shipped") {
     const gift = order.gift!;
     const shipped = await ctx.db.query.fulfillments.findMany({
@@ -533,15 +538,15 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
   }
   if (kind === "order_link") {
     return {
-      subject: `Your order #${order.number} from ${shop.name}`,
+      subject: e.linkSubject(order.number, shop.name),
       text: [
-        `Hi ${first},`,
+        e.hi(first),
         ``,
-        `Here's the link to your order #${order.number}, where you can see where it is, track it and ask us anything about it:`,
+        e.linkIntro(order.number),
         ``,
         link,
         ``,
-        `You asked for this on our "Track your order" page. If it wasn't you, you can ignore this email.`,
+        e.linkFooter,
       ].join("\n"),
     };
   }
@@ -609,21 +614,21 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
     const paid = buyerAmounts(order, lines);
     const pay = ctx.payUrl ? await ctx.payUrl(shop, order) : link;
     return {
-      subject: `You left something at ${shop.name}`,
+      subject: e.cartSubject(shop.name),
       text: [
-        `Hi ${first},`,
+        e.hi(first),
         ``,
-        `You started checking out at ${shop.name} but didn't finish. Your cart is saved:`,
+        e.cartIntro(shop.name),
         ``,
         ...lines.flatMap((l, n) => [`  ${l.title} × ${l.quantity}  ${formatMoney(paid.lines[n]!, paid.currency)}`, ...personalised(l)]),
         ``,
-        `Total: ${formatMoney(paid.totalMinor, paid.currency)}`,
-        ...(paid.giftCardMinor ? [`Left to pay after your gift card: ${formatMoney(paid.chargedMinor, paid.currency)}`] : []),
+        e.cartTotal(formatMoney(paid.totalMinor, paid.currency)),
+        ...(paid.giftCardMinor ? [e.cartAfterGift(formatMoney(paid.chargedMinor, paid.currency))] : []),
         ...(await holidayReminder(ctx.db, shop, order, lines)),
         ``,
-        `Finish your order: ${pay}`,
+        e.cartFinish(pay),
         ``,
-        `If you changed your mind, there's nothing to do. We won't email you about it again.`,
+        e.cartChangedMind,
       ].join("\n"),
     };
   }
@@ -686,24 +691,24 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
     const toCardMinor = refund.amountMinor - toGift;
     const where =
       toGift && toCardMinor
-        ? `${formatMoney(toCardMinor, order.currency)} to the card you paid with and ${formatMoney(toGift, order.currency)} back onto your gift card`
+        ? e.refundCardAndGift(formatMoney(toCardMinor, order.currency), formatMoney(toGift, order.currency))
         : toGift
-          ? `${formatMoney(toGift, order.currency)} back onto your gift card`
+          ? e.refundGift(formatMoney(toGift, order.currency))
           : null;
     return {
-      subject: `Refund for order #${order.number}`,
+      subject: e.refundSubject(order.number),
       text: [
-        `Hi ${first},`,
+        e.hi(first),
         ``,
         where
-          ? `${shop.name} refunded ${where}${full ? " (the whole order)" : ""}.`
-          : `${shop.name} refunded ${refund.presentmentAmountMinor != null && order.presentment ? formatMoney(refund.presentmentAmountMinor, order.presentment.currency) : formatMoney(refund.amountMinor, order.currency)} to the card you paid with${full ? " (the whole order)" : ""}.`,
-        ...(refund.reason ? [``, `Reason: ${refund.reason}`] : []),
+          ? e.refunded(shop.name, where, full)
+          : e.refundedToCard(shop.name, refund.presentmentAmountMinor != null && order.presentment ? formatMoney(refund.presentmentAmountMinor, order.presentment.currency) : formatMoney(refund.amountMinor, order.currency), full),
+        ...(refund.reason ? [``, e.reason(refund.reason)] : []),
         ``,
-        toCardMinor ? `Banks usually show card refunds within 5 to 10 business days.` : `You can use the gift card again right away.`,
-        ...(note ? [``, `Credit note ${note.number}: ${link}/invoice?doc=${note.id}`] : []),
+        toCardMinor ? e.bankDays : e.giftCardNow,
+        ...(note ? [``, e.creditNote(note.number, `${link}/invoice?doc=${note.id}`)] : []),
         ``,
-        `Order status: ${link}`,
+        e.orderStatus(link),
       ].join("\n"),
     };
   }
@@ -734,65 +739,61 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
     const arrives = onlyDownloads ? null : await orderDelivery(ctx.db, shop, order);
     const origins = await shipsFromOf(ctx.db, { orderId: order.id });
     return {
-      subject: `Order #${order.number} confirmed`,
+      subject: e.confirmedSubject(order.number),
       text: [
-        `Hi ${first},`,
+        e.hi(first),
         ``,
-        `Thanks for your order from ${shop.name}. Here's what you bought:`,
+        e.thanksIntro(shop.name),
         ``,
         ...lines.flatMap((l, n) => [`  ${l.title} × ${l.quantity}  ${formatMoney(paid.lines[n]!, paid.currency)}`, ...personalised(l)]),
         ``,
-        `${paid.giftCardMinor ? "Total" : "Total paid"}: ${formatMoney(paid.totalMinor, paid.currency)}`,
+        e.total(formatMoney(paid.totalMinor, paid.currency), !!paid.giftCardMinor),
         ...(paid.giftCardMinor
-          ? [`Paid with gift card: ${formatMoney(paid.giftCardMinor, paid.currency)}`, ...(paid.chargedMinor ? [`Paid by card: ${formatMoney(paid.chargedMinor, paid.currency)}`] : [])]
+          ? [e.paidGiftCard(formatMoney(paid.giftCardMinor, paid.currency)), ...(paid.chargedMinor ? [e.paidCard(formatMoney(paid.chargedMinor, paid.currency))] : [])]
           : []),
-        ...(paid.giftWrapMinor ? [`Includes gift wrapping: ${formatMoney(paid.giftWrapMinor, paid.currency)}`] : []),
-        ...(paid.tipMinor ? [`Includes a tip: ${formatMoney(paid.tipMinor, paid.currency)}`] : []),
+        ...(paid.giftWrapMinor ? [e.giftWrap(formatMoney(paid.giftWrapMinor, paid.currency))] : []),
+        ...(paid.tipMinor ? [e.tip(formatMoney(paid.tipMinor, paid.currency))] : []),
         ...(downloads.length
-          ? [``, `Your download${downloads.length > 1 ? "s" : ""} (each link works ${DOWNLOADS_PER_ITEM} times for every one you bought):`, ...downloads.map((d) => `  ${d.title}: ${link}/download/${d.lineId}`)]
+          ? [``, e.downloads(downloads.length > 1, DOWNLOADS_PER_ITEM), ...downloads.map((d) => `  ${d.title}: ${link}/download/${d.lineId}`)]
           : []),
-        ...(invoice ? [``, `Your invoice ${invoice.number}: ${link}/invoice`] : []),
-        ...(paid.protectionMinor
-          ? [``, `Delivery protection (${formatMoney(paid.protectionMinor, paid.currency)}): if it's lost or arrives damaged, tell ${shop.name} from your order page and they'll send it again for free.`]
+        ...(invoice ? [``, e.invoice(invoice.number, `${link}/invoice`)] : []),
+        ...(paid.protectionMinor ? [``, e.protection(formatMoney(paid.protectionMinor, paid.currency), shop.name)] : []),
+        ...(order.preorderShipsBy
+          ? [``, e.preorder(order.language ? new Intl.DateTimeFormat(e.locale, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${order.preorderShipsBy}T12:00:00Z`)) : formatShipsBy(order.preorderShipsBy))]
           : []),
-        ...(order.preorderShipsBy ? [``, `Pre-order: it ships by ${formatShipsBy(order.preorderShipsBy)}. We'll email tracking as soon as it's on its way.`] : []),
-        ...(arrives ? [``, `Expected delivery: ${formatDeliveryWindow(arrives)}.`] : []),
-        ...dutiesLine(shop, order, origins),
+        ...(arrives ? [``, e.expected(window(arrives))] : []),
+        ...dutiesLine(shop, order, origins, e),
         ...(order.gift
-          ? [
-              ``,
-              `It's a gift for ${order.shippingAddress.name}.${order.gift.recipientEmail ? ` We'll email ${order.gift.recipientEmail} when it ships${order.gift.message ? ", with your message" : ""} and tracking, but no prices.` : ""}`,
-              ...(order.gift.message ? [`Your message: ${order.gift.message}`] : []),
-            ]
+          ? [``, e.giftFor(order.shippingAddress.name, order.gift.recipientEmail ?? null, !!order.gift.message), ...(order.gift.message ? [e.giftMessage(order.gift.message)] : [])]
           : []),
-        ...(order.buyerNote ? [``, `Your note to ${shop.name}: ${order.buyerNote}`] : []),
-        ...(order.parentOrderId ? [``, `You added this after checkout, so it's charged to the same card. It may arrive separately from order #${parentNumber}.`] : []),
-        ...(order.source === "subscription" ? [``, `This is a delivery from your subscription, charged to your saved card. The link in your subscription emails lets you skip, change or cancel the next one.`] : []),
+        ...(order.buyerNote ? [``, e.yourNote(shop.name, order.buyerNote)] : []),
+        ...(order.parentOrderId ? [``, e.addedAfter(parentNumber)] : []),
+        ...(order.source === "subscription" ? [``, e.subscription] : []),
         ...(shop.thankYouNote ? [``, shop.thankYouNote] : []),
         ``,
         onlyDownloads
-          ? `There's nothing to ship. Your downloads are also on your order page: ${link}`
+          ? e.nothingToShip(link)
           : order.pickup
-          ? `You're picking it up from ${shop.name}. We'll email you when it's ready, with the address. See your order any time: ${link}`
+          ? e.pickingUp(shop.name, link)
           : order.localDelivery
-            ? `${shop.name} is delivering it to you themselves${shop.localDeliveryArea?.note ? ` (${shop.localDeliveryArea.note})` : ""}. See your order any time: ${link}`
-            : `We'll email you again when it ships. Track your order any time: ${link}`,
+            ? e.localDelivery(shop.name, shop.localDeliveryArea?.note ?? null, link)
+            : e.willEmail(link),
       ].join("\n"),
     };
   }
   if (kind === "pickup_ready") {
     const pickup = shop.localPickup;
     return {
-      subject: `Order #${order.number} is ready to pick up`,
+      subject: e.pickupSubject(order.number),
       text: [
-        `Hi ${first},`,
+        e.hi(first),
         ``,
-        `Your order from ${shop.name} is ready. Pick it up from:`,
+        e.pickupReady(shop.name),
         ``,
         ...(pickup?.address ?? "").split("\n").map((l) => `  ${l}`),
         ...(pickup?.instructions ? [``, pickup.instructions] : []),
         ``,
-        `Bring your order number, #${order.number}. Order status: ${link}`,
+        e.bring(order.number, link),
       ].join("\n"),
     };
   }
@@ -802,20 +803,20 @@ async function buildEmail(ctx: FulfillmentContext, order: Order, shop: Shop, kin
   const tracking = shipped.map((f) => `  ${f.carrier}: ${f.trackingNumber}${f.trackingUrl ? `  ${f.trackingUrl}` : ""}`);
   if (kind === "shipping_update") {
     return {
-      subject: `Order #${order.number} is on its way`,
-      text: [`Hi ${first},`, ``, `Good news: your order from ${shop.name} has shipped.`, ``, ...tracking, ``, `Order status: ${link}`].join("\n"),
+      subject: e.shippedSubject(order.number),
+      text: [e.hi(first), ``, e.shipped(shop.name), ``, ...tracking, ``, e.orderStatus(link)].join("\n"),
     };
   }
   return {
-    subject: `Order #${order.number} was ${order.pickup ? "picked up" : "delivered"}`,
+    subject: e.deliveredSubject(order.number, !!order.pickup),
     text: [
-      `Hi ${first},`,
+      e.hi(first),
       ``,
-      order.pickup ? `Thanks for picking up your order from ${shop.name}. We hope you love it.` : `Your order from ${shop.name} was delivered. We hope you love it.`,
+      e.delivered(shop.name, !!order.pickup),
       ``,
-      `If anything's wrong, reply to this email. If you like it, a short review helps other buyers: ${link}#review`,
+      e.reviewAsk(link),
       ``,
-      `Order status: ${link}`,
+      e.orderStatus(link),
     ].join("\n"),
   };
 }
@@ -891,11 +892,11 @@ export async function deliverOrderEmail(ctx: FulfillmentContext, shop: Shop, ord
 }
 
 /** The import duties note on a receipt for an order crossing customs, as said at checkout. */
-function dutiesLine(shop: Shop, order: Order, origins: (string | null)[]) {
+function dutiesLine(shop: Shop, order: Order, origins: (string | null)[], e: EmailText = emailText(null)) {
   if (order.pickup || order.localDelivery) return [];
   const policy = dutiesFor(shop, order.shippingAddress.country, origins.length ? origins : null);
   if (!policy) return [];
-  return [``, policy === "included" ? "Import duties and taxes are included, so there's nothing more to pay when it arrives." : "Customs may charge import duties or taxes when it arrives. They're paid to the courier and weren't part of this total."];
+  return [``, policy === "included" ? e.dutiesIncluded : e.dutiesBuyerPays];
 }
 
 /** The longest update a merchant can email to buyers. */

@@ -8,7 +8,7 @@ import { cartLineKey, cleanPersonalization, sameCartLine, acceptPostPurchaseOffe
 import { readCart, readDiscountCode, readGiftCardCode, writeCart, writeDiscountCode, writeGiftCardCode } from "@/lib/cart";
 import { agents, campaigns, db, fulfillment, mailer, payments, platformUrl, refunds, storeAddress, subscriptions, tax } from "@/lib/server";
 import { afterOrderPaid, processPaymentWebhook } from "@/lib/webhooks";
-import { loadShop, storeBase } from "./data";
+import { loadShop, storeBase, storeLang } from "./data";
 import { buyerFx, currencyCookie } from "@/lib/currency";
 import { campaignCookie } from "@/lib/campaigns";
 import { currentBuyer } from "@/lib/buyer";
@@ -210,6 +210,7 @@ export async function checkoutAction(handle: string, _: CheckoutState, form: For
         phone: values.phone || undefined,
       },
       storefront: true,
+      language: await storeLang(handle),
       lines: await readCart(shop.id),
       discountCode: await readDiscountCode(shop.id),
       fx: await buyerFx(shop),
