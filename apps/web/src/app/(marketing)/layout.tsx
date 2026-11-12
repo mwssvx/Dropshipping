@@ -19,6 +19,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
           <span className="hint">© {new Date().getFullYear()} {BRAND}</span>
           <nav className="flex flex-wrap gap-x-5 gap-y-2" aria-label="Footer">
             <Link className="hint hover:text-ink" href="/pricing">Pricing</Link>
+            <Link className="hint hover:text-ink" href="/payout-rules">Payout rules</Link>
             {LEGAL_DOCS.map((d) => (
               <Link key={d.slug} className="hint hover:text-ink" href={`/legal/${d.slug}`}>{d.short}</Link>
             ))}

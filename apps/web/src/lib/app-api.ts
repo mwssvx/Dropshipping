@@ -56,6 +56,8 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  payoutGuide,
+  PAYOUT_GUIDE_NOTES,
   changeProductHandle,
   RETURNS_MIN_SOLD,
   RETURNS_REPORT_DAYS,
@@ -3605,6 +3607,8 @@ const routes: Record<string, Handler> = {
       // The products earning (or losing) the most in the last 30 days, after ads.
       topProducts: profit.products.slice(0, 5).map((p) => ({ title: p.title, units: p.units, profitMinor: p.profitMinor, adsMinor: p.adsMinor, roas: p.roas })),
       payoutsEnabled: shop.payoutsEnabled,
+      // What to have ready before payout setup, until payouts are on.
+      guide: shop.payoutsEnabled ? null : { ...payoutGuide(shop.country), notes: PAYOUT_GUIDE_NOTES },
       // Disputes waiting for an answer, for the button to the Disputes screen.
       disputesOpen: await countOpenDisputes(db, shop.id),
       payouts: payouts.map((p) => ({ id: p.id, amountMinor: p.amountMinor, status: p.status, arrivalDate: p.arrivalDate })),

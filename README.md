@@ -2316,3 +2316,7 @@ A product's screen in the app has "Web address": change it to something short li
 ### Start free, upgrade once you're earning (after launch, part 459)
 
 The Free plan now takes 5% of each sale and nothing a month, so a new store pays only when it sells. Starter is $29, Growth $69 and Scale $199 a month, all with 0% of sales. The pricing page, the Plan page and the app say how much a store needs to sell before Starter costs less (about $580 a month) and tell it when that happens (`breakEvenMinor` and `upgradeHint` in `packages/core/src/plans.ts`).
+
+### What you need to get paid, and the payout rules (after launch, part 460)
+
+Before payout setup, the Money page (and the app's Money tab) lists what to have ready for the store's country in plain words: name, birthday and home address (no shop or office), a bank account, and for US sellers the last 4 digits of their SSN or a free EIN instead. It says no company is needed, that the details go to Stripe's own page and never to us, and that the store can be built first (`payoutGuide` in `packages/core/src/payout-guide.ts`). A public **Payout rules** page (`/payout-rules`, linked from sign-up, the footer and Money) says when money arrives, what can pause it, and what we promise when it does.

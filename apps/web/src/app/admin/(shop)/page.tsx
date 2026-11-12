@@ -28,7 +28,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
     { done: counts.products > 0, title: "Import your first product", href: "/admin/products/import" },
     { done: counts.activeProducts > 0, title: "Make a product active so buyers can see it", href: "/admin/products" },
     { done: counts.paid > 0, title: "Place a test order on your store", href: `/s/${shop.handle}` },
-    { done: shop.payoutsEnabled || requirements.length > 0, title: "Set up payouts so you get paid", href: "/admin/money" },
+    { done: shop.payoutsEnabled || requirements.length > 0, title: "Set up payouts when you're ready to get paid (about 5 minutes)", href: "/admin/money" },
     { done: twoStep.on, title: "Turn on two-step sign-in to keep your money safe", href: "/admin/account" },
   ];
   const left = steps.filter((s) => !s.done).length;

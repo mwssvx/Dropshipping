@@ -19,6 +19,7 @@ type Money = {
   topProducts: { title: string; units: number; profitMinor: number; adsMinor: number; roas: number | null }[];
   payouts: { id: string; amountMinor: number; status: string; arrivalDate: string | null }[];
   holds: { id: string; title: string; explanation: string; holdsPayouts: boolean; dueBy: string | null; submittedAt: string | null; upload: boolean }[];
+  guide?: { ready: string[]; taxId: string | null; bank: string; notes: string[] } | null;
 };
 
 type Channel = "meta" | "google" | "tiktok" | "other";
@@ -122,7 +123,17 @@ export default function MoneyScreen() {
               <Stat label="Paid out so far" value={money(d.paidOutMinor, d.currency)} />
             </View>
           </List>
-          {!d.payoutsEnabled && d.holds.length === 0 ? <Banner tone="warning">Payouts aren't set up yet. Set them up on the web under Money so you get paid.</Banner> : null}
+          {!d.payoutsEnabled && d.holds.length === 0 ? <Banner tone="warning">Payouts aren't set up yet. Set them up on the web under Money when you're ready to get paid.</Banner> : null}
+          {!d.payoutsEnabled && d.holds.length === 0 && d.guide ? (
+            <Section title="What you'll need for payouts">
+              <Card>
+                <View style={{ gap: space(2) }}>
+                  {[...d.guide.ready, d.guide.bank, ...(d.guide.taxId ? [d.guide.taxId] : [])].map((r) => <Body key={r}>{`• ${r}`}</Body>)}
+                  {d.guide.notes.map((n) => <Body key={n} muted>{n}</Body>)}
+                </View>
+              </Card>
+            </Section>
+          ) : null}
 
           <Section title="Last 30 days">
             <List>

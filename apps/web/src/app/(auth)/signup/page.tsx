@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AuthForm } from "../AuthForm";
 import { signUpAction } from "../actions";
 
@@ -13,6 +14,12 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
         <p className="hint mt-1">{invited ? "Use the email address the invite was sent to." : "Everything you need is included, with no apps to buy. Start free."}</p>
       </div>
       <AuthForm mode="signup" action={signUpAction} next={invited ? next : undefined} email={email} />
+      {!invited && (
+        <p className="hint text-sm">
+          No company, office or bank details needed to start. You add payout details only when you&apos;re ready to get paid.{" "}
+          <Link className="underline" href="/payout-rules">Payout rules</Link>
+        </p>
+      )}
     </div>
   );
 }
