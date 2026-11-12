@@ -4,6 +4,9 @@
 // have ready, that no company or shop premises are needed, that we never see the numbers, and that
 // none of it is needed until the store is ready to take real orders.
 
+import { countryName } from "./shipping";
+import { LAUNCH_COUNTRIES, payoutRoute } from "./shops";
+
 export type PayoutGuide = {
   /** What to have ready, one short line each. */
   ready: string[];
@@ -11,6 +14,8 @@ export type PayoutGuide = {
   taxId: string | null;
   /** The kind of bank account payouts go to. */
   bank: string;
+  /** For countries paid through cross-border payouts: how that works. */
+  crossBorder: string | null;
 };
 
 const EU_IBAN = "A bank account in your name with an IBAN in the country your store is based in";
@@ -28,6 +33,7 @@ export function payoutGuide(country: string): PayoutGuide {
       taxId:
         "The last 4 digits of your Social Security number to start. Stripe asks for the full number only once your sales grow, because US tax law needs it for the yearly 1099-K form. Rather not use your SSN? Get a free EIN from the IRS (irs.gov, about 10 minutes online, no company needed) and use that instead.",
       bank: "A US bank account in your name (routing and account number)",
+      crossBorder: null,
     };
   }
   if (country === "CA") {
@@ -35,12 +41,23 @@ export function payoutGuide(country: string): PayoutGuide {
       ready,
       taxId: "Stripe may ask for your Social Insurance Number or business number once your sales grow.",
       bank: "A Canadian bank account in your name (transit, institution and account number)",
+      crossBorder: null,
     };
   }
   if (country === "GB") {
-    return { ready, taxId: null, bank: "A UK bank account in your name (sort code and account number)" };
+    return { ready, taxId: null, bank: "A UK bank account in your name (sort code and account number)", crossBorder: null };
   }
-  return { ready, taxId: "Some countries ask for a tax number once your sales grow; Stripe tells you if yours does.", bank: EU_IBAN };
+  const taxId = "Some countries ask for a tax number once your sales grow; Stripe tells you if yours does.";
+  if ((LAUNCH_COUNTRIES as readonly string[]).includes(country)) return { ready, taxId, bank: EU_IBAN, crossBorder: null };
+  const name = countryName(country);
+  const bank = `A bank account in your name in ${name}. Stripe pays out in your local currency`;
+  if (payoutRoute(country) === "own_account") return { ready, taxId, bank, crossBorder: null };
+  return {
+    ready,
+    taxId,
+    bank,
+    crossBorder: `Stripe doesn't open full accounts in ${name} yet, so buyers pay through us and Stripe sends your money straight to your bank (cross-border payouts). Your store sells in US dollars, and payouts can take a few days longer.`,
+  };
 }
 
 /** Lines shown with every guide: why we ask, and who sees what. */

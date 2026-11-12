@@ -19,7 +19,7 @@ type Money = {
   topProducts: { title: string; units: number; profitMinor: number; adsMinor: number; roas: number | null }[];
   payouts: { id: string; amountMinor: number; status: string; arrivalDate: string | null }[];
   holds: { id: string; title: string; explanation: string; holdsPayouts: boolean; dueBy: string | null; submittedAt: string | null; upload: boolean }[];
-  guide?: { ready: string[]; taxId: string | null; bank: string; notes: string[] } | null;
+  guide?: { ready: string[]; taxId: string | null; bank: string; crossBorder: string | null; notes: string[] } | null;
 };
 
 type Channel = "meta" | "google" | "tiktok" | "other";
@@ -129,6 +129,7 @@ export default function MoneyScreen() {
               <Card>
                 <View style={{ gap: space(2) }}>
                   {[...d.guide.ready, d.guide.bank, ...(d.guide.taxId ? [d.guide.taxId] : [])].map((r) => <Body key={r}>{`• ${r}`}</Body>)}
+                  {d.guide.crossBorder ? <Body>{d.guide.crossBorder}</Body> : null}
                   {d.guide.notes.map((n) => <Body key={n} muted>{n}</Body>)}
                 </View>
               </Card>

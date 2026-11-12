@@ -25,6 +25,7 @@ function PayoutGuideList({ country }: { country: string }) {
         <li>{guide.bank}</li>
         {guide.taxId && <li>{guide.taxId}</li>}
       </ul>
+      {guide.crossBorder && <p className="text-sm">{guide.crossBorder}</p>}
       <ul className="text-sm hint flex flex-col gap-1">
         {PAYOUT_GUIDE_NOTES.map((n) => <li key={n}>{n}</li>)}
       </ul>

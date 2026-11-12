@@ -29,7 +29,7 @@ const FAQ = [
   ["Do I need to hold stock?", "No. You list products from a supplier, and each paid order goes to them to pack and ship to your buyer."],
   ["What does it cost?", `Free costs $0 a month: you pay ${FREE_FEE_PERCENT}% of a sale only when you make one. Once you're earning, paid plans start at ${formatMoney(PLANS.starter.monthlyMinor, "USD")} a month and take nothing from your sales. Card processing fees are separate and the same on every plan.`],
   ["How do I get paid?", "Through Stripe, straight to your bank. The Money page shows what each sale nets after fees and when the next payout lands."],
-  ["Where can I sell?", "Stores can be based in the US, UK, EU and Canada at launch, and sell to buyers wherever your supplier ships."],
+  ["Where can I sell?", "Stores can be based in the US, UK, EU, Canada and about 70 more countries, and sell to buyers wherever your supplier ships, including the US. Where Stripe has no full accounts, it pays your money straight to your local bank."],
   ["Can I take my store elsewhere?", "Yes. One click downloads everything: products, collections, pages, your theme and settings."],
 ];
 

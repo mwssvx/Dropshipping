@@ -2320,3 +2320,7 @@ The Free plan now takes 5% of each sale and nothing a month, so a new store pays
 ### What you need to get paid, and the payout rules (after launch, part 460)
 
 Before payout setup, the Money page (and the app's Money tab) lists what to have ready for the store's country in plain words: name, birthday and home address (no shop or office), a bank account, and for US sellers the last 4 digits of their SSN or a free EIN instead. It says no company is needed, that the details go to Stripe's own page and never to us, and that the store can be built first (`payoutGuide` in `packages/core/src/payout-guide.ts`). A public **Payout rules** page (`/payout-rules`, linked from sign-up, the footer and Money) says when money arrives, what can pause it, and what we promise when it does.
+
+### Stores in about 70 more countries (after launch, part 461)
+
+A store can now be based in about 70 more countries. In Australia, New Zealand, Switzerland, Norway, Japan, Singapore, Hong Kong, Mexico, the UAE, Malaysia and Thailand the seller opens their own Stripe account (`STRIPE_COUNTRIES`). In places where Stripe has no full accounts, like Türkiye, Kazakhstan, India, Colombia or Nigeria (`CROSS_BORDER_COUNTRIES`), the platform takes the card payment and Stripe pays the seller's local bank through cross-border payouts (a recipient account). These stores sell in US dollars and can sell to buyers anywhere their supplier ships, the US included. The store form says how a country gets paid, and the payout guide explains it (`payoutRoute` in `packages/core/src/shops.ts`).

@@ -109,3 +109,23 @@ test("the statement downloads as CSV", async ({ page }, info) => {
   expect(res.headers()["content-type"]).toContain("text/csv");
   expect(await res.text()).toMatch(/^date,type,reference,amount \(USD\),of which tax/);
 });
+
+test("a store based where Stripe has no full accounts is paid by cross-border payouts", async ({ page }, info) => {
+  const id = `${info.project.name}-kz-${Date.now()}`;
+  await page.goto("/signup");
+  await page.getByLabel("Email").fill(`m4-${id}@example.com`);
+  await page.getByLabel("Password").fill("correct horse battery");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByLabel("Store name").fill(`Steppe Lamps ${id}`);
+  await page.getByLabel("Where your business is based").selectOption("KZ");
+  await expect(page.getByRole("status")).toContainText("Stores in Kazakhstan sell in US dollars, and Stripe pays your money to your local bank.");
+  await page.getByRole("button", { name: "Create store" }).click();
+  await expect(page.getByRole("heading", { name: /Welcome to Steppe Lamps/ })).toBeVisible();
+
+  await page.getByRole("link", { name: "Money" }).first().click();
+  const guide = page.getByLabel("What you'll need");
+  await expect(guide).toContainText("A bank account in your name in Kazakhstan");
+  await expect(guide).toContainText("Stripe sends your money straight to your bank (cross-border payouts)");
+  await page.getByRole("button", { name: "Set up payouts" }).click();
+  await expect(page.getByText("Payouts are set up.")).toBeVisible();
+});
