@@ -2344,3 +2344,7 @@ A dropshipper pays the supplier when each order is sent to it, days before the b
 ### Help from a person, with a promised time (after launch, part 466)
 
 Any merchant can write to our team from **Help from a person** (`/admin/support`, linked from Your account, payout holds and the app's Settings), not only through the assistant. A real person answers within 24 hours on Free and Starter, 12 on Growth and 4 on Scale, any day; the promise is on the pricing and plan pages. Each request shows by when a person answers, says so if we're late, and the merchant can add to it, which puts it back in the queue. The staff Escalations list now puts whoever is waiting past their promise first, shows how long is left on each, and how many answers were on time over the last 30 days. `SUPPORT_HOURS`, `openTicket`, `replyToTicket`, `listTickets`, `supportWait` and `supportRecord` in `packages/core/src/support.ts`.
+
+### Imported reviews are marked (after launch, part 467)
+
+Reviews brought over from Shopify Product Reviews or Judge.me now say so on the product page and in the home page's reviews section ("Imported from Judge.me, not checked against an order here"), in every store language, and the product's reviews say how many came from verified buyers here and how many were imported. Only reviews from a real order here are called "Verified buyer". `importedCount` from `productReviews`, `imported` on `storeReviews`.

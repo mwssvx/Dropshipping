@@ -1,4 +1,4 @@
-import { and, avg, count, desc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, avg, count, desc, eq, gt, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
 import { z } from "zod";
 import type { Mailer } from "./email";
@@ -324,6 +324,9 @@ export async function productReviews(db: Db, productId: string, limit = REVIEWS_
     db.select({ n: count() }).from(schema.reviews).where(listed),
     db.select({ n: count() }).from(schema.reviews).where(and(where, hasPhotos)),
   ]);
+  // Reviews brought over from another platform weren't checked against an order here; say how many.
+  const [importedRow] = await db.select({ n: count() }).from(schema.reviews).where(and(where, isNotNull(schema.reviews.importedFrom)));
+  const importedCount = Number(importedRow?.n ?? 0);
   // breakdown[0] is one star, breakdown[4] five.
   const breakdown = [1, 2, 3, 4, 5].map((r) => Number(byRating.find((b) => b.rating === r)?.n ?? 0));
   const n = breakdown.reduce((a, b) => a + b, 0);
@@ -339,7 +342,7 @@ export async function productReviews(db: Db, productId: string, limit = REVIEWS_
   const listedCount = Number(listedRow?.n ?? 0);
   // How many reviews have photos, for the "With photos" filter.
   const withPhotosCount = Number(photoRow?.n ?? 0);
-  return { count: n, average: n ? Math.round((total / n) * 10) / 10 : null, reviews, photos, breakdown, listedCount, withPhotosCount };
+  return { count: n, average: n ? Math.round((total / n) * 10) / 10 : null, reviews, photos, breakdown, listedCount, withPhotosCount, importedCount };
 }
 
 /** A device's "helpful" id: the random value the store keeps in a cookie. */
@@ -467,6 +470,7 @@ export async function storeReviews(db: Db, shopId: string, limit = STORE_REVIEWS
         rating: schema.reviews.rating,
         body: schema.reviews.body,
         orderId: schema.reviews.orderId,
+        importedFrom: schema.reviews.importedFrom,
         photoIds: schema.reviews.photoIds,
         productTitle: schema.products.title,
         productHandle: schema.products.handle,
@@ -481,7 +485,7 @@ export async function storeReviews(db: Db, shopId: string, limit = STORE_REVIEWS
   return {
     count: n,
     average: n ? Math.round(Number(stats?.avg) * 10) / 10 : null,
-    latest: rows.map(({ orderId, photoIds, ...r }) => ({ ...r, verified: !!orderId, photoUrl: photoIds[0] ? reviewPhotoUrl(photoIds[0]) : null })),
+    latest: rows.map(({ orderId, importedFrom, photoIds, ...r }) => ({ ...r, verified: !!orderId, imported: importedFrom, photoUrl: photoIds[0] ? reviewPhotoUrl(photoIds[0]) : null })),
   };
 }
 export type StoreReviews = Awaited<ReturnType<typeof storeReviews>>;
