@@ -26,6 +26,11 @@ async function languageLinks(param: string, prefix: string) {
   return [{ code: "en", name: "English", href: href(null) }, ...langs.map((l) => ({ code: l, name: LANGUAGES[l].name, href: href(l) }))];
 }
 
+/** Checkout and payment pages keep the standard look, whatever custom CSS the store has. */
+async function isCheckoutPath() {
+  return /^\/(checkout|pay)(\/|$)/.test(await storePath());
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ shop: string }> }) {
   const { shop: param } = await params;
   const [shop, theme] = await Promise.all([loadShop(param), loadTheme(param)]);
@@ -88,7 +93,7 @@ export default async function StoreLayout({ children, params }: { children: Reac
   const popup = shop.signupPopupSeconds !== null && shop.status === "active" && !closure && !(await currentBuyer(shop.id))?.acceptsMarketing;
   const picker = currencies.length > 1 ? { currencies, current: (await buyerFx(shop)).currency, action: setCurrencyAction.bind(null, param) } : undefined;
   return (
-    <StoreShell doc={theme} shopName={shop.name} currency={shop.currency} base={base} cartCount={count} closed={shop.status !== "active"} notice={notice} verified={!!shop.verifiedAt && shop.status === "active"} picker={picker} t={t} payments={paymentMethods(shop)} signup={theme.settings.footerSignup && shop.status === "active" ? popupSignupAction.bind(null, param) : undefined} ageGate={theme.settings.ageGate ? { age: theme.settings.ageGate, storeKey: shop.id } : undefined} languages={langs.length ? { root, current: lang ?? "en", options: [{ code: "en", name: "English" }, ...langs.map((l) => ({ code: l, name: LANGUAGES[l].name }))] } : undefined}>
+    <StoreShell doc={theme} withoutCustomCss={await isCheckoutPath()} shopName={shop.name} currency={shop.currency} base={base} cartCount={count} closed={shop.status !== "active"} notice={notice} verified={!!shop.verifiedAt && shop.status === "active"} picker={picker} t={t} payments={paymentMethods(shop)} signup={theme.settings.footerSignup && shop.status === "active" ? popupSignupAction.bind(null, param) : undefined} ageGate={theme.settings.ageGate ? { age: theme.settings.ageGate, storeKey: shop.id } : undefined} languages={langs.length ? { root, current: lang ?? "en", options: [{ code: "en", name: "English" }, ...langs.map((l) => ({ code: l, name: LANGUAGES[l].name }))] } : undefined}>
       <Track shopId={shop.id} kind="page_view" />
       {children}
       {shop.stayAfterAdd && (

@@ -8,6 +8,7 @@ import { db } from "@/lib/server";
 import { countryNames } from "@/lib/store-text";
 import { lineTitles, loadShop, localProducts, storeBase, storeLang, storeT } from "../data";
 import { addAddonAction } from "../actions";
+import { StandardLook } from "@/theme/StandardLook";
 import { AddonOffer } from "./AddonOffer";
 import { Checkout, type RateChoice, type ZoneChoice } from "./CheckoutForm";
 
@@ -123,6 +124,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ shop:
   const offerTitle = offer ? (await localProducts(handle, [{ id: offer.product.id, title: offer.product.title }]))[0]!.title : "";
   return (
     <>
+      <StandardLook />
       {storePixels(shop) && <PixelEvent name="begin_checkout" data={{ ids: quote.items.map((i) => i.variantId), value: (quote.goodsMinor - quote.discountMinor) / 100, currency: shop.currency }} />}
       <Checkout
         handle={handle}

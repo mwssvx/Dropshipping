@@ -824,7 +824,7 @@ export function HomeSections({ sections, data, highlight }: { sections: Section[
   return (
     <>
       {visible.map((s, i) => (
-        <div key={s.id} data-section={s.id} className={highlight === s.id ? "outline-2 outline-dashed outline-accent -outline-offset-2" : undefined}>
+        <div key={s.id} data-section={s.id} data-section-type={s.type} className={highlight === s.id ? "outline-2 outline-dashed outline-accent -outline-offset-2" : undefined}>
           <SectionView section={s} data={data} first={i === 0} />
         </div>
       ))}

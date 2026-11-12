@@ -3,6 +3,8 @@ import { useCallback, useEffect, useId, useReducer, useRef, useState } from "rea
 import {
   applyThemePreset,
   contrastRatio,
+  CUSTOM_CSS_MAX,
+  customCssProblem,
   currentPreset,
   isSocialLink,
   newSectionId,
@@ -27,7 +29,7 @@ import { discardThemeAction, publishThemeAction, saveThemeAction } from "../../s
 import { SchedulePanel, type ThemeScheduleView } from "./SchedulePanel";
 import { MenuEditor, SectionForm, type CollectionOption, type LinkOption, type ProductOption } from "./fields";
 
-type Tab = "themes" | "sections" | "style" | "menus" | "seo";
+type Tab = "themes" | "sections" | "style" | "menus" | "seo" | "code";
 type Save = { state: "saved" | "saving" | "unsaved" | "error"; message?: string };
 
 /** What the preview frame listens for (see /admin/preview). */
@@ -222,7 +224,7 @@ export function ThemeEditor({
       <div className="flex-1 min-h-0 grid lg:grid-cols-[360px_1fr]">
         <aside className="border-r border-border bg-surface overflow-y-auto min-h-0">
           <div role="tablist" aria-label="Editor" className="flex border-b border-border sticky top-0 bg-surface z-10">
-            {([["themes", "Themes"], ["sections", "Sections"], ["style", "Style"], ["menus", "Menus"], ["seo", "Search"]] as const).map(([k, label]) => (
+            {([["themes", "Themes"], ["sections", "Sections"], ["style", "Style"], ["menus", "Menus"], ["seo", "Search"], ["code", "CSS"]] as const).map(([k, label]) => (
               <button key={k} role="tab" type="button" aria-selected={tab === k} onClick={() => setTab(k)}
                 className={`flex-1 py-3 text-sm font-semibold border-b-2 ${tab === k ? "border-accent text-accent" : "border-transparent text-muted hover:text-ink"}`}>
                 {label}
@@ -260,6 +262,7 @@ export function ThemeEditor({
               </>
             )}
             {tab === "seo" && <SeoPanel doc={doc} onChange={change} storeLink={storeLink} />}
+            {tab === "code" && <CodePanel doc={doc} onChange={change} />}
           </div>
           {published && <p className="hint px-4 pb-4">Last published {new Date(published).toLocaleString()}.</p>}
         </aside>
@@ -575,6 +578,69 @@ function SeoPanel({ doc, onChange, storeLink }: { doc: ThemeDoc; onChange: (d: T
         <span className="text-sm text-muted line-clamp-2">{seo.description || "Add a description so buyers know what you sell."}</span>
       </div>
       <p className="hint">Products, collections and pages get their own titles from their names. A sitemap is published for you at /sitemap.xml.</p>
+    </div>
+  );
+}
+
+const CSS_EXAMPLE = `/* Round the add to cart button and make it bigger */
+.store .btn-primary {
+  border-radius: 999px;
+  padding: 0.9rem 2rem;
+}`;
+
+/** The store's own CSS, for the changes the style settings don't cover. It shows in the preview as you type. */
+function CodePanel({ doc, onChange }: { doc: ThemeDoc; onChange: (d: ThemeDoc) => void }) {
+  const css = doc.settings.customCss ?? "";
+  const problem = css ? customCssProblem(css) : null;
+  const id = useId();
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="hint">
+        Add your own CSS to change anything the Style tab doesn&apos;t cover. It&apos;s added after the theme&apos;s styles, on every store page except checkout, which keeps the standard look so buyers can always pay.
+      </p>
+      <div className="field">
+        <label className="label" htmlFor={id}>Custom CSS</label>
+        <textarea
+          id={id}
+          className="input font-mono text-xs leading-relaxed"
+          rows={16}
+          spellCheck={false}
+          autoCapitalize="off"
+          autoCorrect="off"
+          value={css}
+          maxLength={CUSTOM_CSS_MAX}
+          placeholder={CSS_EXAMPLE}
+          aria-invalid={!!problem}
+          aria-describedby={`${id}-hint${problem ? ` ${id}-error` : ""}`}
+          onChange={(e) => onChange({ ...doc, settings: { ...doc.settings, customCss: e.target.value } })}
+          onKeyDown={(e) => {
+            // Tab indents instead of leaving the box; Escape then Tab still moves on.
+            if (e.key !== "Tab" || e.shiftKey || e.currentTarget.dataset.escaped) return;
+            e.preventDefault();
+            const el = e.currentTarget;
+            const { selectionStart: a, selectionEnd: b } = el;
+            const next = `${css.slice(0, a)}  ${css.slice(b)}`;
+            onChange({ ...doc, settings: { ...doc.settings, customCss: next } });
+            requestAnimationFrame(() => el.setSelectionRange(a + 2, a + 2));
+          }}
+          onKeyUp={(e) => {
+            if (e.key === "Escape") e.currentTarget.dataset.escaped = "1";
+            else if (e.key !== "Tab") delete e.currentTarget.dataset.escaped;
+          }}
+        />
+        <span id={`${id}-hint`} className="hint num">{css.length.toLocaleString("en-US")} of {CUSTOM_CSS_MAX.toLocaleString("en-US")} characters. Press Escape, then Tab, to leave the box.</span>
+        {problem && <span id={`${id}-error`} role="alert" className="text-sm text-critical">{problem}</span>}
+      </div>
+      <details className="card p-3 text-sm">
+        <summary className="font-medium cursor-pointer">Handy names to style</summary>
+        <ul className="mt-2 flex flex-col gap-1 hint">
+          <li><code>.store</code> wraps every store page. Colors are the variables <code>--store-bg</code>, <code>--store-text</code> and <code>--store-accent</code>.</li>
+          <li><code>.btn-primary</code> and <code>.btn-secondary</code> are the buttons.</li>
+          <li><code>header</code> and <code>footer</code> are the top and bottom of every page.</li>
+          <li>Home page sections are marked with their type, like <code>[data-section-type=&quot;hero&quot;]</code>.</li>
+        </ul>
+      </details>
+      <p className="hint">Something look wrong? Empty the box and save to go back to the theme as it was. Scripts and HTML aren&apos;t allowed here, so nothing you paste can break your checkout or take buyers&apos; details.</p>
     </div>
   );
 }

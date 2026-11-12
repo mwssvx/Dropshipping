@@ -5,6 +5,7 @@ import { db, payments } from "@/lib/server";
 import { SubmitButton } from "@/components/SubmitButton";
 import { fakePayAction, payByTransferAction } from "../../actions";
 import { loadShop, storeBase, storeLang, storeT } from "../../data";
+import { StandardLook } from "@/theme/StandardLook";
 import { CardForm } from "./CardForm";
 
 export const metadata = { title: "Payment" };
@@ -36,6 +37,7 @@ export default async function PayPage({ params }: { params: Promise<{ shop: stri
 
   return (
     <main className="max-w-md mx-auto px-4 sm:px-6 py-12 flex flex-col gap-6">
+      <StandardLook />
       <h1 className="text-3xl font-bold tracking-tight">{t.payment}</h1>
       {order.source === "payment_link" && (
         <div className="flex flex-col gap-2">
