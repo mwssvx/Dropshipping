@@ -646,6 +646,7 @@ function BuyerReviews({ s, data }: Props<"reviews">) {
                 <span className="font-semibold">
                   {r.name}
                   {r.verified && <span className="hint font-normal"> · {t.verifiedBuyer}</span>}
+                  {!r.verified && r.imported && <span className="hint font-normal"> · {t.importedReview(r.imported)}</span>}
                 </span>
                 <Link href={`${data.base}/products/${r.productHandle}`} className="hint hover:underline">{r.productTitle}</Link>
               </figcaption>

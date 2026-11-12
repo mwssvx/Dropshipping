@@ -52,6 +52,9 @@ test("the merchant brings their Shopify reviews over", async ({ page, browser },
   await expect(buyer.getByText("Love it")).toBeVisible();
   await expect(buyer.getByText("Thanks Ada!")).toBeVisible();
   // Not from an order here, so not marked verified; the unpublished one stays hidden.
-  await expect(buyer.getByText("Verified buyer")).toHaveCount(0);
+  await expect(buyer.getByText("Verified buyer", { exact: true })).toHaveCount(0);
+  // Shoppers see where it came from, so imported reviews can't pass as checked ones.
+  await expect(buyer.getByText("Imported from Shopify Product Reviews, not checked against an order here")).toBeVisible();
+  await expect(buyer.getByText("0 from verified buyers here, 1 imported from another platform")).toBeVisible();
   await expect(buyer.getByText("Smaller than I thought.")).toHaveCount(0);
 });

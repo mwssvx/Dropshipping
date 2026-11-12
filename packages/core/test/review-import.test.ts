@@ -54,6 +54,7 @@ describe("bringing reviews over", () => {
 
     const shown = await productReviews(f.db, f.products.lamp.id);
     expect(shown.count).toBe(1);
+    expect(shown.importedCount).toBe(1);
     expect(shown.reviews[0]).toMatchObject({ name: "Ada L.", rating: 5, reply: "Thanks Ada!", orderId: null, importedFrom: "Shopify Product Reviews", createdAt: new Date("2025-03-04T10:00:00Z") });
     // No email or location is kept.
     const stored = await f.db.query.reviews.findMany({ where: isNotNull(schema.reviews.importKey) });
