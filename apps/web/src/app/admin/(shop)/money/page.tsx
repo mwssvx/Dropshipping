@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatMoney, listPayouts, listRequirements, moneySummary, PAYOUT_GUIDE_NOTES, payoutGuide, planAdvice, PLANS } from "@sf/core";
+import { formatMoney, supplierMoney, SUPPLIER_MONEY_DAYS, listPayouts, listRequirements, moneySummary, PAYOUT_GUIDE_NOTES, payoutGuide, planAdvice, PLANS } from "@sf/core";
 import { requireShop, testPayments } from "@/lib/server";
 import { runPayoutsAction, setupPayoutsAction, simulateHoldAction } from "../../money-actions";
 import { PageHeader } from "../PageHeader";
@@ -35,12 +35,13 @@ function PayoutGuideList({ country }: { country: string }) {
 
 export default async function MoneyPage({ searchParams }: { searchParams: Promise<{ setup?: string }> }) {
   const { shop, db } = await requireShop("money");
-  const [{ setup }, summary, requirements, payouts, advice] = await Promise.all([
+  const [{ setup }, summary, requirements, payouts, advice, cash] = await Promise.all([
     searchParams,
     moneySummary(db, shop),
     listRequirements(db, shop.id),
     listPayouts(db, shop.id),
     planAdvice(db, shop),
+    supplierMoney(db, shop.id),
   ]);
   const money = (m: number) => formatMoney(m, shop.currency);
   const plan = PLANS[shop.plan];
@@ -77,6 +78,27 @@ export default async function MoneyPage({ searchParams }: { searchParams: Promis
             <div><Link className="btn btn-primary" href="/admin/money/setup">Continue setup</Link></div>
           </section>
         ) : null}
+
+        {(cash.orders > 0 || cash.waiting.orders > 0) && (
+          <section className="card p-5 flex flex-col gap-2" aria-labelledby="supplier-money">
+            <h2 id="supplier-money" className="font-semibold">Supplier money</h2>
+            {cash.waiting.orders > 0 && (
+              <p className="banner banner-critical">
+                {cash.waiting.orders === 1 ? "1 order is" : `${cash.waiting.orders} orders are`} waiting because your supplier balance ran out
+                ({money(cash.waiting.costMinor)} of goods). Top it up, then press Try again on{" "}
+                <Link className="underline" href="/admin/orders?show=problems">each order</Link>.
+              </p>
+            )}
+            <p className="text-sm">
+              Your supplier charges you when each order is sent to it, days before the buyer&apos;s money reaches your bank. Over the last{" "}
+              {SUPPLIER_MONEY_DAYS} days that came to about <span className="num font-semibold">{money(cash.dailyMinor)}</span> a day, so keep about{" "}
+              <span className="num font-semibold">{money(cash.keepMinor)}</span> in your supplier balance (your CJ wallet, or the card on your AliExpress account) to cover the next week.
+            </p>
+            <p className="text-sm hint">
+              From your sales, {money(summary.pendingMinor)} is clearing and {money(summary.onTheWayMinor)} is on its way to your bank.
+            </p>
+          </section>
+        )}
 
         {requirements.map((r) => (
           <section key={r.id} className={`card p-5 flex flex-col gap-3 ${r.holdsPayouts ? "border-critical" : ""}`} aria-labelledby={`req-${r.id}`}>

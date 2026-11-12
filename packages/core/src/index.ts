@@ -174,3 +174,4 @@ export * from "./policies";
 export * from "./quiz";
 export * from "./coming-soon";
 export * from "./samples";
+export * from "./supplier-money";

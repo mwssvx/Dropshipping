@@ -19,6 +19,7 @@ type Money = {
   topProducts: { title: string; units: number; profitMinor: number; adsMinor: number; roas: number | null }[];
   payouts: { id: string; amountMinor: number; status: string; arrivalDate: string | null }[];
   holds: { id: string; title: string; explanation: string; holdsPayouts: boolean; dueBy: string | null; submittedAt: string | null; upload: boolean }[];
+  supplierMoney?: { orders: number; dailyMinor: number; keepMinor: number; waiting: { orders: number; costMinor: number } };
   guide?: { ready: string[]; taxId: string | null; bank: string; crossBorder: string | null; notes: string[] } | null;
 };
 
@@ -131,6 +132,19 @@ export default function MoneyScreen() {
                   {[...d.guide.ready, d.guide.bank, ...(d.guide.taxId ? [d.guide.taxId] : [])].map((r) => <Body key={r}>{`• ${r}`}</Body>)}
                   {d.guide.crossBorder ? <Body>{d.guide.crossBorder}</Body> : null}
                   {d.guide.notes.map((n) => <Body key={n} muted>{n}</Body>)}
+                </View>
+              </Card>
+            </Section>
+          ) : null}
+
+          {d.supplierMoney && (d.supplierMoney.orders > 0 || d.supplierMoney.waiting.orders > 0) ? (
+            <Section title="Supplier money">
+              <Card>
+                <View style={{ gap: space(2) }}>
+                  {d.supplierMoney.waiting.orders > 0 ? (
+                    <Banner tone="critical">{`${d.supplierMoney.waiting.orders === 1 ? "1 order is" : `${d.supplierMoney.waiting.orders} orders are`} waiting because your supplier balance ran out (${money(d.supplierMoney.waiting.costMinor, d.currency)} of goods). Top it up, then try each order again.`}</Banner>
+                  ) : null}
+                  <Body>{`Your supplier is paid when each order goes to it, before your sales money arrives. Recent orders cost about ${money(d.supplierMoney.dailyMinor, d.currency)} a day, so keep about ${money(d.supplierMoney.keepMinor, d.currency)} in your supplier balance for the next week.`}</Body>
                 </View>
               </Card>
             </Section>

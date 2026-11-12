@@ -67,6 +67,9 @@ test("payouts, holds, refunds and plans", async ({ page, browser }, info) => {
   const balance = page.getByRole("region", { name: "Balance" });
   await expect(balance.getByText("Clearing")).toBeVisible();
   await expect(page.getByText(/Our fee \(5% on the Free plan\)/)).toBeVisible();
+  // The supplier is paid when the order is sent, before the buyer's money arrives: say how much to keep there.
+  const supplier = page.getByRole("region", { name: "Supplier money" });
+  await expect(supplier).toContainText(/keep about \$\d+\.\d\d in your supplier balance/);
   await page.getByRole("button", { name: "Pay out now" }).click();
   await expect(page.getByRole("cell", { name: "On the way" })).toBeVisible();
   await shot(page, "34-money-balance");
