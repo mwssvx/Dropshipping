@@ -113,6 +113,11 @@ export default function Settings() {
           </List>
         </Section>
       ) : null}
+      <Section title="Help">
+        <List>
+          <Row href="/support" title="Help from a person" subtitle="Write to our team. A real person answers, and you see by when" />
+        </List>
+      </Section>
       {can("trust") ? (
         <Section title="Trust">
           <List>

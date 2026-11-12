@@ -14,7 +14,7 @@ export type PlanId = (typeof schema.shops.$inferSelect)["plan"];
 export const PLANS: Record<PlanId, { name: string; monthlyMinor: number; feeBps: number; ordersPerMonth: number | null; teamSeats: number; blurb: string }> = {
   free: { name: "Free", monthlyMinor: 0, feeBps: 500, ordersPerMonth: 50, teamSeats: 0, blurb: "Everything built in. Nothing to pay until you sell, then 5% of each sale." },
   starter: { name: "Starter", monthlyMinor: 2900, feeBps: 0, ordersPerMonth: 100, teamSeats: 0, blurb: "No cut of your sales. Up to 100 orders a month." },
-  growth: { name: "Growth", monthlyMinor: 6900, feeBps: 0, ordersPerMonth: null, teamSeats: 0, blurb: "No cut of your sales. Unlimited orders and priority support." },
+  growth: { name: "Growth", monthlyMinor: 6900, feeBps: 0, ordersPerMonth: null, teamSeats: 0, blurb: "No cut of your sales. Unlimited orders, and a person answers within 12 hours." },
   scale: { name: "Scale", monthlyMinor: 19900, feeBps: 0, ordersPerMonth: null, teamSeats: 15, blurb: "For teams: up to 15 staff accounts with roles, and advanced analytics." },
 };
 export const PLAN_IDS = Object.keys(PLANS) as PlanId[];

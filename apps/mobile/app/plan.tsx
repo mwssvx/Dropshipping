@@ -10,7 +10,7 @@ type PlanId = string;
 type Data = {
   current: PlanId;
   advice: { orders: number; salesMinor: number; feesMinor: number; currentCostMinor: number; best: { plan: PlanId; saveMinor: number } | null; overLimit: boolean; nearLimit: boolean; upgradeHint: string | null };
-  plans: { id: PlanId; name: string; monthlyMinor: number; feeBps: number; blurb: string; ordersPerMonth: number | null; estimateMinor: number }[];
+  plans: { id: PlanId; name: string; monthlyMinor: number; feeBps: number; blurb: string; ordersPerMonth: number | null; supportHours: number; estimateMinor: number }[];
   testMode: boolean;
 };
 
@@ -77,7 +77,7 @@ export default function PlanScreen() {
                       <Heading>{`${p.name} · ${money(p.monthlyMinor, "USD")} a month`}</Heading>
                       {isCurrent ? <Pill label="Current" tone="info" /> : d.advice.best?.plan === p.id ? <Pill label="Costs least" tone="success" /> : null}
                     </View>
-                    <Body>{`${p.feeBps ? `${p.feeBps / 100}% of each sale` : "0% of your sales"} · ${p.ordersPerMonth ? `up to ${p.ordersPerMonth} orders a month` : "unlimited orders"}`}</Body>
+                    <Body>{`${p.feeBps ? `${p.feeBps / 100}% of each sale` : "0% of your sales"} · ${p.ordersPerMonth ? `up to ${p.ordersPerMonth} orders a month` : "unlimited orders"} · a person answers within ${p.supportHours} hours`}</Body>
                     <Body muted>{p.blurb}</Body>
                     <Body>{`With your last 30 days: ${money(p.estimateMinor, cur)}`}</Body>
                     {isCurrent ? null : confirm === p.id ? (

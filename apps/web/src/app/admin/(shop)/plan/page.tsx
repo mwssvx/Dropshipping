@@ -1,4 +1,4 @@
-import { formatMoney, planAdvice, platformFeeFor, PLAN_IDS, PLANS } from "@sf/core";
+import { formatMoney, planAdvice, platformFeeFor, PLAN_IDS, PLANS, SUPPORT_HOURS } from "@sf/core";
 import { requireShop, testPayments } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { PlanButton } from "./PlanButton";
@@ -54,6 +54,7 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
                 <p className="text-sm">
                   {p.ordersPerMonth ? `Up to ${p.ordersPerMonth} orders a month` : "Unlimited orders"}
                 </p>
+                <p className="text-sm hint">A person answers within {SUPPORT_HOURS[id]} hours</p>
                 <p className="text-sm hint num">With your last 30 days: {money(estimate)}</p>
                 <div className="mt-auto">
                   {isCurrent ? (

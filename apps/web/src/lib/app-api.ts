@@ -56,6 +56,10 @@ import {
   decideReturn,
   RETURN_REASON_LABELS,
   type ReturnDecision,
+  listTickets,
+  openTicket,
+  replyToTicket,
+  SUPPORT_HOURS,
   payoutGuide,
   supplierMoney,
   PAYOUT_GUIDE_NOTES,
@@ -2048,7 +2052,7 @@ const routes: Record<string, Handler> = {
       advice,
       plans: PLAN_IDS.map((id) => {
         const p = PLANS[id];
-        return { id, name: p.name, monthlyMinor: p.monthlyMinor, feeBps: p.feeBps, blurb: p.blurb, ordersPerMonth: p.ordersPerMonth, estimateMinor: p.monthlyMinor + platformFeeFor(id, advice.salesMinor) };
+        return { id, name: p.name, monthlyMinor: p.monthlyMinor, feeBps: p.feeBps, blurb: p.blurb, ordersPerMonth: p.ordersPerMonth, supportHours: SUPPORT_HOURS[id], estimateMinor: p.monthlyMinor + platformFeeFor(id, advice.salesMinor) };
       }),
       testMode: testPayments(),
     };
@@ -4141,6 +4145,31 @@ const routes: Record<string, Handler> = {
     const r = await merchantReply(await fulfillment(), shop.id, params.id!, str((await body(req)).message));
     notifyLater(shop.id);
     return { ok: true, status: r.status, message: r.status === "failed" ? "Saved, but the email didn't go out. Try again in a minute." : "Sent by email." };
+  },
+
+  // Help from a person: write to our team, with a promised answer time.
+  "GET support": async ({ db, shop }) => {
+    const { hours, tickets } = await listTickets(db, shop.id);
+    return {
+      hours,
+      tickets: tickets.map(({ ticket: t, messages, wait }) => ({
+        id: t.id,
+        subject: t.subject,
+        status: t.status,
+        dueAt: wait?.dueAt ?? null,
+        overdue: wait?.overdue ?? false,
+        messages: messages.map((m) => ({ id: m.id, author: m.author, body: m.body, createdAt: m.createdAt })),
+      })),
+    };
+  },
+  "POST support": async ({ req, db, shop }) => {
+    const b = await body(req);
+    const t = await openTicket(db, shop.id, { subject: str(b.subject), body: str(b.message) });
+    return { ok: true, id: t.id, message: "Sent. A person from our team answers here and in your assistant chat." };
+  },
+  "POST support/:id/reply": async ({ req, params, db, shop }) => {
+    await replyToTicket(db, shop.id, params.id!, str((await body(req)).message));
+    return { ok: true };
   },
 
   "GET assistant": async ({ db, shop }) => {

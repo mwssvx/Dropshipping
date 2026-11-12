@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import Link from "next/link";
 import QRCode from "qrcode";
 import { can, listSignIns, pendingTwoStep, twoStepStatus } from "@sf/core";
 import { BRAND } from "@/lib/brand";
@@ -26,6 +27,9 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       <PageHeader title="Your account" />
       <div className="px-4 sm:px-8 flex flex-col gap-6 max-w-3xl">
         <p className="hint">Signed in as {user.email}. These settings are yours, on every store you work on.</p>
+        <p className="text-sm">
+          Stuck on something? <Link className="underline" href="/admin/support">Write to our team</Link>: a real person answers, and you see by when.
+        </p>
         {recovered && status.on && (
           <p className="banner banner-warning" role="status">
             You signed in with a recovery code. If you have a new phone, turn two-step sign-in off and on again to set it up there. Either way,

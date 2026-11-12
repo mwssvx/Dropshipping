@@ -2340,3 +2340,7 @@ A product from CJ, AliExpress or the demo supplier has **Order a sample**: pick 
 ### Supplier money (after launch, part 465)
 
 A dropshipper pays the supplier when each order is sent to it, days before the buyer's money reaches their bank. The Money page (and the app's Money tab) now has **Supplier money**: what supplier orders cost a day over the last 14 days, how much to keep in the supplier balance to cover the next week, and what's still clearing or on its way from sales. Orders the supplier refused because the balance ran out show in red with their total and a link to retry them. `supplierMoney` in `packages/core/src/supplier-money.ts`.
+
+### Help from a person, with a promised time (after launch, part 466)
+
+Any merchant can write to our team from **Help from a person** (`/admin/support`, linked from Your account, payout holds and the app's Settings), not only through the assistant. A real person answers within 24 hours on Free and Starter, 12 on Growth and 4 on Scale, any day; the promise is on the pricing and plan pages. Each request shows by when a person answers, says so if we're late, and the merchant can add to it, which puts it back in the queue. The staff Escalations list now puts whoever is waiting past their promise first, shows how long is left on each, and how many answers were on time over the last 30 days. `SUPPORT_HOURS`, `openTicket`, `replyToTicket`, `listTickets`, `supportWait` and `supportRecord` in `packages/core/src/support.ts`.

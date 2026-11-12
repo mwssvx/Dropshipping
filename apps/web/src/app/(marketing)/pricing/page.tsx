@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { breakEvenMinor, FREE_FEE_PERCENT, PLAN_IDS, PLANS } from "@sf/core";
+import { breakEvenMinor, FREE_FEE_PERCENT, PLAN_IDS, PLANS, SUPPORT_HOURS } from "@sf/core";
 import { PriceCalculator } from "./PriceCalculator";
 
 export const metadata = { title: "Pricing", description: "Start free and pay only when you sell. Once you're earning, a flat monthly price lets you keep every sale." };
@@ -32,6 +32,7 @@ export default function PricingPage() {
             <p className="text-sm font-medium">{p.feeBps ? `+ ${p.feeBps / 100}% of each sale` : "0% of your sales"}</p>
             <p className="text-sm text-muted flex-1">{p.blurb}</p>
             <p className="hint text-sm">{p.ordersPerMonth ? `Up to ${p.ordersPerMonth} orders a month` : "Unlimited orders"}</p>
+            <p className="hint text-sm">A person answers within {SUPPORT_HOURS[p.id]} hours</p>
             <Link href="/signup" className={`btn ${p.id === "growth" ? "btn-primary" : "btn-secondary"}`}>{p.monthlyMinor ? `Start with ${p.name}` : "Start free"}</Link>
           </li>
         ))}
