@@ -2348,3 +2348,7 @@ Any merchant can write to our team from **Help from a person** (`/admin/support`
 ### Imported reviews are marked (after launch, part 467)
 
 Reviews brought over from Shopify Product Reviews or Judge.me now say so on the product page and in the home page's reviews section ("Imported from Judge.me, not checked against an order here"), in every store language, and the product's reviews say how many came from verified buyers here and how many were imported. Only reviews from a real order here are called "Verified buyer". `importedCount` from `productReviews`, `imported` on `storeReviews`.
+
+### The order page in every store language (after launch, part 468)
+
+The buyer's order page now follows the store language they shopped in: the thank-you, what happens next, order progress, delivery dates, parcels and tracking, refunds, totals, downloads, gift and subscription notes, and the review, return, cancel and question forms, with dates written the local way. The words live in `apps/web/src/lib/order-text.ts` (English, German, French, Spanish, Italian, Dutch). Error messages from the server and the order edit form are still in English.

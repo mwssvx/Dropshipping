@@ -1,6 +1,6 @@
 import { PixelEvent } from "@/components/PixelEvent";
 import { notFound } from "next/navigation";
-import { canMarkArrived, buyerAmounts, formatHandoverDay, handoverDayOptions, buyerCancelOptions, buyerThread, formatDeliveryDate, formatDeliveryWindow, orderDelivery, intervalLabel, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems, formatShipsBy, storePixels, surveyFor, orderDownloads, formatFileSize, transferDueBy, orderParcels, parcelDeliveries } from "@sf/core";
+import { canMarkArrived, buyerAmounts, formatHandoverDay, handoverDayOptions, buyerCancelOptions, buyerThread, formatDeliveryWindow, orderDelivery, subscriptionForOrder, subscriptionOfferFor, postPurchaseOfferFor, postPurchaseOrder, countryName, orderEditOptions, describeReferralProgram, formatMoney, getOrderByPaymentIntent, listRefunds, NotFoundError, referralCodeForEmail, RETURN_REASON_LABELS, replacementsOf, returnOptions, reviewableItems, formatShipsBy, storePixels, surveyFor, orderDownloads, formatFileSize, transferDueBy, orderParcels, parcelDeliveries } from "@sf/core";
 import Link from "next/link";
 import { db, fulfillment, storeAddress } from "@/lib/server";
 import { OrderEditForm } from "@/components/OrderEditForm";
@@ -16,9 +16,8 @@ import { ReturnForm } from "./ReturnForm";
 import { PostPurchaseOffer } from "./PostPurchaseOffer";
 import { SubscribeOffer } from "./SubscribeOffer";
 import { SurveyQuestion } from "./SurveyQuestion";
+import { orderText } from "@/lib/order-text";
 
-const time = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-const utc = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC" });
 
 export const metadata = { title: "Order status", robots: { index: false } };
 
@@ -37,7 +36,16 @@ export default async function OrderStatusPage({ params, searchParams }: { params
   const reviewable = paid ? await reviewableItems(await db(), shop.id, ref) : [];
   const base = await storeBase(handle);
   const returns = paid ? await returnOptions(await db(), shop, order) : null;
-  const day = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric" });
+  // Words and dates in the store language the buyer is reading.
+  const lang = await storeLang(handle);
+  const o = orderText(lang);
+  const locale = lang ?? "en-US";
+  const day = new Intl.DateTimeFormat(locale, { month: "long", day: "numeric" });
+  const time = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  const utc = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC" });
+  const shortDay = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", timeZone: "UTC" });
+  const longDate = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+  const dates = (w: Parameters<typeof formatDeliveryWindow>[0]) => formatDeliveryWindow(w, (d) => shortDay.format(d));
   // Amounts as the buyer paid them, in their own currency when they shopped in one.
   const refunds = order.presentment && order.refundedMinor ? await listRefunds(await db(), order.id) : [];
   const due = buyerAmounts(order, order.lines, order.presentment ? refunds.reduce((s, r) => s + (r.presentmentAmountMinor ?? 0), 0) : undefined);
@@ -76,11 +84,11 @@ export default async function OrderStatusPage({ params, searchParams }: { params
     : null;
   // Files bought as digital downloads, with how many times each link still works.
   const downloads = paid ? await orderDownloads(await db(), order.id) : [];
-  const downloadProblem = download === "limit" ? "That download has been used the most times it can be. Ask the store below if you need it again."
-    : download === "refunded" ? "This item was refunded, so its download is closed."
-    : download === "unpaid" ? "Downloads open once the order is paid." : null;
+  const downloadProblem = download === "limit" ? o.downloadLimit
+    : download === "refunded" ? o.downloadRefunded
+    : download === "unpaid" ? o.downloadUnpaid : null;
   const pickupText = paid && (order.pickup || order.localDelivery) ? await storeT(handle) : null;
-  const dayLang = (await storeLang(handle)) ?? "en-US";
+  const dayLang = locale;
   // Until the day before, the buyer can move their pickup or delivery to another open day.
   const dayOptions = pickupText ? handoverDayOptions(shop, order) : null;
   const changeDay = pickupText && dayOptions && order.handoverOn ? (
@@ -92,15 +100,15 @@ export default async function OrderStatusPage({ params, searchParams }: { params
     />
   ) : null;
   const steps = order.pickup ? [
-    { label: "Order confirmed", done: paid },
-    { label: "Being prepared", done: paid },
-    { label: "Ready to pick up", done: !!order.pickupReadyAt },
-    { label: "Picked up", done: order.fulfillmentStatus === "delivered" },
+    { label: o.stepConfirmed, done: paid },
+    { label: o.stepPreparing, done: paid },
+    { label: o.stepReady, done: !!order.pickupReadyAt },
+    { label: o.stepPickedUp, done: order.fulfillmentStatus === "delivered" },
   ] : [
-    { label: "Order confirmed", done: paid },
-    { label: "Being prepared", done: order.localDelivery ? paid : order.fulfillments.some((f) => f.placedAt || f.shippedAt) },
-    { label: "On its way", done: ["shipped", "delivered"].includes(order.fulfillmentStatus) },
-    { label: "Delivered", done: order.fulfillmentStatus === "delivered" },
+    { label: o.stepConfirmed, done: paid },
+    { label: o.stepPreparing, done: order.localDelivery ? paid : order.fulfillments.some((f) => f.placedAt || f.shippedAt) },
+    { label: o.stepOnWay, done: ["shipped", "delivered"].includes(order.fulfillmentStatus) },
+    { label: o.stepDelivered, done: order.fulfillmentStatus === "delivered" },
   ];
   return (
     <main className="max-w-2xl mx-auto px-4 sm:px-6 py-12 flex flex-col gap-8">
@@ -109,21 +117,21 @@ export default async function OrderStatusPage({ params, searchParams }: { params
         <PixelEvent name="purchase" data={{ ids: order.lines.map((l) => l.variantId).filter((id): id is string => !!id), value: order.totalMinor / 100, currency: order.currency, orderId: order.id }} />
       )}
       <div className="flex flex-col gap-2">
-        <p className="hint num">Order #{order.number}</p>
-        <h1 className="text-3xl font-bold tracking-tight">{replacing ? "Your replacement" : paid || order.manualPayment === "bank_transfer" ? `Thank you, ${(order.gift?.from ?? order.shippingAddress.name).split(" ")[0]}!` : "We're waiting for your payment"}</h1>
-        <p className="text-muted">{replacing ? `${shop.name} is sending this at no charge. This page updates as it moves.` : paid ? `We've emailed a receipt to ${order.email}. This page updates as your order moves.` : order.manualPayment === "bank_transfer" ? `We've emailed ${order.email} how to pay. Your order starts as soon as the transfer arrives.` : "If you've paid, this page updates in a moment."}</p>
+        <p className="hint num">{o.orderNumber(order.number)}</p>
+        <h1 className="text-3xl font-bold tracking-tight">{replacing ? o.replacementTitle : paid || order.manualPayment === "bank_transfer" ? o.thanks((order.gift?.from ?? order.shippingAddress.name).split(" ")[0] ?? "") : o.waitingPayment}</h1>
+        <p className="text-muted">{replacing ? o.replacementIntro(shop.name) : paid ? o.paidIntro(order.email) : order.manualPayment === "bank_transfer" ? o.transferIntro(order.email) : o.pendingIntro}</p>
         {paid && (
           <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-            <Link href={`${base}/account`} className="underline">See all your orders</Link>
-            {!replacing && <a href={`${base}/orders/${ref}/invoice`} className="underline">Invoice{order.refundedMinor > 0 ? " and credit notes" : ""}</a>}
+            <Link href={`${base}/account`} className="underline">{o.allOrders}</Link>
+            {!replacing && <a href={`${base}/orders/${ref}/invoice`} className="underline">{o.invoice(order.refundedMinor > 0)}</a>}
           </p>
         )}
         {order.paymentStatus === "pending" && (
-          <Link href={`${base}/pay/${order.id}`} className="btn btn-primary self-start">Finish paying</Link>
+          <Link href={`${base}/pay/${order.id}`} className="btn btn-primary self-start">{o.finishPaying}</Link>
         )}
       </div>
       {paid && !replacing && shop.thankYouNote && (
-        <section className="card p-4 whitespace-pre-line" aria-label={`A note from ${shop.name}`}>{shop.thankYouNote}</section>
+        <section className="card p-4 whitespace-pre-line" aria-label={o.noteFrom(shop.name)}>{shop.thankYouNote}</section>
       )}
       {offer && (
         <PostPurchaseOffer handle={handle} orderRef={ref} title={offer.product.title} imageUrl={offer.product.imageUrl} percentOff={offer.percentOff}
@@ -137,67 +145,64 @@ export default async function OrderStatusPage({ params, searchParams }: { params
       )}
       {/* After the offers, which only last a while. */}
       {survey && <SurveyQuestion handle={handle} orderRef={ref} question={survey.question} options={survey.options} other={survey.other} />}
-      {answered && order.surveyAnswer && <p className="banner banner-success" role="status">Thanks for telling us.</p>}
+      {answered && order.surveyAnswer && <p className="banner banner-success" role="status">{o.surveyThanks}</p>}
       {subscription && subscription.status !== "cancelled" && (
         <p className="banner banner-success" role="status">
-          {justSubscribed ? "You're subscribed. " : ""}
+          {justSubscribed ? o.subscribedNow : ""}
           {subscription.status === "active"
-            ? `${intervalLabel(subscription.intervalDays)} we'll send this again for ${subscription.percentOff}% less. Next delivery: ${formatDeliveryDate(subscription.nextOrderAt)}. `
-            : "Your subscription from this order is paused. "}
-          <Link href={`${base}/subscriptions/${subscription.token}`} className="underline">Manage subscription</Link>
+            ? o.subscriptionActive(o.every(subscription.intervalDays), subscription.percentOff, shortDay.format(subscription.nextOrderAt))
+            : o.subscriptionPaused}
+          <Link href={`${base}/subscriptions/${subscription.token}`} className="underline">{o.manageSubscription}</Link>
         </p>
       )}
       {paid && order.preorderShipsBy && order.fulfillmentStatus === "unfulfilled" && (
         <p className="banner banner-info" role="status">
-          This is a pre-order. It ships by {formatShipsBy(order.preorderShipsBy)}, and we'll email you tracking as soon as it's on its way.
+          {o.preorder(lang ? longDate.format(new Date(`${order.preorderShipsBy}T12:00:00Z`)) : formatShipsBy(order.preorderShipsBy))}
         </p>
       )}
       {partOf && (
         <p className="banner banner-info">
-          A delivery from your subscription, charged to your saved card. <Link href={`${base}/subscriptions/${partOf.token}`} className="underline">Manage subscription</Link>
+          {o.subscriptionDelivery}<Link href={`${base}/subscriptions/${partOf.token}`} className="underline">{o.manageSubscription}</Link>
         </p>
       )}
       {added && (
         <p className="banner banner-success" role="status">
-          Added as order #{added.number} and charged {formatMoney(added.totalMinor, added.currency)} to the same card. <Link href={`${base}/orders/${added.paymentIntentId}`} className="underline">See it</Link>
+          {o.addedAs(added.number, formatMoney(added.totalMinor, added.currency))}<Link href={`${base}/orders/${added.paymentIntentId}`} className="underline">{o.seeIt}</Link>
         </p>
       )}
       {replaces && (
         <p className="banner banner-info">
-          A free replacement for <Link href={`${base}/orders/${replaces.paymentIntentId}`} className="underline">order #{replaces.number}</Link>.{order.note ? ` ${shop.name}: ${order.note}` : ""}
+          {o.replacementFor}<Link href={`${base}/orders/${replaces.paymentIntentId}`} className="underline">{o.orderLink(replaces.number)}</Link>.{order.note ? ` ${shop.name}: ${order.note}` : ""}
         </p>
       )}
       {replacements.map((r) => (
         <p key={r.id} className="banner banner-success" role="status">
-          A replacement is on its way as order #{r.number}, at no charge. <Link href={`${base}/orders/${r.paymentIntentId}`} className="underline">Track it</Link>
+          {o.replacementOnWay(r.number)}<Link href={`${base}/orders/${r.paymentIntentId}`} className="underline">{o.trackIt}</Link>
         </p>
       ))}
       {addedTo && (
         <p className="banner banner-info">
-          You added this after checking out, to the same card as <Link href={`${base}/orders/${addedTo.paymentIntentId}`} className="underline">order #{addedTo.number}</Link>. It may arrive separately.
+          {o.addedAfter}<Link href={`${base}/orders/${addedTo.paymentIntentId}`} className="underline">{o.orderLink(addedTo.number)}</Link>{o.addedAfterEnd}
         </p>
       )}
       {order.gift && (
         <section className="card p-5 flex flex-col gap-1 text-sm" aria-labelledby="gift-heading">
-          <h2 id="gift-heading" className="font-semibold">A gift for {order.shippingAddress.name}</h2>
+          <h2 id="gift-heading" className="font-semibold">{o.giftFor(order.shippingAddress.name)}</h2>
           {order.gift.message && <p className="whitespace-pre-line border-l-2 border-border pl-3">{order.gift.message}</p>}
           <p className="hint">
-            {order.gift.recipientEmail ? `We'll email ${order.gift.recipientEmail} when it ships, with your message and tracking but no prices.` : "We won't contact them. Share the tracking below if you like."}
+            {order.gift.recipientEmail ? o.giftEmail(order.gift.recipientEmail) : o.giftNoContact}
           </p>
         </section>
       )}
       {order.buyerNote && (
         <section className="card p-5 flex flex-col gap-1 text-sm" aria-labelledby="note-heading">
-          <h2 id="note-heading" className="font-semibold">Your note to the store</h2>
+          <h2 id="note-heading" className="font-semibold">{o.yourNote}</h2>
           <p className="whitespace-pre-line">{order.buyerNote}</p>
         </section>
       )}
       {order.refundedMinor > 0 && (
         <p className="banner banner-info">
-          {order.paymentStatus === "refunded" ? "This order was refunded" : `${money(due.refundedMinor)} was refunded`}
-          {order.giftCardMinor
-            ? " to how you paid: card refunds take 5 to 10 business days, and gift card refunds can be used right away."
-            : " to the card you paid with. Banks usually show it within 5 to 10 business days."}
+          {o.refund(order.paymentStatus === "refunded" ? null : money(due.refundedMinor), !!order.giftCardMinor)}
         </p>
       )}
       {transfer && order.paymentStatus === "pending" && (
@@ -215,7 +220,7 @@ export default async function OrderStatusPage({ params, searchParams }: { params
           {transfer.t.transferLapsed} <Link href={`${base}/pay/${order.id}`} className="underline">{transfer.t.payByCardInstead}</Link>
         </p>
       )}
-      <ol className="grid grid-cols-4 gap-2" aria-label="Order progress">
+      <ol className="grid grid-cols-4 gap-2" aria-label={o.progress}>
         {steps.map((s) => (
           <li key={s.label} className="flex flex-col gap-2">
             <span className={`h-1.5 rounded-full ${s.done ? "bg-accent" : "bg-sunken"}`} />
@@ -223,11 +228,11 @@ export default async function OrderStatusPage({ params, searchParams }: { params
           </li>
         ))}
       </ol>
-      {arrives && <p className="text-sm">Expected delivery: <strong>{formatDeliveryWindow(arrives)}</strong></p>}
+      {arrives && <p className="text-sm">{o.expected}<strong>{dates(arrives)}</strong></p>}
       {arrivedText && <MarkArrived action={markArrivedAction.bind(null, handle, ref)} text={{ arrivedQuestion: arrivedText.arrivedQuestion, markArrived: arrivedText.markArrived, arrivedThanks: arrivedText.arrivedThanks }} />}
       {downloads.length > 0 && (
         <section id="downloads" className="card p-5 flex flex-col gap-2 text-sm" aria-labelledby="downloads-heading">
-          <h2 id="downloads-heading" className="font-semibold">Your downloads</h2>
+          <h2 id="downloads-heading" className="font-semibold">{o.downloads}</h2>
           {downloadProblem && <p className="banner banner-warning" role="alert">{downloadProblem}</p>}
           <ul className="flex flex-col gap-2">
             {downloads.map((d) => (
@@ -238,7 +243,7 @@ export default async function OrderStatusPage({ params, searchParams }: { params
                     : <a className="underline" href={`${base}/orders/${ref}/download/${d.lineId}`} download>{d.fileName}</a>}
                   <span className="hint"> · {formatFileSize(d.bytes)}</span>
                 </span>
-                <span className="hint num">{order.paymentStatus === "refunded" ? "Refunded" : d.left === 1 ? "1 download left" : `${d.left} downloads left`}</span>
+                <span className="hint num">{order.paymentStatus === "refunded" ? o.refunded : o.downloadsLeft(d.left)}</span>
               </li>
             ))}
           </ul>
@@ -247,22 +252,22 @@ export default async function OrderStatusPage({ params, searchParams }: { params
       {paid && parcels.length > 1 && (
         <section className="card p-5 flex flex-col gap-3 text-sm" aria-labelledby="parcels">
           <div>
-            <h2 id="parcels" className="font-semibold">Your order comes in {parcels.length} parcels</h2>
-            <p className="hint">They come from different warehouses, so they may arrive on different days. Each one has its own tracking once it ships.</p>
+            <h2 id="parcels" className="font-semibold">{o.parcels(parcels.length)}</h2>
+            <p className="hint">{o.parcelsNote}</p>
           </div>
           <ol className="flex flex-col gap-3">
             {parcels.map((p, i) => {
               const s = p.shipment;
               return (
-                <li key={p.key} className="flex flex-col gap-1" aria-label={`Parcel ${i + 1}`}>
+                <li key={p.key} className="flex flex-col gap-1" aria-label={o.parcel(i + 1)}>
                   <p className="font-medium">
-                    Parcel {i + 1}:{" "}
+                    {o.parcel(i + 1)}:{" "}
                     <span className="hint font-normal">
-                      {s?.status === "delivered" ? "Delivered" : s?.trackingNumber ? "On its way" : "Not shipped yet"}
+                      {s?.status === "delivered" ? o.stepDelivered : s?.trackingNumber ? o.stepOnWay : o.notShipped}
                     </span>
                   </p>
                   <p>{p.items.map((it) => (it.quantity > 1 ? `${it.title} × ${it.quantity}` : it.title)).join(", ")}</p>
-                  {parcelDates.get(p.key) && <p>Expected delivery: <strong>{formatDeliveryWindow(parcelDates.get(p.key)!)}</strong></p>}
+                  {parcelDates.get(p.key) && <p>{o.expected}<strong>{dates(parcelDates.get(p.key)!)}</strong></p>}
                   {s?.trackingNumber && (
                     <p>
                       {s.carrier}:{" "}
@@ -277,19 +282,19 @@ export default async function OrderStatusPage({ params, searchParams }: { params
       )}
       {shipped.length > 0 && !(paid && parcels.length > 1) && (
         <section className="card p-5 flex flex-col gap-2 text-sm" aria-labelledby="tracking">
-          <h2 id="tracking" className="font-semibold">Tracking</h2>
+          <h2 id="tracking" className="font-semibold">{o.tracking}</h2>
           {shipped.map((f) => (
             <p key={f.id}>
               {f.carrier}:{" "}
               {f.trackingUrl ? <a className="underline num" href={f.trackingUrl} target="_blank" rel="noreferrer">{f.trackingNumber}</a> : <span className="num">{f.trackingNumber}</span>}
-              {f.status === "delivered" && <span className="hint"> · delivered</span>}
+              {f.status === "delivered" && <span className="hint">{o.deliveredNote}</span>}
             </p>
           ))}
         </section>
       )}
       {paid && order.protectionMinor > 0 && order.paymentStatus !== "refunded" && (
         <p className="banner banner-info text-sm">
-          Your delivery is protected. If it&apos;s lost or arrives damaged, <a className="underline" href="#questions">tell {shop.name} below</a> and they&apos;ll send it again for free.
+          <a className="underline-offset-2 hover:underline" href="#questions">{o.protectedNote(shop.name)}</a>
         </p>
       )}
       {pickupText && order.localDelivery && order.paymentStatus !== "refunded" && (
@@ -321,90 +326,83 @@ export default async function OrderStatusPage({ params, searchParams }: { params
       )}
       {paid && shipped.length === 0 && !order.preorderShipsBy && !order.pickup && !order.localDelivery && (
         <p className="hint text-sm">
-          {order.lines.length === 1 ? "Your item usually ships" : "Your items usually ship"} within a few days. We&apos;ll email tracking to {order.email} as soon as it&apos;s on its way.
+          {o.shipsSoon(order.lines.length !== 1, order.email)}
         </p>
       )}
       {lastEdit && (
         <p className="banner banner-info" role="status">
           {lastEdit.by === "buyer" && lastEdit.changes[0]?.startsWith("Cancelled")
-            ? `You cancelled this order on ${day.format(new Date(lastEdit.at))}.${order.paymentStatus === "refunded" ? " The refund is on its way to your card, and we've emailed you." : ""}`
-            : <>{lastEdit.by === "buyer" ? "You changed this order" : `${shop.name} changed this order`} on {day.format(new Date(lastEdit.at))}: {lastEdit.changes.join("; ")}.</>}
+            ? o.youCancelled(day.format(new Date(lastEdit.at)), order.paymentStatus === "refunded")
+            : o.changed(lastEdit.by === "buyer", shop.name, day.format(new Date(lastEdit.at)), lastEdit.changes.join("; "))}
         </p>
       )}
       {edit?.canEdit && edit.until && (
-        <section className="card p-5" aria-label="Change your order">
+        <section className="card p-5" aria-label={o.changeOrder}>
           <OrderEditForm action={editOrderByBuyerAction.bind(null, handle, ref)} address={edit.address} lines={edit.lines} countryName={countryName(edit.address.country)}
-            summary="Wrong address, or need another size?"
-            note={`You can change it here until ${utc.format(edit.until)} UTC, as long as it hasn't shipped.`} />
+            summary={o.editSummary}
+            note={o.editNote(utc.format(edit.until))} />
         </section>
       )}
-      {cancel?.canCancel && cancel.until && <CancelOrder action={cancelOrderByBuyerAction.bind(null, handle, ref)} until={utc.format(cancel.until)} />}
+      {cancel?.canCancel && cancel.until && <CancelOrder action={cancelOrderByBuyerAction.bind(null, handle, ref)} until={utc.format(cancel.until)} text={{ title: o.cancel.title, note: o.cancel.note(utc.format(cancel.until)), reason: o.cancel.reason, button: o.cancel.button, pending: o.cancel.pending }} />}
       <section className="card p-5 flex flex-col gap-3 text-sm">
         {order.lines.map((l, n) => (
           <div key={l.id} className="flex justify-between gap-3">
             <span>
               {l.title} × {l.quantity}
               {l.personalization && <span className="block hint">{l.personalization.map((p) => `${p.label}: ${p.value}`).join(" · ")}</span>}
-              {l.preorder && <span className="block hint">Pre-order</span>}
+              {l.preorder && <span className="block hint">{o.preorderLine}</span>}
             </span>
             <span className="num">{money(due.lines[n]!)}</span>
           </div>
         ))}
         {order.discountMinor > 0 && (
-          <div className="flex justify-between gap-3 hint"><span>{order.discountCode ? `Discount (${order.discountCode})` : `Bundle (${order.bundleTitle})`}</span><span className="num">−{money(due.discountMinor)}</span></div>
+          <div className="flex justify-between gap-3 hint"><span>{order.discountCode ? o.discount(order.discountCode) : o.bundle(order.bundleTitle ?? "")}</span><span className="num">−{money(due.discountMinor)}</span></div>
         )}
-        <div className="flex justify-between gap-3 hint"><span>Shipping{order.shippingMethod ? ` (${order.shippingMethod})` : ""}</span><span className="num">{due.shippingMinor ? money(due.shippingMinor) : "Free"}</span></div>
-        {due.protectionMinor > 0 && <div className="flex justify-between gap-3 hint"><span>Delivery protection</span><span className="num">{money(due.protectionMinor)}</span></div>}
-        {due.giftWrapMinor > 0 && <div className="flex justify-between gap-3 hint"><span>Gift wrapping</span><span className="num">{money(due.giftWrapMinor)}</span></div>}
-        {due.tipMinor > 0 && <div className="flex justify-between gap-3 hint"><span>Tip</span><span className="num">{money(due.tipMinor)}</span></div>}
-        {order.taxExemptId && <div className="flex justify-between gap-3 hint"><span>Tax exempt</span><span className="num">{order.taxExemptId}</span></div>}
+        <div className="flex justify-between gap-3 hint"><span>{o.shipping(order.shippingMethod)}</span><span className="num">{due.shippingMinor ? money(due.shippingMinor) : o.free}</span></div>
+        {due.protectionMinor > 0 && <div className="flex justify-between gap-3 hint"><span>{o.protection}</span><span className="num">{money(due.protectionMinor)}</span></div>}
+        {due.giftWrapMinor > 0 && <div className="flex justify-between gap-3 hint"><span>{o.giftWrap}</span><span className="num">{money(due.giftWrapMinor)}</span></div>}
+        {due.tipMinor > 0 && <div className="flex justify-between gap-3 hint"><span>{o.tip}</span><span className="num">{money(due.tipMinor)}</span></div>}
+        {order.taxExemptId && <div className="flex justify-between gap-3 hint"><span>{o.taxExempt}</span><span className="num">{order.taxExemptId}</span></div>}
         {order.taxMinor > 0 && (
-          <div className="flex justify-between gap-3 hint"><span>{order.taxBreakdown.map((t) => t.label).join(", ") || "Tax"}{order.taxIncluded ? " (included)" : ""}</span><span className="num">{money(due.taxMinor)}</span></div>
+          <div className="flex justify-between gap-3 hint"><span>{order.taxBreakdown.map((t) => t.label).join(", ") || o.tax}{order.taxIncluded ? o.included : ""}</span><span className="num">{money(due.taxMinor)}</span></div>
         )}
-        <div className="flex justify-between gap-3 border-t border-border pt-3 font-semibold"><span>Total</span><span className="num">{money(due.totalMinor)}</span></div>
+        <div className="flex justify-between gap-3 border-t border-border pt-3 font-semibold"><span>{o.total}</span><span className="num">{money(due.totalMinor)}</span></div>
         {due.giftCardMinor > 0 && (
           <>
-            <div className="flex justify-between gap-3 hint"><span>Paid with gift card</span><span className="num">−{money(due.giftCardMinor)}</span></div>
-            <div className="flex justify-between gap-3 hint"><span>Paid by card</span><span className="num">{money(due.chargedMinor)}</span></div>
+            <div className="flex justify-between gap-3 hint"><span>{o.paidGiftCard}</span><span className="num">−{money(due.giftCardMinor)}</span></div>
+            <div className="flex justify-between gap-3 hint"><span>{o.paidCard}</span><span className="num">{money(due.chargedMinor)}</span></div>
           </>
         )}
       </section>
       {reviewable.length > 0 && (
         <section id="review" className="card p-5 flex flex-col gap-4" aria-labelledby="review-heading">
-          <h2 id="review-heading" className="font-semibold">How was it?</h2>
+          <h2 id="review-heading" className="font-semibold">{o.reviewTitle}</h2>
           {shop.reviewRewardPercent && reviewable.some((i) => !i.review) && (
-            <p className="text-sm">Leave a review, good or bad, and we&apos;ll email you {shop.reviewRewardPercent}% off your next order as a thank you.</p>
+            <p className="text-sm">{o.reviewReward(shop.reviewRewardPercent)}</p>
           )}
           {reviewable.map((item) =>
             item.review ? (
               <p key={item.productId} className="text-sm">
-                <span className="font-medium">{item.title}:</span> you gave it {item.review.rating} of 5 stars.{" "}
-                {item.review.status === "pending" ? "It shows on the store once the shop has had a look." : "Thank you!"}
-                {item.review.rewardedAt && ` We've emailed you ${shop.reviewRewardPercent ? `${shop.reviewRewardPercent}% off` : "a thank-you code for"} your next order.`}
+                <span className="font-medium">{item.title}:</span> {o.reviewGiven(item.review.rating)}{" "}
+                {item.review.status === "pending" ? o.reviewPending : o.reviewThanks}
+                {item.review.rewardedAt && o.reviewRewarded(shop.reviewRewardPercent)}
               </p>
             ) : (
               <ReviewForm key={item.productId} handle={handle} orderRef={ref} productId={item.productId} title={item.title} name={(order.gift?.from ?? order.shippingAddress.name).split(" ")[0] ?? ""}
-                rating={reviewable.filter((i) => !i.review).length === 1 ? tappedRating : undefined} />
+                rating={reviewable.filter((i) => !i.review).length === 1 ? tappedRating : undefined}
+                text={{ thanks: o.review.thanks(item.title), rewardSent: o.review.rewardSent(shop.reviewRewardPercent ?? 0), reviewOf: o.review.reviewOf(item.title), rating: o.review.rating, stars: [1, 2, 3, 4, 5].map((n) => o.review.stars(n)), body: o.review.body, photos: o.review.photos, photosHint: o.review.photosHint, name: o.review.name, sending: o.review.sending, send: o.review.send }} />
             ),
           )}
         </section>
       )}
       {returns && (returns.latest || returns.canRequest || returns.blocked) && (
         <section id="returns" className="card p-5 flex flex-col gap-3" aria-labelledby="returns-heading">
-          <h2 id="returns-heading" className="font-semibold">Returns</h2>
+          <h2 id="returns-heading" className="font-semibold">{o.returns}</h2>
           {returns.latest && (
             <div className="flex flex-col gap-1 text-sm" role="status">
               <p>
                 {returns.latest.items.map((i) => `${i.title} × ${i.quantity}`).join(", ")}:{" "}
-                {{
-                  requested: `you asked for a return. ${shop.name} will email you when they've looked at it.`,
-                  approved: `${shop.name} approved your return.`,
-                  refunded: `refunded ${returns.latest.resolvedMinor ? formatMoney(returns.latest.resolvedMinor, order.currency) : ""}.`,
-                  credited: `${returns.latest.resolvedMinor ? formatMoney(returns.latest.resolvedMinor, order.currency) : ""} in store credit, sent by email.`,
-                  replaced: `${shop.name} is sending a replacement. There's nothing to send back.`,
-                  exchanged: `${shop.name} is sending ${returns.latest.items.map((i) => i.exchangeTitle ?? i.title).join(", ")} in exchange.`,
-                  declined: `${shop.name} couldn't accept this return.`,
-                }[returns.latest.status]}
+                {o.returnStatus(returns.latest.status, shop.name, returns.latest.resolvedMinor ? formatMoney(returns.latest.resolvedMinor, order.currency) : "", returns.latest.items.map((i) => i.exchangeTitle ?? i.title).join(", "))}
               </p>
               {returns.latest.merchantMessage && (returns.latest.status === "approved" || returns.latest.status === "declined" || returns.latest.status === "exchanged") && (
                 <p className="border-l-2 border-border pl-3 whitespace-pre-line">{returns.latest.merchantMessage}</p>
@@ -414,7 +412,8 @@ export default async function OrderStatusPage({ params, searchParams }: { params
           {returns.blocked && !returns.open && <p className="text-sm hint">{returns.blocked}</p>}
           {returns.canRequest && (
             <ReturnForm handle={handle} orderRef={ref} lines={returns.lines.map((l) => ({ id: l.id, title: l.title, quantity: l.quantity, swaps: returns.exchanges[l.id] ?? [] }))}
-              reasons={Object.entries(RETURN_REASON_LABELS)} closes={returns.closesAt ? day.format(returns.closesAt) : null} />
+              reasons={(Object.keys(RETURN_REASON_LABELS) as (keyof typeof RETURN_REASON_LABELS)[]).map((k): [string, string] => [k, o.reasons[k]])} closes={returns.closesAt ? day.format(returns.closesAt) : null}
+              text={{ ...o.returnForm, until: returns.closesAt ? o.returnForm.until(day.format(returns.closesAt)) : "", swapFor: o.returnForm.swapFor("{title}") }} />
           )}
         </section>
       )}
@@ -428,18 +427,19 @@ export default async function OrderStatusPage({ params, searchParams }: { params
       )}
       {paid && (
         <section className="card p-5 flex flex-col gap-4" aria-labelledby="questions">
-          <h2 id="questions" className="font-semibold">Questions</h2>
+          <h2 id="questions" className="font-semibold">{o.questions}</h2>
           {thread.length > 0 && (
             <ol className="flex flex-col gap-3">
               {thread.map((m) => (
                 <li key={m.id} className={`flex flex-col gap-1 max-w-[85%] ${m.author === "buyer" ? "self-end items-end" : "self-start"}`}>
-                  <span className="hint">{m.author === "buyer" ? "You" : shop.name} · {time.format(m.createdAt)}</span>
+                  <span className="hint">{m.author === "buyer" ? o.you : shop.name} · {time.format(m.createdAt)}</span>
                   <div className={`rounded-2xl px-4 py-2.5 text-sm whitespace-pre-line ${m.author === "buyer" ? "bg-accent text-accent-ink" : "bg-sunken"}`}>{m.body}</div>
                 </li>
               ))}
             </ol>
           )}
-          <QuestionForm handle={handle} orderRef={ref} email={order.email} />
+          <QuestionForm handle={handle} orderRef={ref} email={order.email}
+            text={{ sent: o.question.sent(order.email), label: o.question.label, placeholder: o.question.placeholder, sending: o.question.sending, send: o.question.send }} />
         </section>
       )}
     </main>
