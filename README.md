@@ -2328,3 +2328,7 @@ A store can now be based in about 70 more countries. In Australia, New Zealand, 
 ### No bill while paused, and remove your card (after launch, part 462)
 
 When our staff pause a store, its plan stops being charged straight away (Stripe's `pause_collection` with invoices voided, never charged later), and charging starts again only when the store reopens after an accepted appeal or a reinstatement. The Plan page says so while the store is paused. The Plan page also has **Your card**, which opens Stripe's billing page to change or remove the card the plan is paid with. `syncPlanBilling` and `cardSettingsUrl` in `packages/core/src/payouts.ts`; `pauseBilling` and `billingPortalUrl` on the payment provider.
+
+### US import duties when pricing, and US warehouses first (after launch, part 463)
+
+The US ended duty-free entry for small parcels in 2025, so US buyers can owe duty and a customs fee on delivery for parcels from abroad. When a store that ships to the US imports something leaving from another country, the import page (and the app's import screen) warns before the price is set, and suggests a US warehouse or including duties in the price. CJ and AliExpress listings without a warehouse choice count as leaving from China. When a listing has several warehouses, the import now starts on the store's own country, then the country most of its buyers are in (the US for a new store that ships there), then China. `usDutyWarning`, `mainMarket` and `zonesReach` in `packages/core/src/duties.ts`; `defaultWarehouse(warehouses, country, market)`.

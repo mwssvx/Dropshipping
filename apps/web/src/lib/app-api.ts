@@ -3587,6 +3587,7 @@ const routes: Record<string, Handler> = {
       // Listings sold from several warehouses: the one these options come from, and the others.
       warehouse: p.warehouse,
       warehouses: p.warehouses.map((w) => w.name),
+      dutyWarning: p.dutyWarning,
       product: {
         title: p.product.title,
         imageUrl: p.product.images[0] ?? null,

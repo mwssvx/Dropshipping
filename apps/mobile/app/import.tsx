@@ -11,6 +11,8 @@ import { color, radius, space } from "../src/theme";
 type Preview = {
   supplier: { name: string; label: string };
   alreadyImported: { id: string; title: string } | null;
+  /** Shown when it ships into the US from abroad, where buyers can owe duty on delivery. */
+  dutyWarning?: string | null;
   product: { title: string; imageUrl: string | null; variants: { ref: string; title: string; costMinor: number; stock: number | null; suggestedPriceMinor: number }[] };
 };
 
@@ -91,6 +93,7 @@ export default function ImportScreen() {
         <Card>
           <Body muted>From {preview.supplier.label}</Body>
           {preview.alreadyImported ? <Banner tone="warning">You've already imported this as "{preview.alreadyImported.title}".</Banner> : null}
+          {preview.dutyWarning ? <Banner tone="warning">{preview.dutyWarning}</Banner> : null}
           {preview.product.imageUrl ? (
             <Image source={{ uri: preview.product.imageUrl }} accessibilityLabel="Supplier photo" style={{ width: "100%", aspectRatio: 1, borderRadius: radius.md, backgroundColor: color.sunken }} />
           ) : null}
