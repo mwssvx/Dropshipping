@@ -84,6 +84,16 @@ test("a merchant translates the store into German and a buyer shops in German", 
   await buyer.getByRole("navigation", { name: "Sprache" }).getByRole("link", { name: "English" }).click();
   await expect(buyer.getByRole("heading", { name: "Thank you, Lena!" })).toBeVisible();
 
+  // Search matches the German words, and the account page signs buyers in in German.
+  await buyer.goto(`${storeRoot}/de/search?q=sonnenuntergangslampe`);
+  await expect(buyer).toHaveTitle(/^Suche: sonnenuntergangslampe/);
+  await expect(buyer.getByRole("link", { name: /Sonnenuntergangslampe/ }).first()).toBeVisible();
+  await buyer.goto(`${storeRoot}/de/account`);
+  await expect(buyer.getByRole("heading", { name: "Deine Bestellungen" })).toBeVisible();
+  await buyer.getByLabel("E-Mail").fill("lena@example.com");
+  await buyer.getByRole("button", { name: "Code per E-Mail schicken" }).click();
+  await expect(buyer.getByText("Er gilt 10 Minuten.", { exact: false })).toBeVisible();
+
   // A language the store doesn't offer is a 404.
   const res = await buyer.goto(`${storeRoot}/fr`);
   expect(res?.status()).toBe(404);

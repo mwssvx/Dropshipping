@@ -2356,3 +2356,7 @@ The buyer's order page now follows the store language they shopped in: the thank
 ### Order emails in the buyer's language (after launch, part 469)
 
 An order now remembers the store language the buyer checked out in (`orders.language`, migration 0162; only languages the store offers are kept). The emails buyers get most go out in that language: the order confirmation, shipped, delivered or picked up, refund, ready to pick up, the "Track your order" link and the checkout reminder, with dates written the local way. The words are in `packages/core/src/email-text.ts`. Rarer emails (bank transfer, payment links, order changes, the second reminder with a code, gift notes and the per-parcel shipping email) are still in English.
+
+### Search and the account page in the buyer's language (after launch, part 470)
+
+Store search now matches the translated title and description of each product in the language the shopper is reading, as well as the original words, on the search page and in the suggestions as you type (`language` in `BrowseOptions`). The search page title follows the store language. The buyer's account page and its forms are translated into every store language: signing in with an emailed code, orders and their status, products waiting for a review, birthday, wholesale, points and subscriptions, with dates and numbers written the local way. The words are in `apps/web/src/lib/account-text.ts`.
