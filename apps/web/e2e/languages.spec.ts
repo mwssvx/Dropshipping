@@ -63,9 +63,26 @@ test("a merchant translates the store into German and a buyer shops in German", 
   await expect(buyer.getByLabel("Vollständiger Name")).toBeVisible();
   await expect(buyer.getByRole("button", { name: "Weiter zur Zahlung" })).toBeVisible();
 
+  // After paying, the order page is in German too: what happens next, progress, totals, questions.
+  await buyer.getByLabel("E-Mail").fill("lena@example.com");
+  await buyer.getByLabel("Vollständiger Name").fill("Lena Berger");
+  await buyer.getByLabel("Adresse", { exact: true }).fill("1 Main St");
+  await buyer.getByLabel("Stadt").fill("Austin");
+  await buyer.getByLabel("Bundesland oder Region").fill("TX");
+  await buyer.getByLabel("Postleitzahl").fill("78701");
+  await buyer.getByRole("button", { name: "Weiter zur Zahlung" }).click();
+  await buyer.getByRole("button", { name: /bezahlen$/ }).click();
+  await expect(buyer.getByRole("heading", { name: "Vielen Dank, Lena!" })).toBeVisible();
+  await expect(buyer).toHaveURL(/\/de\/orders\//);
+  await expect(buyer.getByText("Wir haben eine Quittung an lena@example.com geschickt.", { exact: false })).toBeVisible();
+  await expect(buyer.getByLabel("Bestellstatus").getByText("Bestellung bestätigt")).toBeVisible();
+  await expect(buyer.getByText("Gesamt", { exact: true })).toBeVisible();
+  await expect(buyer.getByLabel("Eine Frage zu dieser Bestellung stellen")).toBeVisible();
+  await expect(buyer.getByText("Diese Bestellung stornieren")).toBeVisible();
+
   // English is still one click away, on the same page.
   await buyer.getByRole("navigation", { name: "Sprache" }).getByRole("link", { name: "English" }).click();
-  await expect(buyer.getByLabel("Full name")).toBeVisible();
+  await expect(buyer.getByRole("heading", { name: "Thank you, Lena!" })).toBeVisible();
 
   // A language the store doesn't offer is a 404.
   const res = await buyer.goto(`${storeRoot}/fr`);

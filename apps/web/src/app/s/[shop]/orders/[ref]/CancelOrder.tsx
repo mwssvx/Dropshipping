@@ -5,21 +5,23 @@ import { SubmitButton } from "@/components/SubmitButton";
 import type { CancelState } from "../../actions";
 
 /** "Cancel this order", folded away so it isn't the first thing a happy buyer sees. */
-export function CancelOrder({ action, until }: { action: (state: CancelState, form: FormData) => Promise<CancelState>; until: string }) {
+export type CancelText = { title: string; note: string; reason: string; button: string; pending: string };
+
+export function CancelOrder({ action, text: t }: { action: (state: CancelState, form: FormData) => Promise<CancelState>; until: string; text: CancelText }) {
   const [state, formAction] = useActionState(action, {} as CancelState);
   // The page shows the cancellation once it's done.
   if (state.done) return null;
   return (
     <details className="card p-5">
-      <summary className="cursor-pointer font-semibold">Cancel this order</summary>
+      <summary className="cursor-pointer font-semibold">{t.title}</summary>
       <form action={formAction} className="flex flex-col gap-3 mt-3">
-        <p className="text-sm text-muted">You can cancel it here until {until} UTC, as long as it hasn&apos;t shipped. You&apos;ll get all your money back.</p>
+        <p className="text-sm text-muted">{t.note}</p>
         <FormError message={state.error} />
         <div className="field">
-          <label className="label" htmlFor="cancelReason">Why are you cancelling? (optional)</label>
+          <label className="label" htmlFor="cancelReason">{t.reason}</label>
           <input className="input" id="cancelReason" name="reason" maxLength={300} />
         </div>
-        <SubmitButton className="btn btn-secondary self-start" pendingText="Cancelling…">Cancel order and refund me</SubmitButton>
+        <SubmitButton className="btn btn-secondary self-start" pendingText={t.pending}>{t.button}</SubmitButton>
       </form>
     </details>
   );
