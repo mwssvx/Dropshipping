@@ -16,6 +16,7 @@ import {
   moneySummary,
   planAdvice,
   platformFeeFor,
+  breakEvenMinor,
   refreshPayoutAccount,
   refundOrder,
   requirementKind,
@@ -82,9 +83,12 @@ async function paidOrder(s: Awaited<ReturnType<typeof shop>>, quantity = 2) {
 }
 
 describe("plans and fees", () => {
-  it("takes 2% on the free plan and nothing on paid plans", async () => {
-    expect(platformFeeFor("free", 10_000)).toBe(200);
-    expect(platformFeeFor("free", 2_525)).toBe(51);
+  it("takes 5% on the free plan and nothing on paid plans", async () => {
+    expect(platformFeeFor("free", 10_000)).toBe(500);
+    expect(platformFeeFor("free", 2_525)).toBe(126);
+    expect(breakEvenMinor("starter")).toBe(58_000);
+    expect(breakEvenMinor("growth")).toBe(138_000);
+    expect(breakEvenMinor("free")).toBe(0);
     expect(platformFeeFor("growth", 10_000)).toBe(0);
     expect(estimateProcessingFee(10_000)).toBe(320);
 
@@ -105,10 +109,10 @@ describe("plans and fees", () => {
     await paidOrder(s, 1);
     expect((await planAdvice(db, s)).best).toBeNull();
 
-    // A big month: about $3,000 in sales means $60 in fees, more than Growth's $49.
-    await db.update(schema.orders).set({ totalMinor: 300_000, subtotalMinor: 300_000, shippingMinor: 0, platformFeeMinor: 6_000 }).where(eq(schema.orders.shopId, s.id));
+    // A big month: about $3,000 in sales means $150 in fees, more than Growth's $69.
+    await db.update(schema.orders).set({ totalMinor: 300_000, subtotalMinor: 300_000, shippingMinor: 0, platformFeeMinor: 15_000 }).where(eq(schema.orders.shopId, s.id));
     const advice = await planAdvice(db, s);
-    expect(advice.best).toEqual({ plan: "starter", saveMinor: 6_000 - 1_900 });
+    expect(advice.best).toEqual({ plan: "starter", saveMinor: 15_000 - 2_900 });
   });
 
   it("follows plan changes from billing webhooks", async () => {

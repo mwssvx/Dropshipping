@@ -5,7 +5,7 @@ type Plan = { id: string; name: string; monthlyMinor: number; feeBps: number; or
 
 const usd = (minor: number) => `$${(minor / 100).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
-export function PriceCalculator({ plans }: { plans: Plan[] }) {
+export function PriceCalculator({ plans, growthBreakEvenMinor }: { plans: Plan[]; growthBreakEvenMinor: number }) {
   const [sales, setSales] = useState(2000);
   const [orders, setOrders] = useState(60);
   const rows = plans.map((p) => {
@@ -33,7 +33,7 @@ export function PriceCalculator({ plans }: { plans: Plan[] }) {
           </li>
         ))}
       </ul>
-      <p className="hint text-sm">Before card fees, which are the same on every plan. Free and Growth cost the same at about $2,450 a month in sales.</p>
+      <p className="hint text-sm">Before card fees, which are the same on every plan. Free and Growth cost the same at about {usd(growthBreakEvenMinor)} a month in sales.</p>
     </div>
   );
 }

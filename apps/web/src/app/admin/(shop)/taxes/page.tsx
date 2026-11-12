@@ -32,7 +32,7 @@ export default async function TaxesPage({ searchParams }: { searchParams: Promis
           <h2 className="font-semibold">How tax works here</h2>
           <p>
             We charge tax only to buyers in places where you've told us you're registered, at the buyer's local rate. It's added to
-            the order, shown on the receipt, and listed below so you know what to pay the tax office. Our 2% fee is never taken on tax.
+            the order, shown on the receipt, and listed below so you know what to pay the tax office. Our sales fee is never taken on tax.
           </p>
           <p className="hint">
             Not sure if you need to register? Sellers outside the UK need UK VAT from their first sale there. In the EU, one OSS or

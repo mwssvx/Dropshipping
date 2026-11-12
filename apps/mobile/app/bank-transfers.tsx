@@ -78,7 +78,7 @@ export default function BankTransfersScreen() {
           <Section title="Settings">
             <Card>
               {d.freePlan ? (
-                <Body>Bank transfers are on paid plans, because on the free plan our 2% comes out of card payments.</Body>
+                <Body>Bank transfers are on paid plans, because on the free plan our 5% comes out of card payments.</Body>
               ) : d.canEdit ? (
                 <>
                   <Toggle label="Let buyers pay by bank transfer" value={s.on} onChange={(v) => setEdit({ ...s, on: v })} />

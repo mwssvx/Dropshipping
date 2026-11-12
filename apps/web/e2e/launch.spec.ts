@@ -13,19 +13,19 @@ test("the landing page leads to pricing, and the calculator picks the cheapest p
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Start a dropshipping store for $0");
   await shot(page, "77-landing");
   await page.getByRole("link", { name: "Pricing" }).first().click();
-  await expect(page.getByRole("heading", { name: "Start free. Switch when it saves you money." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Start free. Upgrade once you're earning." })).toBeVisible();
 
   // $2,000 and 60 orders: Free is over its 50-order limit, so Starter is cheapest.
   await expect(page.getByRole("listitem", { name: "Free: over its order limit" })).toBeVisible();
-  await expect(page.getByRole("listitem", { name: "Starter: $19 a month" })).toContainText("cheapest");
+  await expect(page.getByRole("listitem", { name: "Starter: $29 a month" })).toContainText("cheapest");
   // $10,000 and 200 orders: Growth.
   await page.getByLabel(/Sales a month/).fill("10000");
   await page.getByLabel(/Orders a month/).fill("200");
-  await expect(page.getByRole("listitem", { name: "Growth: $49 a month" })).toContainText("cheapest");
-  // $500 and 20 orders: Free's 2% is $10, under Starter's $19.
+  await expect(page.getByRole("listitem", { name: "Growth: $69 a month" })).toContainText("cheapest");
+  // $500 and 20 orders: Free's 5% is $25, under Starter's $29.
   await page.getByLabel(/Sales a month/).fill("500");
   await page.getByLabel(/Orders a month/).fill("20");
-  await expect(page.getByRole("listitem", { name: "Free: $10 a month" })).toContainText("cheapest");
+  await expect(page.getByRole("listitem", { name: "Free: $25 a month" })).toContainText("cheapest");
   await shot(page, "78-pricing");
 });
 

@@ -46,7 +46,7 @@ export function launchChecks(env: Env): LaunchCheck[] {
   });
   add(["STRIPE_PRICE_STARTER", "STRIPE_PRICE_GROWTH", "STRIPE_PRICE_SCALE"].every((k) => env[k]?.startsWith("price_")), {
     id: "stripe-prices", area: "Payments", label: "Prices for the paid plans", severity: "blocker",
-    fix: "Create monthly prices of $19, $49 and $149 in Stripe Billing and set STRIPE_PRICE_STARTER, _GROWTH and _SCALE.",
+    fix: "Create monthly prices of $29, $69 and $199 in Stripe Billing and set STRIPE_PRICE_STARTER, _GROWTH and _SCALE.",
   });
   add(set("RESEND_API_KEY") && set("EMAIL_FROM") && !/example\.(com|org)/.test(env.EMAIL_FROM ?? ""), {
     id: "email", area: "Email", label: "Email sending", severity: "blocker",

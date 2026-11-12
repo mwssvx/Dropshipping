@@ -3,11 +3,12 @@
 // store's account details with the order number as the reference. Nothing is ordered from the
 // supplier until the merchant sees the money arrive and presses Mark as paid; from then on it's an
 // ordinary paid order. If nothing arrives in time the order lapses, and the buyer can still pay by
-// card. Only on paid plans: the free plan's 2% is taken from card payments, which this skips.
+// card. Only on paid plans: the free plan's cut is taken from card payments, which this skips.
 import { and, eq, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { schema, type BankTransfer, type Db } from "@sf/db";
 import { NotFoundError, UserError } from "./errors";
 import { sendOrderEmail, type FulfillmentContext } from "./fulfillment";
+import { FREE_FEE_PERCENT } from "./plans";
 
 type Shop = typeof schema.shops.$inferSelect;
 type Order = typeof schema.orders.$inferSelect;
@@ -20,7 +21,7 @@ const DAY = 24 * 60 * 60 * 1000;
 export async function setBankTransfer(db: Db, shop: Pick<Shop, "id" | "plan">, input: { details: string; days: number } | null) {
   let value: BankTransfer | null = null;
   if (input) {
-    if (shop.plan === "free") throw new UserError("Bank transfers are on paid plans. On the free plan our 2% comes out of card payments, and a transfer skips the card.");
+    if (shop.plan === "free") throw new UserError(`Bank transfers are on paid plans. On the free plan our ${FREE_FEE_PERCENT}% comes out of card payments, and a transfer skips the card.`);
     const details = input.details.trim().replace(/\r\n/g, "\n");
     if (details.length < 10) throw new UserError("Write the account to pay into: the name on the account, and the IBAN or account and sort or routing number.");
     if (details.length > BANK_DETAILS_MAX) throw new UserError(`Keep the account details under ${BANK_DETAILS_MAX} characters.`);

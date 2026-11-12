@@ -56,11 +56,11 @@ test("payouts, holds, refunds and plans", async ({ page, browser }, info) => {
   const buyer = await (await browser.newContext({ ...info.project.use })).newPage();
   await buy(buyer, productUrl);
 
-  // The sale shows as clearing, with our 2% fee and the card fee taken off.
+  // The sale shows as clearing, with our 5% fee and the card fee taken off.
   await page.reload();
   const balance = page.getByRole("region", { name: "Balance" });
   await expect(balance.getByText("Clearing")).toBeVisible();
-  await expect(page.getByText(/Our fee \(2% on the Free plan\)/)).toBeVisible();
+  await expect(page.getByText(/Our fee \(5% on the Free plan\)/)).toBeVisible();
   await page.getByRole("button", { name: "Pay out now" }).click();
   await expect(page.getByRole("cell", { name: "On the way" })).toBeVisible();
   await shot(page, "34-money-balance");

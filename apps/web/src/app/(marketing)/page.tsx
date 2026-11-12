@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatMoney, FREE_FEE_PERCENT, PLANS } from "@sf/core";
 import { BRAND } from "@/lib/brand";
 
 export const metadata = {
@@ -26,7 +27,7 @@ const FIXES = [
 
 const FAQ = [
   ["Do I need to hold stock?", "No. You list products from a supplier, and each paid order goes to them to pack and ship to your buyer."],
-  ["What does it cost?", "Free costs $0 a month and takes 2% of each sale. Paid plans start at $19 a month and take nothing from your sales. Card processing fees are separate and the same on every plan."],
+  ["What does it cost?", `Free costs $0 a month: you pay ${FREE_FEE_PERCENT}% of a sale only when you make one. Once you're earning, paid plans start at ${formatMoney(PLANS.starter.monthlyMinor, "USD")} a month and take nothing from your sales. Card processing fees are separate and the same on every plan.`],
   ["How do I get paid?", "Through Stripe, straight to your bank. The Money page shows what each sale nets after fees and when the next payout lands."],
   ["Where can I sell?", "Stores can be based in the US, UK, EU and Canada at launch, and sell to buyers wherever your supplier ships."],
   ["Can I take my store elsewhere?", "Yes. One click downloads everything: products, collections, pages, your theme and settings."],
@@ -46,7 +47,7 @@ export default function Home() {
             <Link href="/signup" className="btn btn-primary btn-lg">Open your store free</Link>
             <Link href="/pricing" className="btn btn-secondary btn-lg">See pricing</Link>
           </div>
-          <p className="hint">No card needed. Free plan: $0 a month, 2% per sale.</p>
+          <p className="hint">No card needed. Free plan: $0 a month, {FREE_FEE_PERCENT}% per sale, so you only pay when you sell.</p>
         </div>
         <ul className="card p-6 flex flex-col gap-4 text-sm">
           {FIXES.map(([t, d]) => (

@@ -58,7 +58,7 @@ export default function TaxesScreen() {
         data.loading ? <Loading /> : null
       ) : (
         <>
-          <Body muted>We charge tax only to buyers in places where you've told us you're registered, at the buyer's local rate. Our 2% fee is never taken on tax. An accountant can confirm where you need to register.</Body>
+          <Body muted>We charge tax only to buyers in places where you've told us you're registered, at the buyer's local rate. Our sales fee is never taken on tax. An accountant can confirm where you need to register.</Body>
           <Section title="Where you collect tax">
             {d.registrations.length ? (
               <List>

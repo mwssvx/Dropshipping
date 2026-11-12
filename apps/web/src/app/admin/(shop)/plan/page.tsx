@@ -24,6 +24,7 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
             <span className="font-semibold num">{money(advice.currentCostMinor)}</span>
             {current.feeBps ? ` (${money(advice.feesMinor)} in sales fees${current.monthlyMinor ? ` plus ${usd(current.monthlyMinor)}` : ""})` : ""}.
           </p>
+          {advice.upgradeHint && <p className="text-sm">{advice.upgradeHint}</p>}
           {advice.best && (
             <p className="banner banner-info">
               {PLANS[advice.best.plan].name} would have cost {money(advice.best.saveMinor)} less for the same sales.

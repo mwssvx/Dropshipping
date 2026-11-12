@@ -375,9 +375,9 @@ Total: roughly 20 to 22 weeks to a public launch. M6 can start once M2's API is 
 
 | plan | price | for |
 | --- | --- | --- |
-| Starter | $19 a month | everything built in, up to 100 orders a month, an AI budget for normal use |
-| Growth | $49 a month | unlimited orders, a larger AI budget, priority human support |
-| Scale | $149 a month | staff accounts, API rate boost, advanced analytics |
+| Starter | $29 a month | everything built in, up to 100 orders a month, an AI budget for normal use |
+| Growth | $69 a month | unlimited orders, a larger AI budget, priority human support |
+| Scale | $199 a month | staff accounts, API rate boost, advanced analytics |
 
 We add no transaction fee on top of Stripe's card processing on any plan. There's a 14-day trial with no card needed. Check margins against Stripe Connect and Claude API costs before you commit.
 

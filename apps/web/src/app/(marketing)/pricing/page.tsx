@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { PLAN_IDS, PLANS } from "@sf/core";
+import { breakEvenMinor, FREE_FEE_PERCENT, PLAN_IDS, PLANS } from "@sf/core";
 import { PriceCalculator } from "./PriceCalculator";
 
-export const metadata = { title: "Pricing", description: "Start free with 2% per sale, or pay a flat monthly price and keep every sale." };
+export const metadata = { title: "Pricing", description: "Start free and pay only when you sell. Once you're earning, a flat monthly price lets you keep every sale." };
 
 const usd = (minor: number) => `$${(minor / 100).toFixed(0)}`;
 
@@ -11,10 +11,11 @@ export default function PricingPage() {
   return (
     <main className="px-4 sm:px-8 pb-12 max-w-6xl mx-auto flex flex-col gap-10">
       <div className="flex flex-col gap-3 max-w-2xl">
-        <h1 className="text-4xl font-bold tracking-tight">Start free. Switch when it saves you money.</h1>
+        <h1 className="text-4xl font-bold tracking-tight">Start free. Upgrade once you&apos;re earning.</h1>
         <p className="text-lg text-muted">
-          Free costs nothing a month and takes 2% of each sale. Paid plans take nothing from your sales. We tell you in your Money
-          page when another plan would cost you less.
+          Free costs nothing a month: you pay {FREE_FEE_PERCENT}% of a sale only when you make one. Once you sell about{" "}
+          {usd(breakEvenMinor("starter"))} a month, a paid plan costs less and takes nothing from your sales. We tell you on your
+          Money page when that day comes.
         </p>
       </div>
       <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -37,7 +38,7 @@ export default function PricingPage() {
       </ul>
       <section className="card p-6 flex flex-col gap-4" aria-labelledby="calc">
         <h2 id="calc" className="text-xl font-semibold">What would you pay?</h2>
-        <PriceCalculator plans={plans.map((p) => ({ id: p.id, name: p.name, monthlyMinor: p.monthlyMinor, feeBps: p.feeBps, ordersPerMonth: p.ordersPerMonth }))} />
+        <PriceCalculator plans={plans.map((p) => ({ id: p.id, name: p.name, monthlyMinor: p.monthlyMinor, feeBps: p.feeBps, ordersPerMonth: p.ordersPerMonth }))} growthBreakEvenMinor={breakEvenMinor("growth")} />
       </section>
       <section className="grid gap-4 md:grid-cols-3 text-sm" aria-label="Included on every plan">
         <div className="flex flex-col gap-1"><h3 className="font-semibold">On every plan</h3><p className="text-muted">Supplier import, automatic orders, the theme editor, your own domain, reviews, discount codes, checkout reminders, analytics, the app, the API and webhooks.</p></div>
