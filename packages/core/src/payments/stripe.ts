@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import { UserError } from "../errors";
+import { payoutRoute } from "../shops";
 import type { DisputeEvidence, PaymentEvent, PaymentProvider, PayoutAccountStatus, ProviderDispute, ProviderPayout } from "./provider";
 
 export type StripePrices = Partial<Record<"starter" | "growth" | "scale", string>>;
@@ -118,11 +119,15 @@ export class StripePaymentProvider implements PaymentProvider {
   }
 
   async createPayoutAccount(input: { shopId: string; country: string; email: string }) {
+    // Sellers where Stripe has no full accounts get a recipient account: the platform takes the
+    // card payment (destination charges, never on_behalf_of) and Stripe pays out to their bank.
+    const crossBorder = payoutRoute(input.country) === "cross_border";
     const account = await this.stripe.accounts.create({
       type: "express",
       country: input.country,
       email: input.email,
-      capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
+      capabilities: crossBorder ? { transfers: { requested: true } } : { card_payments: { requested: true }, transfers: { requested: true } },
+      ...(crossBorder ? { tos_acceptance: { service_agreement: "recipient" as const } } : {}),
       metadata: { shopId: input.shopId },
     });
     return { accountId: account.id };
