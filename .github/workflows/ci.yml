@@ -5,7 +5,8 @@ on:
     branches: [main]
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # Pinned: Playwright has no Chromium for the Ubuntu 26 image ubuntu-latest moved to.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
