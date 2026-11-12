@@ -49,20 +49,27 @@ export function warehousesOf(product: SupplierProduct): Warehouse[] {
 
 /**
  * The warehouse picked by default: the one in the store's own country when there is one (fastest,
- * and no customs), else China, where most dropshipping stock sits, else the first listed.
+ * and no customs), else one in the country most of its buyers are in (`market`: for most stores the
+ * US, where small parcels from abroad now owe duty), else China, where most dropshipping stock
+ * sits, else the first listed.
  */
-export function defaultWarehouse(warehouses: Warehouse[], storeCountry: string) {
-  return (warehouses.find((w) => w.country === storeCountry) ?? warehouses.find((w) => w.country === "CN") ?? warehouses[0])?.name ?? null;
+export function defaultWarehouse(warehouses: Warehouse[], storeCountry: string, market: string | null = null) {
+  return (
+    warehouses.find((w) => w.country === storeCountry) ??
+    (market ? warehouses.find((w) => w.country === market) : undefined) ??
+    warehouses.find((w) => w.country === "CN") ??
+    warehouses[0]
+  )?.name ?? null;
 }
 
 /**
  * The listing as sold from one warehouse: only its options, with "Ships From" taken out of their
  * names, and the country it ships from. A listing without the option comes back as it is.
  */
-export function fromWarehouse(product: SupplierProduct, storeCountry: string, chosen?: string | null): { product: SupplierProduct; warehouse: string | null; shipsFrom: string | null } {
+export function fromWarehouse(product: SupplierProduct, storeCountry: string, chosen?: string | null, market: string | null = null): { product: SupplierProduct; warehouse: string | null; shipsFrom: string | null } {
   const warehouses = warehousesOf(product);
   if (warehouses.length === 0) return { product, warehouse: null, shipsFrom: null };
-  const name = warehouses.find((w) => w.name === chosen)?.name ?? defaultWarehouse(warehouses, storeCountry)!;
+  const name = warehouses.find((w) => w.name === chosen)?.name ?? defaultWarehouse(warehouses, storeCountry, market)!;
   const variants = product.variants
     .filter((v) => v.options![optionKey(v.options)!] === name)
     .map((v) => {

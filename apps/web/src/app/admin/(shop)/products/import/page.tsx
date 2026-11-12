@@ -59,6 +59,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
                 You already imported this as <Link className="underline" href={`/admin/products/${preview.alreadyImported.id}`}>{preview.alreadyImported.title}</Link>.
               </p>
             )}
+            {preview.dutyWarning && <p className="banner banner-warning" role="note" aria-label="Import duties">{preview.dutyWarning}</p>}
             {preview.warehouses.length > 1 && (
               <section className="card p-5 flex flex-col gap-3" aria-labelledby="warehouse-heading">
                 <div>

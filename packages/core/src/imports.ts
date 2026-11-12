@@ -6,6 +6,7 @@ import { supplierPhotos } from "./gallery";
 import { uniqueHandle } from "./handles";
 import { compareAtFor, DEFAULT_PRICING_RULE, priceFromCost, pricingRuleOf } from "./pricing";
 import { SupplierError, type SupplierAdapter, type SupplierProduct, type Suppliers } from "./suppliers";
+import { mainMarket, zonesReach, usDutyWarning } from "./duties";
 import { fromWarehouse, warehousesOf, type Warehouse } from "./warehouses";
 
 /** Starting retail price from the store's pricing rule. The merchant can change it before import. */
@@ -15,7 +16,7 @@ export function suggestPrice(costMinor: number, rule: PricingRule = DEFAULT_PRIC
 
 async function shopFor(db: Db, shopId: string) {
   const shop = await db.query.shops.findFirst({ where: eq(schema.shops.id, shopId), columns: { pricingRule: true, country: true } });
-  return { rule: shop ? pricingRuleOf(shop) : DEFAULT_PRICING_RULE, country: shop?.country ?? "US" };
+  return { rule: shop ? pricingRuleOf(shop) : DEFAULT_PRICING_RULE, country: shop?.country ?? "US", market: await mainMarket(db, shopId) };
 }
 
 export type ImportPreview = {
@@ -28,6 +29,8 @@ export type ImportPreview = {
   warehouse: string | null;
   /** The warehouse's country when it isn't the store's own. */
   shipsFrom: string | null;
+  /** A warning when it ships into the US from abroad, where buyers can owe duty on delivery. */
+  dutyWarning: string | null;
 };
 
 async function fetchProduct(suppliers: Suppliers, url: string) {
@@ -49,16 +52,18 @@ async function findExisting(db: Db, shopId: string, ref: string) {
   );
 }
 
+const CHINA_SUPPLIERS = new Set<string>(["cj", "aliexpress"]);
+
 /** The listing from the picked warehouse (or the default one), and where it ships from. */
-function sellFrom(listing: SupplierProduct, storeCountry: string, chosen?: string | null) {
-  const picked = fromWarehouse(listing, storeCountry, chosen);
+function sellFrom(listing: SupplierProduct, storeCountry: string, chosen?: string | null, market: string | null = null) {
+  const picked = fromWarehouse(listing, storeCountry, chosen, market);
   return { ...picked, shipsFrom: picked.shipsFrom === storeCountry ? null : picked.shipsFrom };
 }
 
 export async function previewImport(db: Db, suppliers: Suppliers, shopId: string, url: string, warehouse?: string | null): Promise<ImportPreview> {
   const { supplier, product: listing } = await fetchProduct(suppliers, url);
-  const { rule, country } = await shopFor(db, shopId);
-  const { product, warehouse: picked, shipsFrom } = sellFrom(listing, country, warehouse);
+  const { rule, country, market } = await shopFor(db, shopId);
+  const { product, warehouse: picked, shipsFrom } = sellFrom(listing, country, warehouse, market);
   return {
     supplier: { name: supplier.name, label: supplier.label },
     product,
@@ -67,6 +72,8 @@ export async function previewImport(db: Db, suppliers: Suppliers, shopId: string
     warehouses: warehousesOf(listing),
     warehouse: picked,
     shipsFrom,
+    // Without a warehouse to go by, CJ and AliExpress listings leave from China.
+    dutyWarning: usDutyWarning(shipsFrom ?? (picked === null && CHINA_SUPPLIERS.has(supplier.name) ? "CN" : country), await zonesReach(db, shopId, "US")),
   };
 }
 
@@ -92,8 +99,8 @@ export async function importProduct(db: Db, suppliers: Suppliers, shopId: string
   const existing = await findExisting(db, shopId, listing.ref);
   if (existing) throw new UserError(`You've already imported this product as "${existing.title}".`, "duplicate");
 
-  const { rule, country } = await shopFor(db, shopId);
-  const { product, shipsFrom } = sellFrom(listing, country, data.warehouse);
+  const { rule, country, market } = await shopFor(db, shopId);
+  const { product, shipsFrom } = sellFrom(listing, country, data.warehouse, market);
   const photos = supplierPhotos(product.images, product.variants.map((v) => v.imageUrl));
   const variants = product.variants.map((v, i) => {
     const price = data.prices[v.ref] ?? suggestPrice(v.costMinor, rule);

@@ -20,11 +20,14 @@ test("the merchant picks which warehouse to sell from", async ({ page }, info) =
   // A US store starts on the US warehouse.
   await expect(warehouses.getByRole("link", { name: /^United States/ })).toHaveAttribute("aria-current", "true");
   await expect(picker.getByRole("note")).toHaveCount(0);
+  await expect(page.getByRole("note", { name: "Import duties" })).toHaveCount(0);
   await expect(page.getByText(/ships in 3–5 days/)).toBeVisible();
 
   await warehouses.getByRole("link", { name: /^China/ }).click();
   await expect(warehouses.getByRole("link", { name: /^China/ })).toHaveAttribute("aria-current", "true");
   await expect(picker.getByRole("note")).toContainText('It\'ll show "Ships from China" on the product page');
+  // Shipping into the US from China: buyers can owe duty on delivery, so pricing comes with a warning.
+  await expect(page.getByRole("note", { name: "Import duties" })).toContainText("US buyers may owe import duty and a customs fee on parcels from China");
   await expect(page.getByText(/ships in 8–15 days/)).toBeVisible();
   await expect(page.getByRole("cell", { name: /China|Ships From/ })).toHaveCount(0);
 
@@ -34,4 +37,21 @@ test("the merchant picks which warehouse to sell from", async ({ page }, info) =
   const store = (await page.getByRole("link", { name: "View on store ↗" }).getAttribute("href"))!;
   await page.goto(store);
   await expect(page.locator("#ships-from")).toHaveText("Ships from China");
+});
+
+test("a store abroad starts on the US warehouse, where most buyers are", async ({ page }, info) => {
+  const id = `${info.project.name}-de-${Date.now()}`;
+  await page.goto("/signup");
+  await page.getByLabel("Email").fill(`wh-${id}@example.com`);
+  await page.getByLabel("Password").fill("correct horse battery");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByLabel("Store name").fill(`Fans ${id}`);
+  await page.getByLabel("Where your business is based").selectOption("DE");
+  await page.getByRole("button", { name: "Create store" }).click();
+  await expect(page.getByRole("heading", { name: /Welcome to Fans/ })).toBeVisible();
+
+  await page.goto(`/admin/products/import?url=${encodeURIComponent("https://demo-supplier.test/p/desk-fan-warehouses")}`);
+  const warehouses = page.getByRole("region", { name: "Pick a warehouse" }).getByRole("list", { name: "Warehouses" });
+  await expect(warehouses.getByRole("link", { name: /^United States/ })).toHaveAttribute("aria-current", "true");
+  await expect(page.getByRole("note", { name: "Import duties" })).toHaveCount(0);
 });
