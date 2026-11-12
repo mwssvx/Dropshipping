@@ -101,6 +101,9 @@ test("payouts, holds, refunds and plans", async ({ page, browser }, info) => {
   await shot(page, "38-plan");
   await page.getByRole("button", { name: "Upgrade to Growth" }).click();
   await expect(page.getByRole("heading", { name: "You're on Growth" })).toBeVisible();
+  // The card the plan is paid with can be changed or removed (test mode has none).
+  await page.getByRole("button", { name: "Update or remove your card" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "No card is saved for this store." })).toBeVisible();
 });
 
 test("the statement downloads as CSV", async ({ page }, info) => {

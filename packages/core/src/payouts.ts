@@ -454,4 +454,23 @@ export async function changePlan(
   return { url: null, plan };
 }
 
+/**
+ * No bill while we've paused a store: a paused store's plan isn't charged, and charging starts
+ * again when it reopens. Call after any change to the store's status. Does nothing without a plan
+ * subscription (free plan, or test mode).
+ */
+export async function syncPlanBilling(db: Db, payments: PaymentProvider, shopId: string) {
+  const shop = await db.query.shops.findFirst({ where: eq(schema.shops.id, shopId), columns: { status: true, billingSubscriptionId: true } });
+  if (!shop?.billingSubscriptionId) return null;
+  const paused = shop.status === "paused" || shop.status === "suspended";
+  await payments.pauseBilling({ subscriptionId: shop.billingSubscriptionId, paused });
+  return { paused };
+}
+
+/** Where the merchant updates or removes the card their plan is paid with; null in test mode or without one. */
+export async function cardSettingsUrl(payments: PaymentProvider, shop: Pick<Shop, "billingCustomerId">, returnUrl: string) {
+  if (!shop.billingCustomerId) return null;
+  return payments.billingPortalUrl({ customerId: shop.billingCustomerId, returnUrl });
+}
+
 export { PLANS };

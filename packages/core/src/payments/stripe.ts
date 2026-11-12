@@ -161,6 +161,16 @@ export class StripePaymentProvider implements PaymentProvider {
     return { fileId: file.id };
   }
 
+  // "void": invoices that would fall due while the store is paused are voided, never charged later.
+  async pauseBilling(input: { subscriptionId: string; paused: boolean }) {
+    await this.stripe.subscriptions.update(input.subscriptionId, { pause_collection: input.paused ? { behavior: "void" } : "" });
+  }
+
+  async billingPortalUrl(input: { customerId: string; returnUrl: string }) {
+    const portal = await this.stripe.billingPortal.sessions.create({ customer: input.customerId, return_url: input.returnUrl });
+    return portal.url;
+  }
+
   async planCheckoutUrl(input: { shopId: string; plan: string; customerId: string | null; subscriptionId: string | null; email: string; returnUrl: string }) {
     // Existing subscribers change or cancel their plan in Stripe's billing portal.
     if (input.subscriptionId && input.customerId) {

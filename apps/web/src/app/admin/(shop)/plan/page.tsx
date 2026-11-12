@@ -2,6 +2,7 @@ import { formatMoney, planAdvice, platformFeeFor, PLAN_IDS, PLANS } from "@sf/co
 import { requireShop, testPayments } from "@/lib/server";
 import { PageHeader } from "../PageHeader";
 import { PlanButton } from "./PlanButton";
+import { CardButton } from "./CardButton";
 
 export const metadata = { title: "Plan" };
 
@@ -17,6 +18,9 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
       <PageHeader title="Plan" />
       <div className="px-4 sm:px-8 flex flex-col gap-6 max-w-5xl">
         {returned === "updated" && <p className="banner banner-info" role="status">Thanks. Your plan updates as soon as the payment goes through.</p>}
+        {(shop.status === "paused" || shop.status === "suspended") && shop.plan !== "free" && (
+          <p className="banner banner-info" role="status">Your store is paused, so your plan isn&apos;t charged. Charging starts again only when the store reopens.</p>
+        )}
         <section className="card p-5 flex flex-col gap-2">
           <h2 className="font-semibold">You're on {current.name}</h2>
           <p className="text-sm">
@@ -62,6 +66,13 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
             );
           })}
         </section>
+        {(shop.plan !== "free" || shop.billingCustomerId) && (
+          <section className="card p-5 flex flex-col gap-2" aria-labelledby="your-card">
+            <h2 id="your-card" className="font-semibold">Your card</h2>
+            <p className="text-sm hint">Change the card your plan is paid with, or remove it. On the free plan nothing is charged, so you can remove it any time.</p>
+            <CardButton />
+          </section>
+        )}
         {testPayments() && <p className="hint">Test mode: plan changes apply straight away and nothing is charged.</p>}
       </div>
     </main>

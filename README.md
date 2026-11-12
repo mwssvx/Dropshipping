@@ -2324,3 +2324,7 @@ Before payout setup, the Money page (and the app's Money tab) lists what to have
 ### Stores in about 70 more countries (after launch, part 461)
 
 A store can now be based in about 70 more countries. In Australia, New Zealand, Switzerland, Norway, Japan, Singapore, Hong Kong, Mexico, the UAE, Malaysia and Thailand the seller opens their own Stripe account (`STRIPE_COUNTRIES`). In places where Stripe has no full accounts, like Türkiye, Kazakhstan, India, Colombia or Nigeria (`CROSS_BORDER_COUNTRIES`), the platform takes the card payment and Stripe pays the seller's local bank through cross-border payouts (a recipient account). These stores sell in US dollars and can sell to buyers anywhere their supplier ships, the US included. The store form says how a country gets paid, and the payout guide explains it (`payoutRoute` in `packages/core/src/shops.ts`).
+
+### No bill while paused, and remove your card (after launch, part 462)
+
+When our staff pause a store, its plan stops being charged straight away (Stripe's `pause_collection` with invoices voided, never charged later), and charging starts again only when the store reopens after an accepted appeal or a reinstatement. The Plan page says so while the store is paused. The Plan page also has **Your card**, which opens Stripe's billing page to change or remove the card the plan is paid with. `syncPlanBilling` and `cardSettingsUrl` in `packages/core/src/payouts.ts`; `pauseBilling` and `billingPortalUrl` on the payment provider.
