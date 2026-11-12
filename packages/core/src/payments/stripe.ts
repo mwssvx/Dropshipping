@@ -6,7 +6,7 @@ export type StripePrices = Partial<Record<"starter" | "growth" | "scale", string
 
 /**
  * Stripe Connect destination charges: the buyer pays the platform, funds go to the shop's
- * Express account, and on the free plan our 2% is taken as an application fee. Plans are
+ * Express account, and on the free plan our cut is taken as an application fee. Plans are
  * Stripe Billing subscriptions. Not exercised until Stripe keys are set.
  */
 export class StripePaymentProvider implements PaymentProvider {

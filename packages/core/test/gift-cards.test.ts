@@ -48,7 +48,7 @@ describe("gift cards", () => {
     expect(onlyCards).toMatchObject({ shippingMinor: 0, totalMinor: 10_000 });
 
     const { order } = await startCheckout(f.db, f.payments, shop, { email: "giver@example.com", address, lines: [{ variantId: variants[1]!.id, quantity: 2 }] });
-    expect(order).toMatchObject({ taxMinor: 0, totalMinor: 10_000, platformFeeMinor: 200 }); // 2% on the free plan, taken when sold
+    expect(order).toMatchObject({ taxMinor: 0, totalMinor: 10_000, platformFeeMinor: 500 }); // 5% on the free plan, taken when sold
     const paid = await f.pay(order);
     expect(paid.fulfillmentStatus).toBe("delivered");
     const mails = f.mailer.sent.filter((m) => m.to === "giver@example.com" && m.subject.includes("gift card"));
@@ -108,7 +108,7 @@ describe("gift cards", () => {
     expect(paidWithGiftCard).toBe(false);
     expect(order).toMatchObject({ giftCardMinor: 500, paymentStatus: "pending" });
     expect(amountToCharge(order)).toBe(order.totalMinor - 500);
-    expect(order.platformFeeMinor).toBe(Math.round(((order.totalMinor - order.taxMinor - 500) * 200) / 10_000));
+    expect(order.platformFeeMinor).toBe(Math.round(((order.totalMinor - order.taxMinor - 500) * 500) / 10_000));
     // Not spent until the rest is paid.
     expect(await f.balance(card.id)).toBe(500);
     // A payment for the full total is refused: only the rest is charged.

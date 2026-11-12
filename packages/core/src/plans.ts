@@ -1,21 +1,31 @@
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { schema, type Db } from "@sf/db";
+import { formatMoney } from "./money";
 
 /*
- * Pricing, decided 2026-10-08: start free with a small cut of each sale, or pay a flat monthly
- * price with no cut. Prices are in USD cents; other currencies use the same numbers for now.
+ * Pricing, decided 2026-10-08 and raised 2026-11-12: start free with a cut of each sale, then pay
+ * a flat monthly price with no cut once you're earning. Prices are in USD cents; other currencies
+ * use the same numbers for now.
  */
 
 export type PlanId = (typeof schema.shops.$inferSelect)["plan"];
 
 /** teamSeats: people besides the owner who can help run the store. */
 export const PLANS: Record<PlanId, { name: string; monthlyMinor: number; feeBps: number; ordersPerMonth: number | null; teamSeats: number; blurb: string }> = {
-  free: { name: "Free", monthlyMinor: 0, feeBps: 200, ordersPerMonth: 50, teamSeats: 0, blurb: "Everything built in. We take 2% of each sale." },
-  starter: { name: "Starter", monthlyMinor: 1900, feeBps: 0, ordersPerMonth: 100, teamSeats: 0, blurb: "No cut of your sales. Up to 100 orders a month." },
-  growth: { name: "Growth", monthlyMinor: 4900, feeBps: 0, ordersPerMonth: null, teamSeats: 0, blurb: "No cut of your sales. Unlimited orders and priority support." },
-  scale: { name: "Scale", monthlyMinor: 14900, feeBps: 0, ordersPerMonth: null, teamSeats: 15, blurb: "For teams: up to 15 staff accounts with roles, and advanced analytics." },
+  free: { name: "Free", monthlyMinor: 0, feeBps: 500, ordersPerMonth: 50, teamSeats: 0, blurb: "Everything built in. Nothing to pay until you sell, then 5% of each sale." },
+  starter: { name: "Starter", monthlyMinor: 2900, feeBps: 0, ordersPerMonth: 100, teamSeats: 0, blurb: "No cut of your sales. Up to 100 orders a month." },
+  growth: { name: "Growth", monthlyMinor: 6900, feeBps: 0, ordersPerMonth: null, teamSeats: 0, blurb: "No cut of your sales. Unlimited orders and priority support." },
+  scale: { name: "Scale", monthlyMinor: 19900, feeBps: 0, ordersPerMonth: null, teamSeats: 15, blurb: "For teams: up to 15 staff accounts with roles, and advanced analytics." },
 };
 export const PLAN_IDS = Object.keys(PLANS) as PlanId[];
+
+/** The free plan's cut as a percent, for copy ("5%"). */
+export const FREE_FEE_PERCENT = PLANS.free.feeBps / 100;
+
+/** Monthly sales at which a paid plan costs the same as the free plan's cut. */
+export function breakEvenMinor(plan: PlanId) {
+  return PLANS[plan].feeBps ? 0 : Math.round((PLANS[plan].monthlyMinor * 10_000) / PLANS.free.feeBps);
+}
 
 /** Our cut of one sale on this plan. Rounded half up to the cent. */
 export function platformFeeFor(plan: PlanId, totalMinor: number) {
@@ -61,5 +71,18 @@ export async function planAdvice(db: Db, shop: { id: string; plan: PlanId }, now
     best: best.plan !== shop.plan && best.costMinor < current ? { plan: best.plan, saveMinor: current - best.costMinor } : null,
     overLimit: limit !== null && orders > limit,
     nearLimit: limit !== null && orders >= limit * 0.8,
+    upgradeHint: upgradeHint(shop.plan, sales),
   };
+}
+
+/**
+ * "Start free, upgrade once you're earning": for a free store whose sales don't yet make a paid
+ * plan cheaper, how much it would need to sell. Null on paid plans, and once a paid plan pays off
+ * (the advice says so instead).
+ */
+export function upgradeHint(plan: PlanId, salesMinor: number) {
+  if (plan !== "free") return null;
+  const at = breakEvenMinor("starter");
+  if (salesMinor >= at) return null;
+  return `You pay nothing until you sell. Once you're earning about ${formatMoney(at, "USD").replace(/\.00$/, "")} a month, ${PLANS.starter.name} costs less than our ${FREE_FEE_PERCENT}% and keeps every sale yours. We'll tell you here when that happens.`;
 }

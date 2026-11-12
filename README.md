@@ -36,7 +36,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 - [x] M1 Vertical slice: sign up, create a store, add a product, buy it with a test payment, see it paid in admin
 - [x] M2 Dropshipping: import by link, automatic order routing, tracking sync, problem orders, order emails (CJ adapter awaits a live key)
 - [x] M3 Storefront: themes and visual editor (draft and publish), collections, pages, menus, custom domains, search basics
-- [x] M4 Money and trust: plans with the free plan's 2% fee, Stripe Connect payouts, Money page with holds, refunds, statements, sales tax and VAT, store notices and appeals, verified badge
+- [x] M4 Money and trust: plans with the free plan's 5% fee, Stripe Connect payouts, Money page with holds, refunds, statements, sales tax and VAT, store notices and appeals, verified badge
 - [x] M5 AI agents: assistant chat, buyer support with a merchant inbox, listing writer, order fixer, margin watch, approvals, monthly AI budget, staff escalations
 - [x] M6 Mobile app: sign in, Today (numbers, problems, swipe-to-approve), orders with fixes and refunds, import by link with AI listing, price and stock edits, camera photos, Money with document photos, assistant chat, push notifications, offline reading and queued approvals
 - [x] M7 Growth basics: discount codes, checkout reminders, reviews, suggestions, analytics, public API and webhooks, store export and import
@@ -52,7 +52,7 @@ See `.env.example` and `docs/accounts.md` for the real services.
 
 ### How merchants get paid (M4)
 
-1. **Plans** (`packages/core/src/plans.ts`): Free is $0 a month with 2% of each sale (up to 50 orders a month); Starter $19, Growth $49 and Scale $149 take 0%. The fee is fixed on the order at checkout and taken by Stripe as an application fee, so it never needs collecting later. The Plan page and Money page say when another plan would have cost less for the last 30 days. Paid plans are Stripe Billing subscriptions; `customer.subscription.*` webhooks keep the shop's plan in step.
+1. **Plans** (`packages/core/src/plans.ts`): Free is $0 a month with 5% of each sale (up to 50 orders a month); Starter $29, Growth $69 and Scale $199 take 0%. The fee is fixed on the order at checkout and taken by Stripe as an application fee, so it never needs collecting later. The Plan page and Money page say when another plan would have cost less for the last 30 days. Paid plans are Stripe Billing subscriptions; `customer.subscription.*` webhooks keep the shop's plan in step.
 2. **Payouts.** Each store gets a Stripe Connect Express account. Buyers pay the platform, money goes to the store's account (destination charges) and Stripe pays it out to the merchant's bank. Admin > Money shows what's available, clearing, on the way and paid out, worked out from our own order and refund records and the payouts Stripe reports, plus the last 30 days of sales, fees, supplier costs and profit, and a CSV statement.
 3. **Holds.** Anything Stripe asks for (`account.updated` requirements) becomes one card on the Money page saying why, what to send and by when, with an upload for documents (JPG, PNG or PDF up to 5 MB, forwarded to Stripe). In test mode, Money has buttons to simulate a hold and run a payout.
 4. **Refunds** from the order page, in full or in part. Our fee comes back in proportion (the last refund returns any rounding cent), the buyer gets an email per refund, and a full refund cancels supplier orders that haven't shipped, or says which ones the supplier wouldn't stop.
@@ -2312,3 +2312,7 @@ The app's Returns screen links to "Returned most": over the last 30 days, 90 day
 ### A product's web address in the app (after launch, part 458)
 
 A product's screen in the app has "Web address": change it to something short like stoneware-mug, and links to the old address keep sending buyers to the product.
+
+### Start free, upgrade once you're earning (after launch, part 459)
+
+The Free plan now takes 5% of each sale and nothing a month, so a new store pays only when it sells. Starter is $29, Growth $69 and Scale $199 a month, all with 0% of sales. The pricing page, the Plan page and the app say how much a store needs to sell before Starter costs less (about $580 a month) and tell it when that happens (`breakEvenMinor` and `upgradeHint` in `packages/core/src/plans.ts`).

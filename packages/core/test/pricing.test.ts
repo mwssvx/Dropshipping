@@ -19,7 +19,7 @@ describe("pricing rules", () => {
     expect(priceFromCost(10, rule({ minPriceMinor: 500 }))).toBe(500);
     expect(compareAtFor(1399, rule({ compareAtPercent: 30 }))).toBe(1899);
     expect(compareAtFor(1399, rule({}))).toBeNull();
-    expect(keepsFromSale({ plan: "free" }, 1399, 559)).toBe(1399 - 559 - Math.round(1399 * 0.029) - 30 - Math.round(1399 * 0.02));
+    expect(keepsFromSale({ plan: "free" }, 1399, 559)).toBe(1399 - 559 - Math.round(1399 * 0.029) - 30 - Math.round(1399 * 0.05));
   });
 
   it("prices imports with the store's rule and reprices existing products after a preview", async () => {

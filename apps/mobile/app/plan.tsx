@@ -9,7 +9,7 @@ import { space } from "../src/theme";
 type PlanId = string;
 type Data = {
   current: PlanId;
-  advice: { orders: number; salesMinor: number; feesMinor: number; currentCostMinor: number; best: { plan: PlanId; saveMinor: number } | null; overLimit: boolean; nearLimit: boolean };
+  advice: { orders: number; salesMinor: number; feesMinor: number; currentCostMinor: number; best: { plan: PlanId; saveMinor: number } | null; overLimit: boolean; nearLimit: boolean; upgradeHint: string | null };
   plans: { id: PlanId; name: string; monthlyMinor: number; feeBps: number; blurb: string; ordersPerMonth: number | null; estimateMinor: number }[];
   testMode: boolean;
 };
@@ -60,6 +60,7 @@ export default function PlanScreen() {
               <Body>
                 {`Last 30 days: ${d.advice.orders === 1 ? "1 order" : `${d.advice.orders} orders`}, ${money(d.advice.salesMinor, cur)} in sales. This plan cost you ${money(d.advice.currentCostMinor, cur)}${current.feeBps ? ` (${money(d.advice.feesMinor, cur)} in sales fees${current.monthlyMinor ? ` plus ${money(current.monthlyMinor, "USD")}` : ""})` : ""}.`}
               </Body>
+              {d.advice.upgradeHint ? <Body>{d.advice.upgradeHint}</Body> : null}
               {d.advice.best ? <Banner tone="info">{`${d.plans.find((p) => p.id === d.advice.best!.plan)?.name} would have cost ${money(d.advice.best.saveMinor, cur)} less for the same sales.`}</Banner> : null}
               {d.advice.overLimit ? <Banner tone="warning">{`More orders came in than ${current.name} includes. Pick a bigger plan to keep taking every order.`}</Banner> : null}
               <Body muted>No contracts. Switch or cancel any time; we never take a cut on paid plans. Card processing is charged by Stripe on every plan.</Body>

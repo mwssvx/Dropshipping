@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BANK_DETAILS_MAX, BUYER_EDIT_HOURS, can, countOrders, countryName, formatMoney, listSavedViews, orderCountries, orderPage, orderTags, ORDER_PLACED_DAYS, placedSince, fulfillmentParam, paymentParam, RISK_HOLD_LABELS, TRANSFER_DAYS, ORDER_TOTALS, totalParam, type OrderTotalRange, buyerParam, formatHandoverDay, handoverParam, handoverSchedule, MAX_BULK_ORDERS, ordersPastDelivery, sameAddressOnList } from "@sf/core";
+import { BANK_DETAILS_MAX, BUYER_EDIT_HOURS, FREE_FEE_PERCENT, can, countOrders, countryName, formatMoney, listSavedViews, orderCountries, orderPage, orderTags, ORDER_PLACED_DAYS, placedSince, fulfillmentParam, paymentParam, RISK_HOLD_LABELS, TRANSFER_DAYS, ORDER_TOTALS, totalParam, type OrderTotalRange, buyerParam, formatHandoverDay, handoverParam, handoverSchedule, MAX_BULK_ORDERS, ordersPastDelivery, sameAddressOnList } from "@sf/core";
 import { AutoSubmitSelect } from "@/components/AutoSubmitSelect";
 import { SavedViews } from "@/components/SavedViews";
 import { requireShop } from "@/lib/server";
@@ -237,7 +237,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             <h2 id="transfer-settings" className="font-semibold">Bank transfers</h2>
             <p className="text-sm hint max-w-2xl">Let buyers pay by bank transfer instead of by card. They&apos;re emailed your account details with the order number as the reference. Nothing goes to the supplier until you see the money arrive and press Mark as paid on the order. If it doesn&apos;t arrive in time, the order stops waiting and the buyer can still pay by card.</p>
             {shop.plan === "free"
-              ? <p className="text-sm">Bank transfers are on paid plans, because on the free plan our 2% comes out of card payments. <Link href="/admin/plan" className="underline">See plans</Link></p>
+              ? <p className="text-sm">Bank transfers are on paid plans, because on the free plan our {FREE_FEE_PERCENT}% comes out of card payments. <Link href="/admin/plan" className="underline">See plans</Link></p>
               : can(role, "money") ? <BankTransferForm value={shop.bankTransfer} max={BANK_DETAILS_MAX} days={TRANSFER_DAYS} /> : <p className="text-sm hint">{shop.bankTransfer ? "Buyers can pay by bank transfer." : "Bank transfers are off."} The store owner can change this.</p>}
           </section>
         )}
