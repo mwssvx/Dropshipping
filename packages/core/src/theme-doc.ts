@@ -360,6 +360,43 @@ const sectionOf = (type: SectionType) =>
   z.object({ id: sectionId, type: z.literal(type), hidden: z.boolean().default(false), settings: sectionSchemas[type] as z.ZodType<Record<string, unknown>> });
 const section = z.discriminatedUnion("type", SECTION_TYPES.map(sectionOf) as [ReturnType<typeof sectionOf>, ...ReturnType<typeof sectionOf>[]]);
 
+/** The most custom CSS a store can add. */
+export const CUSTOM_CSS_MAX = 20000;
+
+/**
+ * What's wrong with a store's custom CSS, in words the merchant can act on, or null when it's fine.
+ * CSS can't run code, but it sits inside the page's HTML, so it can't contain "<" (no closing the style
+ * tag), can't pull in other stylesheets, and only loads images from https addresses or inline data.
+ */
+export function customCssProblem(css: string): string | null {
+  if (css.length > CUSTOM_CSS_MAX) return `Keep custom CSS under ${CUSTOM_CSS_MAX.toLocaleString("en-US")} characters.`;
+  if (css.includes("<")) return "Custom CSS can't contain \"<\". HTML tags and scripts aren't allowed here.";
+  const code = css.replace(/\/\*[\s\S]*?(\*\/|$)/g, " ");
+  if (/@import/i.test(code)) return "Custom CSS can't load other stylesheets with @import. Paste the CSS itself instead.";
+  if (/expression\s*\(|javascript:|-moz-binding|behavior\s*:/i.test(code)) return "That CSS tries to run code, which isn't allowed.";
+  for (const m of code.matchAll(/url\(\s*(['"]?)([^'")\s]*)/gi)) {
+    if (!/^(https:\/\/|data:image\/)/i.test(m[2]!)) return "Images in custom CSS must be an https web address, like url(https://…).";
+  }
+  const bare = code.replace(/"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'/g, '""');
+  // Escapes can spell any word in disguise (u\72l is url), so they're only allowed inside quotes, as in content: "\201C".
+  if (bare.includes("\\")) return "Backslashes are only allowed inside quotes.";
+  let depth = 0;
+  for (const ch of bare) {
+    if (ch === "{") depth++;
+    else if (ch === "}" && --depth < 0) return "There's a } without a { before it.";
+  }
+  if (depth > 0) return "A { is missing its closing }.";
+  return null;
+}
+
+const customCss = z
+  .string()
+  .default("")
+  .superRefine((css, ctx) => {
+    const problem = customCssProblem(css);
+    if (problem) ctx.addIssue({ code: "custom", message: problem });
+  });
+
 const themeDoc = z.object({
   version: z.literal(1).default(1),
   settings: z.object({
@@ -398,6 +435,8 @@ const themeDoc = z.object({
     // The store's pages on social networks, as icons in the footer. Empty ones don't show.
     social: z.object(Object.fromEntries(SOCIAL_KEYS.map((k) => [k, socialLink(k)])) as Record<SocialNetwork, ReturnType<typeof socialLink>>).prefault({}),
     seo: z.object({ title: text(70), description: text(320) }).prefault({}),
+    // The merchant's own CSS, added after the theme's styles on every store page except checkout.
+    customCss,
   }),
   menus: z.object({ header: z.array(menuItem).max(12).default([]), footer: z.array(menuItem).max(20).default([]) }),
   home: z.array(section).max(30),

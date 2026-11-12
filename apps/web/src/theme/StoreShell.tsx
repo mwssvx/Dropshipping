@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Fragment } from "react";
-import { themeFontsHref, type ThemeDoc } from "@sf/core/theme";
+import { customCssProblem, themeFontsHref, type ThemeDoc } from "@sf/core/theme";
 import { BRAND } from "@/lib/brand";
 import { storeText, type StoreText } from "@/lib/store-text";
 import { SectionView } from "./Sections";
@@ -32,6 +32,7 @@ export function StoreShell({
   payments = [],
   signup,
   ageGate,
+  withoutCustomCss,
   children,
 }: {
   doc: ThemeDoc;
@@ -56,10 +57,14 @@ export function StoreShell({
   signup?: (s: { status?: "sent" | "invalid" }, f: FormData) => Promise<{ status?: "sent" | "invalid" }>;
   /** Asks visitors their age first, when the theme asks for it; the editor preview leaves it out. */
   ageGate?: { age: 18 | 21; storeKey: string };
+  /** Leave out the merchant's own CSS, so checkout always looks and works the standard way. */
+  withoutCustomCss?: boolean;
   children: React.ReactNode;
 }) {
   const { settings, menus } = doc;
   const fonts = themeFontsHref(settings);
+  // Saved themes were checked already; checking again keeps a bad one from ever reaching the page.
+  const css = !withoutCustomCss && settings.customCss?.trim() && !customCssProblem(settings.customCss) ? settings.customCss : "";
   const announcement = doc.home.find((s) => s.type === "announcement" && !s.hidden);
   const logo = settings.logoText || shopName;
   const data = { base, currency, t, catalog: { products: [], collections: [] } };
@@ -175,6 +180,8 @@ export function StoreShell({
           yes: t.ageGateYes(ageGate.age), no: t.ageGateNo, denied: t.ageGateDenied(ageGate.age),
         }} />
       )}
+      {/* Last, so the merchant's rules win over the theme's. */}
+      {css && <style data-custom-css="" dangerouslySetInnerHTML={{ __html: css }} />}
     </div>
   );
 }
