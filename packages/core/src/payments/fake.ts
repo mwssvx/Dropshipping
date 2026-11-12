@@ -109,4 +109,15 @@ export class FakePaymentProvider implements PaymentProvider {
   async planCheckoutUrl() {
     return null;
   }
+
+  /** Billing pauses and restarts asked for, oldest first, for tests. */
+  readonly billingPauses: { subscriptionId: string; paused: boolean }[] = [];
+
+  async pauseBilling(input: { subscriptionId: string; paused: boolean }) {
+    this.billingPauses.push(input);
+  }
+
+  async billingPortalUrl() {
+    return null;
+  }
 }

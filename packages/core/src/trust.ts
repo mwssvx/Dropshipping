@@ -155,14 +155,14 @@ export async function decideAppeal(db: Db, appealId: string, input: { accept: bo
     .update(schema.appeals)
     .set({ status: input.accept ? "accepted" : "rejected", response, decidedBy: input.by, decidedAt: now })
     .where(eq(schema.appeals.id, appeal.id));
-  if (!input.accept) return { reinstated: false };
+  if (!input.accept) return { reinstated: false, shopId: appeal.shopId };
   const notice = (await db.query.storeNotices.findFirst({ where: eq(schema.storeNotices.id, appeal.noticeId) }))!;
   if (notice.kind === "paused") {
     await sendNotice(db, { shopId: appeal.shopId, kind: "reinstated", reason: notice.reason, explanation: `Your appeal was accepted: ${response}`, by: input.by }, now);
-    return { reinstated: true };
+    return { reinstated: true, shopId: appeal.shopId };
   }
   await db.update(schema.storeNotices).set({ closedAt: now }).where(eq(schema.storeNotices.id, notice.id));
-  return { reinstated: false };
+  return { reinstated: false, shopId: appeal.shopId };
 }
 
 export async function listOpenAppeals(db: Db) {

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import {
   addTaxRegistration,
   setDuties,
+  cardSettingsUrl,
   changePlan,
   formatMoney,
   parseMoney,
@@ -97,6 +98,14 @@ export async function changePlanAction(_: FormState, form: FormData): Promise<Fo
   await logged({ shop, user, db }, `Changed the plan to ${plan in PLANS ? PLANS[plan as PlanId].name : plan}`, { href: "/admin/plan" });
   revalidatePath("/admin", "layout");
   return { saved: true };
+}
+
+/** Opens the billing page where the plan's card is updated or removed. */
+export async function cardSettingsAction(_: FormState): Promise<FormState & { message?: string }> {
+  const { shop } = await requireShop("plan");
+  const url = await cardSettingsUrl(payments(), shop, await adminUrl("/admin/plan"));
+  if (url) redirect(url);
+  return { message: "No card is saved for this store. In test mode, plans are never charged." };
 }
 
 export async function refundAction(orderId: string, _: RefundState, form: FormData): Promise<RefundState> {

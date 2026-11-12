@@ -87,7 +87,7 @@ describe("notices and appeals", () => {
     await expect(submitAppeal(db, s.id, pause.id, "Another appeal while the first is still open.")).rejects.toThrow(/already have an appeal/);
     expect(await listOpenAppeals(db)).toHaveLength(1);
 
-    expect(await decideAppeal(db, appeal.id, { accept: true, response: "Thanks, confirmed with the buyers.", by: "staff@x" })).toEqual({ reinstated: true });
+    expect(await decideAppeal(db, appeal.id, { accept: true, response: "Thanks, confirmed with the buyers.", by: "staff@x" })).toMatchObject({ reinstated: true });
     expect((await fresh(s.id)).status).toBe("active");
     expect(await openNotices(db, s.id)).toHaveLength(0);
     const all = await listNotices(db, s.id);

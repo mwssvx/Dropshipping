@@ -104,6 +104,11 @@ export interface PaymentProvider {
   /** Sends a document the provider asked for. */
   submitDocument(input: { accountId: string; requirementKey: string; fileName: string; contentType: string; data: Buffer }): Promise<{ fileId: string }>;
 
+  /** Stops charging the store's plan while we've paused the store, or starts again when it reopens. */
+  pauseBilling(input: { subscriptionId: string; paused: boolean }): Promise<void>;
+  /** The billing page where the merchant updates or removes their saved card; null when there's none (test mode). */
+  billingPortalUrl(input: { customerId: string; returnUrl: string }): Promise<string | null>;
+
   /** Starts a plan change. Returns a page to pay on, or null when the change applies at once. */
   planCheckoutUrl(input: {
     shopId: string;

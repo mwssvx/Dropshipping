@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { decideAppeal, sendNotice, staffReply, UserError, type NoticeReason } from "@sf/core";
-import { requireStaff } from "@/lib/server";
+import { decideAppeal, sendNotice, staffReply, syncPlanBilling, UserError, type NoticeReason } from "@sf/core";
+import { payments, requireStaff } from "@/lib/server";
 import type { FormState } from "../admin/actions";
 
 export async function sendNoticeAction(shopId: string, _: FormState, form: FormData): Promise<FormState> {
@@ -17,6 +17,7 @@ export async function sendNoticeAction(shopId: string, _: FormState, form: FormD
       dueBy: due ? new Date(`${due}T23:59:59Z`) : null,
       by: user.email,
     });
+    await syncPlanBilling(db, payments(), shopId);
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
     throw e;
@@ -28,7 +29,8 @@ export async function sendNoticeAction(shopId: string, _: FormState, form: FormD
 export async function decideAppealAction(appealId: string, _: FormState, form: FormData): Promise<FormState> {
   const { user, db } = await requireStaff();
   try {
-    await decideAppeal(db, appealId, { accept: form.get("decision") === "accept", response: String(form.get("response") ?? ""), by: user.email });
+    const decided = await decideAppeal(db, appealId, { accept: form.get("decision") === "accept", response: String(form.get("response") ?? ""), by: user.email });
+    if (decided.reinstated) await syncPlanBilling(db, payments(), decided.shopId);
   } catch (e) {
     if (e instanceof UserError) return { error: e.message };
     throw e;
