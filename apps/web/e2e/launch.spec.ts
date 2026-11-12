@@ -29,6 +29,17 @@ test("the landing page leads to pricing, and the calculator picks the cheapest p
   await shot(page, "78-pricing");
 });
 
+test("sign-up says no company is needed and links to the payout rules", async ({ page }) => {
+  await page.goto("/signup");
+  await expect(page.getByText(/No company, office or bank details needed to start/)).toBeVisible();
+  await page.getByRole("link", { name: "Payout rules" }).first().click();
+  await expect(page.getByRole("heading", { level: 1, name: "Payout rules" })).toBeVisible();
+  for (const heading of ["When your money arrives", "What can pause payouts", "What we promise", "How to never see a pause"]) {
+    await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+  }
+  await expect(page.getByText(/never paused without a warning, a reason and a date first/)).toBeVisible();
+});
+
 test("legal pages are marked as drafts until a lawyer has checked them", async ({ page }) => {
   for (const doc of ["terms", "privacy", "acceptable-use", "merchant-agreement"]) {
     const res = await page.goto(`/legal/${doc}`);

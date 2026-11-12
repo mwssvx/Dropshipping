@@ -30,6 +30,7 @@ export * from "./pricing";
 export * from "./pages";
 export * from "./domains";
 export * from "./plans";
+export * from "./payout-guide";
 export * from "./payouts";
 export * from "./refunds";
 export * from "./order-edits";

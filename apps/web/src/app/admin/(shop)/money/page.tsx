@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatMoney, listPayouts, listRequirements, moneySummary, planAdvice, PLANS } from "@sf/core";
+import { formatMoney, listPayouts, listRequirements, moneySummary, PAYOUT_GUIDE_NOTES, payoutGuide, planAdvice, PLANS } from "@sf/core";
 import { requireShop, testPayments } from "@/lib/server";
 import { runPayoutsAction, setupPayoutsAction, simulateHoldAction } from "../../money-actions";
 import { PageHeader } from "../PageHeader";
@@ -15,6 +15,22 @@ const PAYOUT_STATUS: Record<string, [string, string]> = {
   failed: ["Failed", "pill-critical"],
   canceled: ["Cancelled", "pill-neutral"],
 };
+
+function PayoutGuideList({ country }: { country: string }) {
+  const guide = payoutGuide(country);
+  return (
+    <div className="flex flex-col gap-3" aria-label="What you'll need">
+      <ul className="list-disc pl-5 text-sm flex flex-col gap-1">
+        {guide.ready.map((r) => <li key={r}>{r}</li>)}
+        <li>{guide.bank}</li>
+        {guide.taxId && <li>{guide.taxId}</li>}
+      </ul>
+      <ul className="text-sm hint flex flex-col gap-1">
+        {PAYOUT_GUIDE_NOTES.map((n) => <li key={n}>{n}</li>)}
+      </ul>
+    </div>
+  );
+}
 
 export default async function MoneyPage({ searchParams }: { searchParams: Promise<{ setup?: string }> }) {
   const { shop, db } = await requireShop("money");
@@ -45,10 +61,12 @@ export default async function MoneyPage({ searchParams }: { searchParams: Promis
           <section className="card p-5 flex flex-col gap-3">
             <h2 className="font-semibold">Set up payouts to get paid</h2>
             <p className="text-sm">
-              Buyers pay by card through Stripe, and the money goes straight to your bank. Setup takes about five minutes: your bank
-              account and a few details to confirm who you are.
+              Buyers pay by card through Stripe, and the money goes straight to your bank. Setup takes about five minutes. Here&apos;s
+              what to have ready:
             </p>
+            <PayoutGuideList country={shop.country} />
             <form action={setupPayoutsAction}><button className="btn btn-primary">Set up payouts</button></form>
+            <p className="hint text-sm"><Link className="underline" href="/payout-rules">When money arrives and what can pause it</Link></p>
             {test && <p className="hint">Test mode: this connects a pretend account straight away, no forms.</p>}
           </section>
         ) : !shop.payoutsEnabled && !requirements.length ? (

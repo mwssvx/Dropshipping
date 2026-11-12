@@ -49,6 +49,12 @@ test("payouts, holds, refunds and plans", async ({ page, browser }, info) => {
 
   // Set up payouts (test mode connects at once and comes straight back).
   await page.getByRole("link", { name: "Money" }).first().click();
+  // Before setup: what to have ready, in plain words. A US store can use an EIN instead of an SSN.
+  const guide = page.getByLabel("What you'll need");
+  await expect(guide).toContainText("No shop, office or warehouse is needed");
+  await expect(guide).toContainText("Get a free EIN from the IRS");
+  await expect(guide).toContainText("We never see or store your ID or tax numbers.");
+  await expect(page.getByRole("link", { name: "When money arrives and what can pause it" })).toHaveAttribute("href", "/payout-rules");
   await shot(page, "33-money-setup");
   await page.getByRole("button", { name: "Set up payouts" }).click();
   await expect(page.getByText("Payouts are set up.")).toBeVisible();
