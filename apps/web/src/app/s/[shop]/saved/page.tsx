@@ -8,7 +8,7 @@ import { readGuestSaved } from "@/lib/saved";
 import { db, storeAddress } from "@/lib/server";
 import { SignInForm } from "../account/SignInForm";
 import { priceAlertsAction, shareSavedAction, toggleSavedAction } from "../actions";
-import { loadShop, localProducts, storeBase, storeT } from "../data";
+import { loadShop, localProducts, storeBase, storeLang, storeT } from "../data";
 
 export const metadata = { title: "Saved items", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -82,7 +82,7 @@ export default async function SavedPage({ params }: { params: Promise<{ shop: st
             <h2 id="keep-heading" className="font-semibold">{t.keepList}</h2>
             <p className="hint">{t.keepListNote}</p>
           </div>
-          <SignInForm handle={handle} next="saved" />
+          <SignInForm handle={handle} next="saved" lang={await storeLang(handle)} />
         </section>
       )}
     </main>

@@ -16,7 +16,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ shop
   const q = (new URL(request.url).searchParams.get("q") ?? "").trim().slice(0, 200);
   if (q.length < 2) return Response.json({ products: [], links: [] });
   const [base, fx] = await Promise.all([storeBase(param), buyerFx(shop)]);
-  const { products, showingFor } = await searchProducts(await db(), shop.id, { q }, fx);
+  const { products, showingFor } = await searchProducts(await db(), shop.id, { q, language: await storeLang(param) }, fx);
   const others = await searchPages(await db(), shop.id, showingFor ?? q, await storeLang(param), 2);
   const items = await localProducts(param, compactProducts(products.slice(0, LIMIT)));
   const show = (m: number) => formatMoney(convertPrice(m, fx), fx.currency);

@@ -8,10 +8,11 @@ import { ProductGrid } from "@/theme/Sections";
 import { loadShop, localProducts, storeBase, storeLang, storeT } from "../data";
 import { addToCartAction } from "../actions";
 
-export async function generateMetadata({ searchParams }: { searchParams: Promise<BrowseParams> }) {
-  const { q } = await searchParams;
+export async function generateMetadata({ params, searchParams }: { params: Promise<{ shop: string }>; searchParams: Promise<BrowseParams> }) {
+  const [{ q }, { shop }] = await Promise.all([searchParams, params]);
+  const t = await storeT(shop);
   // Result pages are endless variations of the catalog: keep them out of search engines.
-  return { title: q?.trim() ? `Search: ${q.trim().slice(0, 60)}` : "Search", robots: { index: false } };
+  return { title: q?.trim() ? `${t.search}: ${q.trim().slice(0, 60)}` : t.search, robots: { index: false } };
 }
 
 export default async function SearchPage({ params, searchParams }: { params: Promise<{ shop: string }>; searchParams: Promise<BrowseParams> }) {
@@ -19,7 +20,7 @@ export default async function SearchPage({ params, searchParams }: { params: Pro
   const query = await searchParams;
   const shop = await loadShop(param);
   const [base, fx] = await Promise.all([storeBase(param), buyerFx(shop)]);
-  const { products, sort, facets, showingFor } = await searchProducts(await db(), shop.id, browseOptions(query), fx);
+  const { products, sort, facets, showingFor } = await searchProducts(await db(), shop.id, { ...browseOptions(query), language: await storeLang(param) }, fx);
   const paged = gridPage(products.length, query.page);
   const shown = products.slice(0, paged.shown);
   const [local, ratings] = await Promise.all([localProducts(param, compactProducts(shown)), productRatings(await db(), shop.id, shown.map((p) => p.id))]);

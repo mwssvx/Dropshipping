@@ -34,6 +34,8 @@ export type BrowseOptions = {
   onSale?: boolean;
   /** Chosen option values, like { Size: ["M", "L"], Color: ["Black"] }. One variant has to match them all. */
   options?: Record<string, string[]>;
+  /** The store language the shopper is reading ("de"): searches match the translated titles and descriptions too. */
+  language?: string | null;
 };
 
 /** An option shoppers can filter by, with how many products have each value. */
@@ -135,13 +137,25 @@ export async function browseProducts(db: Db, shopId: string, products: ActivePro
   const terms = words(showingFor ?? options.q ?? "");
   const sort: Sort = options.sort && options.sort in SORTS ? (options.sort as Sort) : terms.length ? "relevance" : "featured";
   const price = (p: ActiveProduct) => convertPrice(lowestPrice(p), fx);
+  // A shopper reading German types German words: match the product's German title and description as well.
+  const translated = terms.length && options.language && products.length
+    ? new Map(
+        (
+          await db
+            .select({ refId: schema.translations.refId, fields: schema.translations.fields })
+            .from(schema.translations)
+            .where(and(eq(schema.translations.shopId, shopId), eq(schema.translations.language, options.language), eq(schema.translations.kind, "product")))
+        ).map((t) => [t.refId, t.fields]),
+      )
+    : null;
 
   let scored = products
     .filter((p) => p.variants.length)
     .map((p, position) => {
       if (!terms.length) return { p, position, score: 0 };
-      const title = plain(p.title);
-      const rest = `${plain(p.descriptionHtml)} ${p.variants.filter((v) => v.title !== "Default").map((v) => plain(v.title)).join(" ")}`;
+      const own = translated?.get(p.id);
+      const title = plain(own?.title ? `${own.title} ${p.title}` : p.title);
+      const rest = `${own?.description ? `${plain(own.description)} ` : ""}${plain(p.descriptionHtml)} ${p.variants.filter((v) => v.title !== "Default").map((v) => plain(v.title)).join(" ")}`;
       let score = 0;
       for (const t of terms) {
         if (title.includes(t)) score += title.split(/[^\p{L}\p{N}]+/u).some((w) => w.startsWith(t)) ? 3 : 2;
