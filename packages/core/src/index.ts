@@ -176,3 +176,4 @@ export * from "./coming-soon";
 export * from "./samples";
 export * from "./supplier-money";
 export * from "./support";
+export * from "./email-text";
