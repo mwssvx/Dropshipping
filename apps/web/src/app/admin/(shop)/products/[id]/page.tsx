@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { can, formatMoney, getProduct, productReviewSummary, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts, launchListCount, detailsText, MAX_DETAILS, stockHistory, incomingStock, countryName, SHIPPING_COUNTRIES, productSwatches, digitalFileFor, formatFileSize, MAX_DIGITAL_FILE_BYTES, DOWNLOADS_PER_ITEM, CONTENT_UNITS, CONTENT_UNIT_LABELS, unitPrice, formatUnitPrice, type StockMovement } from "@sf/core";
+import { can, formatMoney, getProduct, productReviewSummary, getSupplierLink, listOwnSuppliers, listProducts, NotFoundError, supplierLabel, waitingForProduct, MAX_PHOTOS, productPhotos, savedCount, variantPhotoRows, shopLanguages, LANGUAGES, formatShipsBy, openPreorder, preordersSold, PREORDER_MAX_DAYS, searchSnippet, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, describePurchaseLimit, BADGE_MAX_LENGTH, PHOTO_TEXT_MAX, publishDueProducts, launchListCount, detailsText, MAX_DETAILS, stockHistory, incomingStock, countryName, SHIPPING_COUNTRIES, STORE_COUNTRIES, listSamples, SAMPLES_PER_PRODUCT, productSwatches, digitalFileFor, formatFileSize, MAX_DIGITAL_FILE_BYTES, DOWNLOADS_PER_ITEM, CONTENT_UNITS, CONTENT_UNIT_LABELS, unitPrice, formatUnitPrice, type StockMovement } from "@sf/core";
 import { requireShop, storeAddress, suppliers } from "@/lib/server";
 import { duplicateProductAction, updateProductAction } from "../../../actions";
 import { comingSoonAction } from "../../../publish-actions";
@@ -29,6 +29,7 @@ import { AddressForm } from "./AddressForm";
 import { PhotosPanel } from "./PhotosPanel";
 import { VariantPhotosPanel } from "./VariantPhotosPanel";
 import { BackupPanel, type BackupView } from "./BackupPanel";
+import { SamplePanel } from "./SamplePanel";
 import { StockPanel } from "./StockPanel";
 import { WriteListingButton } from "./WriteListingButton";
 import { DigitalFileForm } from "./DigitalFileForm";
@@ -70,6 +71,9 @@ export default async function EditProductPage({ params, searchParams }: { params
       }
     : null;
   const waitingBy = await waitingForProduct(db, shop.id, product.id);
+  const fromSupplier = !!product.sourceUrl && !!link && link.provider !== "email";
+  const samples = fromSupplier ? await listSamples(db, suppliers(), shop.id, product.id) : [];
+  const day = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" });
   // The store's own stock keeps a history of every change; imported products follow the supplier.
   const digitalFile = !found.giftCard && !found.supplierId ? await digitalFileFor(db, found.id) : null;
   const history = !found.sourceUrl && !found.giftCard ? await stockHistory(db, shop.id, found.id) : [];
@@ -368,6 +372,17 @@ export default async function EditProductPage({ params, searchParams }: { params
             )}
           </section>
           {product.sourceUrl && link && link.provider !== "email" && <BackupPanel productId={product.id} mainLabel={label!} backup={backup} />}
+          {fromSupplier && (
+            <SamplePanel
+              productId={product.id}
+              supplier={label!}
+              home={shop.country}
+              options={product.variants.map((v) => ({ id: v.id, title: v.title, cost: v.costMinor != null ? formatMoney(v.costMinor, shop.currency) : null }))}
+              countries={[...new Set<string>([...STORE_COUNTRIES, ...SHIPPING_COUNTRIES])].map((code) => ({ code, name: countryName(code) })).sort((a, b) => a.name.localeCompare(b.name))}
+              samples={samples.map((s) => ({ id: s.id, title: s.title, status: s.status, when: day.format(s.createdAt), problem: s.problem, tracking: { carrier: s.carrier, number: s.trackingNumber, url: s.trackingUrl } }))}
+              limitReached={samples.filter((s) => s.status !== "failed").length >= SAMPLES_PER_PRODUCT}
+            />
+          )}
           <section className="card p-5 flex flex-col gap-3 max-w-3xl" aria-labelledby="breaks-heading">
             <div>
               <h2 id="breaks-heading" className="font-semibold">Quantity discounts</h2>

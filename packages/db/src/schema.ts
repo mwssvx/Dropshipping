@@ -2405,3 +2405,28 @@ export const partnerPayouts = pgTable(
   },
   (t) => [index("partner_payouts_partner_idx").on(t.partnerId), check("partner_payouts_amount_ok", sql`${t.amountMinor} > 0`)],
 );
+
+// A sample the merchant ordered from the supplier to their own address, to check quality and
+// delivery before selling. Not a sale: no buyer, no payment through us, not in sales or profit.
+export const samples = pgTable(
+  "samples",
+  {
+    id: id(),
+    shopId: uuid("shop_id").notNull().references(() => shops.id, { onDelete: "cascade" }),
+    productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+    variantId: uuid("variant_id").references(() => variants.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    provider: text("provider").notNull(),
+    costMinor: money("cost_minor"),
+    address: jsonb("address").$type<Address>().notNull(),
+    status: text("status", { enum: ["placing", "placed", "shipped", "delivered", "failed"] }).notNull().default("placing"),
+    supplierOrderRef: text("supplier_order_ref"),
+    problem: text("problem"),
+    carrier: text("carrier"),
+    trackingNumber: text("tracking_number"),
+    trackingUrl: text("tracking_url"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("samples_product_idx").on(t.productId)],
+);

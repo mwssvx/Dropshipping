@@ -2332,3 +2332,7 @@ When our staff pause a store, its plan stops being charged straight away (Stripe
 ### US import duties when pricing, and US warehouses first (after launch, part 463)
 
 The US ended duty-free entry for small parcels in 2025, so US buyers can owe duty and a customs fee on delivery for parcels from abroad. When a store that ships to the US imports something leaving from another country, the import page (and the app's import screen) warns before the price is set, and suggests a US warehouse or including duties in the price. CJ and AliExpress listings without a warehouse choice count as leaving from China. When a listing has several warehouses, the import now starts on the store's own country, then the country most of its buyers are in (the US for a new store that ships there), then China. `usDutyWarning`, `mainMarket` and `zonesReach` in `packages/core/src/duties.ts`; `defaultWarehouse(warehouses, country, market)`.
+
+### Order a sample (after launch, part 464)
+
+A product from CJ, AliExpress or the demo supplier has **Order a sample**: pick the option and your own address, and the supplier sends one, charging its cost and shipping the way it does for orders. It isn't a sale, so it isn't in sales, profit or the order list. The card lists samples with their tracking (checked with the supplier when the page opens), up to 3 per product; one the supplier refused shows why and doesn't count. Table `samples` (migration 0161), `orderSample` and `listSamples` in `packages/core/src/samples.ts`.
