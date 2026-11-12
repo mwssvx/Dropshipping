@@ -57,6 +57,7 @@ import {
   RETURN_REASON_LABELS,
   type ReturnDecision,
   payoutGuide,
+  supplierMoney,
   PAYOUT_GUIDE_NOTES,
   changeProductHandle,
   RETURNS_MIN_SOLD,
@@ -3610,6 +3611,8 @@ const routes: Record<string, Handler> = {
       payoutsEnabled: shop.payoutsEnabled,
       // What to have ready before payout setup, until payouts are on.
       guide: shop.payoutsEnabled ? null : { ...payoutGuide(shop.country), notes: PAYOUT_GUIDE_NOTES },
+      // How much to keep in the supplier balance, and orders stuck because it ran out.
+      supplierMoney: await supplierMoney(db, shop.id),
       // Disputes waiting for an answer, for the button to the Disputes screen.
       disputesOpen: await countOpenDisputes(db, shop.id),
       payouts: payouts.map((p) => ({ id: p.id, amountMinor: p.amountMinor, status: p.status, arrivalDate: p.arrivalDate })),

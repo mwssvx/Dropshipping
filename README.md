@@ -2336,3 +2336,7 @@ The US ended duty-free entry for small parcels in 2025, so US buyers can owe dut
 ### Order a sample (after launch, part 464)
 
 A product from CJ, AliExpress or the demo supplier has **Order a sample**: pick the option and your own address, and the supplier sends one, charging its cost and shipping the way it does for orders. It isn't a sale, so it isn't in sales, profit or the order list. The card lists samples with their tracking (checked with the supplier when the page opens), up to 3 per product; one the supplier refused shows why and doesn't count. Table `samples` (migration 0161), `orderSample` and `listSamples` in `packages/core/src/samples.ts`.
+
+### Supplier money (after launch, part 465)
+
+A dropshipper pays the supplier when each order is sent to it, days before the buyer's money reaches their bank. The Money page (and the app's Money tab) now has **Supplier money**: what supplier orders cost a day over the last 14 days, how much to keep in the supplier balance to cover the next week, and what's still clearing or on its way from sales. Orders the supplier refused because the balance ran out show in red with their total and a link to retry them. `supplierMoney` in `packages/core/src/supplier-money.ts`.
